@@ -42,16 +42,14 @@ class App < Roda
 
     r.on 'workout' do
       r.post do
-        if r.params['workout'] == "A"
-          VOTES.insert(user_id:, trustees:, articles_of_incorporation:, ip_address: request.ip, created_on: Time.now.utc)
-
-        else
+        if r.params['workout'] == 'A'
+          VOTES.insert(user_id:, trustees:, articles_of_incorporation:, ip_address: request.ip,
+                       created_on: Time.now.utc)
 
         end
         # this needs to create a new workout with the parameters given
         # then redirect to workout/124 where the exercises and sets are already set up
         # can we do a guid instead of a sequential id?
-
       end
     end
   end
