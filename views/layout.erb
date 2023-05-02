@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="h-full bg-gray-100">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="/tailwind.css" rel="stylesheet">
+    <%= assets(:css) %>
+    <%= assets(:img) %>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <title>a lifting app</title>
+
+  </head>
+
+  <body>
+    <main class="mt-32">
+      <div class="max-w-5xl mx-auto px-4">
+        <%= yield %>
+      </div>
+    </main>
+  </body>
+</html>
