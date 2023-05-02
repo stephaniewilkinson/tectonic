@@ -29,11 +29,16 @@ class App < Roda
     r.root do
       view 'welcome'
     end
-    r.get 'login' do
+    r.get 'home' do
       http_auth do |username, password|
         username == USERNAME && password == PASSWORD
       end
       view 'home'
+    end
+
+    r.on 'workout' do
+      r.post do
+      end
     end
   end
 end
