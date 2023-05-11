@@ -7,6 +7,7 @@ require 'rack/auth/basic'
 require 'roda'
 require 'tilt'
 require_relative 'lib/db'
+require_relative 'lib/workouts'
 
 class App < Roda
   PASSWORD = ENV.fetch 'PASSWORD'
@@ -43,13 +44,15 @@ class App < Roda
     r.on 'workout' do
       r.post do
         if r.params['workout'] == 'A'
-          VOTES.insert(user_id:, trustees:, articles_of_incorporation:, ip_address: request.ip,
-                       created_on: Time.now.utc)
-
+          squat_weight = 150
+          benchpress_weight = 60
+          row_weight = 90
+          workout_id = Workouts.create_workout_a 1, squat_weight, benchpress_weight, row_weight # hardcoding user_id to be 1 here
         end
         # this needs to create a new workout with the parameters given
         # then redirect to workout/124 where the exercises and sets are already set up
         # can we do a guid instead of a sequential id?
+        r.redirect 'workouts/#{workout_id}'
       end
     end
   end
