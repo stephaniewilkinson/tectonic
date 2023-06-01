@@ -58,11 +58,15 @@ class App < Roda
        
         @workout = WORKOUTS.where(id: workout_id).first
         @exercises = EXERCISES.where(workout_id: workout_id)
-        # @sets = for exercise in @exercises do
-        #   binding.irb
-        #   SETS.where(exercise_id = exercise[:id])
-        # end
-        
+
+        @sets = @exercises.map do | exercise |
+          SETS.where(exercise_id: exercise[:id])
+        end
+
+        @exercises_and_sets = @exercises.map do | exercise |
+          [exercise, SETS.where(exercise_id: exercise[:id])]
+        end
+
         view 'workouts/show'
       end
     end

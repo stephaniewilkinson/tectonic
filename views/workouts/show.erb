@@ -1,5 +1,9 @@
-<%= @workout %>
-<br>
+Sets
+<%- @sets.each do | set | %>
+  <%= set %>
+<%- end %>
+<hr>
+Exercises
 
 <%- @exercises.each do | exercise | %>
   <%= exercise %>
@@ -30,7 +34,7 @@
 </div>
 
 
-<%- @exercises.each do | exercise | %>
+<%- @exercises_and_sets.each do | exercise, sets | %>
 	<div class="lg:col-start-3 lg:row-end-1">
 		<h2 class="sr-only">Summary</h2>
 		<div class="rounded-lg bg-gray-50 shadow-sm ring-1 ring-gray-900/5">
@@ -39,6 +43,9 @@
 					<dt class="text-base font-semibold leading-6 text-gray-900"><%= exercise[:name] %></dt>
 					<dd class="mt-1 text-sm font-semibold leading-6 text-gray-900">Goal weight: <%= exercise[:goal_weight] %></dd>
 				</div>
+				<%- sets.each do | set | %>
+					<%= set %>
+				<%- end %>
 				<div class="mt-6 flex w-full flex-none gap-x-4 border-t border-gray-900/5 px-6 pt-6">
 					<dt class="flex-none">
 						<span class="sr-only">Client</span>
