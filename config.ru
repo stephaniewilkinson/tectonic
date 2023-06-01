@@ -29,7 +29,7 @@ class App < Roda
   route do |r|
     r.assets
     r.public
-    
+
     # GET /
     r.root do
       view 'welcome'
@@ -41,7 +41,7 @@ class App < Roda
       end
       view 'home'
     end
-    
+
     r.on 'workouts' do
       r.post do
         if r.params['type'] == 'A'
@@ -50,20 +50,19 @@ class App < Roda
           row_weight = 90
           workout_id = Workouts.create_workout_a 1, squat_weight, benchpress_weight, row_weight # hardcoding user_id to be 1 here
         end
-        
+
         # can we do a guid instead of a sequential id?
         r.redirect "workouts/#{workout_id}"
       end
-      r.get String do | workout_id |
-       
+      r.get String do |workout_id|
         @workout = WORKOUTS.where(id: workout_id).first
-        @exercises = EXERCISES.where(workout_id: workout_id)
+        @exercises = EXERCISES.where(workout_id:)
 
-        @sets = @exercises.map do | exercise |
+        @sets = @exercises.map do |exercise|
           SETS.where(exercise_id: exercise[:id])
         end
 
-        @exercises_and_sets = @exercises.map do | exercise |
+        @exercises_and_sets = @exercises.map do |exercise|
           [exercise, SETS.where(exercise_id: exercise[:id])]
         end
 

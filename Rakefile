@@ -14,16 +14,16 @@ end
 
 namespace :db do
   task :seed do
-    user_id = DB[:users].insert()
-    workout_id = DB[:workouts].insert(user_id: user_id, date: Time.now.utc)
-    exercise_id = DB[:exercises].insert(workout_id: workout_id, goal_weight: 40, name: "Benchpress")
-    DB[:sets].insert(exercise_id: exercise_id, weight: 40, reps: 8)
-    DB[:sets].insert(exercise_id: exercise_id, weight: 40, reps: 8)
-    DB[:sets].insert(exercise_id: exercise_id, weight: 40, reps: 8)
-    exercise_id = DB[:exercises].insert(workout_id: workout_id, goal_weight: 90, name: "Squat")
-    DB[:sets].insert(exercise_id: exercise_id, weight: 90, reps: 5)
-    DB[:sets].insert(exercise_id: exercise_id, weight: 90, reps: 5)
-    DB[:sets].insert(exercise_id: exercise_id, weight: 90, reps: 5)
+    user_id = DB[:users].insert
+    workout_id = DB[:workouts].insert(user_id:, date: Time.now.utc)
+    exercise_id = DB[:exercises].insert(workout_id:, goal_weight: 40, name: 'Benchpress')
+    DB[:sets].insert(exercise_id:, weight: 40, reps: 8)
+    DB[:sets].insert(exercise_id:, weight: 40, reps: 8)
+    DB[:sets].insert(exercise_id:, weight: 40, reps: 8)
+    exercise_id = DB[:exercises].insert(workout_id:, goal_weight: 90, name: 'Squat')
+    DB[:sets].insert(exercise_id:, weight: 90, reps: 5)
+    DB[:sets].insert(exercise_id:, weight: 90, reps: 5)
+    DB[:sets].insert(exercise_id:, weight: 90, reps: 5)
   end
 
   task :create_user do
