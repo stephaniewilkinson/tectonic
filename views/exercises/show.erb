@@ -1,0 +1,15 @@
+<div class="text-5xl">
+Exercise:
+<%= @exercise[:name] %>
+<br>
+Goal weight:
+<%= @exercise[:goal_weight] %>
+
+</div>
+<br>
+<hr>
+<%- @sets.each do |set| %>
+    <hr>
+    <%= set %>
+    <a href="sets/<%= set[:id] %>/"> edit this set</a>
+<%- end %>

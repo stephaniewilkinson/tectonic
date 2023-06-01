@@ -52,21 +52,35 @@ class App < Roda
         end
 
         # can we do a guid instead of a sequential id?
-        r.redirect "workouts/#{workout_id}"
+        r.redirect "workouts/#{workout_id}/"
       end
-      r.get String do |workout_id|
-        @workout = WORKOUTS.where(id: workout_id).first
-        @exercises = EXERCISES.where(workout_id:)
 
-        @sets = @exercises.map do |exercise|
-          SETS.where(exercise_id: exercise[:id])
+      r.on String do |workout_id|
+        r.is do
+          @workout = WORKOUTS.where(id: workout_id).first
+          @exercises = EXERCISES.where(workout_id:)
+          @exercises_and_sets = @exercises.map do |exercise|
+            [exercise, SETS.where(exercise_id: exercise[:id])]
+          end
+          view 'workouts/show'
         end
 
-        @exercises_and_sets = @exercises.map do |exercise|
-          [exercise, SETS.where(exercise_id: exercise[:id])]
-        end
+        r.on 'exercises', String do |exercise_id|
+          r.get do
+            @exercise = EXERCISES[{ id: exercise_id }]
+            @sets = SETS.where(exercise_id: @exercise[:id])
+            view 'exercises/show'
+          end
 
-        view 'workouts/show'
+          r.get 'sets', String do |set_id|
+            p "i'm get set string"
+            @set = SETS.where(id: set_id).first
+            view 'sets/edit'
+          end
+          r.post 'sets', String do |_set_id|
+            view 'sets/edit'
+          end
+        end
       end
     end
   end
