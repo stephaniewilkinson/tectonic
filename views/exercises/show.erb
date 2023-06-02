@@ -11,5 +11,12 @@ Goal weight:
 <%- @sets.each do |set| %>
     <hr>
     <%= set %>
-    <a href="sets/<%= set[:id] %>/"> edit this set</a>
+    <br>
+    <a href="/workouts/<%= @workout[:id] %>/exercises/<%= @exercise[:id] %>/sets/<%= set[:id] %>/"> show</a>
+    <br>
+    <a href="/workouts/<%= @workout[:id] %>/exercises/<%= @exercise[:id] %>/sets/<%= set[:id] %>/edit"> edit</a>
 <%- end %>
+<br>
+<hr>
+
+<a href="/workouts/<%= @workout[:id] %>/exercises/<%= @exercise[:id] %>/sets/new/">Create a new set</a>

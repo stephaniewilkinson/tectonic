@@ -43,6 +43,59 @@ class App < Roda
     end
 
     r.on 'workouts' do
+      r.on String do |workout_id|
+        @workout = WORKOUTS[id: workout_id]
+        r.on 'exercises' do
+          r.on String do |exercise_id|
+            @exercise = EXERCISES[id: exercise_id]
+            r.on 'sets' do
+              r.on 'new' do
+                r.get do
+                  view 'sets/new'
+                end
+                r.post do
+                  set_id = SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
+                  @set = SETS[id: set_id]
+                  r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}/sets/#{set_id}/"
+                end
+              end
+              r.on String do |set_id|
+                r.get 'edit' do
+                  @set = SETS[id: set_id]
+                  view 'sets/edit'
+                end
+                r.get do
+                  @set = SETS[id: set_id]
+                  view 'sets/show'
+                end
+                r.post do
+                  set_id = SETS.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'])
+                  @set = SETS[id: set_id]
+                  view 'sets/show'
+                end
+              end
+            end
+
+            r.get do
+              @sets = SETS.where(exercise_id: @exercise[:id])
+              view 'exercises/show'
+            end
+          end
+        end
+
+        r.is do
+          @workout = WORKOUTS.where(id: workout_id).first
+          @exercises = EXERCISES.where(workout_id:)
+          @exercises_and_sets = @exercises.map do |exercise|
+            [exercise, SETS.where(exercise_id: exercise[:id])]
+          end
+          view 'workouts/show'
+        end
+      end
+      r.get do
+        @workouts = WORKOUTS.all
+        view 'workouts/index'
+      end
       r.post do
         if r.params['type'] == 'A'
           squat_weight = 150
@@ -53,34 +106,6 @@ class App < Roda
 
         # can we do a guid instead of a sequential id?
         r.redirect "workouts/#{workout_id}/"
-      end
-
-      r.on String do |workout_id|
-        r.is do
-          @workout = WORKOUTS.where(id: workout_id).first
-          @exercises = EXERCISES.where(workout_id:)
-          @exercises_and_sets = @exercises.map do |exercise|
-            [exercise, SETS.where(exercise_id: exercise[:id])]
-          end
-          view 'workouts/show'
-        end
-
-        r.on 'exercises', String do |exercise_id|
-          r.get do
-            @exercise = EXERCISES[{ id: exercise_id }]
-            @sets = SETS.where(exercise_id: @exercise[:id])
-            view 'exercises/show'
-          end
-
-          r.get 'sets', String do |set_id|
-            p "i'm get set string"
-            @set = SETS.where(id: set_id).first
-            view 'sets/edit'
-          end
-          r.post 'sets', String do |_set_id|
-            view 'sets/edit'
-          end
-        end
       end
     end
   end

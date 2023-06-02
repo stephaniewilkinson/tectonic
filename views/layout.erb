@@ -7,11 +7,13 @@
     <%= assets(:css) %>
     <%= assets(:img) %>
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <title>a lifting app</title>
 
   </head>
 
   <body>
+  <%= render("nav") %>
     <main class="mt-32">
       <div class="max-w-5xl mx-auto px-4">
         <%= yield %>
