@@ -4,7 +4,7 @@ require_relative '../lib/db'
 
 DB.create_table(:workouts) do
   primary_key :id
-  foreign_key :user_id, :users
+  foreign_key :account_id, :accounts, null: false
   Time :date
   Time :created_on, { default: Time.now.utc, null: false }
 end

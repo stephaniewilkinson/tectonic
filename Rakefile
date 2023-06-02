@@ -27,19 +27,19 @@ namespace :db do
   end
 
   task :create_user do
-    sh 'createuser -U postgres liftoff || true'
+    sh 'createuser -U postgres tectonic || true'
   end
 
   desc 'Setup development and test databases'
   task create: %i[create_user] do
-    sh 'createdb -U postgres -O liftoff liftoff_development'
-    sh 'createdb -U postgres -O liftoff liftoff_test'
+    sh 'createdb -U postgres -O tectonic tectonic_development'
+    sh 'createdb -U postgres -O tectonic tectonic_test'
   end
 
   desc 'Drop the development and test databases'
   task :drop do
-    sh 'dropdb liftoff_development'
-    sh 'dropdb liftoff_test'
+    sh 'dropdb tectonic_development'
+    sh 'dropdb tectonic_test'
   end
 
   desc 'Migrate development and test databases'

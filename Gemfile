@@ -15,6 +15,7 @@ gem 'roda-http-auth'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'
+gem 'rodauth'
 
 group :development do
   gem 'rubocop'

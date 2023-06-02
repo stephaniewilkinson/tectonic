@@ -44,6 +44,9 @@ GEM
       rack
     roda-http-auth (0.2.0)
       roda (>= 2.0, < 4.0)
+    rodauth (2.30.0)
+      roda (>= 2.6.0)
+      sequel (>= 4)
     rubocop (1.50.2)
       json (~> 2.3)
       parallel (~> 1.10)
@@ -83,6 +86,7 @@ DEPENDENCIES
   rake
   roda
   roda-http-auth
+  rodauth
   rubocop
   rubocop-performance
   sequel

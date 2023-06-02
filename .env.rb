@@ -4,9 +4,9 @@ ENV['RACK_ENV'] ||= 'development'
 
 ENV['DATABASE_URL'] ||= case ENV['RACK_ENV']
                         when 'test'
-                          'postgres:///liftoff_test'
+                          'postgres:///tectonic_test'
                         when 'production'
                           'please_fill_me_in_later'
                         else
-                          'postgres:///liftoff_development'
+                          'postgres:///tectonic_development'
                         end
