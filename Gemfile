@@ -16,6 +16,7 @@ gem 'rodauth'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'
+gem 'bcrypt'
 
 group :development do
   gem 'rubocop'
