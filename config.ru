@@ -3,7 +3,6 @@
 require 'dotenv/load'
 require 'http'
 require 'rack'
-require 'rack/auth/basic'
 require 'roda'
 require 'tilt'
 require_relative 'lib/db'
@@ -46,6 +45,9 @@ class App < Roda
     r.on 'workouts' do
       rodauth.require_login
 
+      r.on 'new' do
+        view 'workouts/new'
+      end
       r.on String do |workout_id|
         @workout = WORKOUTS[id: workout_id]
         r.on 'exercises' do
@@ -72,9 +74,9 @@ class App < Roda
                   view 'sets/show'
                 end
                 r.post do
-                  set_id = SETS.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'])
-                  @set = SETS[id: set_id]
-                  view 'sets/show'
+                  SETS.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'],
+                                                is_completed: r.params['is_completed'])
+                  r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}/sets/#{set_id}/"
                 end
               end
             end
@@ -85,10 +87,12 @@ class App < Roda
             end
           end
         end
-
+        r.on 'edit' do
+          view 'workouts/edit'
+        end
         r.is do
-          @workout = WORKOUTS.where(id: workout_id).first
-          @exercises = EXERCISES.where(workout_id:)
+          @workout = Workout.where(id: workout_id).first
+          @exercises = @workout.exercises
           @exercises_and_sets = @exercises.map do |exercise|
             [exercise, SETS.where(exercise_id: exercise[:id])]
           end
@@ -104,14 +108,14 @@ class App < Roda
           squat_weight = 150
           benchpress_weight = 60
           row_weight = 90
-          workout_id = Workouts.create_workout_a 1, squat_weight, benchpress_weight, row_weight # hardcoding user_id to be 1 here
+          workout_id = Workout.create_workout_a 1, squat_weight, benchpress_weight, row_weight # hardcoding user_id to be 1 here
         end
 
         if r.params['type'] == 'B'
           deadlift_weight = 150
           ohp_weight = 60
           pulldown_weight = 90
-          workout_id = Workouts.create_workout_b 1, deadlift_weight, ohp_weight, pulldown_weight # hardcoding user_id to be 1 here
+          workout_id = Workout.create_workout_b 1, deadlift_weight, ohp_weight, pulldown_weight # hardcoding user_id to be 1 here
         end
 
         # can we do a guid instead of a sequential id?
