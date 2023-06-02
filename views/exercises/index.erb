@@ -1,0 +1,13 @@
+<table>
+  <%- @exercises.each do |exercise| %>
+    <tr>
+      <td><%= exercise[:id] %></td>
+      <td><%= exercise[:name] %></td>
+      <td>
+        <a href="/workouts/<%= @workout[:id] %>/exercises/<%= exercise[:id] %>/sets/new/">
+          Do a set of this exercise
+        </a>
+      </td>
+    </tr>
+  <%- end %>
+</table>

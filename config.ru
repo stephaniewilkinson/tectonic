@@ -10,10 +10,8 @@ require_relative 'lib/workouts'
 
 class App < Roda
   ACCOUNTS = ::DB[:accounts]
-  EXERCISES = ::DB[:exercises]
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
   SETS = ::DB[:sets]
-  WORKOUTS = ::DB[:workouts]
 
   plugin :assets, css: 'tailwind.css'
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
@@ -49,21 +47,26 @@ class App < Roda
         view 'workouts/new'
       end
       r.on String do |workout_id|
-        @workout = WORKOUTS[id: workout_id]
+        @workout = Workout[workout_id]
         r.on 'exercises' do
+
           r.on String do |exercise_id|
-            @exercise = EXERCISES[id: exercise_id]
+            @exercise = Exercise[exercise_id]
             r.on 'sets' do
+
               r.on 'new' do
                 r.get do
                   view 'sets/new'
                 end
                 r.post do
-                  set_id = SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
+                  set_id = SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id: exercise_id)
+                  @exercise = Exercise[exercise_id]
+                  @exercise.add_workout(@workout)
                   @set = SETS[id: set_id]
                   r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}/sets/#{set_id}/"
                 end
               end
+
               r.on String do |set_id|
                 r.get 'edit' do
                   @set = SETS[id: set_id]
@@ -74,10 +77,13 @@ class App < Roda
                   view 'sets/show'
                 end
                 r.post do
-                  SETS.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'],
+                  SETS.where(id: set_id).update(exercise_id: exercise_id, weight: r.params['weight'], reps: r.params['reps'],
                                                 is_completed: r.params['is_completed'])
                   r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}/sets/#{set_id}/"
                 end
+              end
+              r.get do
+                view 'sets/index'
               end
             end
 
@@ -86,12 +92,16 @@ class App < Roda
               view 'exercises/show'
             end
           end
+          r.get do
+            @exercises = Exercise.all
+            view 'exercises/index'
+          end
         end
         r.on 'edit' do
           view 'workouts/edit'
         end
         r.is do
-          @workout = Workout.where(id: workout_id).first
+          @workout = Workout[workout_id]
           @exercises = @workout.exercises
           @exercises_and_sets = @exercises.map do |exercise|
             [exercise, SETS.where(exercise_id: exercise[:id])]
@@ -100,7 +110,7 @@ class App < Roda
         end
       end
       r.get do
-        @workouts = WORKOUTS.all
+        @workouts = Workout.all
         view 'workouts/index'
       end
       r.post do
