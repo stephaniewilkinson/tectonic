@@ -9,7 +9,6 @@ require 'tilt'
 require_relative 'lib/db'
 require_relative 'lib/workouts'
 
-
 class App < Roda
   ACCOUNTS = ::DB[:accounts]
   EXERCISES = ::DB[:exercises]
@@ -22,7 +21,6 @@ class App < Roda
   plugin :assets, css: 'tailwind.css'
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
   plugin :head
-  plugin :http_auth
   plugin :public, root: 'assets'
   plugin :render
   plugin :route_csrf
@@ -44,9 +42,6 @@ class App < Roda
     end
 
     r.get 'home' do
-      http_auth do |username, password|
-        username == USERNAME && password == PASSWORD
-      end
       view 'home'
     end
 

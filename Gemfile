@@ -12,10 +12,10 @@ gem 'rackup'
 gem 'rake'
 gem 'roda'
 gem 'roda-http-auth'
+gem 'rodauth'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'
-gem 'rodauth'
 
 group :development do
   gem 'rubocop'

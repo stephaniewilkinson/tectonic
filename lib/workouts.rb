@@ -52,5 +52,4 @@ module Workouts
     SETS.insert(exercise_id:, weight: pulldown_weight, reps: 8)
     workout_id
   end
-
 end
