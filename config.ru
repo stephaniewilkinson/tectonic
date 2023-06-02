@@ -12,7 +12,6 @@ require_relative 'lib/workouts'
 class App < Roda
   ACCOUNTS = ::DB[:accounts]
   EXERCISES = ::DB[:exercises]
-  PASSWORD = ENV.fetch 'PASSWORD'
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
   SETS = ::DB[:sets]
   USERNAME = ENV.fetch 'USERNAME'
