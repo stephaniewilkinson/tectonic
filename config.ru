@@ -14,7 +14,6 @@ class App < Roda
   EXERCISES = ::DB[:exercises]
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
   SETS = ::DB[:sets]
-  USERNAME = ENV.fetch 'USERNAME'
   WORKOUTS = ::DB[:workouts]
 
   plugin :assets, css: 'tailwind.css'
