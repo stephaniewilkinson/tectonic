@@ -85,6 +85,7 @@ DEPENDENCIES
   erubi
   http
   puma
+  rack
   rackup
   rake
   roda
