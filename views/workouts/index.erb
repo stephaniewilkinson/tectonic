@@ -62,12 +62,12 @@
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout[:date].strftime("%A %B %-d, %Y") %></td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout[:account_id] %></td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <a href="<%= workout[:id] %>/">
+                <a href="workouts/<%= workout[:id] %>/">
                   Show
                 </a>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <a href="<%= workout[:id] %>/edit/">
+              <a href="workouts/<%= workout[:id] %>/edit/">
                 Edit
               </a>
             </td>

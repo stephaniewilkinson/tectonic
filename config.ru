@@ -42,7 +42,9 @@ class App < Roda
 
     r.on 'workouts' do
       rodauth.require_login
-
+      r.on 'new' do
+        view 'workouts/new'
+      end
       r.on String do |workout_id|
         @workout = Workout[workout_id]
         r.on 'exercises' do
@@ -101,6 +103,7 @@ class App < Roda
             view 'exercises/index'
           end
         end
+
         r.on 'edit' do
           view 'workouts/edit'
         end
