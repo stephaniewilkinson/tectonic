@@ -4,11 +4,13 @@
       <td><%= exercise[:id] %></td>
       <td><%= exercise[:name] %></td>
       <td>
-        <a href="/workouts/<%= @workout[:id] %>/exercises/<%= exercise[:id] %>/sets/new/">
-          Do a set of this exercise
+        <a href="/workouts/<%= @workout[:id] %>/exercises/<%= exercise[:id] %>/">
+          Show
         </a>
       </td>
+      <td>
+    </td>
     </tr>
   <%- end %>
 </table>
-<a href="exercises/new">Add a new exercise</a>
+<a href="new">Add a new exercise</a>
