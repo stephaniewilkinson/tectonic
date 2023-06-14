@@ -54,7 +54,7 @@ class App < Roda
               r.get('new') { view('sets/new') }
 
               r.post 'new' do
-                set_id = SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
+                SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
                 @exercise = Exercise[exercise_id]
                 r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
               end
@@ -110,7 +110,6 @@ class App < Roda
       r.post do
         @workout = Workout.new(account_id: 1, date: Time.now.utc).save
         workout_id = @workout.id
-        # can we do a guid instead of a sequential id?
         r.redirect "/workouts/#{workout_id}/"
       end
     end

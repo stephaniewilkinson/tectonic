@@ -3,7 +3,7 @@
 require_relative 'workouts'
 require_relative 'db'
 
-class Exercise < Sequel::Model
-  many_to_many :workouts
-  one_to_many :sets
+class Set < Sequel::Model
+  many_to_one :exercise
+  many_to_one :workout
 end
