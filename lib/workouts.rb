@@ -1,12 +1,9 @@
 # frozen_string_literal: true
 
-require_relative 'exercises'
 require_relative 'db'
 
 class Workout < Sequel::Model
-  one_to_many :sets
-
-  SETS = DB[:sets]
+  one_to_many :xsets
 
   # def self.create_workout_a(account_id, squat_weight, benchpress_weight, row_weight)
   #   workout_id = Workout.insert(account_id:, date: Time.now.utc)

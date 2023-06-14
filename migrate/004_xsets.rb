@@ -2,7 +2,7 @@
 
 require_relative '../lib/db'
 
-DB.create_table(:sets) do
+DB.create_table(:xsets) do
   primary_key :id
   foreign_key :exercise_id, :exercises, null: false
   foreign_key :workout_id, :workouts, null: false

@@ -6,21 +6,4 @@
 <a href="exercises">Add an exercise</a>
 
 
-<%- @exercises_and_sets.each do | exercise, sets | %>
-	<div class="text-3xl">Name: <%= exercise[:name] %></div>
-	<div class="text-3xl">Goal Weight: <%= exercise[:goal_weight] %></div>
-  <a href="exercises/<%= exercise[:id] %>/"> Modify this exercise</a>
-  <hr>
-  <%- sets.each do | set | %>
-    Set
-    <br>
-    Weight:
-    <%= set[:weight] %>
-    <br>
-    Reps:
-    <%= set[:reps] %>
-    <br>
-    <hr>
-  <%- end %>
-  <hr>
-<%- end %>
+

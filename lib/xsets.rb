@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-require_relative 'workouts'
 require_relative 'db'
 
-class Set < Sequel::Model
+class Xset < Sequel::Model
   many_to_one :exercise
   many_to_one :workout
 end

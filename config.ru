@@ -6,12 +6,13 @@ require 'rack'
 require 'roda'
 require 'tilt'
 require_relative 'lib/db'
+require_relative 'lib/exercises'
+require_relative 'lib/xsets'
 require_relative 'lib/workouts'
 
 class App < Roda
   ACCOUNTS = ::DB[:accounts]
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
-  SETS = ::DB[:sets]
 
   plugin :assets, css: 'tailwind.css'
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
@@ -38,6 +39,7 @@ class App < Roda
 
     r.on 'workouts' do
       rodauth.require_login
+
       r.get('new') { view('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
@@ -96,10 +98,8 @@ class App < Roda
         end
         r.is do
           @workout = Workout[workout_id]
-          @exercises = @workout.exercises
-          @exercises_and_sets = @exercises.map do |exercise|
-            [exercise, SETS.where(exercise_id: exercise[:id])]
-          end
+          binding.irb
+          @sets = @workout.xsets
           view 'workouts/show'
         end
       end
