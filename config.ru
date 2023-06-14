@@ -32,37 +32,27 @@ class App < Roda
     r.rodauth
 
     # GET /
-    r.root do
-      view 'welcome'
-    end
+    r.root { view('welcome') }
 
-    r.get 'home' do
-      view 'home'
-    end
+    r.get('home') { view('home') }
 
     r.on 'workouts' do
       rodauth.require_login
-      r.on 'new' do
-        view 'workouts/new'
-      end
+      r.get('new') { view('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
         r.on 'exercises' do
-          r.get 'new' do
-            view 'exercises/new'
-          end
+          r.get('new') { view('exercises/new') }
           r.post 'new' do
             @exercise = Exercise.new(name: r.params['name'], goal_weight: r.params['goal_weight'])
             @exercise.save
-            @exercise.add_workout(@workout).save_changes
             r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
           end
           r.on String do |exercise_id|
             @exercise = Exercise[exercise_id]
             r.on 'sets' do
-              r.get 'new' do
-                view 'sets/new'
-              end
+              r.get('new') { view('sets/new') }
+
               r.post 'new' do
                 set_id = SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
                 @exercise = Exercise[exercise_id]
@@ -81,7 +71,7 @@ class App < Roda
                 r.post do
                   SETS.where(id: set_id).update(exercise_id:, weight: r.params['weight'], reps: r.params['reps'],
                                                 is_completed: r.params['is_completed'])
-                  r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}/sets/#{set_id}/"
+                  r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}"
                 end
               end
               r.get do
