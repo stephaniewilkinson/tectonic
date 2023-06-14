@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require_relative '../lib/db'
+require_relative '../lib/tectonic/db'
 
-DB.create_table(:xsets) do
+DB.create_table(:sets) do
   primary_key :id
   foreign_key :exercise_id, :exercises, null: false
   foreign_key :workout_id, :workouts, null: false

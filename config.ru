@@ -5,12 +5,12 @@ require 'http'
 require 'rack'
 require 'roda'
 require 'tilt'
-require_relative 'lib/db'
-require_relative 'lib/exercises'
-require_relative 'lib/xsets'
-require_relative 'lib/workouts'
+require_relative 'lib/tectonic/db'
+require_relative 'lib/tectonic/exercises'
+require_relative 'lib/tectonic/sets'
+require_relative 'lib/tectonic/workouts'
 
-class App < Roda
+class Tectonic < Roda
   ACCOUNTS = ::DB[:accounts]
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
 
@@ -98,8 +98,7 @@ class App < Roda
         end
         r.is do
           @workout = Workout[workout_id]
-          binding.irb
-          @sets = @workout.xsets
+          @sets = @workout.sets
           view 'workouts/show'
         end
       end
@@ -108,12 +107,11 @@ class App < Roda
         view 'workouts/index'
       end
       r.post do
-        @workout = Workout.new(account_id: 1, date: Time.now.utc).save
-        workout_id = @workout.id
-        r.redirect "/workouts/#{workout_id}/"
+        @workout = Workout.new(account_id: 1, date: r.params['date']).save
+        r.redirect "/workouts/#{@workout.id}/"
       end
     end
   end
 end
 
-run App.freeze.app
+run Tectonic.freeze.app
