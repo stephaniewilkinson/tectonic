@@ -1,0 +1,9 @@
+Style/Documentation:
+  Enabled: false
+
+Metrics/BlockLength:
+  Exclude:
+    - 'config.ru'
+
+AllCops:
+  NewCops: enable

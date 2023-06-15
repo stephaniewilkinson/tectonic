@@ -30,7 +30,7 @@ namespace :db do
 
   desc 'Migrate development and test databases'
   task :migrate do
-    Dir['migrate/*'].sort.each do |migration|
+    Dir['migrate/*'].each do |migration|
       sh "ruby #{migration}"
     end
   end

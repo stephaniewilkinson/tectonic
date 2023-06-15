@@ -56,23 +56,23 @@ class Tectonic < Roda
               r.get('new') { view('sets/new') }
 
               r.post 'new' do
-                SETS.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
+                Set.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
                 @exercise = Exercise[exercise_id]
                 r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
               end
 
               r.on String do |set_id|
                 r.get 'edit' do
-                  @set = SETS[id: set_id]
+                  @set = Set[id: set_id]
                   view 'sets/edit'
                 end
                 r.get do
-                  @set = SETS[id: set_id]
+                  @set = Set[id: set_id]
                   view 'sets/show'
                 end
                 r.post do
-                  SETS.where(id: set_id).update(exercise_id:, weight: r.params['weight'], reps: r.params['reps'],
-                                                is_completed: r.params['is_completed'])
+                  Set.where(id: set_id).update(exercise_id:, weight: r.params['weight'], reps: r.params['reps'],
+                                               is_completed: r.params['is_completed'])
                   r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}"
                 end
               end
@@ -82,7 +82,7 @@ class Tectonic < Roda
             end
 
             r.get do
-              @sets = SETS.where(exercise_id: @exercise[:id])
+              @sets = Set.where(exercise_id: @exercise[:id])
               view 'exercises/show'
             end
           end
