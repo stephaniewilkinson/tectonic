@@ -40,20 +40,40 @@ class Tectonic < Roda
       rodauth.require_login
       r.get('new') { view('exercises/new') }
       r.post 'new' do
-        @exercise = Exercise.new(name: r.params['name'])
+        @exercise = Exercise.new(name: r.params['name'], account_id: 1)
         @exercise.save
         r.redirect "/exercises/#{@exercise[:id]}/"
       end
       
       r.on String do |exercise_id|
         @exercise = Exercise[exercise_id]
+
+
+        r.get do
+          @sets = Set.where(exercise_id: @exercise[:id])
+          view 'exercises/show'
+        end
+      end
+
+      r.get do
+        @exercises = Exercise.all
+        view 'exercises/index'
+      end
+    end
+
+    r.on 'workouts' do
+      rodauth.require_login
+
+      r.get('new') { view('workouts/new') }
+      r.on String do |workout_id|
+        @workout = Workout[workout_id]
         r.on 'sets' do
+          @exercises = Exercise.all
           r.get('new') { view('sets/new') }
 
           r.post 'new' do
-            Set.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
-            @exercise = Exercise[exercise_id]
-            r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
+            @set = Set.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id: r.params['exercise_id'])
+            r.redirect "/workouts/#{workout_id}/sets/#{@set[:id]}/"
           end
 
           r.on String do |set_id|
@@ -75,26 +95,6 @@ class Tectonic < Roda
             view 'sets/index'
           end
         end
-
-        r.get do
-          @sets = Set.where(exercise_id: @exercise[:id])
-          view 'exercises/show'
-        end
-      end
-
-      r.get do
-        @exercises = Exercise.all
-        view 'exercises/index'
-      end
-    end
-
-    r.on 'workouts' do
-      rodauth.require_login
-
-      r.get('new') { view('workouts/new') }
-      r.on String do |workout_id|
-        @workout = Workout[workout_id]
-
 
         r.on 'edit' do
           view 'workouts/edit'
