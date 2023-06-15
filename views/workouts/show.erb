@@ -3,7 +3,14 @@
   <%= @workout[:date].strftime("%A %B %-d, %Y")  %>
 </div>
 
-<a href="sets">Add an exercise</a>
+<a href="/workouts/<%= @workout[:id] %>/sets/new">Add a set</a>
+<hr>
 
 
+<%- @workout.sets.each do | set | %>
+  <%= set.exercise[:name] %>
+  <%= set[:reps] %>
+  <%= set[:weight] %>
 
+  <hr>
+<%- end %>

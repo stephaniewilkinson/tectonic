@@ -1,2 +1,13 @@
 here's a set
-<%= @set %>
+<hr>
+<a href="/workouts/<%= @set.workout[:id] %>">
+  Workout: <%= @set.workout[:date].strftime("%A %B %-d, %Y")  %>
+</a>
+<hr>
+<a href="/exercises/<%= @set.exercise[:id] %>">
+  Exercise: <%= @set.exercise[:name] %>
+</a>
+<hr>
+Reps: <%= @set[:reps] %>
+<hr>
+Weight:   <%= @set[:weight] %>
