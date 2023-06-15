@@ -1,15 +1,8 @@
 <table>
   <%- @exercises.each do |exercise| %>
     <tr>
-      <td><%= exercise[:id] %></td>
-      <td><%= exercise[:name] %></td>
-      <td>
-        <a href="/workouts/<%= @workout[:id] %>/exercises/<%= exercise[:id] %>/">
-          Show
-        </a>
-      </td>
-      <td>
-    </td>
+      <td><%= exercise[:id] || "" %></td>
+      <td><%= exercise[:name] || "" %></td>
     </tr>
   <%- end %>
 </table>

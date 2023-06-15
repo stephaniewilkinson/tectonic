@@ -4,6 +4,6 @@ require_relative '../lib/tectonic/db'
 
 DB.create_table(:exercises) do
   primary_key :id
-  String :name # Benchpress
-  Integer :goal_weight
+  foreign_key :account_id, :accounts, null: false
+  String :name, null: false # Benchpress
 end

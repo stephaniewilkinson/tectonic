@@ -36,6 +36,57 @@ class Tectonic < Roda
     r.root { view('welcome') }
 
     r.get('home') { view('home') }
+    r.on 'exercises' do
+      rodauth.require_login
+      r.get('new') { view('exercises/new') }
+      r.post 'new' do
+        @exercise = Exercise.new(name: r.params['name'])
+        @exercise.save
+        r.redirect "/exercises/#{@exercise[:id]}/"
+      end
+      
+      r.on String do |exercise_id|
+        @exercise = Exercise[exercise_id]
+        r.on 'sets' do
+          r.get('new') { view('sets/new') }
+
+          r.post 'new' do
+            Set.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
+            @exercise = Exercise[exercise_id]
+            r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
+          end
+
+          r.on String do |set_id|
+            r.get 'edit' do
+              @set = Set[id: set_id]
+              view 'sets/edit'
+            end
+            r.get do
+              @set = Set[id: set_id]
+              view 'sets/show'
+            end
+            r.post do
+              Set.where(id: set_id).update(exercise_id:, weight: r.params['weight'], reps: r.params['reps'],
+                                           is_completed: r.params['is_completed'])
+              r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}"
+            end
+          end
+          r.get do
+            view 'sets/index'
+          end
+        end
+
+        r.get do
+          @sets = Set.where(exercise_id: @exercise[:id])
+          view 'exercises/show'
+        end
+      end
+
+      r.get do
+        @exercises = Exercise.all
+        view 'exercises/index'
+      end
+    end
 
     r.on 'workouts' do
       rodauth.require_login
@@ -43,55 +94,7 @@ class Tectonic < Roda
       r.get('new') { view('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
-        r.on 'exercises' do
-          r.get('new') { view('exercises/new') }
-          r.post 'new' do
-            @exercise = Exercise.new(name: r.params['name'], goal_weight: r.params['goal_weight'])
-            @exercise.save
-            r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
-          end
-          r.on String do |exercise_id|
-            @exercise = Exercise[exercise_id]
-            r.on 'sets' do
-              r.get('new') { view('sets/new') }
 
-              r.post 'new' do
-                Set.insert(weight: r.params['weight'], reps: r.params['reps'], exercise_id:)
-                @exercise = Exercise[exercise_id]
-                r.redirect "/workouts/#{workout_id}/exercises/#{@exercise[:id]}/"
-              end
-
-              r.on String do |set_id|
-                r.get 'edit' do
-                  @set = Set[id: set_id]
-                  view 'sets/edit'
-                end
-                r.get do
-                  @set = Set[id: set_id]
-                  view 'sets/show'
-                end
-                r.post do
-                  Set.where(id: set_id).update(exercise_id:, weight: r.params['weight'], reps: r.params['reps'],
-                                               is_completed: r.params['is_completed'])
-                  r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}"
-                end
-              end
-              r.get do
-                view 'sets/index'
-              end
-            end
-
-            r.get do
-              @sets = Set.where(exercise_id: @exercise[:id])
-              view 'exercises/show'
-            end
-          end
-
-          r.get do
-            @exercises = Exercise.all
-            view 'exercises/index'
-          end
-        end
 
         r.on 'edit' do
           view 'workouts/edit'
