@@ -1,8 +1,9 @@
 <table>
   <%- @exercises.each do |exercise| %>
     <tr>
-      <td><%= exercise[:id] || "" %></td>
-      <td><%= exercise[:name] || "" %></td>
+      <a href="exercises/<%= exercise[:id] %>">
+        <%= exercise[:name] %>
+      </a>
     </tr>
   <%- end %>
 </table>

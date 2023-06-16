@@ -1,6 +1,6 @@
 <form action="" method="post">
-  Weight: <input type="number" placeholder="80" id="weight" name="weight"><br>
-  Reps: <input type="number" placeholder="5" id="reps" name="reps"><br>
+  Weight: <input type="number" placeholder="80" id="weight" name="weight" required><br>
+  Reps: <input type="number" placeholder="5" id="reps" name="reps" required><br>
   Completed? <input type="checkbox" id="is_completed" name="is_completed" value="true"><br>
   <select name="exercise_id" id="exercise_id">
     <%- @exercises.each do |exercise| %>

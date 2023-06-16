@@ -41,13 +41,11 @@ class Tectonic < Roda
       r.get('new') { view('exercises/new') }
       r.post 'new' do
         @exercise = Exercise.new(name: r.params['name'], account_id: 1)
-        @exercise.save
         r.redirect "/exercises/#{@exercise[:id]}/"
       end
 
       r.on String do |exercise_id|
         @exercise = Exercise[exercise_id]
-
         r.get('edit') { view('exercises/edit') }
         r.get do
           view 'exercises/show'
@@ -96,9 +94,14 @@ class Tectonic < Roda
             view 'sets/index'
           end
         end
-
         r.on 'edit' do
-          view 'workouts/edit'
+          r.get do
+            view 'workouts/edit'
+          end
+          r.post do
+            @workout = Workout[r.params['id']].update(date: r.params['date'])
+            r.redirect "/workouts/#{@workout.id}/"
+          end
         end
         r.is do
           @workout = Workout[workout_id]
@@ -107,7 +110,7 @@ class Tectonic < Roda
         end
       end
       r.get do
-        @workouts = Workout.all
+        @workouts = Workout.order_by(:date).all
         view 'workouts/index'
       end
       r.post do

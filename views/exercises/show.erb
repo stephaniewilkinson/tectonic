@@ -5,3 +5,11 @@
   <br>
 </div>
 <hr>
+
+<%- @exercise.sets.each do | set | %>
+  <hr>
+  reps: <%= set[:reps] %>
+  <br>
+  weight: <%= set[:weight] %>
+
+<%- end %>
