@@ -1,1 +1,28 @@
-all the sets
+<table>
+  <tr>
+    <th>ID</th>
+    <th>Exercise name</th>
+    <th>Reps</th>
+    <th>Weight</th>
+    <th>Edit</th>
+    <th>Show</th>
+  </tr>
+  <tbody>
+    <%- @workout.sets.each do | set | %>
+      <tr>
+        <td><%= set[:id] %></td>
+        <td><%= set.exercise[:name] %></td>
+        <td><%= set[:reps] %></td>
+        <td><%= set[:weight] %></td>
+        <td>
+          <a href="/workouts/<%= set.workout[:id] %>/sets/<%= set.workout[:id] %>/edit">
+            Edit
+        </td>
+        <td>
+          <a href="/workouts/<%= set.workout[:id] %>/sets/<%= set.workout[:id] %>/">
+            Show
+        </td>
+      </tr>
+    <%- end %>
+  </tbody>
+</table>
