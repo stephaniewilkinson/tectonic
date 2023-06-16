@@ -33,14 +33,14 @@ class Tectonic < Roda
     r.rodauth
 
     # GET /
-    r.root { view('welcome') }
+    r.root { view('home') }
 
-    r.get('home') { view('home') }
+    r.get('welcome') { view('welcome') }
     r.on 'exercises' do
-      rodauth.require_login
+      @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('exercises/new') }
       r.post 'new' do
-        @exercise = Exercise.new(name: r.params['name'], account_id: 1)
+        @exercise = Exercise.new(name: r.params['name'], account_id: @account_id)
         r.redirect "/exercises/#{@exercise[:id]}/"
       end
 
@@ -60,7 +60,7 @@ class Tectonic < Roda
 
     r.on 'workouts' do
       rodauth.require_login
-
+      @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
@@ -114,7 +114,7 @@ class Tectonic < Roda
         view 'workouts/index'
       end
       r.post do
-        @workout = Workout.new(account_id: 1, date: r.params['date']).save
+        @workout = Workout.new(account_id: @account_id, date: r.params['date']).save
         r.redirect "/workouts/#{@workout.id}/"
       end
     end
