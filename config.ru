@@ -11,7 +11,6 @@ require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 
 class Tectonic < Roda
-  ACCOUNTS = ::DB[:accounts]
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
 
   plugin :assets, css: 'tailwind.css'

@@ -5,10 +5,8 @@ source 'https://rubygems.org'
 ruby File.read(File.join(__dir__, '.ruby-version')).chomp.delete_prefix('ruby-')
 
 gem 'bcrypt'
-gem 'chartkick'
 gem 'dotenv'
 gem 'erubi'
-gem 'groupdate'
 gem 'http'
 gem 'puma'
 gem 'rack'
