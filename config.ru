@@ -52,7 +52,7 @@ class Tectonic < Roda
       end
 
       r.get do
-        @exercises = Exercise.all
+        @exercises = Exercise.where(account_id: @account_id)
         view 'exercises/index'
       end
     end
@@ -109,7 +109,7 @@ class Tectonic < Roda
         end
       end
       r.get do
-        @workouts = Workout.order_by(:date).all
+        @workouts = Workout.order_by(:date).where(account_id: @account_id)
         view 'workouts/index'
       end
       r.post do
