@@ -13,7 +13,7 @@ require_relative 'lib/tectonic/workouts'
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
 
-  plugin :assets, css: 'tailwind.css'
+  plugin :assets, css: ['tailwind.css', 'styles.css']
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
   plugin :head
   plugin :public, root: 'assets'
