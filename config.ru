@@ -103,8 +103,8 @@ class Tectonic < Roda
           end
         end
         r.is do
-          @workout = Workout[workout_id]
-          @sets = @workout.sets
+          @sets = Set.where(workout_id:).order(:exercise_id)
+          @array_of_exercise_ids = @sets.map(:exercise_id).uniq
           view 'workouts/show'
         end
       end
