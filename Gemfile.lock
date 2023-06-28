@@ -132,6 +132,7 @@ PLATFORMS
 
 DEPENDENCIES
   bcrypt
+  better_html
   dotenv
   erb_lint
   erubi
