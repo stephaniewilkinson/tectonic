@@ -7,3 +7,14 @@ Metrics/BlockLength:
 
 AllCops:
   NewCops: enable
+
+Layout/TrailingEmptyLines:
+  Enabled: false
+
+Layout/InitialIndentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Exclude:
+    - views/*.erb
+    - views/*/*.erb

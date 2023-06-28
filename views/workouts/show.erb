@@ -1,5 +1,5 @@
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-  <h3 class="text-5xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime("%A %B %-d, %Y")  %></h3>
+  <h3 class="text-5xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h3>
   <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-gray-500 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
       <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z" clip-rule="evenodd" />
@@ -17,7 +17,9 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
           </svg>
         </div>
-        <a href="/exercises/<%= exercise_id %>" class="ml-20 align-text-top text-4xl text-gray-500 hover:text-lime-500"><%= Exercise[exercise_id].name %></a>
+        <a href="/exercises/<%= exercise_id %>" class="ml-20 align-text-top text-4xl text-gray-500 hover:text-lime-500">
+          <%= Exercise[exercise_id].name %>
+        </a>
       </dt>
       <table class="mt-8 min-w-full divide-y divide-gray-100">
         <thead>
@@ -30,17 +32,15 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-        <%- @sets.where(exercise_id: exercise_id).each do | set | %>
-
-          <tr>
+          <%- @sets.where(exercise_id:).each do | set | %>
+            <tr>
               <td class="whitespace-nowrap px-3 py-4"><%= set[:weight] %></td>
               <td class="whitespace-nowrap px-3 py-4"><%= set[:reps] %></td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                 <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>" class="text-indigo-400 hover:text-indigo-300">Edit</a>
               </td>
-          </tr>
+            </tr>
           <%- end %>
-
         </tbody>
       </table>
     </div>

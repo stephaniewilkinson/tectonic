@@ -4,6 +4,7 @@ source 'https://rubygems.org'
 
 ruby File.read(File.join(__dir__, '.ruby-version')).chomp.delete_prefix('ruby-')
 
+gem "better_html"
 gem 'bcrypt'
 gem 'dotenv'
 gem 'erb_lint', require: false
