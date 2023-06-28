@@ -5,16 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <%= assets(:css) %>
     <%= assets(:img) %>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
     <script src="https://cdn.tailwindcss.com"></script>
     <title>tectonic plates, a lifting app</title>
-
   </head>
-
   <body>
   <%= render("nav") %>
-    <main class="mt-32">
+    <main>
       <div class="max-w-5xl mx-auto px-4">
         <%= yield %>
       </div>

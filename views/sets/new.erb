@@ -1,12 +1,11 @@
 <form action="" method="post">
   Weight: <input type="number" placeholder="80" id="weight" name="weight" required><br>
   Reps: <input type="number" placeholder="5" id="reps" name="reps" required><br>
-  Completed? <input type="checkbox" id="is_completed" name="is_completed" value="true"><br>
-  <select name="exercise_id" id="exercise_id">
+  Completed? <input type="checkbox" id="is_completed" name="is_completed" value="true" checked><br>
+  <select id="exercise_id" name="exercise_id" class="mt-2 block w-full rounded-lg border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6">
     <%- @exercises.each do |exercise| %>
       <option value="<%= exercise[:id] || "" %>"><%= exercise[:name] || "" %></option>
     <%- end %>
   </select>
-  <br>
-  <input type="submit">
+  <button type="submit" class="mt-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">Save</button>
 </form>

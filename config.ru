@@ -64,7 +64,7 @@ class Tectonic < Roda
       r.on String do |workout_id|
         @workout = Workout[workout_id]
         r.on 'sets' do
-          @exercises = Exercise.all
+          @exercises = Exercise.where(account_id: @account_id)
           r.get('new') { view('sets/new') }
 
           r.post 'new' do
