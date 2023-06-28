@@ -1,11 +1,7 @@
-html {
+h1, h2, h3, h4, h5, h6, .text-5xl, .text-4xl, .text-3xl, .text-2xl, .text-xl {
   font-family: Blonde Sans!important;
-  text-transform: lowercase;
 }
 
-body {
-  background-color: yellowgreen;
-}
 
 @font-face {
   font-family: 'Blonde Serif';
