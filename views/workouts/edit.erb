@@ -1,12 +1,3 @@
-edit your workout
-<form action="" method="post">
-  <div>
-    <label for="date" class="block text-sm font-medium leading-6 text-gray-900">Date</label>
-    <div class="mt-2">
-      <input type="Date" name="date" id="date" required>
-      <input type="hidden" name="id" id="id" value="<%= @workout.id %>">
+<h4 class="text-lg">Update your workout</h4>
 
-    </div>
-  </div>
-  <input type="submit">
-</form>
+<%= render('workouts/_form') %>

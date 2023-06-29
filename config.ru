@@ -93,15 +93,7 @@ class Tectonic < Roda
             view 'sets/index'
           end
         end
-        r.on 'edit' do
-          r.get do
-            view 'workouts/edit'
-          end
-          r.post do
-            @workout = Workout[r.params['id']].update(date: r.params['date'])
-            r.redirect "/workouts/#{@workout.id}/"
-          end
-        end
+        r.get('edit') { view('workouts/edit') }
         r.is do
           @sets = Set.where(workout_id:).order(:exercise_id)
           @array_of_exercise_ids = @sets.map(:exercise_id).uniq
@@ -113,8 +105,15 @@ class Tectonic < Roda
         view 'workouts/index'
       end
       r.post do
-        workout_id = Workout.insert(account_id: @account_id, date: r.params['date'])
-        r.redirect "/workouts/#{workout_id}/"
+        id = r.params['id']
+        if id.empty?
+          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'])
+          r.redirect "/workouts/#{workout_id}/"
+        else
+          Workout.where(id: r.params['id']).update(date: r.params['date'])
+          @workout = Workout[id]
+          r.redirect "/workouts/#{@workout.id}/"
+        end
       end
     end
   end
