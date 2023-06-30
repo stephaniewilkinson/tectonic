@@ -1,6 +1,6 @@
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
   <h3 class="text-5xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h3>
-  <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-gray-500 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+  <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-gray-500 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
       <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z" clip-rule="evenodd" />
     </svg>
@@ -37,7 +37,7 @@
               <td class="whitespace-nowrap px-3 py-4"><%= set[:weight] %></td>
               <td class="whitespace-nowrap px-3 py-4"><%= set[:reps] %></td>
               <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>" class="text-indigo-400 hover:text-indigo-300">Edit</a>
+                <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>" class="text-lime-400 hover:text-lime-300">Edit</a>
               </td>
             </tr>
           <%- end %>
