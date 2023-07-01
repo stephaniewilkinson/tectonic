@@ -5,7 +5,7 @@
   <br>
 </div>
 <hr>
-
+<a class="button" href="/exercises/<%= @exercise[:id] %>/edit">Edit</a>
 <%- @exercise.sets.each do | set | %>
   <hr>
   reps: <%= set[:reps] %>

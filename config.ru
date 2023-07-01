@@ -38,19 +38,21 @@ class Tectonic < Roda
     r.on 'exercises' do
       @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('exercises/new') }
-      r.post 'new' do
-        exercise_id = Exercise.insert(name: r.params['name'], account_id: @account_id)
-        r.redirect "/exercises/#{exercise_id}/"
+      r.post do
+        if r.params['id'].empty?
+          exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'], account_id: @account_id)
+          r.redirect "/exercises/#{exercise_id}/"
+        else
+          Exercise.where(id: r.params['id']).update(name: r.params['name'], icon_url: r.params['icon_url'])
+          @exercise = Exercise[r.params['id']]
+          r.redirect "/exercises/#{@exercise.id}/"
+        end
       end
-
       r.on String do |exercise_id|
         @exercise = Exercise[exercise_id]
         r.get('edit') { view('exercises/edit') }
-        r.get do
-          view 'exercises/show'
-        end
+        r.get { view('exercises/show') }
       end
-
       r.get do
         @exercises = Exercise.where(account_id: @account_id)
         view 'exercises/index'

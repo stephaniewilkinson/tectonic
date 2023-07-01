@@ -1,0 +1,14 @@
+<form action="/exercises" method="post" enctype="multipart/form-data">
+  <div>
+    <label for="name" class="block text-sm font-medium leading-6 text-gray-900">Name</label>
+    <div class="mt-2">
+      <input value="<%= @exercise&.name || nil %>" name="name" id="name" class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+    </div>
+    <label for="icon_url" class="block text-sm font-medium leading-6 text-gray-900">Icon URL</label>
+    <div class="mt-2">
+      <input value="<%= @exercise&.icon_url || nil %>" name="icon_url" id="icon_url" class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+    </div>
+  </div>
+  <input type="hidden" name="id" id="id" value="<%= @exercise&.id || nil %>">
+  <input type="submit" value="Save" class="mt-4 block rounded-lg bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-ss hover:bg-gray-500">
+</form>
