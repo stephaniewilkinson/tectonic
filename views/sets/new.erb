@@ -2,6 +2,7 @@
   Weight: <input type="number" id="weight" name="weight" required autocomplete="off"><br>
   Reps: <input type="number" id="reps" name="reps" required autocomplete="off"><br>
   Completed? <input type="checkbox" id="is_completed" name="is_completed" value="true" checked><br>
+  Warmup set? <input type="checkbox" id="is_warmup" name="is_warmup" value="true" checked><br>
   <select id="exercise_id" name="exercise_id" class="mt-2 block w-full rounded-lg border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500 sm:text-sm sm:leading-6">
     <%- @exercises.each do |exercise| %>
       <option value="<%= exercise[:id] %>"><%= exercise[:name] %></option>

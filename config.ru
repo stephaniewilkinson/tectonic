@@ -71,8 +71,8 @@ class Tectonic < Roda
 
           r.post 'new' do
             set_id = Set.insert(weight: r.params['weight'], reps: r.params['reps'],
-                                exercise_id: r.params['exercise_id'], workout_id:)
-            @set = Set[4]
+                                exercise_id: r.params['exercise_id'], warmup: r.params['is_warmup'],
+                                is_completed: r.params['is_completed'], workout_id:)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
           end
 
