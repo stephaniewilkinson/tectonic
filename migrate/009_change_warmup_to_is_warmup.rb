@@ -2,6 +2,6 @@
 
 require_relative '../lib/tectonic/db'
 
-DB.alter_table(:exercises) do
+DB.alter_table(:sets) do
   rename_column(:warmup, :is_warmup)
 end
