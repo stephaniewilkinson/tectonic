@@ -71,7 +71,7 @@ class Tectonic < Roda
 
           r.post 'new' do
             set_id = Set.insert(weight: r.params['weight'], reps: r.params['reps'],
-                                exercise_id: r.params['exercise_id'], warmup: r.params['is_warmup'],
+                                exercise_id: r.params['exercise_id'], is_warmup: r.params['is_warmup'],
                                 is_completed: r.params['is_completed'], workout_id:)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
           end
@@ -86,7 +86,7 @@ class Tectonic < Roda
               view 'sets/show'
             end
             r.post do
-              Set.where(id: set_id).update(exercise_id:, weight: r.params['weight'], reps: r.params['reps'],
+              Set.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'], is_warmup: r.params['is_warmup'],
                                            is_completed: r.params['is_completed'])
               r.redirect "/workouts/#{workout_id}/exercises/#{exercise_id}"
             end
