@@ -5,6 +5,9 @@ Metrics/BlockLength:
   Exclude:
     - 'config.ru'
 
+Metrics/ClassLength:
+  Enabled: false
+
 AllCops:
   NewCops: enable
 
