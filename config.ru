@@ -86,8 +86,8 @@ class Tectonic < Roda
               view 'sets/show'
             end
             r.post do
-              Set.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'], is_warmup: r.params['is_warmup'],
-                                           is_completed: r.params['is_completed'])
+              Set.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'],
+                                           is_warmup: r.params['is_warmup'], is_completed: r.params['is_completed'])
               r.redirect "/workouts/#{workout_id}"
             end
           end
