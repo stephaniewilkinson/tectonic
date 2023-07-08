@@ -31,11 +31,10 @@ class Tectonic < Roda
     r.public
     r.rodauth
 
-    # GET /
-    r.root { view('welcome') }
-
     r.get('home') { view('home') }
     r.get('about') { view('about') }
+    # GET /
+    r.root { view('welcome') }
     r.on 'exercises' do
       @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('exercises/new') }
