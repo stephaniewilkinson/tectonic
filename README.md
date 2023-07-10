@@ -19,8 +19,20 @@ rodauth login view: rodauth.login_view
 
 how to replace tailwind patterns: https://lorisleiva.com/replacing-tailwind-ui-hero-patterns
 
-# Rodauth templates
+# Rodauth
+```
+rodauth.login_view
 
+```
+
+Here's how to pull HTML from erb templates:
+```
+ERB.new(File.read 'views/rodauth/login.erb').result
+
+```
+
+
+## Rodauth templates
 app/views/rodauth/_login_form.html.erb
 app/views/rodauth/_login_form_footer.html.erb
 app/views/rodauth/_login_form_header.html.erb
