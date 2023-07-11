@@ -49,3 +49,16 @@ app/views/rodauth/change_password.html.erb
 app/views/rodauth/change_login.html.erb
 app/views/rodauth/verify_login_change.html.erb
 app/views/rodauth/close_account.html.erb
+
+# Logo options
+https://thenounproject.com/icon/earth-4510372/
+
+https://thenounproject.com/icon/earth-4511315/
+
+https://thenounproject.com/icon/barbell-plate-4397088/
+
+https://thenounproject.com/icon/barbell-plate-490489/
+
+https://thenounproject.com/icon/barbell-plates-1174446/
+
+https://thenounproject.com/icon/barbell-plate-4802392/
