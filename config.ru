@@ -23,7 +23,10 @@ class Tectonic < Roda
   plugin :slash_path_empty
   plugin :rodauth do
     account_password_hash_column :password_hash
-    enable :login, :logout, :create_account
+    enable :login, :logout, :create_account, :remember
+    after_login do
+      remember_login
+    end
   end
 
   route do |r|
@@ -36,6 +39,7 @@ class Tectonic < Roda
     # GET /
     r.root { view('welcome') }
     r.on 'exercises' do
+      rodauth.require_login
       @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('exercises/new') }
       r.post do
