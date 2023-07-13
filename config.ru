@@ -34,10 +34,14 @@ class Tectonic < Roda
     r.public
     r.rodauth
 
-    r.get('home') { view('home') }
+    r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
     # GET /
-    r.root { view('welcome') }
+    r.root do
+      r.redirect '/welcome' unless rodauth.logged_in?
+      rodauth.login_redirect
+      view('home')
+    end
     r.on 'exercises' do
       rodauth.require_login
       @account_id = rodauth.account_from_session[:id]
