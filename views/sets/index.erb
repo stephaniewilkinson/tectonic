@@ -4,6 +4,8 @@
     <th>Exercise name</th>
     <th>Reps</th>
     <th>Weight</th>
+    <th>Warmup set?</th>
+    <th>Completed?</th>
     <th>Edit</th>
     <th>Show</th>
   </tr>
@@ -14,6 +16,8 @@
         <td><%= set.exercise[:name] %></td>
         <td><%= set[:reps] %></td>
         <td><%= set[:weight] %></td>
+        <td><%= set[:is_warmup] %></td>
+        <td><%= set[:is_completed] %></td>
         <td>
           <a href="/workouts/<%= set.workout[:id] %>/sets/<%= set.workout[:id] %>/edit">
             Edit

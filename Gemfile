@@ -25,3 +25,11 @@ group :development do
   gem 'rubocop'
   gem 'rubocop-performance'
 end
+
+group :test do
+  gem 'capybara-selenium'
+  gem 'minitest'
+  gem 'minitest-capybara'
+  gem 'rack-test'
+  gem 'webdrivers'
+end
