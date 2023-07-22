@@ -21,3 +21,7 @@ Style/FrozenStringLiteralComment:
   Exclude:
     - views/*.erb
     - views/*/*.erb
+
+Naming/FileName:
+  Exclude:
+    - 'views/create-account.erb'
