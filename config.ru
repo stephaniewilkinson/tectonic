@@ -112,7 +112,7 @@ class Tectonic < Roda
         end
       end
       r.get do
-        @workouts = Workout.order_by(:date).where(account_id: @account_id)
+        @workouts = Workout.order_by(:date).where(account_id: @account_id).reverse
         view 'workouts/index'
       end
       r.post do
