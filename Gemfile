@@ -20,6 +20,7 @@ gem 'rodauth'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'
+gem 'chartkick'
 
 group :development do
   gem 'rubocop'
