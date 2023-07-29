@@ -15,15 +15,17 @@
         <div class="absolute rounded-md bg-lime-500 p-2">
           <img src="/icons/mommy-fitness_white.svg" alt="Plank icon" class="h-12 w-12 text-white">
         </div>
-        <a href="/exercises/<%= exercise_id %>" class="ml-14 md:ml-20 text-xl sm:text-4xl text-gray-500 hover:text-lime-500">
+        <a href="/exercises/<%= exercise_id %>" class="ml-20 md:ml-20 text-xl sm:text-4xl text-gray-500 hover:text-lime-500">
           <%= Exercise[exercise_id].name %>
         </a>
       </dt>
       <table class="mt-8 min-w-full divide-y divide-gray-100">
         <thead>
           <tr>
-            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold sm:pl-0">Weight</th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold">Reps</th>
+            <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold sm:pl-0">Weight</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Reps</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Warmup?</th>
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Completed?</th>
             <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-0">
               <span class="sr-only">Edit</span>
             </th>
@@ -31,13 +33,19 @@
         </thead>
         <tbody class="divide-y divide-gray-100">
           <%- @sets.where(exercise_id:).each do | set | %>
-            <tr>
-              <td class="whitespace-nowrap px-3 py-4"><%= set[:weight] %></td>
-              <td class="whitespace-nowrap px-3 py-4"><%= set[:reps] %></td>
-              <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>" class="text-lime-400 hover:text-lime-300">Edit</a>
-              </td>
-            </tr>
+              <tr>
+                <td class="whitespace-nowrap px-3 py-4">
+                  <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>">
+                    <%= set[:weight] %>
+                  </a>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4"><%= set[:reps] %></td>
+                <td class="whitespace-nowrap px-3 py-4"><%= set[:is_warmup] ? 'Warmup set' : 'No %></td>
+                <td class="whitespace-nowrap px-3 py-4"><%= set[:is_completed] ? '✅' : 'Incomplete' %></td>
+                <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
+                  <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>" class="text-lime-400 hover:text-lime-300">Edit</a>
+                </td>
+              </tr>
           <%- end %>
         </tbody>
       </table>
