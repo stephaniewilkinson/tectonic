@@ -5,6 +5,7 @@ require 'http'
 require 'rack'
 require 'roda'
 require 'tilt'
+require 'chartkick'
 require_relative 'lib/tectonic/db'
 require_relative 'lib/tectonic/exercises'
 require_relative 'lib/tectonic/sets'
@@ -12,6 +13,8 @@ require_relative 'lib/tectonic/workouts'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
+
+  include Chartkick::Helper
 
   plugin :assets, css: ['tailwind.css', 'styles.css']
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
