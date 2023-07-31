@@ -6,6 +6,7 @@ ruby File.read(File.join(__dir__, '.ruby-version')).chomp.delete_prefix('ruby-')
 
 gem 'bcrypt'
 gem 'better_html'
+gem 'chartkick'
 gem 'dotenv'
 gem 'erb_lint', require: false
 gem 'erubi'
@@ -20,7 +21,6 @@ gem 'rodauth'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'
-gem 'chartkick'
 
 group :development do
   gem 'rubocop'
