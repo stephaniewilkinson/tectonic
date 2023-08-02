@@ -3,7 +3,7 @@ Style/Documentation:
 
 Metrics/BlockLength:
   Exclude:
-    - 'config.ru'
+    - 'app.rb'
 
 Metrics/ClassLength:
   Enabled: false
