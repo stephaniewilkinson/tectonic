@@ -32,5 +32,4 @@ group :test do
   gem 'minitest'
   gem 'minitest-capybara'
   gem 'rack-test'
-  gem 'webdrivers'
 end
