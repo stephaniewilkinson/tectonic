@@ -11,7 +11,6 @@ gem 'erubi'
 gem 'http'
 gem 'puma'
 gem 'rack'
-gem 'rackup' # this is deprecated but the tests don't pass if i remove it
 gem 'rake'
 gem 'roda'
 gem 'roda-http-auth'
@@ -29,6 +28,7 @@ end
 
 group :test do
   gem 'capybara-selenium'
+  gem 'rackup' # this is deprecated but the tests don't pass if i remove it
   gem 'minitest'
   gem 'minitest-capybara'
   gem 'rack-test'
