@@ -2,8 +2,7 @@
 
 ENV['RACK_ENV'] = 'test'
 
-require 'dotenv/load'
-require 'logger'
+# require 'dotenv/load' #keeping this here until i need it later
 require 'minitest/autorun'
 require 'minitest/capybara'
 require 'minitest/pride'

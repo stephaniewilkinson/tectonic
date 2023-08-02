@@ -21,4 +21,12 @@ describe Tectonic do
     assert last_response.ok?
     assert_includes last_response.body, 'stephanie'
   end
+
+  it 'lets user log in and look at a shelf' do
+    visit '/'
+    visit '/workouts'
+    fill_in 'Email address', with: 'myemail@gmail.com'
+    fill_in 'Password', with: 'password'
+    click_on 'Sign in'
+  end
 end

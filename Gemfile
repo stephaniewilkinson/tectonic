@@ -11,7 +11,7 @@ gem 'erubi'
 gem 'http'
 gem 'puma'
 gem 'rack'
-gem 'rackup'
+gem 'rackup' # this is deprecated but the tests don't pass if i remove it
 gem 'rake'
 gem 'roda'
 gem 'roda-http-auth'
