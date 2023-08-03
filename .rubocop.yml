@@ -4,6 +4,7 @@ Style/Documentation:
 Metrics/BlockLength:
   Exclude:
     - 'app.rb'
+    - 'system_spec.rb'
 
 Metrics/ClassLength:
   Enabled: false
