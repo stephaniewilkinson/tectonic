@@ -9,7 +9,7 @@ describe Tectonic do
   include Rack::Test::Methods
 
   password = SecureRandom.hex
-  email = SecureRandom.hex + '@gmail.com'
+  email = "#{SecureRandom.hex}@gmail.com"
 
   let :app do
     Tectonic
