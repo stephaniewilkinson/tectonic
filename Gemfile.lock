@@ -117,6 +117,7 @@ GEM
     rodauth (2.30.0)
       roda (>= 2.6.0)
       sequel (>= 4)
+    rollbar (3.4.0)
     rubocop (1.55.1)
       json (~> 2.3)
       language_server-protocol (>= 3.17.0)
@@ -179,6 +180,7 @@ DEPENDENCIES
   roda
   roda-http-auth
   rodauth
+  rollbar
   rubocop
   rubocop-performance
   sequel
