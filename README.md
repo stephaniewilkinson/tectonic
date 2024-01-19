@@ -31,6 +31,9 @@ ERB.new(File.read 'views/rodauth/login.erb').result
 
 ```
 
+# Rodauth migrations
+https://github.com/jeremyevans/rodauth#label-Creating+tables
+
 
 ## Rodauth templates
 app/views/rodauth/_login_form.html.erb
