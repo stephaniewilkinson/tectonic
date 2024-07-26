@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
+require 'rake'
 require 'rake/testtask'
 require 'dotenv/load'
 require_relative '.env'
+require_relative 'app'
 
 task default: :test
 
