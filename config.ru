@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative 'app'
-require 'roda'
 
 case ENV.fetch('RACK_ENV', nil)
 when 'production', 'staging'
