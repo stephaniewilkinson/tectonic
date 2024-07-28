@@ -65,3 +65,6 @@ https://thenounproject.com/icon/barbell-plate-490489/
 https://thenounproject.com/icon/barbell-plates-1174446/
 
 https://thenounproject.com/icon/barbell-plate-4802392/
+
+ # Start command
+ bundle exec rackup config.ru -p $PORT

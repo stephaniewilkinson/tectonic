@@ -25,7 +25,10 @@ group :development do
   gem 'better_html'
   gem 'erb_lint', require: false
   gem 'rubocop'
+  gem 'rubocop-minitest'
   gem 'rubocop-performance'
+  gem 'rubocop-rake'
+  gem 'rubocop-sequel'
 end
 
 group :test do

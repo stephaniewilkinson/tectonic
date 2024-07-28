@@ -1,10 +1,15 @@
+require:
+  - rubocop-rake
+  - rubocop-minitest
+  - rubocop-sequel
+
 Style/Documentation:
   Enabled: false
 
 Metrics/BlockLength:
   Exclude:
-    - 'app.rb'
-    - 'spec/system_spec.rb'
+    - "app.rb"
+    - "spec/system_spec.rb"
 
 Metrics/ClassLength:
   Enabled: false
@@ -25,4 +30,4 @@ Style/FrozenStringLiteralComment:
 
 Naming/FileName:
   Exclude:
-    - 'views/create-account.erb'
+    - "views/create-account.erb"

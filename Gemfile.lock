@@ -144,9 +144,16 @@ GEM
       unicode-display_width (>= 2.4.0, < 3.0)
     rubocop-ast (1.31.3)
       parser (>= 3.3.1.0)
+    rubocop-minitest (0.35.1)
+      rubocop (>= 1.61, < 2.0)
+      rubocop-ast (>= 1.31.1, < 2.0)
     rubocop-performance (1.21.1)
       rubocop (>= 1.48.1, < 2.0)
       rubocop-ast (>= 1.31.1, < 2.0)
+    rubocop-rake (0.6.0)
+      rubocop (~> 1.0)
+    rubocop-sequel (0.3.4)
+      rubocop (~> 1.0)
     ruby-progressbar (1.13.0)
     rubyzip (2.3.2)
     selenium-webdriver (4.23.0)
@@ -197,7 +204,10 @@ DEPENDENCIES
   rodauth
   rollbar
   rubocop
+  rubocop-minitest
   rubocop-performance
+  rubocop-rake
+  rubocop-sequel
   sequel
   sequel_pg
   tilt
