@@ -1,29 +1,46 @@
-h1, h2, h3, h4, h5, h6, .text-7xl, .text-6xl, .text-5xl, .text-4xl, .text-3xl, .text-2xl, .text-xl {
-  font-family: Blonde Sans;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.text-7xl,
+.text-6xl,
+.text-5xl,
+.text-4xl,
+.text-3xl,
+.text-2xl,
+.text-xl {
+    font-family: Blonde Sans;
 }
 
 .serif {
-  font-family: Blonde Serif;
+    font-family: Blonde Serif;
+}
+.myteal {
+    background-color: teal;
+}
+@font-face {
+    font-family: "Blonde Serif";
+    src: url("/fonts/blonde_serif-webfont.eot");
+    src:
+        url("/fonts/blonde_serif-webfont.eot?#iefix")
+            format("embedded-opentype"),
+        url("/fonts/blonde_serif-webfont.woff2") format("woff2"),
+        url("/fonts/blonde_serif-webfont.woff") format("woff"),
+        url("/fonts/blonde_serif-webfont.svg#blonde_serifblonde") format("svg");
+    font-weight: normal;
+    font-style: normal;
 }
 
 @font-face {
-  font-family: 'Blonde Serif';
-  src: url('/fonts/blonde_serif-webfont.eot');
-  src: url('/fonts/blonde_serif-webfont.eot?#iefix') format('embedded-opentype'),
-       url('/fonts/blonde_serif-webfont.woff2') format('woff2'),
-       url('/fonts/blonde_serif-webfont.woff') format('woff'),
-       url('/fonts/blonde_serif-webfont.svg#blonde_serifblonde') format('svg');
-  font-weight: normal;
-  font-style: normal;
-}
-
-@font-face {
-  font-family: 'Blonde Sans';
-  src: url('/fonts/blonde_sans-webfont.eot');
-  src: url('/fonts/blonde_sans-webfont.eot?#iefix') format('embedded-opentype'),
-       url('/fonts/blonde_sans-webfont.woff2') format('woff2'),
-       url('/fonts/blonde_sans-webfont.woff') format('woff'),
-       url('/fonts/blonde_sans-webfont.svg#blondeblonde') format('svg');
-  font-weight: normal;
-  font-style: normal;
+    font-family: "Blonde Sans";
+    src: url("/fonts/blonde_sans-webfont.eot");
+    src:
+        url("/fonts/blonde_sans-webfont.eot?#iefix") format("embedded-opentype"),
+        url("/fonts/blonde_sans-webfont.woff2") format("woff2"),
+        url("/fonts/blonde_sans-webfont.woff") format("woff"),
+        url("/fonts/blonde_sans-webfont.svg#blondeblonde") format("svg");
+    font-weight: normal;
+    font-style: normal;
 }
