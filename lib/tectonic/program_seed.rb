@@ -9,16 +9,13 @@ require_relative 'programs'
 class Tectonic < Roda
   # A program written as a Ruby hash, until there is a UI for editing one.
   module ProgramSeed
-    # Monday of block 0, week 1. The day also includes a 35 minute walk, which is
-    # not represented: sets.weight and sets.reps are both NOT NULL and a walk is
-    # neither, so it lives in the program notes instead.
+    # Monday of block 0, week 1.
     BLOCK_0_WEEK_1 = {
       name: 'Block 0',
       block: 0,
       week: 1,
       preferred_reps: 3,
       is_ascending: true,
-      notes: 'Monday also has a 35 minute walk, which a set cannot express.',
       days: [
         {
           weekday: 1,
