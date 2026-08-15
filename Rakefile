@@ -71,3 +71,36 @@ namespace :db do
     puts "Database is at migration version #{db[:schema_info].get(:version)}"
   end
 end
+
+namespace :program do
+  desc 'Seed the block 0 week 1 program, for ACCOUNT_ID or the only account'
+  task :seed do
+    require_relative 'lib/tectonic/program_seed'
+    program = Tectonic::ProgramSeed.seed(seed_account_id)
+    puts "Program #{program.id}: #{program.name} week #{program.week}, #{program.program_days.count} day(s)"
+  end
+
+  desc "Generate a week of workouts: rake 'program:generate[2026-08-17]' PROGRAM_ID=1"
+  task :generate, [:week_start] do |_task, args|
+    require_relative 'lib/tectonic/program_generator'
+    program = Tectonic::Program[ENV.fetch('PROGRAM_ID', nil)] || Tectonic::Program.first
+    abort 'No program to generate. Run rake program:seed first.' unless program
+
+    week_start = args[:week_start] ? Date.parse(args[:week_start]) : Date.today
+    Tectonic::ProgramGenerator.new(program).generate(week_start).each do |workout|
+      puts "#{workout.date.strftime('%A %b %-d')}: workout #{workout.id}, #{workout.sets.count} sets"
+    end
+  end
+end
+
+# The seed needs an account to hang a program off. One account is the normal case
+# in development, so only insist on being told which when there is a choice.
+def seed_account_id
+  return ENV['ACCOUNT_ID'].to_i if ENV['ACCOUNT_ID']
+
+  ids = Tectonic::Program.db[:accounts].select_map(:id)
+  abort 'No accounts yet. Sign up first, or pass ACCOUNT_ID.' if ids.empty?
+  abort "Several accounts exist (#{ids.join(', ')}). Pass ACCOUNT_ID." if ids.length > 1
+
+  ids.first
+end
