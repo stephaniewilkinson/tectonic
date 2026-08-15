@@ -2,6 +2,9 @@
 
 require 'sequel'
 require 'logger'
+# Every model reopens class Tectonic < Roda, so loading one outside app.rb -- from
+# a rake task, say -- needs the superclass to already exist.
+require 'roda'
 
 DB = Sequel.connect ENV.fetch 'DATABASE_URL'
 DB.extension :date_arithmetic

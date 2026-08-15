@@ -1,0 +1,25 @@
+# Render Blueprint. This file is the checked-in source of truth for how tectonic
+# deploys, but it does not govern a dashboard-managed service until the service is
+# linked as a Blueprint in the Render dashboard. Until then, the change that
+# actually matters is putting preDeployCommand's value in the service's
+# "Pre-Deploy Command" field.
+#
+# `name` must match the existing service exactly, otherwise linking this Blueprint
+# creates a second service instead of adopting the current one. Env vars are marked
+# `sync: false` so the values already set in the dashboard are left untouched --
+# in particular SESSION_SECRET, which would log everyone out if regenerated.
+services:
+  - type: web
+    name: tectonic
+    runtime: ruby
+    plan: starter # preDeployCommand requires a paid instance type
+    buildCommand: bundle install
+    preDeployCommand: bundle exec rake db:migrate
+    startCommand: bundle exec rackup config.ru -p $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: RACK_ENV
+        value: production
