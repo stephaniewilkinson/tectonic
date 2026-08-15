@@ -41,7 +41,9 @@ jobs:
       RACK_ENV: test
       # .env is not in the repo, and .env.rb only assigns with ||=, so these win.
       DATABASE_URL: postgres://tectonic:tectonic@localhost:5432/tectonic_test
-      SESSION_SECRET: ci-only-secret-not-used-anywhere-real
+      # Roda's sessions plugin rejects a secret under 64 bytes, and app.rb builds
+      # the app at require time, so a short one fails the suite before it starts.
+      SESSION_SECRET: ci-only-session-secret-not-a-real-credential-padded-to-roda-64-byte-minimum
       # The system spec drives a real Firefox; there is no display on a runner.
       MOZ_HEADLESS: '1'
 
@@ -53,8 +55,9 @@ jobs:
         with:
           # Read the version from .ruby-version, which the Gemfile also reads, so
           # the two cannot drift apart the way 3.2.2 did from 3.3.1 and break the
-          # build before a single test ran.
-          ruby-version-file: .ruby-version
+          # build before a single test ran. setup-ruby spells this as a value of
+          # ruby-version, not an input of its own.
+          ruby-version: .ruby-version
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
 
       - name: Show browser versions
@@ -74,7 +77,7 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version-file: .ruby-version
+          ruby-version: .ruby-version
           bundler-cache: true
 
       - name: rubocop
