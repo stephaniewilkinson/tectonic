@@ -28,3 +28,4 @@ Capybara.configure do |config|
   config.default_driver = :firefox
   config.app_host = 'http://localhost:9292'
 end
+

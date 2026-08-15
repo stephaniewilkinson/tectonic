@@ -7,3 +7,4 @@ class Tectonic < Roda
     many_to_one :workout
   end
 end
+

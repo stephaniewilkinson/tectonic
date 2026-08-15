@@ -5,3 +5,8 @@ linters:
     enabled: true
     rubocop_config:
      inherit_from: .rubocop.yml
+     # Ruby files must end in a blank line, but erb_lint feeds each <% %> fragment
+     # to rubocop as its own snippet, so the cop fires on every tag in every view.
+     # erb_lint's own FinalNewline linter covers the actual ERB files.
+     Layout/TrailingEmptyLines:
+       Enabled: false

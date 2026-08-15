@@ -18,7 +18,8 @@ AllCops:
   NewCops: enable
 
 Layout/TrailingEmptyLines:
-  Enabled: false
+  Enabled: true
+  EnforcedStyle: final_blank_line
 
 Layout/InitialIndentation:
   Enabled: false

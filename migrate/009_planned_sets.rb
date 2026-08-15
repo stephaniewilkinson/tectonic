@@ -11,3 +11,4 @@ Sequel.migration do
     add_column :sets, :is_barbell, TrueClass, { default: false, null: false }
   end
 end
+

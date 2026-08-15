@@ -7,3 +7,4 @@ class Tectonic < Roda
     one_to_many :sets
   end
 end
+

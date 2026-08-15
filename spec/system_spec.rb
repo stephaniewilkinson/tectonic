@@ -40,3 +40,4 @@ describe Tectonic do
     click_on 'Log out'
   end
 end
+

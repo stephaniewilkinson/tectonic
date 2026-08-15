@@ -14,3 +14,4 @@ else
   logger.level = Logger::DEBUG
 end
 run Tectonic.freeze.app
+

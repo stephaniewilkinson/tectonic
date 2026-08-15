@@ -10,3 +10,4 @@ ENV['DATABASE_URL'] ||= case ENV.fetch('RACK_ENV', nil)
                         else
                           'postgres:///tectonic_development'
                         end
+

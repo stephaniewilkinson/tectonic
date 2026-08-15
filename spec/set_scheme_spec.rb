@@ -55,3 +55,4 @@ describe 'Tectonic::SetScheme rep conversion' do
     assert_equal 155, Tectonic::SetScheme.convert_weight(155, from_reps: 5, to_reps: 5)
   end
 end
+

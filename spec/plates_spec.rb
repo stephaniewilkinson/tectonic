@@ -47,3 +47,4 @@ describe 'Tectonic::Plates on a rack other than the default' do
     assert_equal [[10, 2]], Tectonic::Plates.per_side(75, bar_weight: 35)
   end
 end
+

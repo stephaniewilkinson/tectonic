@@ -37,3 +37,4 @@ group :test do
   gem 'minitest-capybara'
   gem 'rack-test'
 end
+
