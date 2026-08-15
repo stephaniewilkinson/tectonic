@@ -20,6 +20,19 @@ h6,
 .myteal {
     background-color: teal;
 }
+
+/* Weight and reps are typed on a touch keypad, so the native number spinners
+   just clutter the inputs. Tailwind has no utility for the spin-button
+   pseudo-elements, so hide them here for every number field. */
+input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
 @font-face {
     font-family: "Blonde Serif";
     src: url("/fonts/blonde_serif-webfont.eot");
