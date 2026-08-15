@@ -9,6 +9,10 @@ gem 'chartkick'
 gem 'dotenv'
 gem 'erubi'
 gem 'http'
+# lib/tectonic/db.rb requires logger, which stopped being a default gem in Ruby
+# 4.0. It was only reaching production as a transitive dependency of the test and
+# development groups, which Render does not install.
+gem 'logger'
 gem 'puma'
 gem 'rack'
 gem 'rackup'
