@@ -25,8 +25,14 @@ describe Tectonic::Warmup do
     assert_empty Tectonic::Warmup.ramp(155, is_barbell: false)
   end
 
-  it 'skips warmups when the working weight is the bar itself' do
-    assert_empty Tectonic::Warmup.ramp(45)
+  it 'still racks the empty bar when the working weight is the bar itself' do
+    assert_equal [{ weight: 45, reps: 5 }], Tectonic::Warmup.ramp(45)
+  end
+
+  it 'always opens with the empty bar, whatever the working weight' do
+    opening = [155, 135, 95, 50, 45].map { |top| Tectonic::Warmup.ramp(top).first[:weight] }
+
+    assert_equal [45, 45, 45, 45, 45], opening
   end
 end
 
@@ -52,3 +58,4 @@ describe 'Tectonic::Warmup ramp shape' do
     assert_equal 35, Tectonic::Warmup.ramp(155, bar_weight: 35).first[:weight]
   end
 end
+
