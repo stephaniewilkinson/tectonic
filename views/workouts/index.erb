@@ -26,6 +26,9 @@
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                 Edit
               </th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                Delete
+              </th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
@@ -43,6 +46,15 @@
                 Edit
               </a>
             </td>
+              <td class="whitespace-nowrap px-3 py-4 text-sm">
+                <form action="/workouts/<%= workout[:id] %>/delete" method="post"
+                      hx-post="/workouts/<%= workout[:id] %>/delete"
+                      hx-target="closest tr"
+                      hx-swap="outerHTML">
+                  <%= csrf_tag("/workouts/#{workout[:id]}/delete") %>
+                  <button type="submit" class="font-medium text-red-600 hover:text-red-800">Delete</button>
+                </form>
+              </td>
               </tr>
             <%- end %>
           </tbody>

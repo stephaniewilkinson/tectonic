@@ -77,6 +77,23 @@ class Tectonic < Roda
       r.get('new') { view('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
+
+        # Delete a workout and its sets, scoped to the logged-in account so a
+        # guessed id can't remove someone else's. sets.workout_id is a non-null
+        # foreign key with no cascade, so the sets have to go first. htmx swaps
+        # the row out in place; without JS the plain form post redirects back to
+        # the refreshed list.
+        r.post 'delete' do
+          check_csrf!
+          if @workout && @workout.account_id == @account_id
+            Workout.db.transaction do
+              Set.where(workout_id:).delete
+              @workout.delete
+            end
+          end
+          r.env['HTTP_HX_REQUEST'] ? '' : r.redirect('/workouts')
+        end
+
         r.on 'sets' do
           @exercises = Exercise.where(account_id: @account_id)
           r.get('new') { view('sets/new') }
