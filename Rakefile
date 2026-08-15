@@ -33,6 +33,26 @@ def baseline(db)
   puts "Stamped existing database at migration version #{BASELINE_VERSION}"
 end
 
+# Migrates to a target version, or to the latest when given none.
+def migrate_to(version)
+  db = migrator_db
+  baseline(db)
+  Sequel::Migrator.run(db, 'migrate', target: version&.to_i)
+  puts "Database is at migration version #{db[:schema_info].get(:version)}"
+end
+
+# Reverses the most recently applied migration.
+def rollback_one
+  db = migrator_db
+  abort 'Nothing to roll back: this database has never been migrated.' unless db.table_exists?(:schema_info)
+
+  target = db[:schema_info].get(:version) - 1
+  abort 'Already at version 0.' if target.negative?
+
+  Sequel::Migrator.run(db, 'migrate', target:)
+  puts "Database is at migration version #{db[:schema_info].get(:version)}"
+end
+
 namespace :db do
   desc 'Create the tectonic postgres user'
   task :create_user do
@@ -53,22 +73,12 @@ namespace :db do
 
   desc "Migrate the database at DATABASE_URL, optionally to a version: rake 'db:migrate[5]'"
   task :migrate, [:version] do |_task, args|
-    db = migrator_db
-    baseline(db)
-    Sequel::Migrator.run(db, 'migrate', target: args[:version]&.to_i)
-    puts "Database is at migration version #{db[:schema_info].get(:version)}"
+    migrate_to(args[:version])
   end
 
   desc 'Roll back the most recent migration'
   task :rollback do
-    db = migrator_db
-    abort 'Nothing to roll back: this database has never been migrated.' unless db.table_exists?(:schema_info)
-
-    target = db[:schema_info].get(:version) - 1
-    abort 'Already at version 0.' if target.negative?
-
-    Sequel::Migrator.run(db, 'migrate', target:)
-    puts "Database is at migration version #{db[:schema_info].get(:version)}"
+    rollback_one
   end
 end
 

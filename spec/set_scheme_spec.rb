@@ -21,6 +21,12 @@ describe Tectonic::SetScheme do
     assert_equal([165, 165, 165, 165], sets.map { |set| set[:weight] })
   end
 
+  it 'tops out at the working weight for a single set' do
+    assert_equal [{ weight: 155, reps: 5 }], Tectonic::SetScheme.working_sets(sets: 1, reps: 5, top_weight: 155)
+  end
+end
+
+describe 'Tectonic::SetScheme rep conversion' do
   it 'keeps the prescribed reps when the program states no preference' do
     sets = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: 105)
 
@@ -47,9 +53,5 @@ describe Tectonic::SetScheme do
     assert_equal 165, Tectonic::SetScheme.convert_weight(155, from_reps: 5, to_reps: 3)
     assert_equal 170, Tectonic::SetScheme.convert_weight(155, from_reps: 5, to_reps: 2)
     assert_equal 155, Tectonic::SetScheme.convert_weight(155, from_reps: 5, to_reps: 5)
-  end
-
-  it 'tops out at the working weight for a single set' do
-    assert_equal [{ weight: 155, reps: 5 }], Tectonic::SetScheme.working_sets(sets: 1, reps: 5, top_weight: 155)
   end
 end

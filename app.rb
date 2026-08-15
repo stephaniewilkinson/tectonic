@@ -8,6 +8,7 @@ require 'tilt'
 require 'chartkick'
 require_relative 'lib/tectonic/db'
 require_relative 'lib/tectonic/exercises'
+require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 
@@ -88,6 +89,20 @@ class Tectonic < Roda
           end
 
           r.on String do |set_id|
+            # Marks a set done from the session view. Must come before the bare
+            # r.post below, which matches any remaining path.
+            r.post 'complete' do
+              check_csrf!
+              set = own_set(set_id, workout_id)
+              r.redirect "/workouts/#{workout_id}/session" unless set
+
+              revised = { weight: r.params['weight'], reps: r.params['reps'] }
+              revised = revised.reject { |_, value| value.to_s.empty? }
+              # No revision means the primary tap, which toggles so a mis-tap is
+              # undone by tapping again. A revision always completes the set.
+              set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
+              r.redirect "/workouts/#{workout_id}/session"
+            end
             r.get 'edit' do
               @set = Set[id: set_id]
               view 'sets/edit'
@@ -105,6 +120,24 @@ class Tectonic < Roda
           end
           r.get do
             view 'sets/index'
+          end
+        end
+        # The gym floor view of a workout, as distinct from workouts/show, which
+        # stays the record of one.
+        r.on 'session' do
+          r.redirect '/workouts' unless @workout && @workout.account_id == @account_id
+
+          r.post do
+            check_csrf!
+            Workout.where(id: workout_id).update(rpe: r.params['rpe'])
+            r.redirect "/workouts/#{workout_id}/session"
+          end
+          r.get do
+            # Insertion order is program order: warmups then working sets, lift by
+            # lift in the position the program gave them.
+            @sets = Set.where(workout_id:).order(:id).all
+            @exercises = Exercise.where(account_id: @account_id).as_hash(:id)
+            view 'workouts/session'
           end
         end
         r.get('edit') { view('workouts/edit') }
@@ -130,6 +163,43 @@ class Tectonic < Roda
         end
       end
     end
+  end
+
+  # A set is only reachable through a workout the logged in account owns, so a set
+  # id belonging to someone else's workout does not resolve.
+  def own_set(set_id, workout_id)
+    return nil unless @workout && @workout.account_id == @account_id
+
+    Set.where(id: set_id, workout_id:).first
+  end
+
+  # Per-side plate breakdown for the session view, blank for anything not loaded
+  # on a bar and for weights this rack cannot make.
+  def plate_label(set)
+    return '' unless set[:is_barbell]
+
+    Plates.label(Plates.per_side(set[:weight]))
+  end
+
+  # Fill for one of the session RPE buttons, highlighting the current rating.
+  def rpe_style(workout, rpe)
+    workout[:rpe] == rpe ? 'bg-lime-500 text-white' : 'bg-white text-gray-700'
+  end
+
+  # Border and fill for a set row: still to do, done as written, or done
+  # differently, which has to read differently from done as planned.
+  def row_style(set)
+    return 'border-gray-200 bg-white' unless set[:is_completed]
+
+    changed_from_plan?(set) ? 'border-amber-300 bg-amber-50' : 'border-lime-300 bg-lime-50'
+  end
+
+  # A set lifted differently from the way it was written. Sets entered by hand
+  # never had a plan, so they can never read as changed.
+  def changed_from_plan?(set)
+    return false unless set[:planned_weight] && set[:planned_reps]
+
+    set[:weight] != set[:planned_weight] || set[:reps] != set[:planned_reps]
   end
 end
 

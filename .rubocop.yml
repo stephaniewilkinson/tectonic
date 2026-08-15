@@ -9,8 +9,7 @@ Style/Documentation:
 Metrics/BlockLength:
   Exclude:
     - "app.rb"
-    - "Rakefile"
-    - "spec/**/*_spec.rb"
+    - "spec/system_spec.rb"
 
 Metrics/ClassLength:
   Enabled: false

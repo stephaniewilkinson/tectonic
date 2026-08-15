@@ -31,7 +31,9 @@ describe Tectonic::Plates do
   it 'returns nil for a weight no combination of plates reaches' do
     assert_nil Tectonic::Plates.per_side(47)
   end
+end
 
+describe 'Tectonic::Plates on a rack other than the default' do
   it 'uses a 35 when the rack has them' do
     assert_equal [[35, 1]], Tectonic::Plates.per_side(115, inventory: [45, 35, 25, 10, 5, 2.5])
   end

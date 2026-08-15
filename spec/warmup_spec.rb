@@ -15,6 +15,12 @@ describe Tectonic::Warmup do
     assert_equal expected, Tectonic::Warmup.ramp(155)
   end
 
+  it 'descends reps as the weight climbs' do
+    reps = Tectonic::Warmup.ramp(155).map { |set| set[:reps] }
+
+    assert_equal [5, 5, 3, 2], reps
+  end
+
   it 'skips warmups for anything not on a barbell' do
     assert_empty Tectonic::Warmup.ramp(155, is_barbell: false)
   end
@@ -22,7 +28,9 @@ describe Tectonic::Warmup do
   it 'skips warmups when the working weight is the bar itself' do
     assert_empty Tectonic::Warmup.ramp(45)
   end
+end
 
+describe 'Tectonic::Warmup ramp shape' do
   it 'ramps less for lighter lifts' do
     assert_equal 4, Tectonic::Warmup.ramp(155).length
     assert_equal 3, Tectonic::Warmup.ramp(135).length
@@ -42,11 +50,5 @@ describe Tectonic::Warmup do
 
   it 'starts from whichever bar is being loaded' do
     assert_equal 35, Tectonic::Warmup.ramp(155, bar_weight: 35).first[:weight]
-  end
-
-  it 'descends reps as the weight climbs' do
-    reps = Tectonic::Warmup.ramp(155).map { |set| set[:reps] }
-
-    assert_equal [5, 5, 3, 2], reps
   end
 end
