@@ -14,7 +14,7 @@ services:
     runtime: ruby
     plan: starter # preDeployCommand requires a paid instance type
     buildCommand: bundle install
-    preDeployCommand: bundle exec rake db:migrate
+    preDeployCommand: bundle exec rake db:migrate && bundle exec rake library:exercises
     startCommand: bundle exec rackup config.ru -p $PORT
     envVars:
       - key: DATABASE_URL

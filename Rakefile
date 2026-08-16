@@ -103,6 +103,15 @@ namespace :program do
   end
 end
 
+namespace :library do
+  desc 'Load the built-in barbell exercise library (idempotent on name)'
+  task :exercises do
+    require_relative 'lib/tectonic/exercise_library'
+    created, skipped = Tectonic::Exercise.load_library
+    puts "Library exercises: #{created} created, #{skipped} already present"
+  end
+end
+
 # The seed needs an account to hang a program off. One account is the normal case
 # in development, so only insist on being told which when there is a choice.
 def seed_account_id
