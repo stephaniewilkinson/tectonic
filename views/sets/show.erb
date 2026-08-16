@@ -1,17 +1,39 @@
-Workout:
-<a class="underline" href="/workouts/<%= @set.workout[:id] %>">
-  <%= @set.workout[:date].strftime('%A %B %-d, %Y') %>
-</a>
-<hr>
-Exercise:
-<a class="underline" href="/exercises/<%= @set.exercise[:id] %>">
-  <%= @set.exercise[:name] %>
-  </a>
-<hr>
-Reps: <%= @set[:reps] %>
-<hr>
-Weight:   <%= @set[:weight] %>
-<hr>
-Warmup?: <%= @set[:is_warmup] %>
-<hr>
-Completed?:   <%= @set[:is_completed] %>
+<div class="mx-auto max-w-md">
+  <h1 class="text-2xl font-semibold text-gray-900">
+    <%= @set.exercise[:name] %> &mdash; <%= @set[:weight] %> &times; <%= @set[:reps] %>
+  </h1>
+  <dl class="mt-6 divide-y divide-gray-200 border-y border-gray-200 text-sm">
+    <div class="flex justify-between py-3">
+      <dt class="text-gray-500">Workout</dt>
+      <dd>
+        <a href="/workouts/<%= @set.workout[:id] %>" class="font-medium text-lime-600 hover:text-lime-500">
+          <%= @set.workout[:date].strftime('%A %B %-d, %Y') %>
+        </a>
+      </dd>
+    </div>
+    <div class="flex justify-between py-3">
+      <dt class="text-gray-500">Exercise</dt>
+      <dd>
+        <a href="/exercises/<%= @set.exercise[:id] %>" class="font-medium text-lime-600 hover:text-lime-500">
+          <%= @set.exercise[:name] %>
+        </a>
+      </dd>
+    </div>
+    <div class="flex justify-between py-3">
+      <dt class="text-gray-500">Weight</dt>
+      <dd class="text-gray-900"><%= @set[:weight] %></dd>
+    </div>
+    <div class="flex justify-between py-3">
+      <dt class="text-gray-500">Reps</dt>
+      <dd class="text-gray-900"><%= @set[:reps] %></dd>
+    </div>
+    <div class="flex justify-between py-3">
+      <dt class="text-gray-500">Warmup</dt>
+      <dd class="text-gray-900"><%= @set[:is_warmup] ? 'Yes' : 'No' %></dd>
+    </div>
+    <div class="flex justify-between py-3">
+      <dt class="text-gray-500">Completed</dt>
+      <dd class="text-gray-900"><%= @set[:is_completed] ? 'Yes' : 'No' %></dd>
+    </div>
+  </dl>
+</div>

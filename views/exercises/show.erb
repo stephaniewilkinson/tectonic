@@ -1,20 +1,33 @@
+<div class="mx-auto max-w-md">
+  <div class="flex items-center justify-between">
+    <h1 class="text-3xl font-semibold text-gray-900"><%= @exercise[:name] %></h1>
+    <%- if @exercise.account_id == @account_id %>
+      <a href="/exercises/<%= @exercise[:id] %>/edit" class="rounded-md bg-lime-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500">Edit</a>
+    <%- else %>
+      <span class="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-500">Built-in exercise</span>
+    <%- end %>
+  </div>
 
-<div class="text-3xl">
-  Exercise:
-  <%= @exercise[:name] %>
-  <br>
+  <%- if @sets.empty? %>
+    <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
+  <%- else %>
+    <table class="mt-6 min-w-full divide-y divide-gray-300">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 pr-3 text-left text-sm font-semibold text-gray-900">Date</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Weight</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Reps</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <%- @sets.each do |set| %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pr-3 text-sm text-gray-500"><%= set.workout[:date].strftime('%b %d, %Y') %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:weight] %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:reps] %></td>
+          </tr>
+        <%- end %>
+      </tbody>
+    </table>
+  <%- end %>
 </div>
-<hr>
-<%- if @exercise.account_id == @account_id %>
-  <a class="button" href="/exercises/<%= @exercise[:id] %>/edit">Edit</a>
-<%- else %>
-  <span class="text-sm text-gray-500">Built-in exercise</span>
-<%- end %>
-<%- @sets.each do | set | %>
-  <hr>
-  reps: <%= set[:reps] %>
-  <br>
-  weight: <%= set[:weight] %>
-  <br>
-  date: <%= set.workout[:date].strftime('%b %d, %Y') %>
-<%- end %>

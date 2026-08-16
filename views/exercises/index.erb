@@ -1,19 +1,38 @@
-<a href="/exercises/new" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-gray-500 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-    <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z" clip-rule="evenodd" />
-  </svg>
-  Add a new exercise
-</a>
-
-<table>
-  <%- @exercises.each do |exercise| %>
-    <tr>
-      <td><%= exercise[:icon] %></td>
-      <td>
-        <a class="underline" href="/exercises/<%= exercise[:id] %>">
-          <%= exercise[:name] %>
-        </a>
-      </td>
-    </tr>
-  <%- end %>
-</table>
+<div class="px-4 sm:px-6 lg:px-8">
+  <div class="sm:flex sm:items-center">
+    <div class="sm:flex-auto">
+      <h1 class="text-base font-semibold leading-6 text-gray-900">Exercises</h1>
+      <p class="mt-2 text-sm text-gray-700">Your movements and the built-in barbell library.</p>
+    </div>
+    <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+      <a href="/exercises/new" class="block rounded-md bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-gray-500">Add a new exercise</a>
+    </div>
+  </div>
+  <div class="mt-8 flow-root">
+    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+        <table class="min-w-full divide-y divide-gray-300">
+          <thead>
+            <tr>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Source</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <%- @exercises.each do |exercise| %>
+              <tr>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                  <a href="/exercises/<%= exercise[:id] %>"
+                     class="font-medium text-lime-600 hover:text-lime-500"><%= exercise[:name] %></a>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                  <%= exercise.library? ? 'Library' : 'Yours' %>
+                </td>
+              </tr>
+            <%- end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
