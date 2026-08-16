@@ -1,0 +1,15 @@
+<%- @library_exercises, @own_exercises = @exercises.partition(&:library?) %>
+<%- unless @library_exercises.empty? %>
+  <optgroup label="Library">
+    <%- @library_exercises.each do |exercise| %>
+      <option value="<%= exercise[:id] %>"><%= exercise[:name] %></option>
+    <%- end %>
+  </optgroup>
+<%- end %>
+<%- unless @own_exercises.empty? %>
+  <optgroup label="Your exercises">
+    <%- @own_exercises.each do |exercise| %>
+      <option value="<%= exercise[:id] %>"><%= exercise[:name] %></option>
+    <%- end %>
+  </optgroup>
+<%- end %>

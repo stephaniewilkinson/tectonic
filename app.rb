@@ -55,18 +55,34 @@ class Tectonic < Roda
           exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'], account_id: @account_id)
           r.redirect "/exercises/#{exercise_id}/"
         else
-          Exercise.where(id: r.params['id']).update(name: r.params['name'], icon_url: r.params['icon_url'])
-          @exercise = Exercise[r.params['id']]
+          # Only the owner may update; library rows (nil account) and other
+          # accounts' rows don't match, so the edit is refused.
+          @exercise = Exercise.where(id: r.params['id'], account_id: @account_id).first
+          r.redirect '/exercises' unless @exercise
+          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'])
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end
       r.on String do |exercise_id|
-        @exercise = Exercise[exercise_id]
-        r.get('edit') { view('exercises/edit') }
-        r.get { view('exercises/show') }
+        # Library exercises (nil account) are visible to everyone, private ones
+        # only to their owner; another account's private exercise won't load.
+        @exercise = Exercise.visible_to(@account_id).where(id: exercise_id).first
+        r.redirect '/exercises' unless @exercise
+        r.get('edit') do
+          # Editing is owner-only; library and others' rows fall back to show.
+          r.redirect "/exercises/#{@exercise.id}/" unless @exercise.account_id == @account_id
+          view('exercises/edit')
+        end
+        r.get do
+          # Only the viewer's own sets for this movement, so a shared library
+          # exercise never surfaces another account's logged sets.
+          my_workouts = Workout.where(account_id: @account_id).select(:id)
+          @sets = Set.where(exercise_id: @exercise.id, workout_id: my_workouts).all
+          view('exercises/show')
+        end
       end
       r.get do
-        @exercises = Exercise.where(account_id: @account_id)
+        @exercises = Exercise.visible_to(@account_id).order(:id)
         view 'exercises/index'
       end
     end
@@ -78,7 +94,7 @@ class Tectonic < Roda
       r.on String do |workout_id|
         @workout = Workout[workout_id]
         r.on 'sets' do
-          @exercises = Exercise.where(account_id: @account_id)
+          @exercises = Exercise.visible_to(@account_id).order(:id)
           r.get('new') { view('sets/new') }
 
           r.post 'new' do
@@ -136,7 +152,7 @@ class Tectonic < Roda
             # Insertion order is program order: warmups then working sets, lift by
             # lift in the position the program gave them.
             @sets = Set.where(workout_id:).order(:id).all
-            @exercises = Exercise.where(account_id: @account_id).as_hash(:id)
+            @exercises = Exercise.visible_to(@account_id).as_hash(:id)
             view 'workouts/session'
           end
         end
