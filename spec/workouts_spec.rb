@@ -51,3 +51,19 @@ describe 'a fresh account' do
   end
 end
 
+describe "another account's workout" do
+  include Capybara::DSL
+  include Minitest::Capybara::Behaviour
+
+  it 'is out of reach, redirecting a stranger to the index' do
+    register
+    visit '/workouts/new'
+    click_on 'Save'
+    path = current_path
+    Capybara.reset_sessions!
+    register
+    visit path
+    assert_equal '/workouts', current_path
+  end
+end
+

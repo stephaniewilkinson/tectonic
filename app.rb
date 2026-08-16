@@ -93,19 +93,20 @@ class Tectonic < Roda
       r.get('new') { view('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
+        # One ownership gate for every nested workout route: a workout that does
+        # not exist or belongs to another account never resolves, so show, edit,
+        # sets, session, and delete are all closed to a guessed id.
+        r.redirect '/workouts' unless @workout && @workout.account_id == @account_id
 
-        # Delete a workout and its sets, scoped to the logged-in account so a
-        # guessed id can't remove someone else's. sets.workout_id is a non-null
-        # foreign key with no cascade, so the sets have to go first. htmx swaps
-        # the row out in place; without JS the plain form post redirects back to
-        # the refreshed list.
+        # Delete a workout and its sets. sets.workout_id is a non-null foreign key
+        # with no cascade, so the sets have to go first. htmx swaps the row out in
+        # place; without JS the plain form post redirects back to the refreshed
+        # list.
         r.post 'delete' do
           check_csrf!
-          if @workout && @workout.account_id == @account_id
-            Workout.db.transaction do
-              Set.where(workout_id:).delete
-              @workout.delete
-            end
+          Workout.db.transaction do
+            Set.where(workout_id:).delete
+            @workout.delete
           end
           r.env['HTTP_HX_REQUEST'] ? '' : r.redirect('/workouts')
         end
@@ -156,10 +157,8 @@ class Tectonic < Roda
           end
         end
         # The gym floor view of a workout, as distinct from workouts/show, which
-        # stays the record of one.
+        # stays the record of one. Ownership is already guaranteed by the gate above.
         r.on 'session' do
-          r.redirect '/workouts' unless @workout && @workout.account_id == @account_id
-
           r.post do
             check_csrf!
             Workout.where(id: workout_id).update(rpe: r.params['rpe'])
