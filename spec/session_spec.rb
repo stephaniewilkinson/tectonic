@@ -41,3 +41,26 @@ describe 'the session view' do
   end
 end
 
+describe 'revising a set in the session' do
+  include Capybara::DSL
+  include Minitest::Capybara::Behaviour
+
+  it 'records the weight actually lifted and marks the set done' do
+    sign_up_for_session
+    visit '/workouts/new'
+    click_on 'Save'
+    workout = current_path
+    visit "#{workout}sets/new"
+    select 'Back Squat', from: 'exercise_id'
+    fill_in 'weight', with: '135'
+    fill_in 'reps', with: '5'
+    click_on 'Save'
+    visit "#{workout}session"
+    find('summary', text: 'Lifted something else').click
+    fill_in 'Weight', with: '145'
+    click_button 'Save'
+    assert_includes page.body, '145'
+    assert page.has_button?('Undo')
+  end
+end
+
