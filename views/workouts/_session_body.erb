@@ -1,0 +1,117 @@
+<%# The swappable core of the session view. Every form posts with htmx targeting
+    #session-body, so a tap re-renders progress, the set row, and the RPE state
+    together; without JS the same forms post normally and the route redirects. %>
+<div class="sticky top-0 bg-gray-100 py-2">
+  <div class="flex gap-0.5" aria-label="Session progress">
+    <%- @sets.each do |set| %>
+      <div class="h-2 flex-1 rounded-sm <%= set[:is_completed] ? 'bg-lime-500' : 'bg-gray-300' %>"></div>
+    <%- end %>
+  </div>
+  <p class="mt-1 text-xs text-gray-500">
+    <%= @sets.count { |set| set[:is_completed] } %> of <%= @sets.length %> sets
+  </p>
+</div>
+
+<%- @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.each do |lift| %>
+  <section class="mt-6">
+    <h2 class="text-xl text-gray-900">
+      <%= @exercises[lift.first[:exercise_id]]&.name %>
+    </h2>
+
+    <%- unless lift.select { |set| set[:is_warmup] }.empty? %>
+      <p class="mt-2 text-xs uppercase tracking-wide text-gray-400">Warmup</p>
+    <%- end %>
+    <ul class="opacity-75">
+      <%- lift.select { |set| set[:is_warmup] }.each do |set| %>
+        <li class="mt-1 flex justify-between gap-3 rounded-lg border px-3 py-2 <%= row_style(set) %>">
+          <div>
+            <span class="text-lg text-gray-900">
+              <%= set[:weight] %> &times; <%= set[:reps] %>
+            </span>
+            <%- unless plate_label(set).empty? %>
+              <span class="ml-2 text-xs text-gray-500">
+                per side <%= plate_label(set) %>
+              </span>
+            <%- end %>
+          </div>
+          <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                hx-target="#session-body" hx-swap="innerHTML">
+            <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+            <button type="submit" class="rounded-lg bg-gray-200 px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-300">
+              <%= set[:is_completed] ? 'Undo' : 'Done' %>
+            </button>
+          </form>
+        </li>
+      <%- end %>
+    </ul>
+
+    <ul class="mt-3">
+      <%- lift.reject { |set| set[:is_warmup] }.each do |set| %>
+        <li class="mt-2 rounded-xl border px-3 py-3 <%= row_style(set) %>">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <span class="text-2xl font-semibold text-gray-900">
+                <%= set[:weight] %> &times; <%= set[:reps] %>
+              </span>
+              <%- unless plate_label(set).empty? %>
+                <div class="text-xs text-gray-500">
+                  per side <%= plate_label(set) %>
+                </div>
+              <%- end %>
+              <%- if set[:is_completed] && changed_from_plan?(set) %>
+                <div class="text-xs text-amber-700">
+                  planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
+                </div>
+              <%- end %>
+            </div>
+            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-target="#session-body" hx-swap="innerHTML">
+              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <button type="submit" class="rounded-xl bg-lime-500 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-gray-500">
+                <%= set[:is_completed] ? 'Undo' : 'Done' %>
+              </button>
+            </form>
+          </div>
+
+          <details class="mt-2">
+            <summary class="cursor-pointer text-xs text-gray-500">Lifted something else</summary>
+            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
+              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
+                Weight
+                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" step="5" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+              </label>
+              <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
+                Reps
+                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+              </label>
+              <button type="submit" class="rounded-lg bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-lime-500">
+                Save
+              </button>
+            </form>
+          </details>
+        </li>
+      <%- end %>
+    </ul>
+  </section>
+<%- end %>
+
+<form action="/workouts/<%= @workout[:id] %>/session" method="post"
+      hx-post="/workouts/<%= @workout[:id] %>/session"
+      hx-target="#session-body" hx-swap="innerHTML"
+      class="mt-10 border-t border-gray-300 pt-4">
+  <%= csrf_tag("/workouts/#{@workout[:id]}/session") %>
+  <h2 class="text-xl text-gray-900">Session RPE</h2>
+  <p class="text-xs text-gray-500">How hard was the whole session?</p>
+  <div class="mt-2 flex gap-2">
+    <%- (6..10).each do |rpe| %>
+      <button value="<%= rpe %>" class="<%= rpe_style(@workout, rpe) %> w-12 rounded-lg border border-gray-300 py-3 text-lg font-semibold" type="submit" name="rpe">
+        <%= rpe %>
+      </button>
+    <%- end %>
+  </div>
+</form>

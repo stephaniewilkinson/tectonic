@@ -134,7 +134,7 @@ class Tectonic < Roda
               # No revision means the primary tap, which toggles so a mis-tap is
               # undone by tapping again. A revision always completes the set.
               set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
-              r.redirect "/workouts/#{workout_id}/session"
+              r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
             end
             r.get 'edit' do
               @set = Set[id: set_id]
@@ -163,7 +163,8 @@ class Tectonic < Roda
           r.post do
             check_csrf!
             Workout.where(id: workout_id).update(rpe: r.params['rpe'])
-            r.redirect "/workouts/#{workout_id}/session"
+            @workout = Workout[workout_id]
+            r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
           end
           r.get do
             # Insertion order is program order: warmups then working sets, lift by
@@ -196,6 +197,15 @@ class Tectonic < Roda
         end
       end
     end
+  end
+
+  # The swappable core of the session view -- progress, every lift, and the RPE
+  # buttons -- rendered without the layout so htmx can drop it into #session-body
+  # after each tap. Without JS the routes redirect and the full page reloads.
+  def session_body(workout_id)
+    @sets = Set.where(workout_id:).order(:id).all
+    @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+    render('workouts/_session_body')
   end
 
   # A set is only reachable through a workout the logged in account owns, so a set
