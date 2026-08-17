@@ -22,9 +22,10 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           workout = Resolver.workout(context, date: Resolver.parse_date(arguments[:date]))
           ok("Workout on #{workout.date.strftime('%Y-%m-%d')} is ready (id #{workout.id}).",
-             structured: Presenter.workout_view(workout))
+             structured: Presenter.view_workout(workout))
         end
       end
     end
   end
 end
+

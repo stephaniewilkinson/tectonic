@@ -16,9 +16,10 @@ class Tectonic < Roda
         def self.perform(context:, **)
           workouts = context.workouts.order(Sequel.desc(:date)).all
           ok("You have #{workouts.size} workout(s).",
-             structured: { workouts: workouts.map { |w| Presenter.workout_view(w) } })
+             structured: { workouts: workouts.map { |w| Presenter.view_workout(w) } })
         end
       end
     end
   end
 end
+

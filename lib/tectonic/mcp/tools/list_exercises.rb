@@ -17,9 +17,10 @@ class Tectonic < Roda
         def self.perform(context:, **)
           exercises = context.exercises.order(:name).all
           ok("You can use #{exercises.size} exercise(s).",
-             structured: { exercises: exercises.map { |e| Presenter.exercise_view(e) } })
+             structured: { exercises: exercises.map { |e| Presenter.view_exercise(e) } })
         end
       end
     end
   end
 end
+

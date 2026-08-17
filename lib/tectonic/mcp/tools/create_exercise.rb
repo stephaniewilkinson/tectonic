@@ -22,9 +22,10 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           exercise = Resolver.exercise(context, name: arguments[:name], icon_url: arguments[:icon_url])
           ok("Exercise '#{exercise.name}' is ready (id #{exercise.id}).",
-             structured: Presenter.exercise_view(exercise))
+             structured: Presenter.view_exercise(exercise))
         end
       end
     end
   end
 end
+

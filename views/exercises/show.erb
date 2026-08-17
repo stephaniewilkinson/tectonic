@@ -8,6 +8,10 @@
     <%- end %>
   </div>
 
+  <%- if provenance(@exercise) %>
+    <p class="mt-1 text-xs text-gray-400"><%= provenance(@exercise) %></p>
+  <%- end %>
+
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>

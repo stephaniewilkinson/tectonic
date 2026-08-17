@@ -56,17 +56,17 @@ class Tectonic < Roda
       module Presenter
         module_function
 
-        def exercise_view(exercise)
+        def view_exercise(exercise)
           { id: exercise.id, name: exercise.name, library: exercise.library? }
             .merge(provenance(exercise))
         end
 
-        def workout_view(workout)
+        def view_workout(workout)
           { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), sets: workout.sets.count }
             .merge(provenance(workout))
         end
 
-        def set_view(set)
+        def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: set.weight, reps: set.reps,
             is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
         end
@@ -79,3 +79,4 @@ class Tectonic < Roda
     end
   end
 end
+

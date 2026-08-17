@@ -1,0 +1,98 @@
+# frozen_string_literal: true
+
+require_relative 'spec_helper'
+require_relative 'mcp_spec' # reuses its helpers (mint, call_tool, tool_result); idempotent require
+require_relative '../lib/tectonic/mcp'
+require 'securerandom'
+
+def named_token(name)
+  account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
+  Tectonic::ApiToken.mint(account_id:, scopes: ['read'], name:).record
+end
+
+describe 'create_exercise' do
+  include Rack::Test::Methods
+
+  it 'creates once and returns the same row for a duplicate name' do
+    raw = mint(scopes: ['write']).raw
+    name = "Move #{SecureRandom.hex(4)}"
+    call_tool('create_exercise', raw:, arguments: { name: })
+    first = tool_result['structuredContent']['id']
+    call_tool('create_exercise', raw:, arguments: { name: })
+    assert_equal first, tool_result['structuredContent']['id']
+  end
+end
+
+describe 'create_workout' do
+  include Rack::Test::Methods
+
+  it 'reuses the workout for a given day' do
+    raw = mint(scopes: ['write']).raw
+    call_tool('create_workout', raw:, arguments: { date: '2027-03-04' })
+    first = tool_result['structuredContent']['id']
+    call_tool('create_workout', raw:, arguments: { date: '2027-03-04' })
+    assert_equal first, tool_result['structuredContent']['id']
+  end
+end
+
+describe 'create_set stamping' do
+  include Rack::Test::Methods
+
+  it 'creates the exercise + workout and stamps the set with the token' do
+    token = mint(scopes: ['write'])
+    call_tool('create_set', raw: token.raw,
+                            arguments: { exercise: 'Back Squat', date: 'today', weight: 135, reps: 5 })
+    set = Tectonic::Set[tool_result['structuredContent']['id']]
+    assert_equal token.record.id, set.created_by_token_id
+  end
+end
+
+describe 'create_set validation' do
+  include Rack::Test::Methods
+
+  it 'refuses a weight outside the allowed range' do
+    raw = mint(scopes: ['write']).raw
+    call_tool('create_set', raw:, arguments: { exercise: 'Back Squat', weight: 99_999, reps: 5 })
+    assert tool_result['isError']
+    assert_includes tool_result.dig('content', 0, 'text'), 'out of range'
+  end
+end
+
+describe 'list_exercises isolation' do
+  include Rack::Test::Methods
+
+  it "never shows another account's private exercise" do
+    secret = "Secret #{SecureRandom.hex(4)}"
+    call_tool('create_exercise', raw: mint(scopes: ['write']).raw, arguments: { name: secret })
+    call_tool('list_exercises', raw: mint(scopes: ['read']).raw)
+    names = tool_result['structuredContent']['exercises'].map { |e| e['name'] }
+    refute_includes names, secret
+  end
+end
+
+describe 'create_set isolation' do
+  include Rack::Test::Methods
+
+  it "never lands a set on another account's workout" do
+    call_tool('create_workout', raw: mint(scopes: ['write']).raw, arguments: { date: '2027-05-05' })
+    other_workout = tool_result['structuredContent']['id']
+    call_tool('create_set', raw: mint(scopes: ['write']).raw,
+                            arguments: { exercise: 'Back Squat', date: '2027-05-05', weight: 135, reps: 5 })
+    set = Tectonic::Set[tool_result['structuredContent']['id']]
+    refute_equal other_workout, set.workout_id
+  end
+end
+
+describe 'the provenance helper' do
+  let(:app) { Tectonic.new({}) }
+
+  it 'names the token and date for a token-made row, nil for a human one' do
+    token = named_token('Claude Desktop')
+    made = Tectonic::Exercise.create(name: "P#{SecureRandom.hex(4)}", account_id: token.account_id,
+                                     created_by_token_id: token.id, created_at: Time.now)
+    human = Tectonic::Exercise.create(name: "P#{SecureRandom.hex(4)}", account_id: token.account_id)
+    assert_includes app.provenance(made), 'Created by Claude Desktop on'
+    assert_nil app.provenance(human)
+  end
+end
+

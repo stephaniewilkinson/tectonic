@@ -243,5 +243,15 @@ class Tectonic < Roda
 
     set[:weight] != set[:planned_weight] || set[:reps] != set[:planned_reps]
   end
+
+  # A line naming the API token that created a row and when, shown only for
+  # objects an LLM made through the MCP endpoint; nil for anything a human made
+  # in the UI, so the two are always distinguishable at a glance.
+  def provenance(record)
+    token = record.created_by_token
+    return unless token && record.created_at
+
+    "Created by #{token.name || 'an API token'} on #{record.created_at.strftime('%b %-d, %Y')}"
+  end
 end
 

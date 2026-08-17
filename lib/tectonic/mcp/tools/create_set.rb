@@ -33,7 +33,7 @@ class Tectonic < Roda
           workout = Resolver.workout(context, date: arguments[:date])
           set = Set.create(attributes(arguments, exercise, workout, context))
           ok("Logged #{set.weight}x#{set.reps} of #{exercise.name} (id #{set.id}).",
-             structured: Presenter.set_view(set))
+             structured: Presenter.view_set(set))
         end
 
         # Range lives here, not in the schema, so an out-of-range value refuses with a
@@ -58,3 +58,4 @@ class Tectonic < Roda
     end
   end
 end
+
