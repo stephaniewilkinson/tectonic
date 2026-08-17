@@ -11,6 +11,7 @@ require_relative 'lib/tectonic/exercises'
 require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
+require_relative 'lib/tectonic/oauth'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -19,6 +20,7 @@ class Tectonic < Roda
 
   plugin :assets, css: ['tailwind.css', 'styles.css']
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
+  plugin :h
   plugin :head
   plugin :public, root: 'assets'
   plugin :render
@@ -31,12 +33,31 @@ class Tectonic < Roda
     after_login do
       remember_login
     end
+    # A login interrupted by an OAuth /authorize request returns to it afterward to finish
+    # granting; a normal login has nothing stashed and falls back to the default '/'.
+    login_redirect do
+      session.delete(Tectonic::OAuthEndpoints::OAUTH_RETURN_KEY) || '/'
+    end
   end
 
   route do |r|
     r.assets
     r.public
     r.rodauth
+
+    # OAuth 2.1 authorization layer for the MCP endpoint. Discovery and the token/register
+    # endpoints are public and machine-facing; /authorize needs the login session and CSRF,
+    # so it lives here in the Roda tree rather than in the plain-Rack MCP stack.
+    r.on '.well-known' do
+      r.get('oauth-protected-resource') { oauth_json(OAuth::Metadata.protected_resource) }
+      r.get('oauth-authorization-server') { oauth_json(OAuth::Metadata.authorization_server) }
+    end
+    r.post('register') { oauth_register(r) }
+    r.is 'authorize' do
+      r.get { oauth_authorize_get(r) }
+      r.post { oauth_authorize_post(r) }
+    end
+    r.post('token') { oauth_token(r) }
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
