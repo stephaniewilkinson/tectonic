@@ -112,12 +112,99 @@ namespace :library do
   end
 end
 
+namespace :mcp do
+  namespace :token do
+    desc "Mint an MCP bearer token: rake 'mcp:token:mint[read,write]' ACCOUNT_ID=1 NAME=laptop"
+    task :mint, [:scopes] do |_task, args|
+      # Rake splits `mint[read,write]` into a named arg plus extras, so gather both.
+      mint_mcp_token([args[:scopes], *args.extras])
+    end
+
+    desc 'List MCP tokens (digest only, never the raw value)'
+    task :list do
+      list_mcp_tokens
+    end
+
+    desc "Soft-revoke an MCP token by id: rake 'mcp:token:revoke[3]'"
+    task :revoke, [:id] do |_task, args|
+      revoke_mcp_token(args[:id])
+    end
+  end
+end
+
+# Mints a token for ACCOUNT_ID (or the only account) with the given scopes and an
+# optional NAME / EXPIRES_IN_DAYS, then prints the raw value once. It is never
+# recoverable afterward, so the print is the whole point.
+def mint_mcp_token(scope_args)
+  require_relative 'lib/tectonic/api_token'
+  minted = Tectonic::ApiToken.mint(account_id: account_id_from(Tectonic::ApiToken),
+                                   scopes: mcp_scopes(scope_args),
+                                   name: ENV.fetch('NAME', nil), expires_at: mcp_token_expiry)
+  announce_minted_token(minted)
+end
+
+# Prints the new token's metadata plus its raw value, which is shown here once and
+# is unrecoverable afterward.
+def announce_minted_token(minted)
+  record = minted.record
+  puts "Minted token ##{record.id} for account #{record.account_id}, scopes: #{record.scope_list.join(', ')}"
+  puts 'Raw token (shown once, copy it now):'
+  puts minted.raw
+end
+
+# Scopes from the mixed rake arg forms, defaulting to read-only when none are given.
+def mcp_scopes(scope_args)
+  scopes = Array(scope_args).flat_map { |value| value.to_s.split(/[\s,]+/) }.reject(&:empty?)
+  scopes.empty? ? ['read'] : scopes
+end
+
+# Optional expiry from EXPIRES_IN_DAYS; a token with none never expires on its own.
+def mcp_token_expiry
+  days = ENV.fetch('EXPIRES_IN_DAYS', nil)
+  days ? Time.now + (days.to_i * 86_400) : nil
+end
+
+def list_mcp_tokens
+  require_relative 'lib/tectonic/api_token'
+  tokens = Tectonic::ApiToken.order(:id).all
+  abort 'No MCP tokens yet.' if tokens.empty?
+  tokens.each { |token| puts mcp_token_summary(token) }
+end
+
+def mcp_token_summary(token)
+  used = token.last_used_at ? token.last_used_at.strftime('%Y-%m-%d') : 'never'
+  "##{token.id} account=#{token.account_id} #{mcp_token_state(token)} " \
+    "scopes=[#{token.scope_list.join(',')}] name=#{token.name || '-'} last_used=#{used}"
+end
+
+def mcp_token_state(token)
+  return 'revoked' if token.revoked_at
+  return 'expired' if token.expires_at && token.expires_at <= Time.now
+
+  'active'
+end
+
+def revoke_mcp_token(id)
+  require_relative 'lib/tectonic/api_token'
+  token = Tectonic::ApiToken[id.to_i]
+  abort "No token with id #{id}." unless token
+
+  token.revoke!
+  puts "Revoked token ##{token.id}."
+end
+
 # The seed needs an account to hang a program off. One account is the normal case
 # in development, so only insist on being told which when there is a choice.
 def seed_account_id
+  account_id_from(Tectonic::Program)
+end
+
+# Resolves the account to act on: ACCOUNT_ID when given, otherwise the sole account,
+# aborting when there is none or a choice to make. Any loaded model reaches accounts.
+def account_id_from(model)
   return ENV['ACCOUNT_ID'].to_i if ENV['ACCOUNT_ID']
 
-  ids = Tectonic::Program.db[:accounts].select_map(:id)
+  ids = model.db[:accounts].select_map(:id)
   abort 'No accounts yet. Sign up first, or pass ACCOUNT_ID.' if ids.empty?
   abort "Several accounts exist (#{ids.join(', ')}). Pass ACCOUNT_ID." if ids.length > 1
 

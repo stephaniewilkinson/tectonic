@@ -23,3 +23,8 @@ services:
         sync: false
       - key: RACK_ENV
         value: production
+      # The MCP transport's DNS-rebinding protection allows only loopback by
+      # default, so the deployed endpoint would 403 every request until its real
+      # Host values are allow-listed here.
+      - key: MCP_ALLOWED_HOSTS
+        value: tectonicplates.app,tectonic.onrender.com
