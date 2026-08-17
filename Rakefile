@@ -34,10 +34,12 @@ def baseline(db)
 end
 
 # Migrates to a target version, or to the latest when given none.
+# allow_missing_migration_files tolerates the gap left by in-flight migrations that
+# claimed 014/015 on unmerged branches; this branch's own migrations are 016-019.
 def migrate_to(version)
   db = migrator_db
   baseline(db)
-  Sequel::Migrator.run(db, 'migrate', target: version&.to_i)
+  Sequel::Migrator.run(db, 'migrate', target: version&.to_i, allow_missing_migration_files: true)
   puts "Database is at migration version #{db[:schema_info].get(:version)}"
 end
 
@@ -49,7 +51,7 @@ def rollback_one
   target = db[:schema_info].get(:version) - 1
   abort 'Already at version 0.' if target.negative?
 
-  Sequel::Migrator.run(db, 'migrate', target:)
+  Sequel::Migrator.run(db, 'migrate', target:, allow_missing_migration_files: true)
   puts "Database is at migration version #{db[:schema_info].get(:version)}"
 end
 

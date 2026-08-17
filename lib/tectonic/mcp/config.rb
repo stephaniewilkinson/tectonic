@@ -21,6 +21,19 @@ class Tectonic < Roda
         ENV.fetch('MCP_ENDPOINT_PATH', '/mcp')
       end
 
+      # The externally reachable origin of this deployment, e.g. https://tectonicplates.app
+      # in production. Every OAuth issuer/metadata URL and the token audience derive from
+      # it, so a misconfigured base URL fails closed rather than pointing at localhost.
+      def public_base_url
+        ENV.fetch('MCP_PUBLIC_BASE_URL', 'http://localhost:9292')
+      end
+
+      # The protected resource identifier and OAuth token audience: the public origin plus
+      # the endpoint path. An OAuth token whose `resource` is not exactly this is refused.
+      def resource_url
+        "#{public_base_url}#{endpoint_path}"
+      end
+
       # The global write kill switch (spec §5). Default on; flip MCP_WRITES_ENABLED to
       # a falsey value to make every write tool refuse while reads keep working.
       def writes_enabled?
