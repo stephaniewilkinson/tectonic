@@ -28,3 +28,8 @@ services:
       # Host values are allow-listed here.
       - key: MCP_ALLOWED_HOSTS
         value: tectonicplates.app,tectonic.onrender.com
+      # The public origin every OAuth issuer/metadata URL and the token audience
+      # derive from. Without it the discovery documents would advertise localhost
+      # and claude.ai could not complete the OAuth flow against the deployment.
+      - key: MCP_PUBLIC_BASE_URL
+        value: https://tectonicplates.app
