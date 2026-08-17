@@ -28,6 +28,21 @@ class Tectonic < Roda
       Minted.new(raw, record)
     end
 
+    # An OAuth access token: an api_tokens row with kind 'oauth', tagged with the client
+    # it was issued to and the resource (audience) it is valid for, so the MCP auth
+    # middleware can reject a token presented at any other endpoint. ~1 hour expiry.
+    OAUTH_ACCESS_LIFETIME = 3600
+
+    def self.mint_oauth(account_id:, scopes:, client_id:, resource:)
+      raw = SecureRandom.urlsafe_base64(32)
+      record = create(
+        account_id:, token_digest: digest(raw), kind: 'oauth', client_id:, resource:,
+        scopes: Sequel.pg_array(Array(scopes).map(&:to_s), :text),
+        expires_at: Time.now + OAUTH_ACCESS_LIFETIME
+      )
+      Minted.new(raw, record)
+    end
+
     # Resolves a raw bearer token to its live row, or nil when it is unknown, expired,
     # or revoked. The lookup is by digest, so the raw value is never compared in SQL.
     def self.verify(raw)
@@ -46,6 +61,12 @@ class Tectonic < Roda
     # A token is usable until it is revoked or its expiry passes.
     def active?
       revoked_at.nil? && (expires_at.nil? || expires_at > Time.now)
+    end
+
+    # An OAuth-issued token, as opposed to a personal access token. Only OAuth tokens
+    # carry an audience the MCP auth middleware enforces; PATs (kind 'pat') do not.
+    def oauth?
+      kind == 'oauth'
     end
 
     # Records that the token was just used to authenticate a request.
