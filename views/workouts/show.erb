@@ -16,6 +16,10 @@
   </div>
 </div>
 
+<%- if provenance(@workout) %>
+  <p class="mt-2 text-xs text-gray-400"><%= provenance(@workout) %></p>
+<%- end %>
+
 <dl class="mt-5 grid grid-cols-2 gap-5 lg:grid-cols-3">
   <%- @array_of_exercise_ids.each do | exercise_id | %>
     <div class="relative overflow-hidden rounded-xl bg-white px-4 pt-5 shadow sm:px-6 sm:pt-6">

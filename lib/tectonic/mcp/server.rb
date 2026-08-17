@@ -3,6 +3,11 @@
 require 'mcp'
 require_relative 'config'
 require_relative 'tools/whoami'
+require_relative 'tools/create_exercise'
+require_relative 'tools/create_workout'
+require_relative 'tools/create_set'
+require_relative 'tools/list_exercises'
+require_relative 'tools/list_workouts'
 
 class Tectonic < Roda
   module MCP
@@ -14,7 +19,11 @@ class Tectonic < Roda
       # Every tool the server exposes. Registering a new tool is adding its class here
       # (and requiring it above); auth, scoping, validation, and auditing come from the
       # base class.
-      TOOLS = [Tools::Whoami].freeze
+      TOOLS = [
+        Tools::Whoami,
+        Tools::CreateExercise, Tools::CreateWorkout, Tools::CreateSet,
+        Tools::ListExercises, Tools::ListWorkouts
+      ].freeze
 
       module_function
 

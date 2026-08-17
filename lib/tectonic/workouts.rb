@@ -1,10 +1,13 @@
 # frozen_string_literal: true
 
 require_relative 'db'
+require_relative 'api_token'
 
 class Tectonic < Roda
   class Workout < Sequel::Model
     one_to_many :sets
+    # The API token that created this row, or nil for a human-made one.
+    many_to_one :created_by_token, class: 'Tectonic::ApiToken', key: :created_by_token_id
 
     # def self.create_workout_a(account_id, squat_weight, benchpress_weight, row_weight)
     #   workout_id = Workout.insert(account_id:, date: Time.now.utc)

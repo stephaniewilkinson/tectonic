@@ -1,0 +1,82 @@
+# frozen_string_literal: true
+
+require 'date'
+require_relative '../tool'
+require_relative '../../exercises'
+require_relative '../../workouts'
+require_relative '../../sets'
+require_relative '../../api_token'
+
+class Tectonic < Roda
+  module MCP
+    module Tools
+      # Find-or-create by natural key, shared by every write tool so the three never
+      # diverge in how they resolve an exercise or workout or stamp provenance. Each
+      # method works only through the request's account-scoped datasets, so a resolved
+      # row is always the caller's own (or the shared library) and never another
+      # account's -- a cross-account write is unexpressible here, not merely avoided.
+      module Resolver
+        module_function
+
+        # An exercise the account already has (its own or a library one) by name, or a
+        # new private one stamped with the calling token.
+        def exercise(context, name:, icon_url: nil)
+          clean = name.to_s.strip
+          raise Tool::Refusal, 'An exercise needs a non-empty name.' if clean.empty?
+
+          context.exercises.where(name: clean).order(:id).first ||
+            Exercise.create(name: clean, icon_url:, account_id: context.account_id,
+                            created_by_token_id: context.token_id, created_at: Time.now)
+        end
+
+        # The account's workout on a calendar date, or a new one stamped with the
+        # calling token. Matching casts the timestamp to a date so it is idempotent
+        # on the day regardless of the stored time-of-day.
+        def workout(context, date:)
+          day = date.is_a?(Date) ? date : parse_date(date)
+          context.workouts.where(Sequel.cast(:date, :date) => day).order(:id).first ||
+            Workout.create(account_id: context.account_id, date: day,
+                           created_by_token_id: context.token_id, created_at: Time.now)
+        end
+
+        # 'today' or nil for the current day, an ISO YYYY-MM-DD otherwise; anything
+        # else refuses with a message a model can correct from.
+        def parse_date(raw)
+          text = raw.to_s.strip
+          return Date.today if text.empty? || text.casecmp('today').zero?
+
+          Date.iso8601(text)
+        rescue ArgumentError
+          raise Tool::Refusal, "Couldn't read #{raw.inspect} as a date; use 'today' or YYYY-MM-DD."
+        end
+      end
+
+      # Turns a model row into the hash a tool returns, so a read tool and a write
+      # tool describe the same object identically. Every view carries provenance.
+      module Presenter
+        module_function
+
+        def view_exercise(exercise)
+          { id: exercise.id, name: exercise.name, library: exercise.library? }
+            .merge(provenance(exercise))
+        end
+
+        def view_workout(workout)
+          { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), sets: workout.sets.count }
+            .merge(provenance(workout))
+        end
+
+        def view_set(set)
+          { id: set.id, exercise: set.exercise.name, weight: set.weight, reps: set.reps,
+            is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
+        end
+
+        # Who and when, both nil for a human-made row so a client can tell the two apart.
+        def provenance(record)
+          { created_by: record.created_by_token&.name, created_at: record.created_at&.iso8601 }
+        end
+      end
+    end
+  end
+end
+
