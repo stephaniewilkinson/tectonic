@@ -11,6 +11,7 @@ require_relative 'lib/tectonic/exercises'
 require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
+require_relative 'lib/tectonic/oauth_keys'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -19,7 +20,13 @@ class Tectonic < Roda
 
   plugin :assets, css: ['tailwind.css', 'styles.css']
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
+  plugin :h
   plugin :head
+  # Rodauth's json feature (OAuth token/registration endpoints speak JSON) calls back
+  # into Roda's json plugin to serialize responses; json_parser merges a JSON request
+  # body into request.params so dynamic client registration can read it.
+  plugin :json
+  plugin :json_parser
   plugin :public, root: 'assets'
   plugin :render
   plugin :route_csrf
@@ -27,16 +34,49 @@ class Tectonic < Roda
   plugin :slash_path_empty
   plugin :rodauth do
     account_password_hash_column :password_hash
-    enable :login, :logout, :create_account, :remember
+    # User login plus the OAuth 2.1 authorization server that issues the tokens every
+    # MCP client authenticates with. All auth -- web sessions and machine access --
+    # runs through this one Rodauth config rather than any hand-rolled path.
+    enable :login, :logout, :create_account, :remember, :json,
+           :oauth_authorization_code_grant, :oauth_pkce,
+           :oauth_client_credentials_grant, :oauth_jwt,
+           :oauth_resource_indicators, :oauth_dynamic_client_registration,
+           :oauth_token_introspection, :oauth_token_revocation
     after_login do
       remember_login
     end
+
+    # The scopes an LLM can be granted, and the RSA keypair that signs (private) and
+    # verifies (public) the JWT access tokens the resource server checks locally.
+    oauth_application_scopes %w[read write]
+    oauth_jwt_keys OAuthKeys.signing_keys
+    oauth_jwt_public_keys OAuthKeys.verification_keys
+    # OAuth 2.1 / MCP: PKCE is already required; refuse the weak "plain" challenge so
+    # only S256 is accepted.
+    oauth_pkce_allow_plain_method false
+    # Public clients (claude.ai registers via DCR with no secret, relying on PKCE) use
+    # token_endpoint_auth_method "none", so accept it alongside the secret methods.
+    oauth_token_endpoint_auth_methods_supported %w[client_secret_basic client_secret_post none]
+    # Open dynamic client registration (RFC 7591): an LLM registers itself with no
+    # prior account -- the user is bound later, at the consent step. A registered client
+    # can do nothing until a logged-in user authorizes it, so registration stays open.
+    before_register do
+      # No account to authorize against, and nothing else to gate: registration is open.
+    end
+    # Standard authorization-code default: redirect back with ?code=... rather than
+    # rodauth-oauth's form_post default, which is what MCP clients like claude.ai expect
+    # when they omit response_mode. (form_post is still offered for clients that ask.)
+    oauth_response_mode 'query'
   end
 
   route do |r|
     r.assets
     r.public
     r.rodauth
+    # rodauth-oauth serves RFC 8414 authorization-server metadata from its own method
+    # rather than a registered route, so it has to be invoked here; it only fires for
+    # GET /.well-known/oauth-authorization-server and otherwise falls through.
+    rodauth.load_oauth_server_metadata_route
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
