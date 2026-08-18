@@ -28,3 +28,14 @@ services:
       # Host values are allow-listed here.
       - key: MCP_ALLOWED_HOSTS
         value: tectonicplates.app,tectonic.onrender.com
+      # The public origin the OAuth authorization server and MCP resource server
+      # advertise (token audience, resource + AS metadata, discovery URLs). Must be the
+      # canonical https origin clients connect to.
+      - key: MCP_PUBLIC_BASE_URL
+        value: https://tectonicplates.app
+      # The RSA private key (PEM) that signs OAuth JWT access tokens; the public half is
+      # derived from it. Must be stable across deploys and instances or issued tokens
+      # stop verifying -- so it is set once in the dashboard, never regenerated. Generate
+      # with: openssl genrsa 2048
+      - key: OAUTH_JWT_PRIVATE_KEY
+        sync: false

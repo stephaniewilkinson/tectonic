@@ -72,9 +72,11 @@ https://thenounproject.com/icon/barbell-plate-4802392/
 # MCP server
 
 Tectonic exposes a [Model Context Protocol](https://modelcontextprotocol.io) endpoint
-so an LLM client can act on an account's data through audited, per-account tools. This
-is the *infrastructure* — transport, auth, scoping, auditing, guardrails — plus one
-proof tool, `whoami`. Adding real tools later is meant to be cheap; see "Adding a tool".
+so an LLM client can act on an account's data through audited, per-account tools:
+`create_exercise`/`create_workout`/`create_set`, `list_exercises`/`list_workouts`,
+`search`/`fetch` (the ChatGPT connector contract), and `whoami`. The framework around
+them — transport, auth, scoping, auditing, guardrails — makes adding a tool cheap; see
+"Adding a tool".
 
 The endpoint is a plain Rack app mounted at `/mcp` in `config.ru`, entirely outside
 Roda's sessions, CSRF, and assets. It uses the `mcp` gem (pinned to `1.2.0`) and is
@@ -82,28 +84,37 @@ constructed **stateless** (`stateless: true`): each POST is self-contained, no s
 or SSE state is held in memory, so there is **no single-process constraint** — it scales
 horizontally like any other request.
 
-## Minting a token
+## Authentication (OAuth 2.1)
 
-Access is by bearer token. Only the SHA-256 digest is stored; the raw value is printed
-once at creation and is unrecoverable afterward.
+Access is by OAuth 2.1, served by Rodauth (`rodauth-oauth`) in the same app. An LLM
+client (Claude, ChatGPT, …) connects to the MCP URL, registers itself via Dynamic
+Client Registration, and the user authorizes it on the consent page. Access tokens are
+short-lived **RS256 JWTs** the MCP endpoint verifies locally — signature, expiry, and
+audience (RFC 8707) — with no database lookup. There is nothing to mint or paste.
+
+Discovery lives at the root, per the MCP authorization spec:
+
+- `/.well-known/oauth-protected-resource` — RFC 9728; names this resource and its
+  authorization server.
+- `/.well-known/oauth-authorization-server` — RFC 8414; the authorize/token/register
+  endpoints, scopes, and S256 PKCE.
+
+For a **headless** caller (a script or CLI), register a confidential client and use the
+client-credentials grant:
 
 ```
-# read-only token for the only account (or pass ACCOUNT_ID when several exist)
-bundle exec rake 'mcp:token:mint[read]' ACCOUNT_ID=1 NAME=laptop
-
-# read + write, expiring in 30 days
-bundle exec rake 'mcp:token:mint[read,write]' ACCOUNT_ID=1 NAME=laptop EXPIRES_IN_DAYS=30
-
-bundle exec rake mcp:token:list          # digest only, never the raw value
-bundle exec rake 'mcp:token:revoke[3]'   # soft-revoke by id
+# registers a client bound to an account; prints client_id + client_secret once
+bundle exec rake 'oauth:client:register[My Script]' ACCOUNT_ID=1
+# then exchange them at POST /token (grant_type=client_credentials) for a JWT
 ```
 
 ## The endpoint
 
 - URL: `https://<host>/mcp` (locally `http://localhost:9292/mcp`).
-- Every request needs `Authorization: Bearer <token>`. Missing, malformed, unknown,
-  expired, or revoked tokens are rejected with `401` before the request reaches the
-  transport.
+- Every request needs `Authorization: Bearer <jwt>`. Missing, malformed, expired,
+  wrong-audience, or badly signed tokens are rejected with `401` — carrying a
+  `WWW-Authenticate` challenge that points at the protected-resource metadata — before
+  the request reaches the transport.
 - DNS-rebinding protection is on. Loopback hosts are always allowed; a deployed host
   must be listed in `MCP_ALLOWED_HOSTS` (and browser origins in `MCP_ALLOWED_ORIGINS`).
 
@@ -117,21 +128,26 @@ Configuration (all read from the environment):
 | `MCP_ALLOWED_ORIGINS` | — | Extra browser Origin values. |
 | `MCP_AUDIT_READS` | off | Also audit read tools (writes are always audited). |
 | `MCP_SCOPES` | `read write` | Scopes the server recognizes. |
+| `MCP_PUBLIC_BASE_URL` | — | Public https origin, for the token audience and discovery URLs. Required in production. |
+| `OAUTH_JWT_PRIVATE_KEY` | — | RSA private key (PEM) signing access tokens; the public half is derived. Required in production; an ephemeral pair is generated otherwise. |
 
 ## Connecting it as a custom connector
 
-In a client that supports remote MCP servers (e.g. Claude), add a custom connector:
+In a client that supports remote MCP servers (Claude, ChatGPT), add a custom connector:
 
 - Type: HTTP / "Streamable HTTP" MCP server.
 - URL: `https://<host>/mcp`.
-- Authentication: Bearer token — paste the raw value from `mcp:token:mint`.
+- Authentication: **OAuth** — the client discovers the authorization server from the
+  URL and walks you through the consent page; there is no token to paste. ChatGPT's
+  standard connector additionally requires `search`/`fetch` tools, which the server
+  exposes.
 
-Or point any MCP-capable client at the URL with that `Authorization` header. A quick
-check with curl:
+Or point any MCP-capable client at the URL. A quick check with curl, using a JWT
+obtained from the OAuth flow (or the client-credentials grant above):
 
 ```
 curl -sX POST https://<host>/mcp \
-  -H 'authorization: Bearer <token>' \
+  -H 'authorization: Bearer <jwt>' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"whoami","arguments":{}}}'
