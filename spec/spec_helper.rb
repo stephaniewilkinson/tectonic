@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 ENV['RACK_ENV'] = 'test'
+# The OAuth resource identifier the MCP endpoint verifies tokens against and advertises
+# in its discovery document; tests sign and expect tokens for this audience.
+ENV['MCP_PUBLIC_BASE_URL'] ||= 'https://example.org'
 
 # require 'dotenv/load' #keeping this here until i need it later
 require 'minitest/autorun'

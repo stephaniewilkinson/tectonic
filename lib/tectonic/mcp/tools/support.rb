@@ -5,7 +5,6 @@ require_relative '../tool'
 require_relative '../../exercises'
 require_relative '../../workouts'
 require_relative '../../sets'
-require_relative '../../api_token'
 
 class Tectonic < Roda
   module MCP
@@ -26,7 +25,7 @@ class Tectonic < Roda
 
           context.exercises.where(name: clean).order(:id).first ||
             Exercise.create(name: clean, icon_url:, account_id: context.account_id,
-                            created_by_token_id: context.token_id, created_at: Time.now)
+                            created_by_oauth_application_id: context.application_id, created_at: Time.now)
         end
 
         # The account's workout on a calendar date, or a new one stamped with the
@@ -36,7 +35,7 @@ class Tectonic < Roda
           day = date.is_a?(Date) ? date : parse_date(date)
           context.workouts.where(Sequel.cast(:date, :date) => day).order(:id).first ||
             Workout.create(account_id: context.account_id, date: day,
-                           created_by_token_id: context.token_id, created_at: Time.now)
+                           created_by_oauth_application_id: context.application_id, created_at: Time.now)
         end
 
         # 'today' or nil for the current day, an ISO YYYY-MM-DD otherwise; anything
@@ -73,7 +72,7 @@ class Tectonic < Roda
 
         # Who and when, both nil for a human-made row so a client can tell the two apart.
         def provenance(record)
-          { created_by: record.created_by_token&.name, created_at: record.created_at&.iso8601 }
+          { created_by: record.created_by_oauth_application&.name, created_at: record.created_at&.iso8601 }
         end
       end
     end

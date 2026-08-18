@@ -12,6 +12,7 @@ require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/oauth_keys'
+require_relative 'lib/tectonic/mcp/config'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -73,6 +74,15 @@ class Tectonic < Roda
     r.assets
     r.public
     r.rodauth
+    # RFC 9728 protected-resource metadata: rodauth-oauth does not ship it, and MCP
+    # clients require it to discover the authorization server. It lives at the root
+    # (the /mcp resource server is mounted separately), so Roda serves it -- and it must
+    # be matched before the AS metadata route below, which consumes the shared
+    # `.well-known` segment.
+    r.get('.well-known/oauth-protected-resource') do
+      response['content-type'] = 'application/json'
+      MCP::Config.protected_resource_metadata.to_json
+    end
     # rodauth-oauth serves RFC 8414 authorization-server metadata from its own method
     # rather than a registered route, so it has to be invoked here; it only fires for
     # GET /.well-known/oauth-authorization-server and otherwise falls through.
@@ -288,10 +298,10 @@ class Tectonic < Roda
   # objects an LLM made through the MCP endpoint; nil for anything a human made
   # in the UI, so the two are always distinguishable at a glance.
   def provenance(record)
-    token = record.created_by_token
-    return unless token && record.created_at
+    application = record.created_by_oauth_application
+    return unless application && record.created_at
 
-    "Created by #{token.name || 'an API token'} on #{record.created_at.strftime('%b %-d, %Y')}"
+    "Created by #{application.name || 'an LLM'} on #{record.created_at.strftime('%b %-d, %Y')}"
   end
 end
 

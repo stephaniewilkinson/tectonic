@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'spec_helper'
+require_relative '../lib/tectonic/mcp'
 require 'json'
 require 'base64'
 require 'digest'
@@ -65,14 +66,26 @@ module OAuthFlow
     JSON.parse(last_response.body)
   end
 
-  # Full flow: fresh account + client -> a signed JWT access token payload string.
-  def access_token(scope: %w[read write])
-    _id, email, password = create_account
+  # Creates and logs in a fresh account, returning its id.
+  def sign_in
+    id, email, password = create_account
     login(email, password)
+    id
+  end
+
+  # Registers a client and walks the authorization-code + PKCE flow for the
+  # already-signed-in session, returning the token endpoint's JSON response.
+  def issue_token(scope: %w[read write])
     client = register_client
     verifier, challenge = pkce
     code = authorize(client, challenge, scope:)
     exchange(client, code, verifier)
+  end
+
+  # Full flow: fresh account + client -> the token endpoint's JSON response.
+  def access_token(scope: %w[read write])
+    sign_in
+    issue_token(scope:)
   end
 end
 
@@ -119,6 +132,35 @@ describe 'the authorization code + PKCE flow' do
     assert_equal 'read write', payload['scope']
     assert_includes Array(payload['aud']), OAuthFlow::RESOURCE
     assert payload['sub'], 'expected a subject (account) claim'
+  end
+end
+
+describe 'OAuth protected-resource metadata' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  it 'advertises the MCP resource, its authorization server, and the scopes (RFC 9728)' do
+    get '/.well-known/oauth-protected-resource'
+    md = JSON.parse(last_response.body)
+    assert_equal 200, last_response.status
+    assert_equal OAuthFlow::RESOURCE, md['resource']
+    assert_equal %w[read write], md['scopes_supported']
+    assert md['authorization_servers'].is_a?(Array) && !md['authorization_servers'].empty?
+  end
+end
+
+describe 'the resource server accepts authorization-server tokens' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  it 'verifies an issued JWT and resolves it to the account and scopes' do
+    account = sign_in
+    token = issue_token['access_token']
+    claims = Tectonic::MCP::AccessToken.verify(token)
+    refute_nil claims, 'an authorization-server token must pass resource-server verification'
+    context = Tectonic::MCP::RequestContext.from_claims(claims)
+    assert_equal account, context.account_id
+    assert_equal %w[read write], context.scopes
   end
 end
 

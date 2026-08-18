@@ -3,6 +3,8 @@
 require_relative 'spec_helper'
 require_relative '../lib/tectonic/mcp'
 require 'securerandom'
+require 'jwt'
+require 'openssl'
 
 # The MCP endpoint mounted as its own Rack app. The transport ignores the request
 # path, so posting to /mcp on localhost keeps the default loopback host allowed. A
@@ -27,10 +29,31 @@ def new_account
   DB[:accounts].insert(email: "#{SecureRandom.hex}@example.com", password_hash: 'x', created_on: Time.now)
 end
 
-def mint(scopes: ['read'], account_id: nil, expires_at: nil, revoked: false)
-  minted = Tectonic::ApiToken.mint(account_id: account_id || new_account, scopes:, expires_at:)
-  minted.record.revoke! if revoked
-  minted
+# A registered OAuth client (the "LLM") to attribute a test token to. Fresh per mint so
+# each token maps to its own application id, the way real distinct clients would.
+def new_oauth_application(name: 'Test LLM')
+  Tectonic::OAuthApplication.create(name:, client_id: SecureRandom.uuid, client_secret: SecureRandom.hex,
+                                    redirect_uri: 'https://example.com/cb', scopes: 'read write')
+end
+
+Minted = Struct.new(:raw, :account_id, :application_id)
+
+# Signs a JWT access token exactly as the authorization server does, so the resource
+# server accepts it: the account in `sub`, the client in `client_id`, the granted
+# scopes, and this MCP endpoint as the audience. The keyword overrides drive the
+# rejection paths (a past `exp`, a foreign `aud`, a wrong signing `key`).
+def mint(scopes: ['read'], account_id: nil, exp: nil, aud: nil, key: nil)
+  account_id ||= new_account
+  application = new_oauth_application
+  raw = JWT.encode(mint_claims(account_id, application, scopes, exp, aud),
+                   key || Tectonic::OAuthKeys.private_key, Tectonic::OAuthKeys::ALGORITHM)
+  Minted.new(raw, account_id, application.id)
+end
+
+def mint_claims(account_id, application, scopes, exp, aud)
+  { sub: account_id.to_s, client_id: application.client_id, scope: Array(scopes).join(' '),
+    aud: aud || [Tectonic::MCP::Config.resource_url], iat: Time.now.to_i,
+    exp: exp || (Time.now.to_i + 3600) }
 end
 
 def mcp_headers(raw)
@@ -93,12 +116,17 @@ describe 'MCP bearer authentication' do
   end
 
   it 'rejects an expired token' do
-    raw = mint(expires_at: Time.now - 60).raw
+    raw = mint(exp: Time.now.to_i - 60).raw
     assert_equal 401, call_tool('whoami', raw:).status
   end
 
-  it 'rejects a revoked token' do
-    raw = mint(revoked: true).raw
+  it 'rejects a token signed by an unknown key' do
+    raw = mint(key: OpenSSL::PKey::RSA.generate(2048)).raw
+    assert_equal 401, call_tool('whoami', raw:).status
+  end
+
+  it 'rejects a token minted for another audience' do
+    raw = mint(aud: ['https://someone-else.example/mcp']).raw
     assert_equal 401, call_tool('whoami', raw:).status
   end
 end
@@ -132,7 +160,7 @@ describe 'the whoami tool' do
   end
 
   it 'resolves each token to its own account' do
-    first = mint.record.account_id
+    first = mint.account_id
     second_raw = mint.raw
     call_tool('whoami', raw: second_raw)
     refute_equal first, tool_result['structuredContent']['account_id']
@@ -170,7 +198,7 @@ describe 'MCP scope enforcement' do
   it 'audits the refusal of a write tool' do
     token = mint(scopes: ['read'])
     call_tool('audit_probe', raw: token.raw, arguments: { note: 'hi' })
-    row = Tectonic::McpAuditLog.where(token_id: token.record.id).first
+    row = Tectonic::McpAuditLog.where(oauth_application_id: token.application_id).first
     assert_equal 'refused', row.result_status
   end
 end
@@ -198,14 +226,14 @@ describe 'MCP audit logging' do
   it 'lands a row when a write succeeds' do
     token = mint(scopes: ['write'])
     call_tool('audit_probe', raw: token.raw, arguments: { note: 'done' })
-    row = Tectonic::McpAuditLog.where(token_id: token.record.id).first
+    row = Tectonic::McpAuditLog.where(oauth_application_id: token.application_id).first
     assert_equal 'success', row.result_status
   end
 
   it 'lands a row when a write fails' do
     token = mint(scopes: ['write'])
     call_tool('audit_probe', raw: token.raw, arguments: { note: 'boom' })
-    row = Tectonic::McpAuditLog.where(token_id: token.record.id).first
+    row = Tectonic::McpAuditLog.where(oauth_application_id: token.application_id).first
     assert_equal 'error', row.result_status
   end
 end
