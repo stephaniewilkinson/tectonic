@@ -103,3 +103,28 @@ describe 'the provenance helper' do
   end
 end
 
+describe 'search and fetch' do
+  include Rack::Test::Methods
+
+  it 'finds a created exercise and fetches its detail back' do
+    account = new_account
+    raw = mint(scopes: %w[read write], account_id: account).raw
+    name = "Findable #{SecureRandom.hex(4)}"
+    call_tool('create_exercise', raw:, arguments: { name: })
+    call_tool('search', raw:, arguments: { query: name })
+    hit = tool_result['structuredContent']['results'].find { |r| r['title'] == name }
+    assert_match(/\Aexercise:\d+\z/, hit['id'])
+    call_tool('fetch', raw:, arguments: { id: hit['id'] })
+    document = tool_result['structuredContent']
+    assert_equal name, document['title']
+    assert document['text'] && document['url']
+  end
+
+  it "never fetches another account's object" do
+    call_tool('create_exercise', raw: mint(scopes: ['write']).raw, arguments: { name: "S#{SecureRandom.hex(4)}" })
+    handle = "exercise:#{tool_result['structuredContent']['id']}"
+    call_tool('fetch', raw: mint(scopes: ['read']).raw, arguments: { id: handle })
+    assert tool_result['isError']
+  end
+end
+

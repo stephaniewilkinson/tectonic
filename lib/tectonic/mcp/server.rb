@@ -8,6 +8,8 @@ require_relative 'tools/create_workout'
 require_relative 'tools/create_set'
 require_relative 'tools/list_exercises'
 require_relative 'tools/list_workouts'
+require_relative 'tools/search'
+require_relative 'tools/fetch'
 
 class Tectonic < Roda
   module MCP
@@ -22,7 +24,9 @@ class Tectonic < Roda
       TOOLS = [
         Tools::Whoami,
         Tools::CreateExercise, Tools::CreateWorkout, Tools::CreateSet,
-        Tools::ListExercises, Tools::ListWorkouts
+        Tools::ListExercises, Tools::ListWorkouts,
+        # search + fetch satisfy ChatGPT's connector contract (composer + Deep Research).
+        Tools::Search, Tools::Fetch
       ].freeze
 
       module_function
