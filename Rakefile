@@ -112,85 +112,38 @@ namespace :library do
   end
 end
 
-namespace :mcp do
-  namespace :token do
-    desc "Mint an MCP bearer token: rake 'mcp:token:mint[read,write]' ACCOUNT_ID=1 NAME=laptop"
-    task :mint, [:scopes] do |_task, args|
-      # Rake splits `mint[read,write]` into a named arg plus extras, so gather both.
-      mint_mcp_token([args[:scopes], *args.extras])
-    end
-
-    desc 'List MCP tokens (digest only, never the raw value)'
-    task :list do
-      list_mcp_tokens
-    end
-
-    desc "Soft-revoke an MCP token by id: rake 'mcp:token:revoke[3]'"
-    task :revoke, [:id] do |_task, args|
-      revoke_mcp_token(args[:id])
+namespace :oauth do
+  namespace :client do
+    desc "Register a headless OAuth client (LLM): rake 'oauth:client:register[Name]' ACCOUNT_ID=1"
+    task :register, [:name] do |_task, args|
+      register_oauth_client(args[:name])
     end
   end
 end
 
-# Mints a token for ACCOUNT_ID (or the only account) with the given scopes and an
-# optional NAME / EXPIRES_IN_DAYS, then prints the raw value once. It is never
-# recoverable afterward, so the print is the whole point.
-def mint_mcp_token(scope_args)
-  require_relative 'lib/tectonic/api_token'
-  minted = Tectonic::ApiToken.mint(account_id: account_id_from(Tectonic::ApiToken),
-                                   scopes: mcp_scopes(scope_args),
-                                   name: ENV.fetch('NAME', nil), expires_at: mcp_token_expiry)
-  announce_minted_token(minted)
+# Registers a confidential OAuth client bound to ACCOUNT_ID (or the only account) and
+# prints its client_id and secret once. A headless caller exchanges them via the
+# client-credentials grant at /token for a short-lived JWT access token; interactive
+# clients (claude.ai, ChatGPT) never need this -- they register themselves over DCR.
+def register_oauth_client(name)
+  require_relative 'lib/tectonic/oauth_application'
+  require 'securerandom'
+  require 'bcrypt'
+  secret = SecureRandom.urlsafe_base64(32)
+  app = Tectonic::OAuthApplication.create(
+    name: name || 'Headless client', account_id: account_id_from(Tectonic::OAuthApplication),
+    client_id: SecureRandom.uuid, client_secret: BCrypt::Password.create(secret), scopes: 'read write'
+  )
+  announce_oauth_client(app, secret)
 end
 
-# Prints the new token's metadata plus its raw value, which is shown here once and
-# is unrecoverable afterward.
-def announce_minted_token(minted)
-  record = minted.record
-  puts "Minted token ##{record.id} for account #{record.account_id}, scopes: #{record.scope_list.join(', ')}"
-  puts 'Raw token (shown once, copy it now):'
-  puts minted.raw
-end
-
-# Scopes from the mixed rake arg forms, defaulting to read-only when none are given.
-def mcp_scopes(scope_args)
-  scopes = Array(scope_args).flat_map { |value| value.to_s.split(/[\s,]+/) }.reject(&:empty?)
-  scopes.empty? ? ['read'] : scopes
-end
-
-# Optional expiry from EXPIRES_IN_DAYS; a token with none never expires on its own.
-def mcp_token_expiry
-  days = ENV.fetch('EXPIRES_IN_DAYS', nil)
-  days ? Time.now + (days.to_i * 86_400) : nil
-end
-
-def list_mcp_tokens
-  require_relative 'lib/tectonic/api_token'
-  tokens = Tectonic::ApiToken.order(:id).all
-  abort 'No MCP tokens yet.' if tokens.empty?
-  tokens.each { |token| puts mcp_token_summary(token) }
-end
-
-def mcp_token_summary(token)
-  used = token.last_used_at ? token.last_used_at.strftime('%Y-%m-%d') : 'never'
-  "##{token.id} account=#{token.account_id} #{mcp_token_state(token)} " \
-    "scopes=[#{token.scope_list.join(',')}] name=#{token.name || '-'} last_used=#{used}"
-end
-
-def mcp_token_state(token)
-  return 'revoked' if token.revoked_at
-  return 'expired' if token.expires_at && token.expires_at <= Time.now
-
-  'active'
-end
-
-def revoke_mcp_token(id)
-  require_relative 'lib/tectonic/api_token'
-  token = Tectonic::ApiToken[id.to_i]
-  abort "No token with id #{id}." unless token
-
-  token.revoke!
-  puts "Revoked token ##{token.id}."
+# Prints the new client's id and its secret, which is shown here once (the row keeps
+# only a bcrypt hash), so the print is the whole point.
+def announce_oauth_client(app, secret)
+  puts "Registered client ##{app.id} '#{app.name}' for account #{app.account_id}, scopes: #{app.scopes}"
+  puts "client_id:     #{app.client_id}"
+  puts 'client_secret (shown once, copy it now):'
+  puts secret
 end
 
 # The seed needs an account to hang a program off. One account is the normal case
