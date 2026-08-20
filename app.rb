@@ -19,12 +19,27 @@ class Tectonic < Roda
   include Chartkick::Helper
 
   plugin :assets, css: ['tailwind.css', 'styles.css']
-  plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
+  # frame-ancestors keeps every page, the OAuth consent screen most of all, out of a
+  # third party's iframe; base-uri and object-src close the two injection sinks that cost
+  # nothing to shut. Script and style sources are deliberately left open here because the
+  # site loads a JIT stylesheet CDN and renders inline chart scripts; the OAuth pages
+  # override this with a policy that names their one script origin exactly.
+  plugin :default_headers,
+         'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains',
+         'X-Content-Type-Options' => 'nosniff',
+         'Referrer-Policy' => 'strict-origin-when-cross-origin',
+         'Content-Security-Policy' => "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
   plugin :h
   plugin :head
   plugin :public, root: 'assets'
   plugin :render
-  plugin :route_csrf
+  # A failed CSRF check is a refusal, not a crash: Roda's default raises, which reaches the
+  # client as a 500 and reads like a server fault rather than the rejection it is. This
+  # matters most on the OAuth consent POST, the one form whose forgery is worth attempting.
+  plugin :route_csrf do |_r|
+    response.status = 403
+    'That request could not be verified. Reload the page and try again.'
+  end
   plugin :sessions, secret: SESSION_SECRET
   plugin :slash_path_empty
   plugin :rodauth do
@@ -34,10 +49,10 @@ class Tectonic < Roda
       remember_login
     end
     # A login interrupted by an OAuth /authorize request returns to it afterward to finish
-    # granting; a normal login has nothing stashed and falls back to the default '/'.
-    login_redirect do
-      session.delete(Tectonic::OAuthEndpoints::OAUTH_RETURN_KEY) || '/'
-    end
+    # granting. Rodauth has to own this: logging in clears the whole session, so a location
+    # this app stashed itself would be wiped before the redirect is chosen. Rodauth reads
+    # its own key back out before that clear, so it survives.
+    login_return_to_requested_location? true
   end
 
   route do |r|
@@ -58,13 +73,13 @@ class Tectonic < Roda
       r.post { oauth_authorize_post(r) }
     end
     r.post('token') { oauth_token(r) }
+    r.post('revoke') { oauth_revoke(r) }
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
     # GET /
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
-      rodauth.login_redirect
       view('home')
     end
     r.on 'exercises' do
@@ -272,7 +287,7 @@ class Tectonic < Roda
     token = record.created_by_token
     return unless token && record.created_at
 
-    "Created by #{token.name || 'an API token'} on #{record.created_at.strftime('%b %-d, %Y')}"
+    "Created by #{token.label} on #{record.created_at.strftime('%b %-d, %Y')}"
   end
 end
 
