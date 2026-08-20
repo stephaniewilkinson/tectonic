@@ -1,3 +1,7 @@
+<%# A lift with nothing but warmups draws no chart, and a page that draws no chart is
+    not worth half a megabyte of charting library, so the layout takes its cue from
+    here rather than loading them for everyone. %>
+<%- @charts = !@weight_counts.empty? %>
 <div class="mx-auto max-w-md">
   <div class="flex items-center justify-between">
     <h1 class="text-3xl font-semibold text-gray-900"><%= @exercise[:name] %></h1>
@@ -15,7 +19,7 @@
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>
-    <%- unless @weight_counts.empty? %>
+    <%- if @charts %>
       <div class="mt-6">
         <h2 class="text-sm font-semibold text-gray-900">Working sets at each weight</h2>
         <%= column_chart(@weight_counts, xtitle: 'Weight', ytitle: 'Sets') %>
