@@ -11,9 +11,10 @@ require 'securerandom'
 # meets before they have logged a single set. The rule now is that they follow a chart,
 # so these specs name the pages that draw one and the pages that do not.
 module PageAssets
-  CHART_SCRIPTS = ['/js/chart.umd.js', '/js/chartkick.js'].freeze
-  # Vendored for a time axis, which nothing in the app draws, so no page should carry it.
-  DATE_ADAPTER = '/js/chartjs-adapter-date-fns.bundle.js'
+  # In dependency order: Chart.js, the adapter that lets it read dates, then Chartkick,
+  # which adapts what it finds. The exercise chart is plotted against days, so the
+  # adapter is load-bearing rather than along for the ride.
+  CHART_SCRIPTS = ['/js/chart.umd.js', '/js/chartjs-adapter-date-fns.bundle.js', '/js/chartkick.js'].freeze
 
   def app
     Tectonic.app
@@ -70,7 +71,7 @@ describe 'a page with no chart on it' do
   end
 end
 
-describe 'the exercise page with a histogram on it' do
+describe 'the exercise page with a chart on it' do
   include Rack::Test::Methods
   include PageAssets
 
@@ -80,21 +81,18 @@ describe 'the exercise page with a histogram on it' do
     get "/exercises/#{@exercise_id}"
   end
 
-  # Chartkick adapts Chart.js, so the library it adapts has to be the one named first.
-  it 'loads Chart.js and then Chartkick, and nothing else does' do
+  # A dependency loaded after the thing that depends on it is a dependency that was not
+  # there when it was wanted, so the order is asserted and not merely the presence.
+  it 'loads Chart.js, then the date adapter, then Chartkick' do
     body = last_response.body
+    positions = PageAssets::CHART_SCRIPTS.map { |script| body.index(script) }
 
-    assert_includes body, PageAssets::CHART_SCRIPTS.first
-    assert_includes body, PageAssets::CHART_SCRIPTS.last
-    assert_operator body.index(PageAssets::CHART_SCRIPTS.first), :<, body.index(PageAssets::CHART_SCRIPTS.last)
+    assert_equal PageAssets::CHART_SCRIPTS.length, positions.compact.length
+    assert_equal positions.compact.sort, positions
   end
 
-  it 'still hands the chart its counts' do
-    assert_includes last_response.body, 'new Chartkick["ColumnChart"]'
-  end
-
-  it 'carries no date adapter, there being no time axis to give one to' do
-    refute_includes last_response.body, PageAssets::DATE_ADAPTER
+  it 'still hands the chart its points' do
+    assert_includes last_response.body, 'new Chartkick["LineChart"]'
   end
 end
 

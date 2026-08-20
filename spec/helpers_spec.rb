@@ -48,29 +48,6 @@ describe 'rpe_style' do
   end
 end
 
-describe 'weight_histogram' do
-  let(:app) { Tectonic.new({}) }
-
-  it 'is empty for a lift with nothing logged' do
-    assert_empty app.weight_histogram([])
-  end
-
-  it 'counts the sets at each weight, lightest first' do
-    sets = [{ weight: 185, is_warmup: false }, { weight: 135, is_warmup: false }, { weight: 185, is_warmup: false }]
-
-    assert_equal [['135', 1], ['185', 2]], app.weight_histogram(sets)
-  end
-
-  # The ramp-up is not the work, and counting it would put the tallest column at the
-  # lightest weight on every lift.
-  it 'leaves warmups out, down to an empty chart when they are all there is' do
-    sets = [{ weight: 45, is_warmup: true }, { weight: 225, is_warmup: false }]
-
-    assert_equal [['225', 1]], app.weight_histogram(sets)
-    assert_empty app.weight_histogram([{ weight: 45, is_warmup: true }])
-  end
-end
-
 describe 'plate_label' do
   let(:app) { Tectonic.new({}) }
 

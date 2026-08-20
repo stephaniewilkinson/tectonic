@@ -209,8 +209,9 @@ class Tectonic < Roda
           # Only the viewer's own sets for this movement, so a shared library
           # exercise never surfaces another account's logged sets.
           my_workouts = Workout.where(account_id: @account_id).select(:id)
-          @sets = Set.where(exercise_id: @exercise.id, workout_id: my_workouts).all
-          @weight_counts = weight_histogram(@sets)
+          mine = Set.where(exercise_id: @exercise.id, workout_id: my_workouts)
+          @sets = mine.all
+          @heaviest_by_day = heaviest_by_day(mine)
           view('exercises/show')
         end
       end
@@ -397,17 +398,20 @@ class Tectonic < Roda
     Plates.label(Plates.per_side(set[:weight]))
   end
 
-  # How many sets a lift has landed on each weight, lightest to heaviest, which is the
-  # histogram the exercise page draws. Warmups are left out because the ramp-up piles
-  # onto the light end and buries the working weights the chart exists to show. The
-  # weights need no bucketing of their own: the plates that make them have already
-  # quantized them, so each weight lifted is a bin. The labels are strings so Chartkick
-  # reads the axis as categories in the order given rather than as a numeric scale,
-  # which would spread the columns out by the gaps between weights.
-  def weight_histogram(sets)
-    working = sets.reject { |set| set[:is_warmup] }
-    counts = working.group_by { |set| set[:weight] }.transform_values(&:length)
-    counts.sort.map { |weight, count| [weight.to_s, count] }
+  # The heaviest a lift was taken on each day it was recorded, oldest day first, which
+  # is the line the exercise page draws. Warmups are left out: on any normal day the top
+  # set is heavier than the ramp-up and the answer is the same either way, but a day of
+  # warmups alone should leave a gap in the line rather than a dip that reads as a light
+  # session. The maximum is taken in the database, since the alternative is dragging
+  # every set a lift has ever had into Ruby to fold it back down to one number a day.
+  # The date belongs to the workout rather than the set and is stored as a timestamp, so
+  # it is cast to a day the way the MCP tools cast it when they match one.
+  def heaviest_by_day(sets)
+    recorded = Sequel.cast(Sequel[:workouts][:date], :date)
+    heaviest = Sequel.function(:max, Sequel[:sets][:weight])
+    sets.exclude(is_warmup: true).join(:workouts, id: :workout_id).group(recorded).order(recorded)
+        .select_map([Sequel.as(recorded, :day), Sequel.as(heaviest, :heaviest)])
+        .map { |day, weight| [day.to_s, weight] }
   end
 
   # Fill for one of the session RPE buttons, highlighting the current rating.
