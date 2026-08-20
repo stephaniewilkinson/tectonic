@@ -1,73 +1,194 @@
-# Linting
+# Tectonic
+
+Tectonic is a barbell strength-training tracker. An account logs workouts; a workout
+holds sets of an exercise at a weight and a rep count, in the order they are lifted. All
+weights are integer pounds.
+
+What makes it more than a list is that a session is written before it is lifted. A
+program expands into ordinary set rows — warmup ramp included, every weight rounded to
+something a bar can actually be loaded to — so lifting is tapping through a list that
+already knows what comes next, and each row keeps the prescription beside what was
+actually done. An MCP endpoint exposes the same data to an LLM as a connector, which is
+the second half of this file.
+
+The stack is Roda and Sequel on Postgres, with Rodauth for accounts and `rodauth-oauth`
+for the OAuth 2.1 authorization server the MCP endpoint authenticates against. Views are
+ERB with Tailwind from a CDN, and htmx for the parts of the session screen that have to
+change without a page load. It deploys to Render.
+
+## What it does
+
+- **Session view** (`/workouts/:id/session`) — the gym-floor screen, as distinct from
+  `/workouts/:id`, which is the record of one. A progress bar across the top, sets grouped
+  by lift with warmups dimmed, the per-side plate breakdown under each weight ("per side
+  1×25 1×10"), and a Done button per set that toggles, so a mis-tap is undone by tapping
+  again. A set lifted differently is entered inline and the row turns amber rather than
+  lime, because done-as-written and done-differently have to read differently. The whole
+  session gets an RPE rating, with a bar-speed guide for choosing one.
+- **Exercises** — 54 built-in barbell movements shared by every account, plus any you add
+  yourself. A built-in exercise is visible to everyone but the sets shown under it are
+  only ever your own.
+- **Workouts** — list, record view, reschedule, delete.
+- **Programs** — the engine below. Authored in Ruby and run from rake; there is no UI for
+  editing one yet.
+- **Accounts** — Rodauth login, account creation, logout, remember-me.
+- **MCP** — audited, per-account tools over an OAuth 2.1-authenticated endpoint at `/mcp`.
+
+## Getting started
+
+You need Ruby at the version in `.ruby-version` (the `Gemfile` reads the same file, so the
+two cannot drift), a local Postgres, and — only for the browser specs — Firefox with
+geckodriver.
+
 ```
-erblint views/*/*
-erblint views/*
-
-# Resources
-example uploader to s3 https://pastebin.com/DtPJnbn3
-
-downloading chartsjs as image https://stackoverflow.com/questions/20206038/converting-chart-js-canvas-chart-to-image-using-todataurl-results-in-blank-im
-
-
-Resource for downloading charts as gifs: https://wpdatatables.com/animated-charts/
-
-resource for tableau charts as gifs https://towardsdatascience.com/how-to-render-your-tableau-viz-as-a-gif-file-b0a11ed6acf9
-
-Rodauth methods: https://rodauth.jeremyevans.net/rdoc/files/README_rdoc.html#label-rodauth+Methods
-
-rodauth login view: rodauth.login_view
-
-how to replace tailwind patterns: https://lorisleiva.com/replacing-tailwind-ui-hero-patterns
-
-# Rodauth
-```
-rodauth.login_view
-
+bundle install
 ```
 
-Here's how to pull HTML from erb templates:
-```
-ERB.new(File.read 'views/rodauth/login.erb').result
+### Environment
+
+`dotenv` loads `.env` when the app is required. `.env-example` names the variables but
+gives them empty values, so it is a list to work from rather than a file to copy: an empty
+`DATABASE_URL` fails inside `Sequel.connect` rather than falling back to a default. (It
+also lists `USERNAME` and `PASSWORD`, which nothing in the app reads.)
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | `app.rb` connects at require time, so nothing loads without it. `.env.rb`, which only the `Rakefile` reads, defaults it from `RACK_ENV` to `postgres:///tectonic_development` or `postgres:///tectonic_test`. |
+| `SESSION_SECRET` | yes | **At least 64 bytes.** Roda's sessions plugin refuses a shorter one, and `app.rb` builds the app at require time, so a short or missing secret raises before a single route is reached. Generate one with `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'`. |
+| `RACK_ENV` | no | `development` unless set. `test` quiets Sequel's query log; `production` and `staging` enable Rollbar and require real OAuth keys. |
+
+The MCP and OAuth variables are all optional in development and are documented in the
+table further down.
+
+### Database
 
 ```
+bundle exec rake db:create          # createuser tectonic, then the development and test databases
+bundle exec rake db:migrate         # applies migrate/001_schema.rb against DATABASE_URL
+bundle exec rake library:exercises  # loads the 54 built-in movements, idempotent on name
+```
 
-# Rodauth migrations
-https://github.com/jeremyevans/rodauth#label-Creating+tables
+`db:create` shells out to `createuser -U postgres` and `createdb -U postgres -O tectonic`,
+so it assumes a superuser role named `postgres` and gives the databases to a `tectonic`
+role. If your Postgres has neither, `createdb tectonic_development` by hand and go
+straight to `db:migrate`, which only needs `DATABASE_URL` to point somewhere it can
+connect.
 
+The schema is one squashed baseline. `db:migrate` stamps a database that already carries
+the tables rather than trying to rebuild or roll it back, so an existing database from
+before the squash adopts the baseline instead of breaking on it.
 
-## Rodauth templates
-app/views/rodauth/_login_form.html.erb
-app/views/rodauth/_login_form_footer.html.erb
-app/views/rodauth/_login_form_header.html.erb
-app/views/rodauth/login.html.erb
-app/views/rodauth/multi_phase_login.html.erb
-app/views/rodauth/create_account.html.erb
-app/views/rodauth/verify_account_resend.html.erb
-app/views/rodauth/verify_account.html.erb
-app/views/rodauth/logout.html.erb
-app/views/rodauth/remember.html.erb
-app/views/rodauth/reset_password_request.html.erb
-app/views/rodauth/reset_password.html.erb
-app/views/rodauth/change_password.html.erb
-app/views/rodauth/change_login.html.erb
-app/views/rodauth/verify_login_change.html.erb
-app/views/rodauth/close_account.html.erb
+### Running it
 
-# Logo options
-https://thenounproject.com/icon/earth-4510372/
+```
+bundle exec rackup config.ru        # http://localhost:9292
+```
 
-https://thenounproject.com/icon/earth-4511315/
+`config.ru` mounts two apps side by side under `Rack::URLMap`: the MCP endpoint at `/mcp`,
+which has its own bearer-token auth and never touches Roda's sessions or CSRF, and the
+Roda app at everything else. `/` redirects to `/welcome` until you are logged in, so start
+by signing up at `/create-account`.
 
-https://thenounproject.com/icon/barbell-plate-4397088/
+## Running the tests
 
-https://thenounproject.com/icon/barbell-plate-490489/
+```
+RACK_ENV=test bundle exec rake test                            # the whole suite
+RACK_ENV=test bundle exec ruby -Ispec spec/set_scheme_spec.rb  # one file
+```
 
-https://thenounproject.com/icon/barbell-plates-1174446/
+Set `RACK_ENV=test` yourself. The `Rakefile` loads `.env.rb` before anything else, which
+picks the database from whatever `RACK_ENV` holds at that moment; `spec_helper` sets it to
+`test` afterwards, far too late to change the connection. Without it the suite runs
+against your development database and leaves its randomly generated accounts and workouts
+there.
 
-https://thenounproject.com/icon/barbell-plate-4802392/
+Two prerequisites, neither obvious from the failure you get without them:
 
- # Start command
- bundle exec rackup config.ru -p $PORT
+- **Postgres, migrated.** `app.rb` connects at require time, so even the pure unit specs
+  need a live database as soon as `spec_helper` loads the app.
+- **A real Firefox.** `spec/exercises_spec.rb`, `route_ownership_spec.rb`,
+  `session_spec.rb`, `system_spec.rb` and `workouts_spec.rb` drive a browser through
+  Capybara and selenium, on a Puma server bound to port 9292. `MOZ_HEADLESS=1` keeps
+  windows from opening; CI sets it for the same reason.
+
+The linters, both of which CI runs:
+
+```
+bundle exec rubocop
+bundle exec erblint views/*/* views/*
+```
+
+## The program engine
+
+A program is a plan; workouts and sets are what it produces. Three tables hold the plan —
+`programs`, `program_days`, `program_lifts` — and generating a week turns them into
+ordinary `workouts` and `sets` rows with `is_completed` false. A planned session is not a
+separate kind of record: lifting a set as written only flips `is_completed`, while lifting
+it differently changes `weight` or `reps` and leaves `planned_weight` and `planned_reps`
+behind as the record of what was asked for.
+
+- **`programs`** — name, block, week, and two preferences the maths below reads:
+  `preferred_reps` (the rep count main work should be expressed at) and `is_ascending`
+  (whether working sets climb to the top weight or sit flat).
+- **`program_days`** — a weekday, in Ruby's numbering where 1 is Monday, and a focus such
+  as "Squat". A day is a weekday rather than a date, so the same program regenerates every
+  week.
+- **`program_lifts`** — an exercise at a position within the day, with `sets`, `reps`,
+  `top_weight`, `is_barbell` (whether it warms up off a bar and shows plate maths) and
+  `is_main` (whether the rep-count preference applies to it). Position is the order it was
+  written, which is the order it is generated and the order it appears in the session.
+
+`Tectonic::ProgramSeed` (`lib/tectonic/program_seed.rb`) is a program written as a frozen
+Ruby hash, until there is a UI for editing one. It creates the program, its days and its
+lifts, creating any exercise it names that the account does not already have, and is
+idempotent on account, name, block and week — reseeding returns the existing program
+untouched.
+
+`Tectonic::ProgramGenerator` (`lib/tectonic/program_generator.rb`) expands a program into
+a week of workouts. It is idempotent on account and date, so regenerating a week never
+duplicates sets and never overwrites what was actually lifted.
+
+The maths it generates through is the interesting part of the app, and each piece is
+specced on its own:
+
+- **`SetScheme`** (`set_scheme.rb`) — how many working sets, at what load, for how many
+  reps. It converts the prescription to the program's preferred rep count through the
+  RPE-8 percentage chart, so 4×5 at 155 becomes 4×3 at 165: fewer reps is more weight for
+  the same effort. Conversion only ever goes down, only between rep counts the chart
+  covers, and only for a lift marked `is_main`, so an accessory prescribed at 8 keeps its
+  8. Earlier sets then sit 3% below the top per step when the program ascends.
+- **`Warmup`** (`warmup.rb`) — the ramp from the empty 45 lb bar to just under the working
+  weight, in tiers, because a lighter lift needs less of a ramp to get there and reps
+  descend as the weight climbs. Barbell work only: bodyweight, banded and machine lifts
+  ramp differently, if at all. Where rounding would put two ramp steps on the same weight,
+  the repeat is dropped — lifting the same bar twice is not a ramp.
+- **`Plates`** (`plates.rb`) — the per-side breakdown for a loaded bar, searched depth
+  first with the heaviest plate first, so the first exact match is also the one using the
+  fewest plates. It backtracks rather than giving up, so an awkward rack still loads
+  weights a purely greedy walk would call impossible, and returns nil for a weight the
+  rack genuinely cannot make, which the session view renders as nothing at all.
+- **`Rounding`** (`rounding.rb`) — every calculated weight lands on a multiple of 5 before
+  it is written, because 2.5s on each side is the smallest change you can actually load.
+
+Today the engine is reachable only from two rake tasks:
+
+```
+bundle exec rake program:seed                                  # ACCOUNT_ID=1, or the only account
+bundle exec rake 'program:generate[2026-08-17]' PROGRAM_ID=1   # week starting that Monday
+```
+
+Which, from the seeded block 0, writes a Monday whose first lift reads: 45×5, 95×5, 115×3
+and 135×2 as the warmup ramp, then 150, 155, 160 and 165 for 3 — the 4×5 at 155 the
+program asked for, converted and ascended.
+
+## Deployment
+
+`render.yaml` is the checked-in Render blueprint: `bundle install` to build, `bundle exec
+rake db:migrate && bundle exec rake library:exercises` as the pre-deploy command, and
+`bundle exec rackup config.ru -p $PORT` to start. Secrets are marked `sync: false` so the
+values already set in the dashboard are left alone — regenerating `SESSION_SECRET` would
+log everyone out, and regenerating `OAUTH_JWT_PRIVATE_KEY` would stop every issued access
+token from verifying.
 
 # MCP server
 
