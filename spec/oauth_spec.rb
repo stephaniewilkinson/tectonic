@@ -152,6 +152,22 @@ describe 'OAuth dynamic client registration' do
   end
 end
 
+describe 'the unauthenticated registration endpoint' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  # Nothing else caps a request body, so without this an anonymous caller chooses how
+  # much the process allocates on an endpoint that needs no credentials at all.
+  it 'refuses a registration body past the size cap' do
+    body = { client_name: 'A' * (17 * 1024), redirect_uris: ['https://claude.ai/api/mcp/auth_callback'] }
+    post '/register', body.to_json, json_headers
+    refusal = JSON.parse(last_response.body)
+
+    assert_equal 400, last_response.status
+    assert_equal 'invalid_client_metadata', refusal['error']
+  end
+end
+
 describe 'the authorization code + PKCE flow' do
   include Rack::Test::Methods
   include OAuthFlow

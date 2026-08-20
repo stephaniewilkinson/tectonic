@@ -18,6 +18,9 @@ require_relative 'lib/tectonic/mcp/config'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
+  # The most a client registration may weigh. Registration metadata is a few hundred
+  # bytes; this leaves room for a long client name and a jwks document and nothing more.
+  REGISTRATION_BODY_LIMIT = 16 * 1024
 
   include Chartkick::Helper
 
@@ -83,6 +86,16 @@ class Tectonic < Roda
     # it, but where the authorization code may be delivered is not open: rodauth-oauth
     # asks only whether the redirect_uri parses, and a callback pointing anywhere turns
     # one careless approval on the consent screen into a stolen code.
+    # POST /register is unauthenticated by design, which also means an anonymous caller
+    # decides how much this process allocates: nothing else caps a request body, and the
+    # JSON parser builds whatever it is handed. The size is checked before the body is
+    # read, and the refusal is the RFC 7591 error shape rather than a 413, which a
+    # client reads as a transport failure rather than as a registration it can fix.
+    before_register_route do
+      next unless request.content_length.to_i > REGISTRATION_BODY_LIMIT
+
+      register_throw_json_response_error('invalid_client_metadata', 'The registration request is too large.')
+    end
     before_register do
       registered = @oauth_application_params[oauth_applications_redirect_uri_column].to_s.split
       refused = registered.reject { |uri| OAuth::RedirectUri.allowed?(uri) }
