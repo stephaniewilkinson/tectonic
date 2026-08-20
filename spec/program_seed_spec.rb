@@ -10,12 +10,18 @@ def seed_account
 end
 
 describe 'ProgramSeed' do
-  it 'creates the program with its week, its day and every lift' do
+  it 'creates the program with every week, its day and every lift' do
     program = Tectonic::ProgramSeed.seed(seed_account)
     week = program.program_weeks.first
-    assert_equal 1, program.weeks
+    assert_equal Tectonic::ProgramSeed::WEEKS, program.weeks
     assert_equal 1, week.program_days.count
     assert_equal 5, week.program_days.first.program_lifts.count
+  end
+
+  it 'writes one deload week, so the block backs off without anyone editing a lift' do
+    program = Tectonic::ProgramSeed.seed(seed_account)
+    deloads = program.program_weeks.select(&:is_deload)
+    assert_equal [Tectonic::ProgramSeed::DELOAD_WEEK], deloads.map(&:number)
   end
 
   it 'is idempotent: reseeding the same block returns the same program' do
