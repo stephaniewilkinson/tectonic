@@ -2,6 +2,8 @@
 
 require_relative '../tool'
 require_relative 'support'
+# Exercise#barbell?, which is what a logged set inherits its plate math from.
+require_relative '../../exercise_library'
 
 class Tectonic < Roda
   module MCP
@@ -47,11 +49,15 @@ class Tectonic < Roda
           raise Tool::Refusal, "Reps #{arguments[:reps]} is out of range; use #{REPS.first}-#{REPS.last}."
         end
 
+        # is_barbell comes off the movement rather than the arguments: whether a lift is
+        # loaded on a bar is a fact about the lift, not something a model should be asked
+        # to assert, and a schema that asked would get it wrong or omitted and the set
+        # would lose its plate math either way.
         def self.attributes(arguments, exercise, workout, context)
           { exercise_id: exercise.id, workout_id: workout.id,
             weight: arguments[:weight], reps: arguments[:reps],
             is_warmup: arguments.fetch(:is_warmup, false),
-            is_completed: arguments.fetch(:is_completed, false),
+            is_completed: arguments.fetch(:is_completed, false), is_barbell: exercise.barbell?,
             created_by_oauth_application_id: context.application_id, created_at: Time.now }
         end
       end
