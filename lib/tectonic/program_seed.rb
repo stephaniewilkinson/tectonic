@@ -82,11 +82,19 @@ class Tectonic < Roda
       )
     end
 
-    # A movement the seed names but the account does not have yet is created here, and is
-    # a barbell movement when the library knows the name -- the same default every path
-    # with nobody to ask uses.
+    # A movement the seed names, resolved among the ones the account can actually select:
+    # its own rows and the shared library. Filtering on account_id alone could never match
+    # a library row, because a library row's account_id is null by design -- that is what
+    # makes it visible to everyone -- so seeding after `rake library:exercises` built a
+    # private second "Back Squat" beside the library one and pointed the whole program at
+    # the copy. Sets logged against the two then aggregated separately, which is the one
+    # thing an exercise row exists to prevent. Oldest first when both exist, the rule the
+    # MCP resolver already uses, so the row a lifter's history is on wins over a later
+    # duplicate. Only a name nothing visible answers to is created, and it is a barbell
+    # movement when the library knows the name -- the default every path with nobody to
+    # ask uses.
     def exercise_id(account_id, name)
-      Exercise.where(account_id:, name:).first&.id ||
+      Exercise.visible_to(account_id).where(name:).order(:id).first&.id ||
         Exercise.insert(account_id:, name:, is_barbell: Exercise.barbell_by_name?(name))
     end
 
