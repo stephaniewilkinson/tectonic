@@ -21,6 +21,16 @@ class Tectonic < Roda
   # The most a client registration may weigh. Registration metadata is a few hundred
   # bytes; this leaves room for a long client name and a jwks document and nothing more.
   REGISTRATION_BODY_LIMIT = 16 * 1024
+  # The consent screen's own policy. It is the one page where a single click hands an
+  # API client the account, and the only script it needs is the stylesheet CDN the site
+  # is written against, so everything else is denied outright rather than left open the
+  # way the site-wide policy has to leave it. form-action is deliberately absent: the
+  # consent POST is answered with a 302 to the client's callback, and browsers disagree
+  # about whether form-action applies across a redirect, so naming it would risk
+  # breaking the exchange it is supposed to protect.
+  CONSENT_SECURITY_POLICY = "default-src 'none'; script-src https://cdn.tailwindcss.com; " \
+                            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " \
+                            "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 
   include Chartkick::Helper
 
@@ -112,6 +122,15 @@ class Tectonic < Roda
     # leaves the grant behind it alive; this revokes that grant, as RFC 9700 section
     # 4.14.2 requires. Prepended so it sits in front of the feature methods it extends.
     auth_class_eval { prepend OAuth::RefreshTokenReuse }
+    # The consent screen renders through a layout of its own. The site layout carries an
+    # analytics pixel, two charting libraries, a date bundle, and htmx -- five third-party
+    # scripts, none of them subresource-pinned -- and any one of them could rewrite the
+    # form that grants an API client the account. None of them has anything to do with
+    # this page, so it loads none of them, and the policy above says so.
+    authorize_view do
+      scope.response['Content-Security-Policy'] = CONSENT_SECURITY_POLICY
+      scope.view('authorize', layout: 'oauth_layout')
+    end
     # Standard authorization-code default: redirect back with ?code=... rather than
     # rodauth-oauth's form_post default, which is what MCP clients like claude.ai expect
     # when they omit response_mode. (form_post is still offered for clients that ask.)

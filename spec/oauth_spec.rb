@@ -46,6 +46,14 @@ module OAuthFlow
     [verifier, challenge]
   end
 
+  # GETs the consent screen the way a user arriving from an LLM does.
+  def consent_page(client, scope: %w[read write])
+    _, challenge = pkce
+    get '/authorize', client_id: client['client_id'], redirect_uri: client['redirect_uris'].first,
+                      response_type: 'code', code_challenge: challenge, code_challenge_method: 'S256',
+                      scope: scope.join(' '), resource: RESOURCE
+  end
+
   # Runs the consent step: GET the authorize page, then POST it back with the CSRF
   # token and the granted scopes. Returns the authorization code from the redirect.
   def authorize(client, challenge, scope: %w[read write])
@@ -272,6 +280,52 @@ describe 'the OAuth consent form refuses a forged submission' do
   end
 end
 
+describe 'the OAuth consent screen' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  before do
+    sign_in
+    consent_page(register_client)
+  end
+
+  # One click here hands an API client the account, and the site layout would have
+  # brought five third-party scripts to the page it happens on, any one of which could
+  # rewrite the form under the user.
+  it 'loads none of the site layout scripts' do
+    assert_equal 200, last_response.status
+    %w[tinyanalytics chartkick chart.umd date-fns htmx].each do |script|
+      refute_includes last_response.body, script
+    end
+  end
+
+  # form-action stays out: the consent POST is answered with a 302 to the client's
+  # callback, and browsers disagree about whether it applies across a redirect.
+  it 'carries a policy naming only the script origin it needs' do
+    policy = last_response.headers['Content-Security-Policy']
+
+    assert_includes policy, "default-src 'none'"
+    assert_includes policy, 'script-src https://cdn.tailwindcss.com'
+    assert_includes policy, "frame-ancestors 'none'"
+    refute_includes policy, 'form-action'
+  end
+end
+
+describe 'the OAuth consent screen still grants' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  it 'issues a code that exchanges for a token' do
+    sign_in
+    client = register_client
+    verifier, challenge = pkce
+    code = authorize(client, challenge)
+
+    assert code, 'the consent form must still submit and redirect with a code'
+    assert exchange(client, code, verifier)['access_token']
+  end
+end
+
 describe 'every response carries the baseline security headers' do
   include Rack::Test::Methods
   include OAuthFlow
@@ -280,11 +334,7 @@ describe 'every response carries the baseline security headers' do
   # hands out account access.
   it 'refuses to be framed on the authorize page' do
     sign_in
-    client = register_client
-    _, challenge = pkce
-    get '/authorize', client_id: client['client_id'], redirect_uri: client['redirect_uris'].first,
-                      response_type: 'code', code_challenge: challenge,
-                      code_challenge_method: 'S256', scope: 'read'
+    consent_page(register_client)
 
     assert_equal 200, last_response.status
     assert_includes last_response.headers['Content-Security-Policy'], "frame-ancestors 'none'"
