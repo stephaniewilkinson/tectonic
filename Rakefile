@@ -114,6 +114,13 @@ namespace :library do
   end
 end
 
+namespace :oauth do
+  desc "Delete spent OAuth rows older than a grace period: rake 'oauth:prune[30]'"
+  task :prune, [:days] do |_task, args|
+    prune_oauth(Integer(args[:days] || 30))
+  end
+end
+
 namespace :mcp do
   namespace :token do
     desc "Mint an MCP bearer token: rake 'mcp:token:mint[read,write]' ACCOUNT_ID=1 NAME=laptop"
@@ -132,6 +139,15 @@ namespace :mcp do
       revoke_mcp_token(args[:id])
     end
   end
+end
+
+# Deletes OAuth rows that can never be used again, keeping `days` of them for forensics.
+# The policy itself lives in OAuth::Retention so it can be tested; this only reports.
+def prune_oauth(days)
+  db = migrator_db
+  require_relative 'lib/tectonic/oauth/retention'
+  counts = Tectonic::OAuth::Retention.prune(db, Time.now - (days * 86_400))
+  counts.each { |table, deleted| puts "#{table}: #{deleted} deleted" }
 end
 
 # Mints a token for ACCOUNT_ID (or the only account) with the given scopes and an
