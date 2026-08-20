@@ -46,16 +46,20 @@ bundle install
 
 ### Environment
 
-`dotenv` loads `.env` when the app is required. `.env-example` names the variables but
-gives them empty values, so it is a list to work from rather than a file to copy: an empty
-`DATABASE_URL` fails inside `Sequel.connect` rather than falling back to a default. (It
-also lists `USERNAME` and `PASSWORD`, which nothing in the app reads.)
+`dotenv` loads `.env` when the app is required, and `.env-example` is a file to copy:
+`cp .env-example .env` gives a working development setup, pointed at the
+`tectonic_development` database `rake db:create` makes below. The keys that are secrets in
+a deployment are commented out there rather than left blank, each with the command that
+generates it, because a blank is worse than an absence here — dotenv sets the name to the
+empty string, every fallback in this project tests for nil, and an empty `DATABASE_URL`
+reaches `Sequel.connect` and raises rather than falling back to a default.
 
 | Variable | Required | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | `app.rb` connects at require time, so nothing loads without it. `.env.rb`, which only the `Rakefile` reads, defaults it from `RACK_ENV` to `postgres:///tectonic_development` or `postgres:///tectonic_test`. |
-| `SESSION_SECRET` | yes | **At least 64 bytes.** Roda's sessions plugin refuses a shorter one, and `app.rb` builds the app at require time, so a short or missing secret raises before a single route is reached. Generate one with `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'`. |
-| `RACK_ENV` | no | `development` unless set. `test` quiets Sequel's query log; `production` and `staging` enable Rollbar and require real OAuth keys. |
+| `DATABASE_URL` | yes | `app.rb` connects at require time, so nothing loads without it. `.env.rb`, which only the `Rakefile` reads, defaults it from `RACK_ENV` to `postgres:///tectonic_development` or `postgres:///tectonic_test`, but it defaults with `||=`, so a value in `.env` wins and that default never fires. A test run is the exception: `spec_helper` names its own database whatever the environment already held, so a `.env` cannot reach the suite. |
+| `SESSION_SECRET` | yes | **At least 64 bytes.** Roda's sessions plugin refuses a shorter one, and `app.rb` builds the app at require time, so a short or missing secret raises before a single route is reached. `.env-example` carries one that is long enough and says in its own text that it is for development; generate a real one with `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'` for anything deployed. |
+| `RACK_ENV` | no | `development` unless set. `test` quiets Sequel's query log; `production` and `staging` initialise Sentry and require real OAuth keys. |
+| `SENTRY_DSN` | no | The Sentry project DSN, read only when `RACK_ENV` is `production` or `staging`. Without it — unset or empty — the app boots and serves with error reporting switched off and says so once on stderr: losing error reporting is not a reason to refuse to start, which is why this behaves unlike `OAUTH_JWT_PRIVATE_KEY`. |
 
 The MCP and OAuth variables are all optional in development and are documented in the
 table further down.
@@ -92,15 +96,16 @@ by signing up at `/create-account`.
 ## Running the tests
 
 ```
-RACK_ENV=test bundle exec rake test                            # the whole suite
-RACK_ENV=test bundle exec ruby -Ispec spec/set_scheme_spec.rb  # one file
+bundle exec rake test                            # the whole suite
+bundle exec ruby -Ispec spec/set_scheme_spec.rb  # one file
 ```
 
-Set `RACK_ENV=test` yourself. The `Rakefile` loads `.env.rb` before anything else, which
-picks the database from whatever `RACK_ENV` holds at that moment; `spec_helper` sets it to
-`test` afterwards, far too late to change the connection. Without it the suite runs
-against your development database and leaves its randomly generated accounts and workouts
-there.
+Neither variable has to be passed in. `spec_helper` sets `RACK_ENV` and then names the
+database itself — `TEST_DATABASE_URL` when a run wants one of its own, and
+`postgres:///tectonic_test` otherwise — whatever the shell, a `.env` or the `Rakefile` had
+already chosen, which is what keeps a suite that cleans up after nothing away from your
+development database. `rake 'db:reset[name]'` rebuilds one an earlier run has already
+seeded.
 
 Two prerequisites, neither obvious from the failure you get without them:
 

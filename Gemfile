@@ -32,7 +32,7 @@ gem 'rodauth'
 # client-credentials, and JWT access tokens -- all as Rodauth features, so all auth
 # runs through one framework rather than a hand-rolled server.
 gem 'rodauth-oauth'
-gem 'rollbar'
+gem 'sentry-ruby'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'

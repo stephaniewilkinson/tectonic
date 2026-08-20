@@ -39,3 +39,12 @@ services:
       # with: openssl genrsa 2048
       - key: OAUTH_JWT_PRIVATE_KEY
         sync: false
+      # The Sentry project DSN error reports are sent to, replacing the error reporter
+      # whose token used to be a literal in config.ru in this public repository. A DSN
+      # grants event submission rather than access to anything, but it is still a
+      # credential and this is still a public repo, so it lives in the dashboard
+      # alongside the two above and never in the tree. Absent,
+      # the app boots and serves with reporting switched off rather than refusing to
+      # start: losing error reporting is not worth an outage.
+      - key: SENTRY_DSN
+        sync: false
