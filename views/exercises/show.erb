@@ -22,9 +22,15 @@
     <%- if @charts %>
       <div class="mt-6">
         <h2 class="text-sm font-semibold text-gray-900">Heaviest weight each day</h2>
-        <%# min: nil lets the axis fit the weights instead of starting at zero, which
+        <%# discrete: true spaces the recorded days evenly instead of by the calendar,
+            which is a deliberate trade and worth naming: a week between sessions and a
+            five-month layoff now look identical on the axis, and only the labels say
+            which happened. It is the right trade for this page, whose question is
+            whether the weight is going up, and against a real calendar a lift trained
+            in January and again in June draws two points either side of an empty plot.
+            min: nil lets the axis fit the weights instead of starting at zero, which
             nobody lifts and which flattens a season of progress into the top inch. %>
-        <%= line_chart(@heaviest_by_day, ytitle: 'Weight', curve: false, min: nil) %>
+        <%= line_chart(@heaviest_by_day, ytitle: 'Weight', curve: false, min: nil, discrete: true) %>
       </div>
     <%- end %>
 
