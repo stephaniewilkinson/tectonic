@@ -4,6 +4,7 @@ require_relative 'db'
 require_relative 'exercises'
 require_relative 'program_days'
 require_relative 'program_lifts'
+require_relative 'program_weeks'
 require_relative 'programs'
 require_relative 'set_scheme'
 require_relative 'sets'
@@ -19,13 +20,19 @@ class Tectonic < Roda
       @program = program
     end
 
-    # Inserts a workout per program day with every set pre-created, warmups
-    # included. Returns the week's workouts, whether generated now or already
-    # present. Safe to run twice: see existing_workout.
-    def generate(week_start)
-      start = week_start.to_date
+    # Inserts a workout per program day of the numbered week, with every set
+    # pre-created, warmups included. Returns that week's workouts, whether generated
+    # now or already present. Safe to run twice: see existing_workout.
+    #
+    # The week is named by its position in the block rather than by a date, because
+    # the block's start date already fixes when each of its weeks falls; asking a
+    # caller for the right Monday was asking them to recompute what the program knows.
+    def generate(number)
+      week = @program.week(number)
+      raise ArgumentError, "Program #{@program.id} has no week #{number}; it has #{@program.weeks}." unless week
+
       DB.transaction do
-        @program.program_days.sort_by(&:weekday).map { |day| generate_day(day, date_for(day, start)) }
+        week.program_days.sort_by(&:weekday).map { |day| generate_day(day, week.date_for(day.weekday)) }
       end
     end
 
@@ -46,12 +53,6 @@ class Tectonic < Roda
     # workouts.date is a timestamp, so equality on a bare date would never hit.
     def existing_workout(date)
       Workout.where(account_id: @program.account_id, date: date...(date + 1)).first
-    end
-
-    # Program days are weekdays, not dates, so a day lands on the first matching
-    # weekday within the seven days beginning at week_start.
-    def date_for(day, week_start)
-      week_start + ((day.weekday - week_start.wday) % 7)
     end
 
     def insert_sets(workout, lift)
