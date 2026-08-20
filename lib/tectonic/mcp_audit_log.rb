@@ -13,7 +13,7 @@ class Tectonic < Roda
     def self.record(context:, tool_name:, arguments:, status:, error: nil)
       insert(
         account_id: context.account_id,
-        token_id: context.token_id,
+        oauth_application_id: context.application_id,
         tool_name:,
         arguments: Sequel.pg_jsonb(arguments || {}),
         result_status: status.to_s,

@@ -5,9 +5,16 @@ require_relative 'mcp_spec' # reuses its helpers (mint, call_tool, tool_result);
 require_relative '../lib/tectonic/mcp'
 require 'securerandom'
 
-def named_token(name)
+NamedClient = Struct.new(:id, :account_id)
+
+# A registered OAuth client with a given name plus an account, so provenance can be
+# checked reading the client's name back off the row it stamped.
+def named_client(name)
   account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
-  Tectonic::ApiToken.mint(account_id:, scopes: ['read'], name:).record
+  application = Tectonic::OAuthApplication.create(name:, client_id: SecureRandom.uuid,
+                                                  client_secret: SecureRandom.hex,
+                                                  redirect_uri: 'https://e/cb', scopes: 'read')
+  NamedClient.new(application.id, account_id)
 end
 
 describe 'create_exercise' do
@@ -43,7 +50,7 @@ describe 'create_set stamping' do
     call_tool('create_set', raw: token.raw,
                             arguments: { exercise: 'Back Squat', date: 'today', weight: 135, reps: 5 })
     set = Tectonic::Set[tool_result['structuredContent']['id']]
-    assert_equal token.record.id, set.created_by_token_id
+    assert_equal token.application_id, set.created_by_oauth_application_id
   end
 end
 
@@ -86,13 +93,38 @@ end
 describe 'the provenance helper' do
   let(:app) { Tectonic.new({}) }
 
-  it 'names the token and date for a token-made row, nil for a human one' do
-    token = named_token('Claude Desktop')
-    made = Tectonic::Exercise.create(name: "P#{SecureRandom.hex(4)}", account_id: token.account_id,
-                                     created_by_token_id: token.id, created_at: Time.now)
-    human = Tectonic::Exercise.create(name: "P#{SecureRandom.hex(4)}", account_id: token.account_id)
+  it 'names the client and date for an LLM-made row, nil for a human one' do
+    client = named_client('Claude Desktop')
+    made = Tectonic::Exercise.create(name: "P#{SecureRandom.hex(4)}", account_id: client.account_id,
+                                     created_by_oauth_application_id: client.id, created_at: Time.now)
+    human = Tectonic::Exercise.create(name: "P#{SecureRandom.hex(4)}", account_id: client.account_id)
     assert_includes app.provenance(made), 'Created by Claude Desktop on'
     assert_nil app.provenance(human)
+  end
+end
+
+describe 'search and fetch' do
+  include Rack::Test::Methods
+
+  it 'finds a created exercise and fetches its detail back' do
+    account = new_account
+    raw = mint(scopes: %w[read write], account_id: account).raw
+    name = "Findable #{SecureRandom.hex(4)}"
+    call_tool('create_exercise', raw:, arguments: { name: })
+    call_tool('search', raw:, arguments: { query: name })
+    hit = tool_result['structuredContent']['results'].find { |r| r['title'] == name }
+    assert_match(/\Aexercise:\d+\z/, hit['id'])
+    call_tool('fetch', raw:, arguments: { id: hit['id'] })
+    document = tool_result['structuredContent']
+    assert_equal name, document['title']
+    assert document['text'] && document['url']
+  end
+
+  it "never fetches another account's object" do
+    call_tool('create_exercise', raw: mint(scopes: ['write']).raw, arguments: { name: "S#{SecureRandom.hex(4)}" })
+    handle = "exercise:#{tool_result['structuredContent']['id']}"
+    call_tool('fetch', raw: mint(scopes: ['read']).raw, arguments: { id: handle })
+    assert tool_result['isError']
   end
 end
 

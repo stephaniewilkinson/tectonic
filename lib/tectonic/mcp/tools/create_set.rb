@@ -52,7 +52,7 @@ class Tectonic < Roda
             weight: arguments[:weight], reps: arguments[:reps],
             is_warmup: arguments.fetch(:is_warmup, false),
             is_completed: arguments.fetch(:is_completed, false),
-            created_by_token_id: context.token_id, created_at: Time.now }
+            created_by_oauth_application_id: context.application_id, created_at: Time.now }
         end
       end
     end

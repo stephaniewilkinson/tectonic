@@ -21,17 +21,31 @@ class Tectonic < Roda
         ENV.fetch('MCP_ENDPOINT_PATH', '/mcp')
       end
 
-      # The externally reachable origin of this deployment, e.g. https://tectonicplates.app
-      # in production. Every OAuth issuer/metadata URL and the token audience derive from
-      # it, so a misconfigured base URL fails closed rather than pointing at localhost.
+      # The public origin the server is reached at (scheme + host, no trailing slash),
+      # used to build the OAuth resource identifier and the discovery URLs. Required in
+      # production; unset elsewhere, where discovery is not exercised.
       def public_base_url
-        ENV.fetch('MCP_PUBLIC_BASE_URL', 'http://localhost:9292')
+        ENV.fetch('MCP_PUBLIC_BASE_URL', nil)
       end
 
-      # The protected resource identifier and OAuth token audience: the public origin plus
-      # the endpoint path. An OAuth token whose `resource` is not exactly this is refused.
+      # The canonical MCP resource URI (RFC 8707): the public origin plus the mount
+      # path. An access token must carry this in `aud` to be accepted, and the
+      # protected-resource metadata advertises it, so both sides read one value.
       def resource_url
         "#{public_base_url}#{endpoint_path}"
+      end
+
+      # Where the RFC 9728 protected-resource metadata lives, named in the 401 challenge
+      # so a client can discover the authorization server.
+      def resource_metadata_url
+        "#{public_base_url}/.well-known/oauth-protected-resource"
+      end
+
+      # The RFC 9728 protected-resource metadata document: this MCP resource, the
+      # authorization server that guards it (the same origin), and the scopes on offer.
+      def protected_resource_metadata
+        { resource: resource_url, authorization_servers: [public_base_url],
+          scopes_supported: scopes, bearer_methods_supported: ['header'] }
       end
 
       # The global write kill switch (spec §5). Default on; flip MCP_WRITES_ENABLED to

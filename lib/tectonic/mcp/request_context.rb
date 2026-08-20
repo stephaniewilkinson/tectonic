@@ -3,7 +3,7 @@
 require_relative '../workouts'
 require_relative '../exercises'
 require_relative '../sets'
-require_relative '../api_token'
+require_relative '../oauth_application'
 
 class Tectonic < Roda
   module MCP
@@ -15,21 +15,33 @@ class Tectonic < Roda
     # this (never a raw model, never an account_id argument), which is the scoping
     # guarantee every future tool inherits for free.
     class RequestContext
-      attr_reader :account_id, :email, :scopes, :token_id
+      attr_reader :account_id, :email, :scopes, :application_id
 
-      # Builds a context from a verified ApiToken, reading identity straight off the
-      # account row so a tool never has to name an account itself.
-      def self.from_token(token)
-        account = token.db[:accounts].where(id: token.account_id).first
-        new(account_id: token.account_id, email: account && account[:email],
-            scopes: token.scope_list, token_id: token.id)
+      # Builds a context from a verified access token's JWT claims: `sub` is the
+      # account (the resource owner for the authorization-code grant), `client_id`
+      # identifies the OAuth application (the LLM, for provenance and audit), and
+      # `scope` is the space-separated grant. A client-credentials token carries the
+      # client_id in `sub`, so the account falls back to the application's owner.
+      def self.from_claims(claims)
+        application = OAuthApplication.where(client_id: claims['client_id']).first
+        account_id = account_id_from(claims, application)
+        account = account_id && DB[:accounts].where(id: account_id).first
+        new(account_id:, email: account && account[:email],
+            scopes: claims['scope'].to_s.split, application_id: application&.id)
       end
 
-      def initialize(account_id:, email:, scopes:, token_id:)
+      # The account a token acts on: the numeric `sub` of a user grant, else the owner
+      # of the client (a client-credentials grant carries no resource owner).
+      def self.account_id_from(claims, application)
+        sub = claims['sub'].to_s
+        sub.match?(/\A\d+\z/) ? sub.to_i : application&.account_id
+      end
+
+      def initialize(account_id:, email:, scopes:, application_id:)
         @account_id = account_id
         @email = email
         @scopes = scopes.map(&:to_s).freeze
-        @token_id = token_id
+        @application_id = application_id
       end
 
       # The account's workouts, and nothing else's.

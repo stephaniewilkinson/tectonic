@@ -11,7 +11,8 @@ require_relative 'lib/tectonic/exercises'
 require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
-require_relative 'lib/tectonic/oauth'
+require_relative 'lib/tectonic/oauth_keys'
+require_relative 'lib/tectonic/mcp/config'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -22,6 +23,11 @@ class Tectonic < Roda
   plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
   plugin :h
   plugin :head
+  # Rodauth's json feature (OAuth token/registration endpoints speak JSON) calls back
+  # into Roda's json plugin to serialize responses; json_parser merges a JSON request
+  # body into request.params so dynamic client registration can read it.
+  plugin :json
+  plugin :json_parser
   plugin :public, root: 'assets'
   plugin :render
   plugin :route_csrf
@@ -29,35 +35,58 @@ class Tectonic < Roda
   plugin :slash_path_empty
   plugin :rodauth do
     account_password_hash_column :password_hash
-    enable :login, :logout, :create_account, :remember
+    # User login plus the OAuth 2.1 authorization server that issues the tokens every
+    # MCP client authenticates with. All auth -- web sessions and machine access --
+    # runs through this one Rodauth config rather than any hand-rolled path.
+    enable :login, :logout, :create_account, :remember, :json,
+           :oauth_authorization_code_grant, :oauth_pkce,
+           :oauth_client_credentials_grant, :oauth_jwt,
+           :oauth_resource_indicators, :oauth_dynamic_client_registration,
+           :oauth_token_introspection, :oauth_token_revocation
     after_login do
       remember_login
     end
-    # A login interrupted by an OAuth /authorize request returns to it afterward to finish
-    # granting; a normal login has nothing stashed and falls back to the default '/'.
-    login_redirect do
-      session.delete(Tectonic::OAuthEndpoints::OAUTH_RETURN_KEY) || '/'
+
+    # The scopes an LLM can be granted, and the RSA keypair that signs (private) and
+    # verifies (public) the JWT access tokens the resource server checks locally.
+    oauth_application_scopes %w[read write]
+    oauth_jwt_keys OAuthKeys.signing_keys
+    oauth_jwt_public_keys OAuthKeys.verification_keys
+    # OAuth 2.1 / MCP: PKCE is already required; refuse the weak "plain" challenge so
+    # only S256 is accepted.
+    oauth_pkce_allow_plain_method false
+    # Public clients (claude.ai registers via DCR with no secret, relying on PKCE) use
+    # token_endpoint_auth_method "none", so accept it alongside the secret methods.
+    oauth_token_endpoint_auth_methods_supported %w[client_secret_basic client_secret_post none]
+    # Open dynamic client registration (RFC 7591): an LLM registers itself with no
+    # prior account -- the user is bound later, at the consent step. A registered client
+    # can do nothing until a logged-in user authorizes it, so registration stays open.
+    before_register do
+      # No account to authorize against, and nothing else to gate: registration is open.
     end
+    # Standard authorization-code default: redirect back with ?code=... rather than
+    # rodauth-oauth's form_post default, which is what MCP clients like claude.ai expect
+    # when they omit response_mode. (form_post is still offered for clients that ask.)
+    oauth_response_mode 'query'
   end
 
   route do |r|
     r.assets
     r.public
     r.rodauth
-
-    # OAuth 2.1 authorization layer for the MCP endpoint. Discovery and the token/register
-    # endpoints are public and machine-facing; /authorize needs the login session and CSRF,
-    # so it lives here in the Roda tree rather than in the plain-Rack MCP stack.
-    r.on '.well-known' do
-      r.get('oauth-protected-resource') { oauth_json(OAuth::Metadata.protected_resource) }
-      r.get('oauth-authorization-server') { oauth_json(OAuth::Metadata.authorization_server) }
+    # RFC 9728 protected-resource metadata: rodauth-oauth does not ship it, and MCP
+    # clients require it to discover the authorization server. It lives at the root
+    # (the /mcp resource server is mounted separately), so Roda serves it -- and it must
+    # be matched before the AS metadata route below, which consumes the shared
+    # `.well-known` segment.
+    r.get('.well-known/oauth-protected-resource') do
+      response['content-type'] = 'application/json'
+      MCP::Config.protected_resource_metadata.to_json
     end
-    r.post('register') { oauth_register(r) }
-    r.is 'authorize' do
-      r.get { oauth_authorize_get(r) }
-      r.post { oauth_authorize_post(r) }
-    end
-    r.post('token') { oauth_token(r) }
+    # rodauth-oauth serves RFC 8414 authorization-server metadata from its own method
+    # rather than a registered route, so it has to be invoked here; it only fires for
+    # GET /.well-known/oauth-authorization-server and otherwise falls through.
+    rodauth.load_oauth_server_metadata_route
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
@@ -269,10 +298,10 @@ class Tectonic < Roda
   # objects an LLM made through the MCP endpoint; nil for anything a human made
   # in the UI, so the two are always distinguishable at a glance.
   def provenance(record)
-    token = record.created_by_token
-    return unless token && record.created_at
+    application = record.created_by_oauth_application
+    return unless application && record.created_at
 
-    "Created by #{token.name || 'an API token'} on #{record.created_at.strftime('%b %-d, %Y')}"
+    "Created by #{application.name || 'an LLM'} on #{record.created_at.strftime('%b %-d, %Y')}"
   end
 end
 
