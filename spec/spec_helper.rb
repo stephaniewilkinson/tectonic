@@ -1,6 +1,15 @@
 # frozen_string_literal: true
 
 ENV['RACK_ENV'] = 'test'
+# The suite names its own database rather than inheriting whichever one the shell, a
+# .env file or the Rakefile has already chosen for the app. It has to: these specs
+# create accounts, workouts, exercises, sets, OAuth grants and audit rows and clean none
+# of them up, and inheriting is how a bare `rake test` came to seed the development
+# database -- the Rakefile requires .env.rb, which resolves a URL from RACK_ENV, long
+# before this line runs. The connection is opened by app.rb below, so setting it here is
+# early enough. TEST_DATABASE_URL is for a run that wants a database of its own, which
+# is what two suites at once need.
+ENV['DATABASE_URL'] = ENV.fetch('TEST_DATABASE_URL', 'postgres:///tectonic_test')
 # The OAuth resource identifier the MCP endpoint verifies tokens against and advertises
 # in its discovery document; tests sign and expect tokens for this audience.
 ENV['MCP_PUBLIC_BASE_URL'] ||= 'https://example.org'

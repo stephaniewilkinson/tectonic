@@ -39,8 +39,10 @@ jobs:
 
     env:
       RACK_ENV: test
-      # .env is not in the repo, and .env.rb only assigns with ||=, so these win.
-      DATABASE_URL: postgres://tectonic:tectonic@localhost:5432/tectonic_test
+      # The suite chooses its own database rather than inheriting the app's, so this is
+      # the only URL the job has to name; spec/spec_helper.rb reads it and the migrate
+      # step below points a connection at the same database.
+      TEST_DATABASE_URL: postgres://tectonic:tectonic@localhost:5432/tectonic_test
       # Roda's sessions plugin rejects a secret under 64 bytes, and app.rb builds
       # the app at require time, so a short one fails the suite before it starts.
       SESSION_SECRET: ci-only-session-secret-not-a-real-credential-padded-to-roda-64-byte-minimum
@@ -64,7 +66,7 @@ jobs:
         run: firefox --version && geckodriver --version | head -1
 
       - name: Migrate the test database
-        run: bundle exec rake db:migrate
+        run: DATABASE_URL="$TEST_DATABASE_URL" bundle exec rake db:migrate
 
       - name: Run tests
         run: bundle exec rake test
