@@ -140,9 +140,10 @@ class Tectonic < Roda
                        status: status, duration_ms: elapsed_ms)
         end
 
-        # Every write is audited, on success and failure alike; reads only when opted in.
+        # Every write is audited, on success and failure alike; a read only when its tool
+        # opted in or the operator turned reads on for the whole server.
         def audit(status, error)
-          return unless @tool.scope == :write || @tool.audit_reads?
+          return unless @tool.scope == :write || @tool.audit_reads? || Config.audit_reads?
 
           McpAuditLog.record(context: @context, tool_name: @tool.tool_name,
                              arguments: @arguments, status: status, error: error)

@@ -71,9 +71,12 @@ class Tectonic < Roda
             is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
         end
 
-        # Who and when, both nil for a human-made row so a client can tell the two apart.
+        # Who and when, created_by nil only for a human-made row so a client can tell the
+        # two apart. It reads the token's label rather than its name, because an OAuth
+        # token carries no operator-given name and would otherwise report the same nil
+        # that is supposed to mean a person made this.
         def provenance(record)
-          { created_by: record.created_by_token&.name, created_at: record.created_at&.iso8601 }
+          { created_by: record.created_by_token&.label, created_at: record.created_at&.iso8601 }
         end
       end
     end
