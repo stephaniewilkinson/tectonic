@@ -35,6 +35,13 @@ class Tectonic < Roda
 
   include Chartkick::Helper
 
+  # Every chart on the site is styled here rather than at each call site: lime because
+  # that is the app's colour everywhere else, and whole numbers on the count axis
+  # because Chart.js otherwise labels the gridlines in halves, and half a set is not a
+  # thing anyone lifted.
+  Chartkick.options = { colors: ['#84cc16'], height: '260px',
+                        library: { scales: { y: { ticks: { precision: 0 } } } } }
+
   plugin :assets, css: ['tailwind.css', 'styles.css']
   # frame-ancestors keeps every page out of a third party's iframe, the OAuth consent
   # screen most of all: it is the one page where a click grants an API client access to
@@ -200,6 +207,7 @@ class Tectonic < Roda
           # exercise never surfaces another account's logged sets.
           my_workouts = Workout.where(account_id: @account_id).select(:id)
           @sets = Set.where(exercise_id: @exercise.id, workout_id: my_workouts).all
+          @weight_counts = weight_histogram(@sets)
           view('exercises/show')
         end
       end
@@ -359,6 +367,19 @@ class Tectonic < Roda
     return '' unless set[:is_barbell]
 
     Plates.label(Plates.per_side(set[:weight]))
+  end
+
+  # How many sets a lift has landed on each weight, lightest to heaviest, which is the
+  # histogram the exercise page draws. Warmups are left out because the ramp-up piles
+  # onto the light end and buries the working weights the chart exists to show. The
+  # weights need no bucketing of their own: the plates that make them have already
+  # quantized them, so each weight lifted is a bin. The labels are strings so Chartkick
+  # reads the axis as categories in the order given rather than as a numeric scale,
+  # which would spread the columns out by the gaps between weights.
+  def weight_histogram(sets)
+    working = sets.reject { |set| set[:is_warmup] }
+    counts = working.group_by { |set| set[:weight] }.transform_values(&:length)
+    counts.sort.map { |weight, count| [weight.to_s, count] }
   end
 
   # Fill for one of the session RPE buttons, highlighting the current rating.
