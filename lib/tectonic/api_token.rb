@@ -46,12 +46,19 @@ class Tectonic < Roda
     # Resolves a raw bearer token to its live row, or nil when it is unknown, expired,
     # or revoked. The lookup is by digest, so the raw value is never compared in SQL.
     def self.verify(raw)
-      return if raw.nil? || raw.empty?
-
-      token = where(token_digest: digest(raw)).first
+      token = locate(raw)
       return unless token&.active?
 
       token
+    end
+
+    # The row for a raw token whether or not it is still usable. Revocation needs this:
+    # an expired access token can still have a live refresh token behind it, so refusing
+    # to find it would leave that chain alive.
+    def self.locate(raw)
+      return if raw.nil? || raw.empty?
+
+      where(token_digest: digest(raw)).first
     end
 
     def self.digest(raw)
@@ -74,9 +81,27 @@ class Tectonic < Roda
       update(last_used_at: Time.now)
     end
 
-    # Soft-revoke: the row stays so audit rows keep a live foreign key to it.
+    # Soft-revoke: the row stays so audit rows keep a live foreign key to it. Revoking an
+    # OAuth access token also revokes the refresh tokens that minted it, because a
+    # refresh token left alive would mint a replacement within seconds and the revocation
+    # would have bought nothing. Written as a dataset update rather than through
+    # OAuthRefreshToken so this file stays free of a circular require; the cascade cannot
+    # recur, because it touches rows rather than models.
     def revoke!
-      update(revoked_at: Time.now) unless revoked_at
+      return if revoked_at
+
+      update(revoked_at: Time.now)
+      db[:oauth_refresh_tokens].where(access_token_id: id, revoked_at: nil)
+                               .update(revoked_at: Time.now)
+    end
+
+    # A human-readable name for provenance lines. Only an operator-minted token carries a
+    # name, so an OAuth token falls back to naming the client it was issued to; without
+    # this every OAuth-created row would report the nil that means "a human made this".
+    def label
+      return name if name
+
+      oauth? ? "OAuth client #{client_id}" : 'an API token'
     end
 
     # Plain array of granted scope strings, decoupled from the Postgres array type.
