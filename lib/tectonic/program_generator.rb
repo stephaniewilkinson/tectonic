@@ -39,20 +39,24 @@ class Tectonic < Roda
     private
 
     def generate_day(day, date)
-      existing = existing_workout(date)
+      existing = existing_workout(day, date)
       return existing if existing
 
-      workout = Workout.create(account_id: @program.account_id, date:)
+      workout = Workout.create(account_id: @program.account_id, date:, program_day_id: day.id)
       day.program_lifts.sort_by(&:position).each { |lift| insert_sets(workout, lift) }
       workout
     end
 
-    # Idempotency on (account_id, date). A day that already has a workout is left
-    # exactly as it is, so regenerating a week never duplicates sets and never
-    # overwrites what was actually lifted. Matched across the whole day because
-    # workouts.date is a timestamp, so equality on a bare date would never hit.
-    def existing_workout(date)
-      Workout.where(account_id: @program.account_id, date: date...(date + 1)).first
+    # Idempotency on (account_id, program day, date): the workout this day already wrote
+    # for this date is left exactly as it is, so regenerating a week never duplicates
+    # sets and never overwrites what was lifted. Keying on the date alone conflated two
+    # different things -- any workout logged that day silently stood in for this day's
+    # session, and the generator could not recognise its own output as its own. Matched
+    # across the whole day because workouts.date is a timestamp, so equality on a bare
+    # date would never hit.
+    def existing_workout(day, date)
+      Workout.where(account_id: @program.account_id, program_day_id: day.id,
+                    date: date...(date + 1)).first
     end
 
     def insert_sets(workout, lift)

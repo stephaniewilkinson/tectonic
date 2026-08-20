@@ -2,69 +2,19 @@
   <div class="sm:flex sm:items-center">
     <div class="sm:flex-auto">
       <h1 class="text-base font-semibold leading-6 text-gray-900">Workouts</h1>
-      <p class="mt-2 text-sm text-gray-700">A list of all the workouts.</p>
+      <p class="mt-2 text-sm text-gray-700">Sessions still to train, then the training already done.</p>
     </div>
     <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
       <a href="/workouts/new" type="button" class="block rounded-md bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-lime-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">New workout</a>
     </div>
   </div>
-  <div class="mt-8 flow-root">
-    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-        <table class="min-w-full divide-y divide-gray-300">
-          <thead>
-            <tr>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Date
-              </th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                  Sets
-              </th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                Show
-              </th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                Edit
-              </th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                Delete
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <%- @workouts.each do | workout | %>
-              <tr>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <%= workout[:date].strftime('%b %d, %Y') %>
-                <%- if provenance(workout) %>
-                  <div class="text-xs text-gray-400"><%= provenance(workout) %></div>
-                <%- end %>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout.sets.count %></td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <a href="/workouts/<%= workout[:id] %>/">
-                  Show
-                </a>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-              <a href="/workouts/<%= workout[:id] %>/edit/">
-                Edit
-              </a>
-            </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm">
-                <form action="/workouts/<%= workout[:id] %>/delete" method="post"
-                      hx-post="/workouts/<%= workout[:id] %>/delete"
-                      hx-target="closest tr"
-                      hx-swap="outerHTML">
-                  <%= csrf_tag("/workouts/#{workout[:id]}/delete") %>
-                  <button type="submit" class="font-medium text-red-600 hover:text-red-800">Delete</button>
-                </form>
-              </td>
-              </tr>
-            <%- end %>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+
+  <%# Written sessions are only worth a heading of their own once there are some, so an
+      account that has never generated a week sees the list it always saw. %>
+  <%- unless @upcoming.empty? %>
+    <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Upcoming</h2>
+    <%= render('workouts/_table', locals: { workouts: @upcoming }) %>
+    <h2 class="mt-10 text-sm font-semibold uppercase tracking-wide text-gray-500">History</h2>
+  <%- end %>
+  <%= render('workouts/_table', locals: { workouts: @workouts }) %>
 </div>

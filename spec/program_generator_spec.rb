@@ -51,6 +51,17 @@ describe 'ProgramGenerator across a block' do
     assert_equal [Date.new(2026, 8, 17), Date.new(2026, 8, 24), Date.new(2026, 8, 31)], dates
   end
 
+  # Idempotency used to key on the date alone, so a workout logged by hand on a day the
+  # program also writes stood in for that day's session and it was never generated.
+  it 'generates its day even when an unrelated workout is already logged that date' do
+    program = build_program
+    hand_logged = Tectonic::Workout.create(account_id: program.account_id, date: Date.new(2026, 8, 17))
+    generated = Tectonic::ProgramGenerator.new(program).generate(1).first
+    refute_equal hand_logged.id, generated.id
+    assert_equal program.week(1).program_days.first.id, generated.program_day_id
+    assert_nil hand_logged.refresh.program_day_id
+  end
+
   it 'refuses a week the block does not have' do
     generator = Tectonic::ProgramGenerator.new(build_program(weeks: 2))
     error = assert_raises(ArgumentError) { generator.generate(3) }

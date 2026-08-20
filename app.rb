@@ -327,7 +327,14 @@ class Tectonic < Roda
         end
       end
       r.get do
-        @workouts = Workout.order_by(:date).where(account_id: @account_id).reverse
+        # Sessions still to train are read forwards and training already done is read
+        # backwards, so both lists open on the workout nearest today. with_performance
+        # answers "has anything been lifted here" for the whole page in the query that
+        # fetches it, which is what keeps the split off the sets table.
+        planned, history = Workout.where(account_id: @account_id).with_performance
+                                  .reverse(:date).all.partition { |workout| workout.status == :planned }
+        @upcoming = planned.reverse
+        @workouts = history
         view 'workouts/index'
       end
       r.post do
