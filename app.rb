@@ -12,6 +12,7 @@ require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/oauth_keys'
+require_relative 'lib/tectonic/oauth/refresh_token_reuse'
 require_relative 'lib/tectonic/mcp/config'
 
 class Tectonic < Roda
@@ -81,6 +82,10 @@ class Tectonic < Roda
     before_register do
       # No account to authorize against, and nothing else to gate: registration is open.
     end
+    # Refresh tokens rotate on use, which detects a stolen token being replayed but
+    # leaves the grant behind it alive; this revokes that grant, as RFC 9700 section
+    # 4.14.2 requires. Prepended so it sits in front of the feature methods it extends.
+    auth_class_eval { prepend OAuth::RefreshTokenReuse }
     # Standard authorization-code default: redirect back with ?code=... rather than
     # rodauth-oauth's form_post default, which is what MCP clients like claude.ai expect
     # when they omit response_mode. (form_post is still offered for clients that ask.)

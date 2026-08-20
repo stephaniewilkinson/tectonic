@@ -66,6 +66,14 @@ module OAuthFlow
     JSON.parse(last_response.body)
   end
 
+  # Presents a refresh token at the token endpoint the way a client does, as the
+  # client the grant was issued to.
+  def refresh(client, refresh_token)
+    post '/token', { grant_type: 'refresh_token', refresh_token:,
+                     client_id: client['client_id'], resource: RESOURCE }
+    JSON.parse(last_response.body)
+  end
+
   # Creates and logs in a fresh account, returning its id.
   def sign_in
     id, email, password = create_account
@@ -76,10 +84,16 @@ module OAuthFlow
   # Registers a client and walks the authorization-code + PKCE flow for the
   # already-signed-in session, returning the token endpoint's JSON response.
   def issue_token(scope: %w[read write])
+    issue_token_for_client(scope:).last
+  end
+
+  # The same flow, returning the client alongside its token: a refresh has to be
+  # presented by the client the grant belongs to, so both are needed together.
+  def issue_token_for_client(scope: %w[read write])
     client = register_client
     verifier, challenge = pkce
     code = authorize(client, challenge, scope:)
-    exchange(client, code, verifier)
+    [client, exchange(client, code, verifier)]
   end
 
   # Full flow: fresh account + client -> the token endpoint's JSON response.
@@ -132,6 +146,47 @@ describe 'the authorization code + PKCE flow' do
     assert_equal 'read write', payload['scope']
     assert_includes Array(payload['aud']), OAuthFlow::RESOURCE
     assert payload['sub'], 'expected a subject (account) claim'
+  end
+end
+
+describe 'a replayed refresh token' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  # Rotation alone only detects the breach: the replayed token matches no live grant
+  # and is refused, but the grant itself stays usable, so whoever rotated first keeps
+  # the account. RFC 9700 section 4.14.2 requires the grant to die on detected reuse,
+  # which is the only outcome that costs the thief anything.
+  it 'revokes the grant, so the token that replaced it stops working' do
+    sign_in
+    client, token = issue_token_for_client
+    stolen = token['refresh_token']
+
+    thief = refresh(client, stolen)
+    assert_equal 200, last_response.status, "the first rotation must succeed: #{thief.inspect}"
+
+    replayed = refresh(client, stolen)
+    assert_equal 400, last_response.status
+    assert_equal 'invalid_grant', replayed['error']
+
+    refresh(client, thief['refresh_token'])
+    assert_equal 400, last_response.status, 'the rotated token must die with the grant'
+  end
+
+  # Reuse revocation reads the grant out of the token, so the token has to prove it
+  # was issued here: otherwise anyone holding a client id could revoke a stranger's
+  # access by presenting a made-up token that names a guessed grant.
+  it 'is refused without revoking anything when the tag is forged' do
+    sign_in
+    client, token = issue_token_for_client
+    application_id = DB[:oauth_applications].where(client_id: client['client_id']).get(:id)
+    grant_id = DB[:oauth_grants].where(oauth_application_id: application_id).get(:id)
+
+    refresh(client, "#{grant_id}~forged~forged")
+    assert_equal 400, last_response.status
+
+    rotated = refresh(client, token['refresh_token'])
+    assert_equal 200, last_response.status, "the grant must survive a forged token: #{rotated.inspect}"
   end
 end
 
