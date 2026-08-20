@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
+require 'date'
 require_relative 'db'
 require_relative 'oauth_application'
+require_relative 'one_rep_max'
+require_relative 'sets'
+require_relative 'workouts'
 
 class Tectonic < Roda
   class Exercise < Sequel::Model
@@ -23,6 +27,23 @@ class Tectonic < Roda
     # other value is a single account's own.
     def library?
       account_id.nil?
+    end
+
+    # The best estimated max an account's completed sets of this movement support as of a
+    # date, or nil while nothing has been lifted that the chart can read. Answering as of
+    # a date rather than only for today is the point: asked at the end of each week, it is
+    # the curve a training block is actually judged by.
+    def estimated_max(account_id:, on: Date.today)
+      OneRepMax.best_of(lifted_sets(account_id, on))
+    end
+
+    # An account's own completed sets of this movement, up to and including a date. Scoped
+    # through the workouts rather than the sets alone, because a library movement is
+    # shared and the work done on it is not: another account's lifting must never reach
+    # this number.
+    def lifted_sets(account_id, on)
+      mine = Workout.where(account_id:).where { date < (on + 1) }.select(:id)
+      Set.where(exercise_id: id, workout_id: mine, is_completed: true).select(:weight, :reps, :rpe).all
     end
   end
 end

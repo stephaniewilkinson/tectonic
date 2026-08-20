@@ -183,15 +183,21 @@ class Tectonic < Roda
       r.get('new') { view('exercises/new') }
       r.post do
         check_csrf!
+        # Whether the movement is loaded on a bar is asked outright here and the answer
+        # is taken as given, ticked or not: a person looking at the checkbox knows their
+        # own variation better than a name ever says. The paths with nobody to ask fall
+        # back to the library name instead.
+        is_barbell = !r.params['is_barbell'].nil?
         if r.params['id'].empty?
-          exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'], account_id: @account_id)
+          exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'],
+                                        account_id: @account_id, is_barbell:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
           # accounts' rows don't match, so the edit is refused.
           @exercise = Exercise.where(id: r.params['id'], account_id: @account_id).first
           r.redirect '/exercises' unless @exercise
-          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'])
+          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:)
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end
@@ -265,10 +271,11 @@ class Tectonic < Roda
               set = own_set(set_id, workout_id)
               r.redirect "/workouts/#{workout_id}/session" unless set
 
-              revised = { weight: r.params['weight'], reps: r.params['reps'] }
+              revised = { weight: r.params['weight'], reps: r.params['reps'], rpe: r.params['rpe'] }
               revised = revised.reject { |_, value| value.to_s.empty? }
               # No revision means the primary tap, which toggles so a mis-tap is
-              # undone by tapping again. A revision always completes the set.
+              # undone by tapping again. A revision always completes the set, and a
+              # rating counts as one: rating a set is saying you lifted it.
               set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
               r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
             end
@@ -327,7 +334,14 @@ class Tectonic < Roda
         end
       end
       r.get do
-        @workouts = Workout.order_by(:date).where(account_id: @account_id).reverse
+        # Sessions still to train are read forwards and training already done is read
+        # backwards, so both lists open on the workout nearest today. with_performance
+        # answers "has anything been lifted here" for the whole page in the query that
+        # fetches it, which is what keeps the split off the sets table.
+        planned, history = Workout.where(account_id: @account_id).with_performance
+                                  .reverse(:date).all.partition { |workout| workout.status == :planned }
+        @upcoming = planned.reverse
+        @workouts = history
         view 'workouts/index'
       end
       r.post do
@@ -410,9 +424,11 @@ class Tectonic < Roda
     counts.sort.map { |weight, count| [weight.to_s, count] }
   end
 
-  # Fill for one of the session RPE buttons, highlighting the current rating.
-  def rpe_style(workout, rpe)
-    workout[:rpe] == rpe ? 'bg-lime-500 text-white' : 'bg-white text-gray-700'
+  # Fill for one of the RPE buttons, highlighting the current rating. Session and set
+  # both keep their rating in an rpe column, and the two rows of buttons ask the same
+  # question at different scopes, so one helper answers for either.
+  def rpe_style(rated, rpe)
+    rated[:rpe] == rpe ? 'bg-lime-500 text-white' : 'bg-white text-gray-700'
   end
 
   # Border and fill for a set row: still to do, done as written, or done

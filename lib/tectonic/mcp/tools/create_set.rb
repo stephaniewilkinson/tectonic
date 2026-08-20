@@ -14,16 +14,18 @@ class Tectonic < Roda
       class CreateSet < Tool
         WEIGHT = (0..2000)
         REPS = (1..100)
+        RPE = (1..10)
 
         tool_name 'create_set'
         description 'Log a set of an exercise (by name) into a workout (by date, ' \
-                    "'today' by default). Weights are integer pounds."
+                    "'today' by default). Weights are integer pounds, rpe is how hard " \
+                    'that set was on the 1-10 scale.'
         scope :write
         input_schema(
           type: 'object',
           properties: {
             exercise: { type: 'string' }, date: { type: 'string' },
-            weight: { type: 'integer' }, reps: { type: 'integer' },
+            weight: { type: 'integer' }, reps: { type: 'integer' }, rpe: { type: 'integer' },
             is_warmup: { type: 'boolean' }, is_completed: { type: 'boolean' }
           },
           required: %w[exercise weight reps], additionalProperties: false
@@ -39,14 +41,18 @@ class Tectonic < Roda
         end
 
         # Range lives here, not in the schema, so an out-of-range value refuses with a
-        # message that names the bound rather than a generic validation error.
+        # message that names the bound rather than a generic validation error. RPE is
+        # optional, so only a value that was actually supplied is checked.
         def self.check_range(arguments)
-          unless WEIGHT.cover?(arguments[:weight])
-            raise Tool::Refusal, "Weight #{arguments[:weight]} is out of range; use #{WEIGHT.first}-#{WEIGHT.last} lb."
-          end
-          return if REPS.cover?(arguments[:reps])
+          in_range(WEIGHT, arguments[:weight], 'Weight', unit: ' lb')
+          in_range(REPS, arguments[:reps], 'Reps')
+          in_range(RPE, arguments[:rpe], 'RPE') unless arguments[:rpe].nil?
+        end
 
-          raise Tool::Refusal, "Reps #{arguments[:reps]} is out of range; use #{REPS.first}-#{REPS.last}."
+        def self.in_range(range, value, name, unit: '')
+          return if range.cover?(value)
+
+          raise Tool::Refusal, "#{name} #{value} is out of range; use #{range.first}-#{range.last}#{unit}."
         end
 
         # is_barbell comes off the movement rather than the arguments: whether a lift is
@@ -55,7 +61,7 @@ class Tectonic < Roda
         # would lose its plate math either way.
         def self.attributes(arguments, exercise, workout, context)
           { exercise_id: exercise.id, workout_id: workout.id,
-            weight: arguments[:weight], reps: arguments[:reps],
+            weight: arguments[:weight], reps: arguments[:reps], rpe: arguments[:rpe],
             is_warmup: arguments.fetch(:is_warmup, false),
             is_completed: arguments.fetch(:is_completed, false), is_barbell: exercise.barbell?,
             created_by_oauth_application_id: context.application_id, created_at: Time.now }

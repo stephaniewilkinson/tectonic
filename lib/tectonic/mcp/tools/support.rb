@@ -3,6 +3,8 @@
 require 'date'
 require_relative '../tool'
 require_relative '../../exercises'
+# Exercise.barbell_by_name?, the default the resolver gives a movement it has to create.
+require_relative '../../exercise_library'
 require_relative '../../workouts'
 require_relative '../../sets'
 
@@ -18,13 +20,17 @@ class Tectonic < Roda
         module_function
 
         # An exercise the account already has (its own or a library one) by name, or a
-        # new private one stamped with the calling token.
-        def exercise(context, name:, icon_url: nil)
+        # new private one stamped with the calling token. A new one is a barbell movement
+        # when the caller says so and otherwise when its name is one the library knows:
+        # there is no user at the other end of this to ask, and a set that arrives without
+        # the flag loses the plate math this app is named for.
+        def exercise(context, name:, icon_url: nil, is_barbell: nil)
           clean = name.to_s.strip
           raise Tool::Refusal, 'An exercise needs a non-empty name.' if clean.empty?
 
           context.exercises.where(name: clean).order(:id).first ||
             Exercise.create(name: clean, icon_url:, account_id: context.account_id,
+                            is_barbell: is_barbell.nil? ? Exercise.barbell_by_name?(clean) : is_barbell,
                             created_by_oauth_application_id: context.application_id, created_at: Time.now)
         end
 
@@ -67,7 +73,7 @@ class Tectonic < Roda
 
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: set.weight, reps: set.reps,
-            is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
+            rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
         end
 
         # Who and when, both nil for a human-made row so a client can tell the two apart.
@@ -108,7 +114,7 @@ class Tectonic < Roda
           return unless match
 
           if match[:type] == 'exercise'
-            exercise_document(context.exercises.where(id: match[:id]).first)
+            exercise_document(context, context.exercises.where(id: match[:id]).first)
           else
             workout_document(context.workouts.where(id: match[:id]).first)
           end
@@ -123,11 +129,16 @@ class Tectonic < Roda
             url: url('workouts', workout.id) }
         end
 
-        def exercise_document(exercise)
+        # The estimated max rides along with the movement rather than being a tool of its
+        # own: it is derived from the account's completed sets, so a model reading about a
+        # lift gets the number that percentage-based programming needs without a second
+        # round trip. It is nil until something has been lifted that the chart can read.
+        def exercise_document(context, exercise)
           return unless exercise
 
+          estimated = exercise.estimated_max(account_id: context.account_id)
           exercise_result(exercise).merge(text: "Exercise: #{exercise.name}.",
-                                          metadata: { library: exercise.library? })
+                                          metadata: { library: exercise.library?, estimated_1rm: estimated })
         end
 
         def workout_document(workout)

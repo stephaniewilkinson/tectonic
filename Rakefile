@@ -4,10 +4,14 @@ require 'rake/testtask'
 require 'dotenv/load'
 require_relative '.env'
 
-# The single migration this schema now lives in. Everything up to and including the
-# old 024 was folded into it, so any database already carrying that schema is at this
+# The migration the squashed schema lives in. Everything up to and including the old
+# 024 was folded into it, so any database already carrying that schema is at this
 # version by definition, whatever number it happens to record.
 BASELINE_VERSION = 1
+# The highest version this migrate directory can bring a database to, read from the
+# files so it cannot drift as migrations are added. It is what tells an old-numbering
+# version apart from a current one, which matters the moment a second migration exists.
+LATEST_VERSION = Dir[File.join(__dir__, 'migrate', '*.rb')].map { |file| File.basename(file).to_i }.max
 
 task default: :test
 
@@ -24,19 +28,26 @@ def migrator_db
   DB
 end
 
-# Brings a database that already carries this schema to the baseline's version without
-# running it. Two kinds arrive here: one predating the migrator, which has the tables
-# but no schema_info to prove it, and one migrated under the old numbering, which
-# records a version far above the single migration that now exists. Left alone the
+# Brings a database that already carries the squashed schema to the baseline's version
+# without running it. Two kinds arrive here: one predating the migrator, which has the
+# tables but no schema_info to prove it, and one migrated under the old numbering, which
+# records a version far above anything this directory can produce. Left alone the
 # migrator would try to recreate the tables in the first case and to roll the schema
 # back in the second, so both are stamped instead. A database with no tables at all is
 # untouched: it needs the migration actually run.
+#
+# A version inside the current sequence is left exactly as it is. Adopting on anything
+# but the baseline was harmless while the baseline was the only migration and became a
+# bug the moment a second one existed: a database at version 2 was stamped back to 1 on
+# every run and the migrator then replayed a migration it had already applied. The one
+# version this cannot distinguish is an old-numbering database whose number the sequence
+# has since grown past, which stops mattering long before it reaches 24.
 def baseline(db)
   return unless db.table_exists?(:accounts)
 
   db.create_table?(:schema_info) { Integer :version, default: 0, null: false }
   recorded = db[:schema_info].get(:version)
-  return if recorded == BASELINE_VERSION
+  return if recorded&.between?(BASELINE_VERSION, LATEST_VERSION)
 
   # An empty schema_info takes a row; one already carrying a version has it corrected.
   if recorded.nil?
@@ -117,24 +128,44 @@ namespace :db do
 end
 
 namespace :program do
-  desc 'Seed the block 0 week 1 program, for ACCOUNT_ID or the only account'
+  desc 'Seed the block 0 program, for ACCOUNT_ID or the only account'
   task :seed do
     require_relative 'lib/tectonic/program_seed'
     program = Tectonic::ProgramSeed.seed(seed_account_id)
-    puts "Program #{program.id}: #{program.name} week #{program.week}, #{program.program_days.count} day(s)"
+    puts "Program #{program.id}: #{program.name}, #{program.weeks} week(s) from #{program.start_date}"
   end
 
-  desc "Generate a week of workouts: rake 'program:generate[2026-08-17]' PROGRAM_ID=1"
-  task :generate, [:week_start] do |_task, args|
+  desc "Generate a week of workouts: rake 'program:generate[1]' PROGRAM_ID=1, the current week by default"
+  task :generate, [:week] do |_task, args|
     require_relative 'lib/tectonic/program_generator'
-    program = Tectonic::Program[ENV.fetch('PROGRAM_ID', nil)] || Tectonic::Program.first
-    abort 'No program to generate. Run rake program:seed first.' unless program
-
-    week_start = args[:week_start] ? Date.parse(args[:week_start]) : Date.today
-    Tectonic::ProgramGenerator.new(program).generate(week_start).each do |workout|
-      puts "#{workout.date.strftime('%A %b %-d')}: workout #{workout.id}, #{workout.sets.count} sets"
-    end
+    generate_program_week(args[:week])
   end
+end
+
+# Generates one week of a block, defaulting to the week today falls in. The block's
+# start date already fixes when each week runs, so the caller no longer has to work out
+# which Monday to name -- and a block that has not started or has already finished has
+# no current week, which is worth saying rather than guessing the nearest one.
+def generate_program_week(number)
+  program = Tectonic::Program[ENV.fetch('PROGRAM_ID', nil)] || Tectonic::Program.first
+  abort 'No program to generate. Run rake program:seed first.' unless program
+
+  week = number ? program.week(number.to_i) : program.week_on
+  abort missing_week_message(program, number) unless week
+  announce_generated(Tectonic::ProgramGenerator.new(program).generate(week.number))
+end
+
+def announce_generated(workouts)
+  workouts.each do |workout|
+    puts "#{workout.date.strftime('%A %b %-d')}: workout #{workout.id}, #{workout.sets.count} sets"
+  end
+end
+
+def missing_week_message(program, number)
+  return "Program #{program.id} has no week #{number}; it has #{program.weeks}." if number
+
+  "Program #{program.id} runs #{program.weeks} week(s) from #{program.start_date}, which does not cover today. " \
+    "Name a week: rake 'program:generate[1]'."
 end
 
 namespace :library do
