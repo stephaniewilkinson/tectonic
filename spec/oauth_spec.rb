@@ -164,3 +164,50 @@ describe 'the resource server accepts authorization-server tokens' do
   end
 end
 
+describe 'the OAuth consent form refuses a forged submission' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  # Submitting this form is what grants a client access to the account, so a request
+  # that fails the CSRF check has to be refused outright -- and refused as a refusal,
+  # not as the 500 an uncaught exception would produce.
+  it 'answers 403 and issues no code without a valid CSRF token' do
+    sign_in
+    client = register_client
+    _, challenge = pkce
+    post '/authorize', client_id: client['client_id'], redirect_uri: client['redirect_uris'].first,
+                       response_type: 'code', code_challenge: challenge,
+                       code_challenge_method: 'S256', scope: %w[read]
+
+    assert_equal 403, last_response.status
+    assert_nil last_response.headers['location']
+  end
+end
+
+describe 'every response carries the baseline security headers' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  # The consent screen is the page worth framing over a decoy, since one click on it
+  # hands out account access.
+  it 'refuses to be framed on the authorize page' do
+    sign_in
+    client = register_client
+    _, challenge = pkce
+    get '/authorize', client_id: client['client_id'], redirect_uri: client['redirect_uris'].first,
+                      response_type: 'code', code_challenge: challenge,
+                      code_challenge_method: 'S256', scope: 'read'
+
+    assert_equal 200, last_response.status
+    assert_includes last_response.headers['Content-Security-Policy'], "frame-ancestors 'none'"
+  end
+
+  it 'sets the policy, nosniff, and a referrer policy on an ordinary page' do
+    get '/welcome'
+    assert_includes last_response.headers['Content-Security-Policy'], "frame-ancestors 'none'"
+    assert_includes last_response.headers['Content-Security-Policy'], "object-src 'none'"
+    assert_equal 'nosniff', last_response.headers['X-Content-Type-Options']
+    assert_equal 'strict-origin-when-cross-origin', last_response.headers['Referrer-Policy']
+  end
+end
+
