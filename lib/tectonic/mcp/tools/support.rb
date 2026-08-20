@@ -67,7 +67,7 @@ class Tectonic < Roda
 
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: set.weight, reps: set.reps,
-            is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
+            rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
         end
 
         # Who and when, both nil for a human-made row so a client can tell the two apart.
@@ -108,7 +108,7 @@ class Tectonic < Roda
           return unless match
 
           if match[:type] == 'exercise'
-            exercise_document(context.exercises.where(id: match[:id]).first)
+            exercise_document(context, context.exercises.where(id: match[:id]).first)
           else
             workout_document(context.workouts.where(id: match[:id]).first)
           end
@@ -123,11 +123,16 @@ class Tectonic < Roda
             url: url('workouts', workout.id) }
         end
 
-        def exercise_document(exercise)
+        # The estimated max rides along with the movement rather than being a tool of its
+        # own: it is derived from the account's completed sets, so a model reading about a
+        # lift gets the number that percentage-based programming needs without a second
+        # round trip. It is nil until something has been lifted that the chart can read.
+        def exercise_document(context, exercise)
           return unless exercise
 
+          estimated = exercise.estimated_max(account_id: context.account_id)
           exercise_result(exercise).merge(text: "Exercise: #{exercise.name}.",
-                                          metadata: { library: exercise.library? })
+                                          metadata: { library: exercise.library?, estimated_1rm: estimated })
         end
 
         def workout_document(workout)

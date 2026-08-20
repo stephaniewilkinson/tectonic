@@ -265,10 +265,11 @@ class Tectonic < Roda
               set = own_set(set_id, workout_id)
               r.redirect "/workouts/#{workout_id}/session" unless set
 
-              revised = { weight: r.params['weight'], reps: r.params['reps'] }
+              revised = { weight: r.params['weight'], reps: r.params['reps'], rpe: r.params['rpe'] }
               revised = revised.reject { |_, value| value.to_s.empty? }
               # No revision means the primary tap, which toggles so a mis-tap is
-              # undone by tapping again. A revision always completes the set.
+              # undone by tapping again. A revision always completes the set, and a
+              # rating counts as one: rating a set is saying you lifted it.
               set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
               r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
             end
@@ -417,9 +418,11 @@ class Tectonic < Roda
     counts.sort.map { |weight, count| [weight.to_s, count] }
   end
 
-  # Fill for one of the session RPE buttons, highlighting the current rating.
-  def rpe_style(workout, rpe)
-    workout[:rpe] == rpe ? 'bg-lime-500 text-white' : 'bg-white text-gray-700'
+  # Fill for one of the RPE buttons, highlighting the current rating. Session and set
+  # both keep their rating in an rpe column, and the two rows of buttons ask the same
+  # question at different scopes, so one helper answers for either.
+  def rpe_style(rated, rpe)
+    rated[:rpe] == rpe ? 'bg-lime-500 text-white' : 'bg-white text-gray-700'
   end
 
   # Border and fill for a set row: still to do, done as written, or done

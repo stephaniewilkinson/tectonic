@@ -75,6 +75,22 @@
             </form>
           </div>
 
+          <%# Rated per set, not just per session: five lifts in a session are five
+              different questions, and the answer decays within seconds of racking the
+              bar. Submitting a rating completes the set, because rating one is saying
+              you lifted it. %>
+          <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-1">
+            <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+            <span class="mr-1 text-xs uppercase tracking-wide text-gray-400">RPE</span>
+            <%- (6..10).each do |rating| %>
+              <button value="<%= rating %>" class="<%= rpe_style(set, rating) %> w-10 rounded-lg border border-gray-300 py-1.5 text-sm font-semibold" type="submit" name="rpe">
+                <%= rating %>
+              </button>
+            <%- end %>
+          </form>
+
           <details class="mt-2">
             <summary class="cursor-pointer text-xs text-gray-500">Lifted something else</summary>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
