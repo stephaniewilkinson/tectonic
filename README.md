@@ -130,6 +130,7 @@ Configuration (all read from the environment):
 | `MCP_SCOPES` | `read write` | Scopes the server recognizes. |
 | `MCP_PUBLIC_BASE_URL` | — | Public https origin, for the token audience and discovery URLs. Required in production. |
 | `OAUTH_JWT_PRIVATE_KEY` | — | RSA private key (PEM) signing access tokens; the public half is derived. Required in production; an ephemeral pair is generated otherwise. |
+| `OAUTH_REDIRECT_URI_ALLOWLIST` | Claude, ChatGPT, loopback | The callbacks a client may register (comma/space separated), replacing the defaults rather than adding to them. An entry ending in `/` matches any path under it; a loopback entry matches any port. |
 
 ## Connecting it as a custom connector
 

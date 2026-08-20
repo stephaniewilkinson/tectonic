@@ -12,6 +12,7 @@ require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/oauth_keys'
+require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/refresh_token_reuse'
 require_relative 'lib/tectonic/mcp/config'
 
@@ -77,11 +78,23 @@ class Tectonic < Roda
     # token_endpoint_auth_method "none", so accept it alongside the secret methods.
     oauth_token_endpoint_auth_methods_supported %w[client_secret_basic client_secret_post none]
     # Open dynamic client registration (RFC 7591): an LLM registers itself with no
-    # prior account -- the user is bound later, at the consent step. A registered client
-    # can do nothing until a logged-in user authorizes it, so registration stays open.
+    # prior account -- the user is bound later, at the consent step. Registration stays
+    # open because a registered client can do nothing until a logged-in user authorizes
+    # it, but where the authorization code may be delivered is not open: rodauth-oauth
+    # asks only whether the redirect_uri parses, and a callback pointing anywhere turns
+    # one careless approval on the consent screen into a stolen code.
     before_register do
-      # No account to authorize against, and nothing else to gate: registration is open.
+      registered = @oauth_application_params[oauth_applications_redirect_uri_column].to_s.split
+      refused = registered.reject { |uri| OAuth::RedirectUri.allowed?(uri) }
+      next if refused.empty?
+
+      register_throw_json_response_error('invalid_redirect_uri', register_invalid_uri_message(refused.first))
     end
+    # A native client's callback is a loopback address, which is necessarily http
+    # (RFC 8252 section 7.3), and rodauth-oauth accepts https alone. Admitting http is
+    # what makes a loopback callback registrable at all; the allow-list above is what
+    # keeps http from meaning anything but loopback.
+    oauth_valid_uri_schemes %w[https http]
     # Refresh tokens rotate on use, which detects a stolen token being replayed but
     # leaves the grant behind it alive; this revokes that grant, as RFC 9700 section
     # 4.14.2 requires. Prepended so it sits in front of the feature methods it extends.

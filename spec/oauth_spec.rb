@@ -133,6 +133,23 @@ describe 'OAuth dynamic client registration' do
     assert client['client_id']
     assert_equal 'none', client['token_endpoint_auth_method']
   end
+
+  it 'registers a native client on the loopback port it happened to bind' do
+    register_client(redirect_uri: 'http://127.0.0.1:53791/callback')
+    assert_equal 201, last_response.status
+  end
+
+  # Registration itself stays open, but the callback is where the authorization code
+  # is delivered: a client free to name any callback needs only one careless approval
+  # on the consent screen to walk away with a code.
+  it 'refuses a callback that is not on the allow-list, and stores no client' do
+    registered = DB[:oauth_applications].count
+    refusal = register_client(redirect_uri: 'https://evil.example/steal')
+
+    assert_equal 400, last_response.status
+    assert_equal 'invalid_redirect_uri', refusal['error']
+    assert_equal registered, DB[:oauth_applications].count
+  end
 end
 
 describe 'the authorization code + PKCE flow' do
