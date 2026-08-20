@@ -17,8 +17,13 @@ class Tectonic < Roda
   # session is not a separate kind of record: it is ordinary Set rows written
   # ahead of time with is_completed false, which lifting flips to true.
   class ProgramGenerator
-    def initialize(program)
+    # created_by is the OAuth client that asked for this week, when an assistant did. It
+    # is stamped onto the rows the same way a set logged over MCP is stamped, so a
+    # session an assistant scheduled says so in the UI rather than appearing to have come
+    # from nowhere. Nil for the rake task, which is a person at a command line.
+    def initialize(program, created_by: nil)
       @program = program
+      @created_by = created_by
     end
 
     # Inserts a workout per program day of the numbered week, with every set
@@ -43,7 +48,8 @@ class Tectonic < Roda
       existing = existing_workout(day, date)
       return existing if existing
 
-      workout = Workout.create(account_id: @program.account_id, date:, program_day_id: day.id)
+      workout = Workout.create(account_id: @program.account_id, date:, program_day_id: day.id,
+                               created_by_oauth_application_id: @created_by)
       day.program_lifts.sort_by(&:position).each { |lift| insert_sets(workout, lift) }
       workout
     end
@@ -108,7 +114,8 @@ class Tectonic < Roda
         workout_id: workout.id, exercise_id: lift.exercise_id,
         weight: set[:weight], reps: set[:reps],
         planned_weight: set[:weight], planned_reps: set[:reps],
-        is_warmup:, is_completed: false, is_barbell: lift.is_barbell
+        is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
+        created_by_oauth_application_id: @created_by
       )
     end
   end

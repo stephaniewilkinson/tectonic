@@ -8,6 +8,16 @@ require_relative 'tools/create_workout'
 require_relative 'tools/create_set'
 require_relative 'tools/list_exercises'
 require_relative 'tools/list_workouts'
+require_relative 'tools/list_programs'
+require_relative 'tools/get_program'
+require_relative 'tools/create_program'
+require_relative 'tools/add_program_week'
+require_relative 'tools/add_program_day'
+require_relative 'tools/update_program_day'
+require_relative 'tools/add_program_lift'
+require_relative 'tools/update_program_lift'
+require_relative 'tools/delete_program_lift'
+require_relative 'tools/generate_program_week'
 require_relative 'tools/search'
 require_relative 'tools/fetch'
 
@@ -18,13 +28,18 @@ class Tectonic < Roda
     # state between requests, so a fresh server per request is how per-account scoping
     # is reached without any shared mutable state.
     module ServerFactory
-      # Every tool the server exposes. Registering a new tool is adding its class here
-      # (and requiring it above); auth, scoping, validation, and auditing come from the
-      # base class.
+      # Every tool the server exposes, grouped the way an assistant works: log what was
+      # lifted, read what has been, and write and revise the plan behind it. Registering a
+      # new tool is adding its class here (and requiring it above); auth, scoping,
+      # validation, and auditing come from the base class.
       TOOLS = [
         Tools::Whoami,
         Tools::CreateExercise, Tools::CreateWorkout, Tools::CreateSet,
         Tools::ListExercises, Tools::ListWorkouts,
+        Tools::ListPrograms, Tools::GetProgram, Tools::CreateProgram,
+        Tools::AddProgramWeek, Tools::AddProgramDay, Tools::UpdateProgramDay,
+        Tools::AddProgramLift, Tools::UpdateProgramLift, Tools::DeleteProgramLift,
+        Tools::GenerateProgramWeek,
         # search + fetch satisfy ChatGPT's connector contract (composer + Deep Research).
         Tools::Search, Tools::Fetch
       ].freeze

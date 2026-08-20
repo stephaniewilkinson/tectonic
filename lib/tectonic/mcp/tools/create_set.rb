@@ -12,10 +12,6 @@ class Tectonic < Roda
       # date (both through the shared Resolver, so the set can only ever land on the
       # account's own workout), after range-checking weight and reps.
       class CreateSet < Tool
-        WEIGHT = (0..2000)
-        REPS = (1..100)
-        RPE = (1..10)
-
         tool_name 'create_set'
         description 'Log a set of an exercise (by name) into a workout (by date, ' \
                     "'today' by default). Weights are integer pounds, rpe is how hard " \
@@ -40,19 +36,13 @@ class Tectonic < Roda
              structured: Presenter.view_set(set))
         end
 
-        # Range lives here, not in the schema, so an out-of-range value refuses with a
-        # message that names the bound rather than a generic validation error. RPE is
-        # optional, so only a value that was actually supplied is checked.
+        # The ranges are Bounds', shared with every other tool that writes a weight or a
+        # rep count, so the same number is refused the same way whether it is being
+        # logged here, revised through update_set, or prescribed in a program.
         def self.check_range(arguments)
-          in_range(WEIGHT, arguments[:weight], 'Weight', unit: ' lb')
-          in_range(REPS, arguments[:reps], 'Reps')
-          in_range(RPE, arguments[:rpe], 'RPE') unless arguments[:rpe].nil?
-        end
-
-        def self.in_range(range, value, name, unit: '')
-          return if range.cover?(value)
-
-          raise Tool::Refusal, "#{name} #{value} is out of range; use #{range.first}-#{range.last}#{unit}."
+          Bounds.check(Bounds::WEIGHT, arguments[:weight], 'Weight', unit: ' lb')
+          Bounds.check(Bounds::REPS, arguments[:reps], 'Reps')
+          Bounds.check(Bounds::RPE, arguments[:rpe], 'RPE')
         end
 
         # is_barbell comes off the movement rather than the arguments: whether a lift is

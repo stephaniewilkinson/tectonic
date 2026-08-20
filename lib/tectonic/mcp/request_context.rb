@@ -4,6 +4,10 @@ require_relative '../workouts'
 require_relative '../exercises'
 require_relative '../sets'
 require_relative '../oauth_application'
+require_relative '../program_days'
+require_relative '../program_lifts'
+require_relative '../program_weeks'
+require_relative '../programs'
 
 class Tectonic < Roda
   module MCP
@@ -58,6 +62,29 @@ class Tectonic < Roda
       # Sets belonging to the account, reached only through its own workouts.
       def sets
         Set.where(workout_id: workouts.select(:id))
+      end
+
+      # The account's training blocks, and the three tables hanging off them. Each is
+      # reached through the one above rather than by its own account column, because
+      # only `programs` carries one -- a lift is the account's because its day is,
+      # because its week is, because its block is. Written as nested subqueries so the
+      # chain is enforced by the database on every read, which keeps the guarantee at
+      # the top of this file true for programs too: there is no accessor here that can
+      # be widened to another account's plan.
+      def programs
+        Program.where(account_id: @account_id)
+      end
+
+      def program_weeks
+        ProgramWeek.where(program_id: programs.select(:id))
+      end
+
+      def program_days
+        ProgramDay.where(program_week_id: program_weeks.select(:id))
+      end
+
+      def program_lifts
+        ProgramLift.where(program_day_id: program_days.select(:id))
       end
 
       # Whether the token carries a given scope; the tool base class checks this before
