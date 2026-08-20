@@ -15,6 +15,13 @@
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>
+    <%- unless @weight_counts.empty? %>
+      <div class="mt-6">
+        <h2 class="text-sm font-semibold text-gray-900">Working sets at each weight</h2>
+        <%= column_chart(@weight_counts, xtitle: 'Weight', ytitle: 'Sets') %>
+      </div>
+    <%- end %>
+
     <table class="mt-6 min-w-full divide-y divide-gray-300">
       <thead>
         <tr>
