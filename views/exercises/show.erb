@@ -1,3 +1,7 @@
+<%# A lift with nothing but warmups recorded draws no chart, and a page that draws no
+    chart is not worth half a megabyte of charting library, so the layout takes its cue
+    from here rather than loading them for everyone. %>
+<%- @charts = !@heaviest_by_day.empty? %>
 <div class="mx-auto max-w-md">
   <div class="flex items-center justify-between">
     <h1 class="text-3xl font-semibold text-gray-900"><%= @exercise[:name] %></h1>
@@ -15,10 +19,12 @@
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>
-    <%- unless @weight_counts.empty? %>
+    <%- if @charts %>
       <div class="mt-6">
-        <h2 class="text-sm font-semibold text-gray-900">Working sets at each weight</h2>
-        <%= column_chart(@weight_counts, xtitle: 'Weight', ytitle: 'Sets') %>
+        <h2 class="text-sm font-semibold text-gray-900">Heaviest weight each day</h2>
+        <%# min: nil lets the axis fit the weights instead of starting at zero, which
+            nobody lifts and which flattens a season of progress into the top inch. %>
+        <%= line_chart(@heaviest_by_day, ytitle: 'Weight', curve: false, min: nil) %>
       </div>
     <%- end %>
 
