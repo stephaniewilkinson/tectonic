@@ -33,11 +33,14 @@ end
 
 Capybara.javascript_driver = :firefox
 
+# No port is named, so Capybara takes a free one for the run and every visit is
+# relative to the server it started. Pinning 9292 here, and repeating it in app_host,
+# meant a second suite bound the port the first was already serving on, which is a
+# browser spec failing for a reason that has nothing to do with the app -- and it would
+# do the same to CI the day its jobs run in parallel.
 Capybara.configure do |config|
   config.server = :puma
   config.run_server = true
-  config.server_port = 9292
   config.default_driver = :firefox
-  config.app_host = 'http://localhost:9292'
 end
 

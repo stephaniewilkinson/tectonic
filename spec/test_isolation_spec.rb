@@ -22,3 +22,14 @@ describe 'the database the suite runs against' do
     assert_equal URI.parse(named).path.delete_prefix('/'), DB.opts[:database].to_s
   end
 end
+
+describe 'the Capybara server' do
+  # Capybara takes a free port when none is named. Naming one is what made a second
+  # suite collide with the first, and app_host repeated the number, so fixing either
+  # without the other would have sent the browser to a server that was not there.
+  it 'is left to find its own port rather than pinned to one' do
+    assert_nil Capybara.server_port
+    assert_nil Capybara.app_host
+  end
+end
+
