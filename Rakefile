@@ -4,9 +4,10 @@ require 'rake/testtask'
 require 'dotenv/load'
 require_relative '.env'
 
-# Migrations 001-005 predate the migrator, so a database created before it exists
-# already has those tables but no schema_info row to prove it.
-BASELINE_VERSION = 5
+# The single migration this schema now lives in. Everything up to and including the
+# old 024 was folded into it, so any database already carrying that schema is at this
+# version by definition, whatever number it happens to record.
+BASELINE_VERSION = 1
 
 task default: :test
 
@@ -23,23 +24,34 @@ def migrator_db
   DB
 end
 
-# A database that predates the migrator reads as version 0, so the migrator would
-# try to recreate tables that are already there. Stamp it at the baseline instead.
+# Brings a database that already carries this schema to the baseline's version without
+# running it. Two kinds arrive here: one predating the migrator, which has the tables
+# but no schema_info to prove it, and one migrated under the old numbering, which
+# records a version far above the single migration that now exists. Left alone the
+# migrator would try to recreate the tables in the first case and to roll the schema
+# back in the second, so both are stamped instead. A database with no tables at all is
+# untouched: it needs the migration actually run.
 def baseline(db)
-  return if db.table_exists?(:schema_info) || !db.table_exists?(:accounts)
+  return unless db.table_exists?(:accounts)
 
-  db.create_table(:schema_info) { Integer :version, default: 0, null: false }
-  db[:schema_info].insert(version: BASELINE_VERSION)
-  puts "Stamped existing database at migration version #{BASELINE_VERSION}"
+  db.create_table?(:schema_info) { Integer :version, default: 0, null: false }
+  recorded = db[:schema_info].get(:version)
+  return if recorded == BASELINE_VERSION
+
+  # An empty schema_info takes a row; one already carrying a version has it corrected.
+  if recorded.nil?
+    db[:schema_info].insert(version: BASELINE_VERSION)
+  else
+    db[:schema_info].update(version: BASELINE_VERSION)
+  end
+  puts "Adopted the squashed baseline: version #{recorded || 'none'} -> #{BASELINE_VERSION}"
 end
 
 # Migrates to a target version, or to the latest when given none.
-# allow_missing_migration_files tolerates the gap left by in-flight migrations that
-# claimed 014/015 on unmerged branches; this branch's own migrations are 016-019.
 def migrate_to(version)
   db = migrator_db
   baseline(db)
-  Sequel::Migrator.run(db, 'migrate', target: version&.to_i, allow_missing_migration_files: true)
+  Sequel::Migrator.run(db, 'migrate', target: version&.to_i)
   puts "Database is at migration version #{db[:schema_info].get(:version)}"
 end
 
@@ -51,7 +63,7 @@ def rollback_one
   target = db[:schema_info].get(:version) - 1
   abort 'Already at version 0.' if target.negative?
 
-  Sequel::Migrator.run(db, 'migrate', target:, allow_missing_migration_files: true)
+  Sequel::Migrator.run(db, 'migrate', target:)
   puts "Database is at migration version #{db[:schema_info].get(:version)}"
 end
 

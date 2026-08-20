@@ -1,4 +1,5 @@
 <form action="/workouts/<%= @workout.id %>/sets/<%= @set.id %>" method="post">
+  <%= csrf_tag("/workouts/#{@workout.id}/sets/#{@set.id}") %>
     <div>
       <label for="weight" class="block text-sm font-medium text-gray-900">Weight</label>
       <input type="number" id="weight" name="weight" autocomplete="off" step="5" inputmode="numeric"

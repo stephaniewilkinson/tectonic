@@ -172,6 +172,7 @@ class Tectonic < Roda
       @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('exercises/new') }
       r.post do
+        check_csrf!
         if r.params['id'].empty?
           exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'], account_id: @account_id)
           r.redirect "/exercises/#{exercise_id}/"
@@ -237,6 +238,7 @@ class Tectonic < Roda
           r.get('new') { view('sets/new') }
 
           r.post 'new' do
+            check_csrf!
             set_id = Set.insert(weight: r.params['weight'], reps: r.params['reps'],
                                 exercise_id: r.params['exercise_id'], is_warmup: r.params['is_warmup'] || false,
                                 is_completed: r.params['is_completed'] || false, workout_id:)
@@ -258,18 +260,28 @@ class Tectonic < Roda
               set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
               r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
             end
+            # Every route below resolves the set through own_set, which scopes it to
+            # this workout -- and the workout is already gated to the account above. A
+            # bare `Set[id]` would match any set in the database, so a set id from
+            # another account's workout would load and save here despite that gate.
             r.get 'edit' do
-              @set = Set[id: set_id]
+              @set = own_set(set_id, workout_id)
+              r.redirect "/workouts/#{workout_id}" unless @set
               view 'sets/edit'
             end
             r.get do
-              @set = Set[id: set_id]
+              @set = own_set(set_id, workout_id)
+              r.redirect "/workouts/#{workout_id}" unless @set
               view 'sets/show'
             end
             r.post do
-              Set.where(id: set_id).update(weight: r.params['weight'], reps: r.params['reps'],
-                                           is_warmup: r.params['is_warmup'] || false,
-                                           is_completed: r.params['is_completed'] || false)
+              check_csrf!
+              set = own_set(set_id, workout_id)
+              r.redirect "/workouts/#{workout_id}" unless set
+
+              set.update(weight: r.params['weight'], reps: r.params['reps'],
+                         is_warmup: r.params['is_warmup'] || false,
+                         is_completed: r.params['is_completed'] || false)
               r.redirect "/workouts/#{workout_id}"
             end
           end
@@ -306,13 +318,18 @@ class Tectonic < Roda
         view 'workouts/index'
       end
       r.post do
+        check_csrf!
         id = r.params['id']
         if id.empty?
           workout_id = Workout.insert(account_id: @account_id, date: r.params['date'])
           r.redirect "/workouts/#{workout_id}/"
         else
-          Workout.where(id: r.params['id']).update(date: r.params['date'])
-          @workout = Workout[id]
+          # Rescheduling is owner-only. This route sits outside the nested ownership
+          # gate, so without the account in the filter any id would match and any
+          # account's workout could be moved to a new date.
+          @workout = Workout.where(id:, account_id: @account_id).first
+          r.redirect '/workouts' unless @workout
+          @workout.update(date: r.params['date'])
           r.redirect "/workouts/#{@workout.id}/"
         end
       end
