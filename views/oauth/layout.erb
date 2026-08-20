@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr" class="h-full bg-gray-100">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authorize access &mdash; tectonic plates</title>
+    <meta name="robots" content="noindex, nofollow">
+    <%= assets(:css) %>
+    <%# Deliberately not the site layout. This is the page where a user hands an API
+        client access to their account, so it carries no analytics pixel, no charting
+        bundle, and no htmx -- the stylesheet CDN is the only third party left, and the
+        Content-Security-Policy set alongside this view pins scripts to exactly it. %>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="h-full">
+    <main>
+      <div class="max-w-5xl mx-auto px-4">
+        <%= yield %>
+      </div>
+    </main>
+  </body>
+</html>

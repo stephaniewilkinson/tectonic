@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 require 'rack/utils'
+require_relative '../mcp/config'
 require_relative '../oauth_client'
 require_relative 'authorize_request'
+require_relative 'params'
 
 class Tectonic < Roda
   module OAuth
@@ -32,11 +34,14 @@ class Tectonic < Roda
         def redirect_error_url
           query = { error: error.to_s }
           query[:state] = state unless state.to_s.empty?
-          "#{redirect_uri}?#{Rack::Utils.build_query(query)}"
+          Redirect.with(redirect_uri, query)
         end
       end
 
-      def validate(params)
+      def validate(raw_params)
+        params = Params.strings(raw_params)
+        return page_error unless params
+
         client = OAuthClient.locate(params['client_id'])
         return page_error unless client&.redirect_uri_allowed?(params['redirect_uri'])
 
@@ -53,6 +58,7 @@ class Tectonic < Roda
         return 'invalid_request' if params['code_challenge'].to_s.empty?
         return 'invalid_request' unless params['code_challenge_method'] == 'S256'
         return 'invalid_scope' unless scopes_supported?(params['scope'])
+        return 'invalid_target' unless resource_supported?(params['resource'])
 
         nil
       end
@@ -61,13 +67,27 @@ class Tectonic < Roda
         scope.to_s.split.all? { |name| SUPPORTED_SCOPES.include?(name) }
       end
 
+      # This deployment protects exactly one resource, so the only honourable audience
+      # (RFC 8707) is that one. Naming any other is invalid_target rather than a token
+      # minted for an audience no endpoint here would ever accept.
+      def resource_supported?(resource)
+        resource.to_s.empty? || resource == MCP::Config.resource_url
+      end
+
       def build_request(client, params)
         AuthorizeRequest.new(
           client:, client_id: client.client_id, redirect_uri: params['redirect_uri'],
           scopes: granted_scopes(params['scope'], client), code_challenge: params['code_challenge'],
-          code_challenge_method: params['code_challenge_method'], resource: params['resource'],
+          code_challenge_method: params['code_challenge_method'], resource: audience(params['resource']),
           state: params['state']
         )
+      end
+
+      # A client that names no resource still gets a token bound to this endpoint; the
+      # alternative is a null audience the MCP middleware refuses forever, which reads
+      # to the client as an authorization loop with no error to act on.
+      def audience(resource)
+        resource.to_s.empty? ? MCP::Config.resource_url : resource
       end
 
       # The scopes the code will carry: those requested, narrowed to what this server

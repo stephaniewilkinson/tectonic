@@ -25,15 +25,30 @@ class Tectonic < Roda
 
       # RFC 8414: the authorization server's own capabilities. S256-only PKCE and the
       # authorization_code + refresh_token grants are the whole of what we implement.
+      # Every client here is public, so 'none' is the only auth method advertised --
+      # naming client_secret_post as well would promise a client authentication the token
+      # endpoint does not perform, which reads as a stronger guarantee than it is.
       def authorization_server
-        base = MCP::Config.public_base_url
+        endpoints(MCP::Config.public_base_url).merge(capabilities)
+      end
+
+      # Where each part of the flow lives, all derived from the one public origin.
+      def endpoints(base)
         {
           issuer: base, authorization_endpoint: "#{base}/authorize",
           token_endpoint: "#{base}/token", registration_endpoint: "#{base}/register",
+          revocation_endpoint: "#{base}/revoke"
+        }
+      end
+
+      # What this server will actually do, which is deliberately the smaller list.
+      def capabilities
+        {
           scopes_supported: SCOPES, response_types_supported: ['code'],
           grant_types_supported: %w[authorization_code refresh_token],
           code_challenge_methods_supported: ['S256'],
-          token_endpoint_auth_methods_supported: %w[none client_secret_post]
+          token_endpoint_auth_methods_supported: ['none'],
+          revocation_endpoint_auth_methods_supported: ['none']
         }
       end
     end
