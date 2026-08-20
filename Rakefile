@@ -55,6 +55,19 @@ def migrate_to(version)
   puts "Database is at migration version #{db[:schema_info].get(:version)}"
 end
 
+# The way back from a database a test run has seeded, which is what a bare `rake test`
+# did to development until the suite began naming its own. Rebuilding is the cure rather
+# than hunting the rows down, since one run leaves accounts, workouts, exercises, sets,
+# grants and audit rows scattered across half the schema. A name can be given so a
+# scratch database is rebuilt the same way, and the migration runs in a subprocess
+# because this process resolved its own connection from the environment as it loaded.
+def reset_database(name)
+  database = name || 'tectonic_development'
+  sh "dropdb --if-exists #{database}"
+  sh "createdb #{database}"
+  sh({ 'DATABASE_URL' => "postgres:///#{database}" }, 'bundle', 'exec', 'rake', 'db:migrate')
+end
+
 # Reverses the most recently applied migration.
 def rollback_one
   db = migrator_db
@@ -67,6 +80,10 @@ def rollback_one
   puts "Database is at migration version #{db[:schema_info].get(:version)}"
 end
 
+# The two databases a checkout keeps locally: one to develop against, and the one the
+# suite connects to when a run has not named a database of its own.
+LOCAL_DATABASES = %w[tectonic_development tectonic_test].freeze
+
 namespace :db do
   desc 'Create the tectonic postgres user'
   task :create_user do
@@ -75,14 +92,17 @@ namespace :db do
 
   desc 'Setup development and test databases'
   task create: %i[create_user] do
-    sh 'createdb -U postgres -O tectonic tectonic_development'
-    sh 'createdb -U postgres -O tectonic tectonic_test'
+    LOCAL_DATABASES.each { |database| sh "createdb -U postgres -O tectonic #{database}" }
   end
 
   desc 'Drop the development and test databases'
   task :drop do
-    sh 'dropdb tectonic_development'
-    sh 'dropdb tectonic_test'
+    LOCAL_DATABASES.each { |database| sh "dropdb #{database}" }
+  end
+
+  desc "Drop, recreate and migrate a database, development by default: rake 'db:reset[tectonic_scratch]'"
+  task :reset, [:database] do |_task, args|
+    reset_database(args[:database])
   end
 
   desc "Migrate the database at DATABASE_URL, optionally to a version: rake 'db:migrate[5]'"
