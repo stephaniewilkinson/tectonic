@@ -74,23 +74,31 @@ class Tectonic < Roda
     # spelling rather than of which row an account happens to be holding.
     BARBELL_NAMES = LIBRARY.map(&:downcase).freeze
 
-    # Whether this movement is loaded on a bar, which is what decides if a set of it
-    # gets plate math and a warmup ramp. Being loaded on a bar is a property of the
-    # movement and belongs on the exercises table; it is not there, so the library --
-    # which is nothing but the list of barbell movements -- answers for it, and every
-    # write path asks here instead of each remembering to supply a flag. Matching the
-    # name rather than the row means an account's own "Bench Press", made before the
-    # library existed or by an assistant that resolved the name to a private row,
-    # counts too. When the column lands this method is the only thing to change.
+    # Whether this movement is loaded on a bar, which is what decides if a set of it gets
+    # plate math and a warmup ramp. It is a property of the movement, so it is a column on
+    # the movement; every write path still asks here rather than each of them remembering
+    # to supply a flag, which is what let three of them forget. This used to match the
+    # name against the library, which was right for the fifty-four movements the library
+    # names and could never be right for anything else -- a lifter's own variation, or a
+    # movement an assistant invented, was a barbell lift or not by spelling alone.
     def barbell?
+      is_barbell
+    end
+
+    # What a movement of this name is, for the paths that create one with nobody to ask:
+    # the library loader, the program seed, and the MCP resolver, which turns any name a
+    # model has not seen before into a private row. A person creating one in the UI is
+    # asked outright and their answer stands, so this is a default rather than a rule.
+    def self.barbell_by_name?(name)
       BARBELL_NAMES.include?(name.to_s.strip.downcase)
     end
 
     # Inserts any missing library rows and returns [created, skipped]. Idempotent
-    # on name, so running it again is a no-op.
+    # on name, so running it again is a no-op. Every library movement is a barbell
+    # movement, so a database built by this loader needs no backfill to be right.
     def self.load_library
       missing = LIBRARY.select { |name| where(account_id: nil, name:).empty? }
-      missing.each { |name| insert(account_id: nil, name:) }
+      missing.each { |name| insert(account_id: nil, name:, is_barbell: true) }
       [missing.length, LIBRARY.length - missing.length]
     end
   end

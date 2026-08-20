@@ -183,15 +183,21 @@ class Tectonic < Roda
       r.get('new') { view('exercises/new') }
       r.post do
         check_csrf!
+        # Whether the movement is loaded on a bar is asked outright here and the answer
+        # is taken as given, ticked or not: a person looking at the checkbox knows their
+        # own variation better than a name ever says. The paths with nobody to ask fall
+        # back to the library name instead.
+        is_barbell = !r.params['is_barbell'].nil?
         if r.params['id'].empty?
-          exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'], account_id: @account_id)
+          exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'],
+                                        account_id: @account_id, is_barbell:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
           # accounts' rows don't match, so the edit is refused.
           @exercise = Exercise.where(id: r.params['id'], account_id: @account_id).first
           r.redirect '/exercises' unless @exercise
-          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'])
+          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:)
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end

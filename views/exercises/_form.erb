@@ -9,6 +9,13 @@
     <div class="mt-2">
       <input value="<%= @exercise&.icon_url || nil %>" name="icon_url" id="icon_url" class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
     </div>
+    <%# The one thing about a movement the app cannot work out from its name once the
+        movement is not one of the built-in fifty-four: whether its sets are loaded on a
+        bar, and so whether they get a plate breakdown and a warmup ramp. %>
+    <div class="mt-4 flex items-center gap-2">
+      <input type="checkbox" name="is_barbell" id="is_barbell" value="1" <%= 'checked' if @exercise&.is_barbell %> class="h-4 w-4 rounded border-gray-300 text-lime-500 focus:ring-lime-500">
+      <label for="is_barbell" class="text-sm font-medium leading-6 text-gray-900">Loaded on a barbell</label>
+    </div>
   </div>
   <input type="hidden" name="id" id="id" value="<%= @exercise&.id || nil %>">
   <input type="submit" value="Save" class="mt-4 block rounded-lg bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-ss hover:bg-gray-500">

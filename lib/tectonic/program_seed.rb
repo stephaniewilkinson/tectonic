@@ -3,6 +3,8 @@
 require 'date'
 require_relative 'db'
 require_relative 'exercises'
+# Exercise.barbell_by_name?, the default a movement the seed has to create comes out with.
+require_relative 'exercise_library'
 require_relative 'program_days'
 require_relative 'program_lifts'
 require_relative 'program_weeks'
@@ -80,8 +82,12 @@ class Tectonic < Roda
       )
     end
 
+    # A movement the seed names but the account does not have yet is created here, and is
+    # a barbell movement when the library knows the name -- the same default every path
+    # with nobody to ask uses.
     def exercise_id(account_id, name)
-      Exercise.where(account_id:, name:).first&.id || Exercise.insert(account_id:, name:)
+      Exercise.where(account_id:, name:).first&.id ||
+        Exercise.insert(account_id:, name:, is_barbell: Exercise.barbell_by_name?(name))
     end
 
     # A seeded block opens on the Monday of the week it is seeded in, so the week it
