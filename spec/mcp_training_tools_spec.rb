@@ -54,6 +54,22 @@ describe 'create_set stamping' do
   end
 end
 
+# A set an assistant logs has to arrive knowing whether it is on a bar, or it renders
+# without the plate breakdown that is the point of the app. Nothing asks the model:
+# the flag is read off the movement the set landed on, here a private row the resolver
+# created from the name, which is recognised as a barbell lift by that name alone.
+describe 'create_set plate math' do
+  include Rack::Test::Methods
+
+  it 'takes the barbell flag from the movement rather than from the caller' do
+    raw = mint(scopes: ['write']).raw
+    call_tool('create_set', raw:, arguments: { exercise: 'Back Squat', weight: 135, reps: 5 })
+    assert Tectonic::Set[tool_result['structuredContent']['id']].is_barbell
+    call_tool('create_set', raw:, arguments: { exercise: 'Cable Fly', weight: 40, reps: 12 })
+    refute Tectonic::Set[tool_result['structuredContent']['id']].is_barbell
+  end
+end
+
 describe 'create_set validation' do
   include Rack::Test::Methods
 

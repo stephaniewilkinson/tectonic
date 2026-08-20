@@ -1,15 +1,20 @@
 <%- @library_exercises, @own_exercises = @exercises.partition(&:library?) %>
+<%# The movement the set is already on, so editing one opens on it. A menu with
+    nothing marked submits its first option, which on the edit form would quietly
+    move the set to whichever exercise happens to sort first. Nil on the new-set
+    form, where there is no set yet and the first option is the right default. %>
+<%- @chosen_exercise_id = @set && @set[:exercise_id] %>
 <%- unless @library_exercises.empty? %>
   <optgroup label="Library">
     <%- @library_exercises.each do |exercise| %>
-      <option value="<%= exercise[:id] %>"><%= exercise[:name] %></option>
+      <option value="<%= exercise[:id] %>" <%= 'selected' if exercise[:id] == @chosen_exercise_id %>><%= exercise[:name] %></option>
     <%- end %>
   </optgroup>
 <%- end %>
 <%- unless @own_exercises.empty? %>
   <optgroup label="Your exercises">
     <%- @own_exercises.each do |exercise| %>
-      <option value="<%= exercise[:id] %>"><%= exercise[:name] %></option>
+      <option value="<%= exercise[:id] %>" <%= 'selected' if exercise[:id] == @chosen_exercise_id %>><%= exercise[:name] %></option>
     <%- end %>
   </optgroup>
 <%- end %>

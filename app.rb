@@ -8,6 +8,9 @@ require 'tilt'
 require 'chartkick'
 require_relative 'lib/tectonic/db'
 require_relative 'lib/tectonic/exercises'
+# Not just the rake loader's list: it is also what tells a set whether it is loaded
+# on a bar, so the web process needs it too.
+require_relative 'lib/tectonic/exercise_library'
 require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
@@ -249,7 +252,8 @@ class Tectonic < Roda
             check_csrf!
             set_id = Set.insert(weight: r.params['weight'], reps: r.params['reps'],
                                 exercise_id: r.params['exercise_id'], is_warmup: r.params['is_warmup'] || false,
-                                is_completed: r.params['is_completed'] || false, workout_id:)
+                                is_completed: r.params['is_completed'] || false, workout_id:,
+                                is_barbell: visible_exercise(r.params['exercise_id'])&.barbell? || false)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
           end
 
@@ -289,7 +293,8 @@ class Tectonic < Roda
 
               set.update(weight: r.params['weight'], reps: r.params['reps'],
                          is_warmup: r.params['is_warmup'] || false,
-                         is_completed: r.params['is_completed'] || false)
+                         is_completed: r.params['is_completed'] || false,
+                         **substitution(set, r.params['exercise_id']))
               r.redirect "/workouts/#{workout_id}"
             end
           end
@@ -359,6 +364,29 @@ class Tectonic < Roda
     return nil unless @workout && @workout.account_id == @account_id
 
     Set.where(id: set_id, workout_id:).first
+  end
+
+  # The movement a form asked for, looked up only among the ones this account may
+  # select -- its own and the shared library -- so a set can never be pointed at a
+  # stranger's private exercise. nil when the id is absent, not a number, or not
+  # visible, which every caller reads as "no movement was chosen". Base ten because
+  # Integer() would otherwise read a zero-padded id as octal and reject "08".
+  def visible_exercise(exercise_id)
+    id = Integer(exercise_id.to_s, 10, exception: false)
+    Exercise.visible_to(@account_id).where(id:).first if id
+  end
+
+  # The exercise change a set edit is asking for, as attributes to merge into the
+  # update, or nothing when the movement is unchanged or is not one this account may
+  # choose. A substituted set takes the new movement's barbell flag with it, because
+  # plate math left behind by the lift that was swapped out is worse than none; an
+  # unchanged movement keeps the flag it has, so a program's per-lift override -- a
+  # machine variation of a barbell movement, say -- survives an edit to the weight.
+  def substitution(set, exercise_id)
+    exercise = visible_exercise(exercise_id)
+    return {} if exercise.nil? || exercise.id == set.exercise_id
+
+    { exercise_id: exercise.id, is_barbell: exercise.barbell? }
   end
 
   # Per-side plate breakdown for the session view, blank for anything not loaded

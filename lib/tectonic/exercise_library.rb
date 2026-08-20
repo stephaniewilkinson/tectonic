@@ -70,6 +70,22 @@ class Tectonic < Roda
       'Push Jerk'
     ].freeze
 
+    # The same names folded for comparison, so the lookup below is a matter of
+    # spelling rather than of which row an account happens to be holding.
+    BARBELL_NAMES = LIBRARY.map(&:downcase).freeze
+
+    # Whether this movement is loaded on a bar, which is what decides if a set of it
+    # gets plate math and a warmup ramp. Being loaded on a bar is a property of the
+    # movement and belongs on the exercises table; it is not there, so the library --
+    # which is nothing but the list of barbell movements -- answers for it, and every
+    # write path asks here instead of each remembering to supply a flag. Matching the
+    # name rather than the row means an account's own "Bench Press", made before the
+    # library existed or by an assistant that resolved the name to a private row,
+    # counts too. When the column lands this method is the only thing to change.
+    def barbell?
+      BARBELL_NAMES.include?(name.to_s.strip.downcase)
+    end
+
     # Inserts any missing library rows and returns [created, skipped]. Idempotent
     # on name, so running it again is a no-op.
     def self.load_library
