@@ -13,6 +13,7 @@ require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
+require_relative 'lib/tectonic/oauth/grant_bound_tokens'
 require_relative 'lib/tectonic/oauth/refresh_token_reuse'
 require_relative 'lib/tectonic/mcp/config'
 
@@ -122,6 +123,10 @@ class Tectonic < Roda
     # leaves the grant behind it alive; this revokes that grant, as RFC 9700 section
     # 4.14.2 requires. Prepended so it sits in front of the feature methods it extends.
     auth_class_eval { prepend OAuth::RefreshTokenReuse }
+    # Revoking a grant has to reach the access tokens it already issued, not just the
+    # ones it would go on to issue. A JWT is verified by signature alone, so it needs to
+    # name its grant for the resource server to check; this puts that name in the claims.
+    auth_class_eval { prepend OAuth::GrantBoundTokens }
     # The consent screen renders through a layout of its own. The site layout carries an
     # analytics pixel, two charting libraries, a date bundle, and htmx -- five third-party
     # scripts, none of them subresource-pinned -- and any one of them could rewrite the

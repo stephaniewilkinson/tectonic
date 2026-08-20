@@ -36,24 +36,37 @@ def new_oauth_application(name: 'Test LLM')
                                     redirect_uri: 'https://example.com/cb', scopes: 'read write')
 end
 
-Minted = Struct.new(:raw, :account_id, :application_id)
+Minted = Struct.new(:raw, :account_id, :application_id, :grant_id)
 
 # Signs a JWT access token exactly as the authorization server does, so the resource
 # server accepts it: the account in `sub`, the client in `client_id`, the granted
-# scopes, and this MCP endpoint as the audience. The keyword overrides drive the
-# rejection paths (a past `exp`, a foreign `aud`, a wrong signing `key`).
+# scopes, this MCP endpoint as the audience, and the grant it was issued against in
+# `gid`. The grant row is real, because the resource server checks it is still live --
+# a token naming no live grant is refused, which is how revocation reaches tokens
+# already issued. The keyword overrides drive the rejection paths (a past `exp`, a
+# foreign `aud`, a wrong signing `key`); revoking the returned grant_id covers the rest.
 def mint(scopes: ['read'], account_id: nil, exp: nil, aud: nil, key: nil)
   account_id ||= new_account
   application = new_oauth_application
-  raw = JWT.encode(mint_claims(account_id, application, scopes, exp, aud),
-                   key || Tectonic::OAuthKeys.private_key, Tectonic::OAuthKeys::ALGORITHM)
-  Minted.new(raw, account_id, application.id)
+  grant_id = new_grant(account_id, application, scopes)
+  claims = grant_claims(account_id, application, scopes, grant_id)
+  claims[:aud] = aud if aud
+  claims[:exp] = exp if exp
+  raw = JWT.encode(claims, key || Tectonic::OAuthKeys.private_key, Tectonic::OAuthKeys::ALGORITHM)
+  Minted.new(raw, account_id, application.id, grant_id)
 end
 
-def mint_claims(account_id, application, scopes, exp, aud)
-  { sub: account_id.to_s, client_id: application.client_id, scope: Array(scopes).join(' '),
-    aud: aud || [Tectonic::MCP::Config.resource_url], iat: Time.now.to_i,
-    exp: exp || (Time.now.to_i + 3600) }
+# The claims the authorization server signs for a granted token.
+def grant_claims(account_id, application, scopes, grant_id)
+  { sub: account_id.to_s, client_id: application.client_id, gid: grant_id,
+    scope: Array(scopes).join(' '), aud: [Tectonic::MCP::Config.resource_url],
+    iat: Time.now.to_i, exp: Time.now.to_i + 3600 }
+end
+
+# The oauth_grants row a token is issued against, as rodauth-oauth would have written it.
+def new_grant(account_id, application, scopes)
+  DB[:oauth_grants].insert(account_id:, oauth_application_id: application.id,
+                           scopes: Array(scopes).join(' '), expires_in: Time.now + 3600)
 end
 
 def mcp_headers(raw)
@@ -128,6 +141,27 @@ describe 'MCP bearer authentication' do
   it 'rejects a token minted for another audience' do
     raw = mint(aud: ['https://someone-else.example/mcp']).raw
     assert_equal 401, call_tool('whoami', raw:).status
+  end
+end
+
+# Revoking a grant has to reach the tokens it already issued. A JWT is valid on its
+# signature alone, so without a grant check a stolen token keeps working for its full
+# hour after the grant behind it was killed.
+describe 'MCP tokens die with their grant' do
+  include Rack::Test::Methods
+
+  it 'rejects a token whose grant was revoked after it was issued' do
+    minted = mint
+    assert_equal 200, call_tool('whoami', raw: minted.raw).status
+
+    DB[:oauth_grants].where(id: minted.grant_id).update(revoked_at: Time.now)
+    assert_equal 401, call_tool('whoami', raw: minted.raw).status
+  end
+
+  it 'rejects a token that names no grant at all' do
+    claims = JWT.decode(mint.raw, Tectonic::OAuthKeys.public_key, false).first.except('gid')
+    untagged = JWT.encode(claims, Tectonic::OAuthKeys.private_key, Tectonic::OAuthKeys::ALGORITHM)
+    assert_equal 401, call_tool('whoami', raw: untagged).status
   end
 end
 

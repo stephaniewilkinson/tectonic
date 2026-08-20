@@ -29,9 +29,14 @@ class Tectonic < Roda
 
       # The grant a token names, or nil for anything this server did not issue: a
       # malformed token, a forged tag, or a token minted before tagging existed.
+      # Exactly three parts, so a token with anything appended is refused rather than
+      # silently validating on its first three -- the mac only covers the first two.
       def grant_id(token)
-        id, secret, tag = token.to_s.split(SEPARATOR)
-        return unless id && secret && tag && !id.empty?
+        parts = token.to_s.split(SEPARATOR)
+        return unless parts.length == 3
+
+        id, secret, tag = parts
+        return if id.empty?
         return unless OpenSSL.secure_compare(mac("#{id}#{SEPARATOR}#{secret}"), tag)
 
         id.to_i
