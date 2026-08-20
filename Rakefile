@@ -121,6 +121,21 @@ namespace :oauth do
       register_oauth_client(args[:name])
     end
   end
+
+  desc "Delete spent grants and abandoned clients, with a grace period: rake 'oauth:prune[30]'"
+  task :prune, [:days] do |_task, args|
+    prune_oauth(args[:days])
+  end
+end
+
+# Collects what open registration leaves behind. The policy -- what counts as spent,
+# and what has to be kept because something still points at it -- lives in Retention
+# and is specced there; this only reports what it did.
+def prune_oauth(days)
+  require_relative 'lib/tectonic/oauth/retention'
+  days = (days || Tectonic::OAuth::Retention::DEFAULT_DAYS).to_i
+  pruned = Tectonic::OAuth::Retention.prune(days:)
+  puts "Pruned #{pruned[:grants]} grant(s) and #{pruned[:applications]} client(s) spent for #{days}+ days."
 end
 
 # Registers a confidential OAuth client bound to ACCOUNT_ID (or the only account) and

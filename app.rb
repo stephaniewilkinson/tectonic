@@ -12,10 +12,26 @@ require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/oauth_keys'
+require_relative 'lib/tectonic/oauth/redirect_uri'
+require_relative 'lib/tectonic/oauth/grant_bound_tokens'
+require_relative 'lib/tectonic/oauth/refresh_token_reuse'
 require_relative 'lib/tectonic/mcp/config'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
+  # The most a client registration may weigh. Registration metadata is a few hundred
+  # bytes; this leaves room for a long client name and a jwks document and nothing more.
+  REGISTRATION_BODY_LIMIT = 16 * 1024
+  # The consent screen's own policy. It is the one page where a single click hands an
+  # API client the account, and the only script it needs is the stylesheet CDN the site
+  # is written against, so everything else is denied outright rather than left open the
+  # way the site-wide policy has to leave it. form-action is deliberately absent: the
+  # consent POST is answered with a 302 to the client's callback, and browsers disagree
+  # about whether form-action applies across a redirect, so naming it would risk
+  # breaking the exchange it is supposed to protect.
+  CONSENT_SECURITY_POLICY = "default-src 'none'; script-src https://cdn.tailwindcss.com; " \
+                            "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " \
+                            "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 
   include Chartkick::Helper
 
@@ -76,10 +92,49 @@ class Tectonic < Roda
     # token_endpoint_auth_method "none", so accept it alongside the secret methods.
     oauth_token_endpoint_auth_methods_supported %w[client_secret_basic client_secret_post none]
     # Open dynamic client registration (RFC 7591): an LLM registers itself with no
-    # prior account -- the user is bound later, at the consent step. A registered client
-    # can do nothing until a logged-in user authorizes it, so registration stays open.
+    # prior account -- the user is bound later, at the consent step. Registration stays
+    # open because a registered client can do nothing until a logged-in user authorizes
+    # it, but where the authorization code may be delivered is not open: rodauth-oauth
+    # asks only whether the redirect_uri parses, and a callback pointing anywhere turns
+    # one careless approval on the consent screen into a stolen code.
+    # POST /register is unauthenticated by design, which also means an anonymous caller
+    # decides how much this process allocates: nothing else caps a request body, and the
+    # JSON parser builds whatever it is handed. The size is checked before the body is
+    # read, and the refusal is the RFC 7591 error shape rather than a 413, which a
+    # client reads as a transport failure rather than as a registration it can fix.
+    before_register_route do
+      next unless request.content_length.to_i > REGISTRATION_BODY_LIMIT
+
+      register_throw_json_response_error('invalid_client_metadata', 'The registration request is too large.')
+    end
     before_register do
-      # No account to authorize against, and nothing else to gate: registration is open.
+      registered = @oauth_application_params[oauth_applications_redirect_uri_column].to_s.split
+      refused = registered.reject { |uri| OAuth::RedirectUri.allowed?(uri) }
+      next if refused.empty?
+
+      register_throw_json_response_error('invalid_redirect_uri', register_invalid_uri_message(refused.first))
+    end
+    # A native client's callback is a loopback address, which is necessarily http
+    # (RFC 8252 section 7.3), and rodauth-oauth accepts https alone. Admitting http is
+    # what makes a loopback callback registrable at all; the allow-list above is what
+    # keeps http from meaning anything but loopback.
+    oauth_valid_uri_schemes %w[https http]
+    # Refresh tokens rotate on use, which detects a stolen token being replayed but
+    # leaves the grant behind it alive; this revokes that grant, as RFC 9700 section
+    # 4.14.2 requires. Prepended so it sits in front of the feature methods it extends.
+    auth_class_eval { prepend OAuth::RefreshTokenReuse }
+    # Revoking a grant has to reach the access tokens it already issued, not just the
+    # ones it would go on to issue. A JWT is verified by signature alone, so it needs to
+    # name its grant for the resource server to check; this puts that name in the claims.
+    auth_class_eval { prepend OAuth::GrantBoundTokens }
+    # The consent screen renders through a layout of its own. The site layout carries an
+    # analytics pixel, two charting libraries, a date bundle, and htmx -- five third-party
+    # scripts, none of them subresource-pinned -- and any one of them could rewrite the
+    # form that grants an API client the account. None of them has anything to do with
+    # this page, so it loads none of them, and the policy above says so.
+    authorize_view do
+      scope.response['Content-Security-Policy'] = CONSENT_SECURITY_POLICY
+      scope.view('authorize', layout: 'oauth_layout')
     end
     # Standard authorization-code default: redirect back with ?code=... rather than
     # rodauth-oauth's form_post default, which is what MCP clients like claude.ai expect
