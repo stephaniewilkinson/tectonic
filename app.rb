@@ -20,7 +20,17 @@ class Tectonic < Roda
   include Chartkick::Helper
 
   plugin :assets, css: ['tailwind.css', 'styles.css']
-  plugin :default_headers, 'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains'
+  # frame-ancestors keeps every page out of a third party's iframe, the OAuth consent
+  # screen most of all: it is the one page where a click grants an API client access to
+  # the account, so it is the one worth framing over a decoy. base-uri and object-src
+  # close the two injection sinks that cost nothing to shut. Script and style sources are
+  # deliberately left open because the site loads a JIT stylesheet CDN and renders inline
+  # chart scripts, so naming them would be a policy this app does not yet satisfy.
+  plugin :default_headers,
+         'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains',
+         'X-Content-Type-Options' => 'nosniff',
+         'Referrer-Policy' => 'strict-origin-when-cross-origin',
+         'Content-Security-Policy' => "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
   plugin :h
   plugin :head
   # Rodauth's json feature (OAuth token/registration endpoints speak JSON) calls back
@@ -30,7 +40,14 @@ class Tectonic < Roda
   plugin :json_parser
   plugin :public, root: 'assets'
   plugin :render
-  plugin :route_csrf
+  # A failed CSRF check is a refusal, not a crash: Roda's default raises, which reaches
+  # the client as a 500 and reads like a server fault rather than the rejection it is.
+  # This matters most on the OAuth authorize POST, the one form here whose forgery is
+  # worth attempting -- submitting it grants a client access to the account.
+  plugin :route_csrf do |_r|
+    response.status = 403
+    'That request could not be verified. Reload the page and try again.'
+  end
   plugin :sessions, secret: SESSION_SECRET
   plugin :slash_path_empty
   plugin :rodauth do
@@ -93,7 +110,6 @@ class Tectonic < Roda
     # GET /
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
-      rodauth.login_redirect
       view('home')
     end
     r.on 'exercises' do
