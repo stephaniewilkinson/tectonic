@@ -137,6 +137,16 @@ class Tectonic < Roda
       refused = registered.reject { |uri| OAuth::RedirectUri.allowed?(uri) }
       next if refused.empty?
 
+      # A refusal used to leave no trace: the caller got the RFC 7591 error and the
+      # server kept nothing. That is the wrong shape for this particular failure --
+      # the allow-list is a standing guess about what a vendor's connector will
+      # present, and being wrong shows up as somebody reporting that it would not
+      # connect, with no way to find out what was attempted. Reproducing it needs
+      # whatever subscription exposes that connector, so the one chance to see the
+      # cause is the moment it happens. One line on stderr, which the platform log
+      # keeps, is the whole fix.
+      warn "refused redirect_uri at registration: #{OAuth::RedirectUri.describe(refused.first)} " \
+           "(#{refused.length} of #{registered.length} refused)"
       register_throw_json_response_error('invalid_redirect_uri', register_invalid_uri_message(refused.first))
     end
     # A native client's callback is a loopback address, which is necessarily http

@@ -39,6 +39,9 @@ class Tectonic < Roda
       ].freeze
 
       LOOPBACK_HOSTS = %w[localhost 127.0.0.1 ::1].freeze
+      # Enough of a callback to recognise its shape, and no more. A registration is
+      # unauthenticated, so this is a stranger's string being written to a log.
+      LOGGED_LENGTH = 200
 
       module_function
 
@@ -73,6 +76,32 @@ class Tectonic < Roda
       # whole path or nothing.
       def path_match?(entry, uri)
         entry.path.end_with?('/') ? uri.path.start_with?(entry.path) : entry.path == uri.path
+      end
+
+      # A refused callback, reduced to something safe to write to a log.
+      #
+      # The query string is dropped. It is client-supplied, may carry anything, and the
+      # only question a log has to answer here is which callback shape was presented --
+      # which the origin and path already answer. The port is kept when it is not the
+      # scheme's default, because on loopback the port is the interesting part.
+      #
+      # Whatever arrives is a stranger's string on an unauthenticated endpoint, and by
+      # definition may not parse at all, so control characters go: a newline in a
+      # registration would otherwise forge a second line in the log and let the caller
+      # write entries of their own choosing.
+      def describe(candidate)
+        uri = parse(candidate)
+        sanitize(uri&.hostname ? "#{uri.scheme}://#{authority(uri)}#{uri.path}" : candidate)
+      end
+
+      def authority(uri)
+        return host(uri) if uri.port.nil? || uri.port == uri.default_port
+
+        "#{host(uri)}:#{uri.port}"
+      end
+
+      def sanitize(value)
+        value.to_s.gsub(/[[:cntrl:]]/, '').slice(0, LOGGED_LENGTH).to_s
       end
 
       def loopback?(uri)
