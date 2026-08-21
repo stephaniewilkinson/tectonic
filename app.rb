@@ -419,13 +419,16 @@ class Tectonic < Roda
   # session. The maximum is taken in the database, since the alternative is dragging
   # every set a lift has ever had into Ruby to fold it back down to one number a day.
   # The date belongs to the workout rather than the set and is stored as a timestamp, so
-  # it is cast to a day the way the MCP tools cast it when they match one.
+  # it is cast to a day the way the MCP tools cast it when they match one. Each day is
+  # labelled rather than dated: the chart plots these as categories, evenly spaced, so
+  # the label is the only calendar left on the axis and it carries the year, there being
+  # nothing else to tell one March from another.
   def heaviest_by_day(sets)
     recorded = Sequel.cast(Sequel[:workouts][:date], :date)
     heaviest = Sequel.function(:max, Sequel[:sets][:weight])
     sets.exclude(is_warmup: true).join(:workouts, id: :workout_id).group(recorded).order(recorded)
         .select_map([Sequel.as(recorded, :day), Sequel.as(heaviest, :heaviest)])
-        .map { |day, weight| [day.to_s, weight] }
+        .map { |day, weight| [day.strftime('%b %-d, %Y'), weight] }
   end
 
   # Fill for one of the RPE buttons, highlighting the current rating. Session and set

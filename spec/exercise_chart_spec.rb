@@ -60,7 +60,21 @@ describe 'the exercise page' do
     assert_equal 200, last_response.status
     assert_includes last_response.body, 'Heaviest weight each day'
     assert_includes last_response.body, 'new Chartkick["LineChart"]'
-    assert_includes last_response.body, '[["2026-03-02",185],["2026-03-09",155]]'
+    assert_includes last_response.body, '[["Mar 2, 2026",185],["Mar 9, 2026",155]]'
+  end
+
+  # A layoff is a gap in the data and must stay one: the day it came back is the next
+  # point along, not a point five months down a calendar. The axis is asked for
+  # explicitly, since Chartkick reads date-shaped keys as a timeline otherwise.
+  it 'gives a lift picked up again months later the very next point on the axis' do
+    sign_in_with_a_lift
+    log_set 185, on: Time.new(2026, 1, 5, 7, 30)
+    log_set 190, on: Time.new(2026, 6, 15, 7, 30)
+
+    get "/exercises/#{@exercise_id}"
+
+    assert_includes last_response.body, '[["Jan 5, 2026",185],["Jun 15, 2026",190]]'
+    assert_includes last_response.body, '"discrete":true'
   end
 end
 

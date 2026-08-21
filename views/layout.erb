@@ -30,18 +30,17 @@
     <script defer src="https://app.tinyanalytics.io/pixel/KyJ6JipBW9No4r00"></script>
     <!-- END Pixel Code -->
 
-    <%# Charting costs half a megabyte, and on a page that draws no chart it is half a
-        megabyte of nothing -- the login form, the sign-up form and every workout page
-        carried it. A view that charts says so by setting @charts, which is set by the
-        time this runs because Roda renders the template first and this layout around it.
-        The order is the dependency order: Chart.js, then the date adapter that gives it
-        a time axis, then Chartkick, which adapts what it finds. The adapter is not
-        optional for the exercise page -- its line is plotted against dates, and Chart.js
-        renders a blank canvas rather than an axis when it has no adapter to read them
-        with. %>
+    <%# Charting costs a quarter of a megabyte, and on a page that draws no chart it is a
+        quarter of a megabyte of nothing -- the login form, the sign-up form and every
+        workout page carried it. A view that charts says so by setting @charts, which is
+        set by the time this runs because Roda renders the template first and this layout
+        around it. Chart.js is named before Chartkick, which adapts it. The vendored
+        chartjs-adapter-date-fns bundle, 215KB of it, is not loaded at all: it teaches
+        Chart.js to read dates for a time axis, and the one chart in the app plots its
+        days as evenly spaced categories, so nothing ever parses a date. A chart that
+        wants a real calendar will need it back. %>
     <%- if @charts %>
       <script src="/js/chart.umd.js"></script>
-      <script src="/js/chartjs-adapter-date-fns.bundle.js"></script>
       <script src="/js/chartkick.js"></script>
     <%- end %>
     <script src="/js/htmx.min.js"></script>

@@ -6,22 +6,24 @@ require 'bcrypt'
 require 'securerandom'
 
 # What each page actually loads, asserted against the rendered HTML rather than against
-# the layout's good intentions. Chart.js and Chartkick are roughly half a megabyte and
-# used to be in the head of every page in the app, including the two forms a visitor
-# meets before they have logged a single set. The rule now is that they follow a chart,
-# so these specs name the pages that draw one and the pages that do not.
+# the layout's good intentions. A quarter of a megabyte of charting used to sit in the
+# head of every page in the app, including the two forms a visitor meets before they have
+# logged a single set. The rule now is that it follows a chart, so these specs name the
+# pages that draw one and the pages that do not.
 module PageAssets
-  # In dependency order: Chart.js, the adapter that lets it read dates, then Chartkick,
-  # which adapts what it finds. The exercise chart is plotted against days, so the
-  # adapter is load-bearing rather than along for the ride.
-  CHART_SCRIPTS = ['/js/chart.umd.js', '/js/chartjs-adapter-date-fns.bundle.js', '/js/chartkick.js'].freeze
+  # In dependency order: Chart.js, then Chartkick, which adapts it.
+  CHART_SCRIPTS = ['/js/chart.umd.js', '/js/chartkick.js'].freeze
+  # Vendored, and loaded by nothing. It exists to give Chart.js a time axis, and the one
+  # chart in the app spaces its days evenly rather than by the calendar, so no page has a
+  # date for it to parse. Asserted so that it cannot drift back into the layout unnoticed.
+  DATE_ADAPTER = '/js/chartjs-adapter-date-fns.bundle.js'
 
   def app
     Tectonic.app
   end
 
   def refute_chart_scripts
-    CHART_SCRIPTS.each { |script| refute_includes last_response.body, script }
+    (CHART_SCRIPTS + [DATE_ADAPTER]).each { |script| refute_includes last_response.body, script }
   end
 
   def make_account
@@ -83,7 +85,7 @@ describe 'the exercise page with a chart on it' do
 
   # A dependency loaded after the thing that depends on it is a dependency that was not
   # there when it was wanted, so the order is asserted and not merely the presence.
-  it 'loads Chart.js, then the date adapter, then Chartkick' do
+  it 'loads Chart.js, then Chartkick' do
     body = last_response.body
     positions = PageAssets::CHART_SCRIPTS.map { |script| body.index(script) }
 
@@ -93,6 +95,12 @@ describe 'the exercise page with a chart on it' do
 
   it 'still hands the chart its points' do
     assert_includes last_response.body, 'new Chartkick["LineChart"]'
+  end
+
+  # The axis is categories, not a calendar, so there is no date for the adapter to read
+  # and 215KB of it stays on the shelf.
+  it 'carries no date adapter' do
+    refute_includes last_response.body, PageAssets::DATE_ADAPTER
   end
 end
 
