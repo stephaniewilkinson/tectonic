@@ -50,8 +50,19 @@ class Tectonic < Roda
           check_load(attributes)
           { sets: attributes[:sets], reps: attributes[:reps], top_weight: attributes[:top_weight],
             percent_of_max: attributes[:percent_of_max], note: attributes[:note],
+            progression: progression_for(attributes),
             is_main: attributes.fetch(:is_main, false),
             is_barbell: attributes.fetch(:is_barbell, exercise.barbell?) }
+        end
+
+        # How a lift is priced already says how it should progress, so an assistant is
+        # never asked to state both and cannot state them inconsistently. A percentage is
+        # read fresh from the estimated max each week and has therefore already moved by
+        # whatever the lifting moved it; pounds are a starting point the rules step from.
+        # Without this a lift written as a percentage would take the column's default and
+        # be generated as though it had a weight to step off, which it has not.
+        def progression_for(attributes)
+          attributes[:percent_of_max] ? 'percent' : 'linear'
         end
 
         def check_load(attributes)

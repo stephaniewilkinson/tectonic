@@ -52,13 +52,25 @@ class Tectonic < Roda
         # flag with it unless the caller says otherwise, because plate math describing the
         # lift that was swapped out is worse than none -- the same rule the web UI follows.
         def self.fields(context, lift, arguments)
-          attributes = arguments.slice(:sets, :reps, :top_weight, :percent_of_max, :is_main, :is_barbell, :note)
+          attributes = repriced(lift, arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
+                                                      :is_main, :is_barbell, :note))
           return attributes unless arguments[:exercise]
 
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           return attributes if exercise.id == lift.exercise_id
 
           { exercise_id: exercise.id, is_barbell: exercise.barbell? }.merge(attributes)
+        end
+
+        # An edit that changes how a lift is priced changes how it progresses, because the
+        # two are the same fact: a percentage is re-read from the estimated max each week,
+        # pounds are a starting point the rules step from. Swapping one for the other and
+        # leaving the old rule behind would write a row the generator cannot price -- a
+        # percentage lift it tries to step off a top_weight that is now null.
+        def self.repriced(lift, attributes)
+          return attributes unless attributes.key?(:top_weight) || attributes.key?(:percent_of_max)
+
+          attributes.merge(progression: ProgramWriter.progression_for(merged(lift, attributes)))
         end
 
         # Position is applied by renumbering the whole day rather than written as a

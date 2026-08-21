@@ -81,20 +81,37 @@ end
 describe 'a block that responds to a week that went badly' do
   include Progressing
 
-  it 'takes ten off after a week whose working sets went uncompleted' do
-    program = block(weeks: 2)
+  # One bad week asks the same question again rather than answering it: the weight holds,
+  # and only a second failure at it reads as a stall worth backing off from.
+  it 'holds the load after a single week whose working sets went uncompleted' do
+    program = block(weeks: 3)
     workout, = generate(program, 1)
     fall_short(workout)
 
-    assert_equal 145, generate(program, 2).last
+    assert_equal 155, generate(program, 2).last
   end
 
-  it 'takes ten off after a week lifted under what it asked for' do
-    program = block(weeks: 2)
+  it 'holds the load after a single week lifted under what it asked for' do
+    program = block(weeks: 3)
     workout, = generate(program, 1)
     working_sets(workout).each { |set| set.update(is_completed: true, reps: set.planned_reps - 2) }
 
-    assert_equal 145, generate(program, 2).last
+    assert_equal 155, generate(program, 2).last
+  end
+end
+
+# Two failures running is the signal the rule waits for before it moves the weight down.
+describe 'a block that backs off after a genuine stall' do
+  include Progressing
+
+  it 'backs off once a second attempt has fallen short too' do
+    program = block(weeks: 3)
+    first, = generate(program, 1)
+    fall_short(first)
+    second, = generate(program, 2)
+    fall_short(second)
+
+    assert_equal 150, generate(program, 3).last
   end
 
   # A week nobody trained says nothing about how strong the lifter is, so it moves nothing.

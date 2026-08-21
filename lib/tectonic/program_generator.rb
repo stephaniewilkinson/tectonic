@@ -128,28 +128,46 @@ class Tectonic < Roda
     # the number they were authored with, which is also what makes a block generatable out
     # of order.
     def progressed_weight(week, lift)
-      previous = previous_session(week, lift)
-      return written_start(lift) unless previous
+      sessions = previous_sessions(week, lift)
+      return written_start(lift) if sessions.empty?
 
-      Progression.next_top_weight(previous[:top_weight], previous[:sets])
+      Progression.next_top_weight(sessions.first[:top_weight], sessions.map { |s| s[:outcome] },
+                                  increment: load_increment)
     end
 
-    # The most recent session of this movement inside this block, as the load it prescribed
-    # and the working sets it prescribed it as. Warmups are left out: they are a ramp to the
-    # top set and say nothing about whether the top set was there.
+    # The size of one step, which is the smallest change the rack can actually make. Five
+    # pounds is 2.5s on each side, the lightest pair in Plates::DEFAULT_INVENTORY, and the
+    # number Rounding is built around. It is read here, in one place, rather than at the
+    # call site, because equipment is about to become a property of an account (#64): when
+    # it is, this is the method that asks the account what it can load, and the rule above
+    # goes on reading "one increment" without changing.
+    def load_increment
+      Rounding::INCREMENT
+    end
+
+    # This block's sessions of this movement, most recent first, each as the load it
+    # prescribed and what became of it. The rules ask two short questions of them: what
+    # happened last time, and whether the attempt before that also fell short.
     #
     # Matched on the movement rather than on the program lift row, because every week writes
     # lift rows of its own and they are the same lift only in that they name the same
     # exercise. Confined to this block, because top_weight is the block's own starting point
     # and a lift that wants to carry strength across blocks is written as a percentage of a
     # max, which spans them by construction.
-    def previous_session(week, lift)
-      workout = previous_workout(week, lift)
-      return nil unless workout
+    def previous_sessions(week, lift)
+      previous_workouts(week, lift).filter_map { |workout| session(workout, lift) }
+    end
 
+    # One session as the rules read it: the load it asked for, restated in the lift's own
+    # units, and whether it was met, fallen short of, or never trained. Warmups are left
+    # out -- they are a ramp to the top set and say nothing about whether the top set was
+    # there -- and a session with nothing planned in it is not a prescription at all.
+    def session(workout, lift)
       sets = Set.where(workout_id: workout.id, exercise_id: lift.exercise_id, is_warmup: false).all
       heaviest = sets.select(&:planned_weight).max_by(&:planned_weight)
-      heaviest && { top_weight: written_top(heaviest, lift), sets: sets.map(&:values) }
+      return nil unless heaviest
+
+      { top_weight: written_top(heaviest, lift), outcome: Progression.outcome(sets.map(&:values)) }
     end
 
     # The previous session's top set, restated at the rep count this lift is written in. A
@@ -163,10 +181,14 @@ class Tectonic < Roda
       SetScheme.convert_weight(set.planned_weight, from_reps: set.planned_reps, to_reps: lift.reps)
     end
 
-    def previous_workout(week, lift)
+    # Every earlier session of this movement in the block, latest first. Not limited to the
+    # two the strike count needs: weeks nobody trained are skipped when counting, so the
+    # second attempt can sit any distance back, and a window wide enough to be safe is the
+    # whole block anyway -- a handful of rows for a movement trained once a week.
+    def previous_workouts(week, lift)
       lifted = Set.where(exercise_id: lift.exercise_id).select(:workout_id)
       Workout.where(account_id: @program.account_id, program_day_id: earlier_days(week), id: lifted)
-             .order(Sequel.desc(:date), Sequel.desc(:id)).first
+             .order(Sequel.desc(:date), Sequel.desc(:id)).all
     end
 
     # The days of every earlier week of this block that was not a deload. Deload weeks are

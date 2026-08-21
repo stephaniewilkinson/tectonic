@@ -4,45 +4,75 @@ require 'roda'
 require_relative 'rounding'
 
 class Tectonic < Roda
-  # What the next prescription of a lift should be, read off the last one and what was
-  # actually done against it. Three rules decide it and they are deliberately dull, because
-  # a lifter has to be able to predict Monday's load on Sunday night, and a rule nobody can
-  # anticipate is one nobody trusts enough to follow.
+  # What the next prescription of a lift should be, read off the sessions before it. Three
+  # rules decide it and they are deliberately dull, because a lifter has to be able to
+  # predict Monday's load on Sunday night, and a rule nobody can anticipate is one nobody
+  # trusts enough to follow.
   #
-  #   trained it all as written   ->  five pounds more
-  #   trained it and fell short   ->  ten pounds less
-  #   did not train it at all     ->  the same again
+  #   hit every rep     ->  up one increment
+  #   fell short once   ->  the same again
+  #   fell short twice  ->  down one increment
   #
-  # The asymmetry between the step up and the step down is the point. Adding is a guess
-  # that the lifter is stronger, and a wrong guess costs a session; subtracting is a
-  # response to evidence that the load was too heavy, and coming back at the same weight
-  # that just failed wastes the week. Twice the step gets clear of it in one go rather than
-  # grinding at the edge of failure for a fortnight.
+  # Holding before dropping is the part worth explaining. One failed session is not
+  # evidence of a stall: sleep, food and stress move day-to-day performance by more than a
+  # rep, so a weight missed on Monday is often one that would have gone up on any other
+  # Monday. Repeating it asks the question again under different conditions, and only a
+  # second failure answers it. This is the pattern Starting Strength and its descendants
+  # settled on, for that reason. A success clears the count, so two failures a month apart
+  # with a good week between them are two first failures rather than a stall.
   #
-  # A session nobody trained is not evidence of anything, so it moves nothing. Absence of
-  # proof is the case a rule most easily gets wrong: dropping the load for a week the
-  # lifter was travelling would compound over three such weeks into a prescription far
-  # under what they can lift, all of it inferred from days when no bar was touched.
+  # A session nobody trained is neither, and is the case a rule most easily gets wrong. It
+  # moves the load nowhere and it neither earns a strike nor clears one: absence of proof
+  # is not proof of weakness, and dropping the load for a week the lifter was travelling
+  # would compound over three such weeks into a prescription far under what they can lift,
+  # all of it inferred from days when no bar was touched.
+  #
+  # The step is one increment rather than a number of pounds, and the increment is passed
+  # in. Every rack here makes 5 lb jumps today, because 2.5s on each side is the smallest
+  # pair of plates in the inventory; an account with 1 lb plates makes 2 lb jumps, and the
+  # same rule then reads "up one increment" without a word of this changing.
   module Progression
-    # Up by the smallest change a bar can actually make, down by two of them.
-    ADVANCE = Rounding::INCREMENT
-    REGRESS = Rounding::INCREMENT * 2
     # What a deload week takes off the load it would otherwise have been given.
     DELOAD_FACTOR = 0.9
+    # How many failed attempts in a row it takes to call a weight a stall rather than a
+    # bad day.
+    STRIKES = 2
 
     module_function
 
-    # The top weight for the next session of a lift, given what the last one prescribed and
-    # the working sets it was prescribed as. Warmups are not passed in: they are a ramp to
-    # the top set and say nothing about whether the top set was there.
-    def next_top_weight(top_weight, sets)
-      return top_weight unless trained?(sets)
-      return top_weight + ADVANCE if sets.all? { |set| met?(set) }
+    # The top weight for the next session of a lift: the load the last one prescribed, and
+    # the outcomes of the sessions before it, most recent first.
+    def next_top_weight(top_weight, outcomes, increment: Rounding::INCREMENT)
+      case outcomes.first
+      when :met then top_weight + increment
+      when :short then stalled?(outcomes) ? backed_off(top_weight, increment) : top_weight
+      else top_weight
+      end
+    end
 
-      # A floor, so a long run of bad weeks lands on an empty bar rather than at zero or
-      # below it. Reaching it means the rule has been wrong for months and a person should
-      # be looking at the block, which a load of nothing at least makes obvious.
-      [top_weight - REGRESS, Rounding::INCREMENT].max
+    # What one session did with what it was asked for. Warmups are not passed in: they are
+    # a ramp to the top set and say nothing about whether the top set was there.
+    def outcome(sets)
+      return :missed unless sets.any? { |set| set[:is_completed] }
+      return :met if sets.all? { |set| met?(set) }
+
+      :short
+    end
+
+    # Two failed attempts running, counting only the sessions that were actually trained.
+    # A week nobody trained sits between them without breaking the run, because it is not
+    # a week the lifter answered the question in either direction.
+    def stalled?(outcomes)
+      attempted = outcomes.reject { |outcome| outcome == :missed }
+      attempted.take(STRIKES) == Array.new(STRIKES, :short)
+    end
+
+    # A floor at one increment, so a long run of bad weeks lands on the lightest loadable
+    # weight rather than at zero or below it. Reaching it means the rule has been wrong for
+    # months and a person should be looking at the block, which a load of nothing at least
+    # makes obvious.
+    def backed_off(top_weight, increment)
+      [top_weight - increment, increment].max
     end
 
     # A deload's reduction, applied to whatever load the rules above arrived at. Load only:
@@ -50,13 +80,6 @@ class Tectonic < Roda
     # reach inside SetScheme, and a week at ninety percent is already a week that recovers.
     def deloaded(top_weight)
       Rounding.to_increment(top_weight * DELOAD_FACTOR)
-    end
-
-    # Whether the session happened at all, which is one completed set: the same test the
-    # workout list uses to tell a session that was performed from one that was only ever
-    # written down.
-    def trained?(sets)
-      sets.any? { |set| set[:is_completed] }
     end
 
     # Whether a set answered what was asked of it. Lifting more than the prescription, or
