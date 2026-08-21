@@ -16,6 +16,7 @@ require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/connection'
 require_relative 'lib/tectonic/equipment'
+require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/program_editor'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/oauth_keys'
@@ -46,7 +47,16 @@ class Tectonic < Roda
   # that is the app's colour everywhere else, and whole numbers on the count axis
   # because Chart.js otherwise labels the gridlines in halves, and half a set is not a
   # thing anyone lifted.
-  Chartkick.options = { colors: ['#84cc16'], height: '260px',
+  #
+  # The palette is for charts that draw more than one series, and is asked for by those
+  # charts rather than set here. Chart.js gives every series past the end of the colour
+  # list its own grey, so a lone lime drew two lifts the same shade and the legend
+  # stopped telling them apart -- but a list of colours applied globally is worse: it
+  # colours each bar of a single-series chart differently, which reads as though the
+  # colours mean something. One colour is the right default; a chart comparing lifts
+  # passes this instead.
+  CHART_COLORS = ['#84cc16', '#0369a1', '#f59e0b', '#8b5cf6', '#e11d48'].freeze
+  Chartkick.options = { colors: [CHART_COLORS.first], height: '260px',
                         library: { scales: { y: { ticks: { precision: 0 } } } } }
 
   plugin :assets, css: ['tailwind.css', 'styles.css']
@@ -239,6 +249,25 @@ class Tectonic < Roda
       r.get do
         @equipment = Equipment.for_account(@account_id)
         view('equipment')
+      end
+    end
+
+    # What the training actually contained, folded into weeks. Every other view lists
+    # rows and so can only answer what happened on a given day; this one answers whether
+    # the volume is going up, which is the question a block is judged by.
+    r.on 'volume' do
+      rodauth.require_login
+      @account_id = rodauth.account_from_session[:id]
+
+      r.get do
+        @weeks = volume_window(r.params['weeks'])
+        @lifts = Volume.lifts(@account_id, weeks: @weeks)
+        @lift = @lifts.find { |id, _name| id.to_s == r.params['exercise_id'].to_s }
+        @rows = Volume.weekly(@account_id, exercise_id: @lift&.first, weeks: @weeks)
+        @summary = Volume.summary(@rows)
+        @top_sets = Volume.top_sets(@account_id, exercise_id: @lift&.first, weeks: @weeks)
+        @by_exercise = Volume.by_exercise(@account_id, weeks: @weeks) unless @lift
+        view('volume')
       end
     end
 
@@ -576,6 +605,14 @@ class Tectonic < Roda
     sets.exclude(is_warmup: true).join(:workouts, id: :workout_id).group(recorded).order(recorded)
         .select_map([Sequel.as(recorded, :day), Sequel.as(heaviest, :heaviest)])
         .map { |day, weight| [day.strftime('%b %-d, %Y'), weight] }
+  end
+
+  # The window the volume page is asked for, or a block's worth. Only the offered
+  # windows are honoured: the number reaches a date subtraction, and a query string is
+  # not a place to let someone choose how many weeks of anybody's training to sum.
+  def volume_window(requested)
+    window = requested.to_i
+    Volume::WINDOWS.include?(window) ? window : Volume::DEFAULT_WEEKS
   end
 
   # Fill for one of the RPE buttons, highlighting the current rating. Session and set
