@@ -6,6 +6,7 @@ require 'json'
 require 'base64'
 require 'digest'
 require 'securerandom'
+require 'stringio'
 require 'bcrypt'
 
 # The OAuth authorization server, driven through the Roda app with Rack::Test. The
@@ -38,6 +39,16 @@ module OAuthFlow
              token_endpoint_auth_method: 'none', scope: 'read write' }
     post '/register', body.to_json, json_headers
     JSON.parse(last_response.body)
+  end
+
+  # `warn` writes to $stderr, so the object is swapped rather than the file descriptor.
+  def capture_stderr
+    original = $stderr
+    $stderr = StringIO.new
+    yield
+    $stderr.string
+  ensure
+    $stderr = original
   end
 
   def pkce
@@ -157,6 +168,39 @@ describe 'OAuth dynamic client registration' do
     assert_equal 400, last_response.status
     assert_equal 'invalid_redirect_uri', refusal['error']
     assert_equal registered, DB[:oauth_applications].count
+  end
+end
+
+# The allow-list is a standing guess about what a vendor's connector will present, and
+# being wrong shows up as somebody reporting that it would not connect. Reproducing that
+# needs whatever subscription exposes the connector, so the refusal has to be legible
+# from the one attempt that already happened.
+describe 'a refused registration' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  it 'says what was rejected, on stderr where the platform log keeps it' do
+    logged = capture_stderr { register_client(redirect_uri: 'https://evil.example/steal?state=abc') }
+
+    assert_includes logged, 'refused redirect_uri at registration'
+    assert_includes logged, 'https://evil.example/steal'
+    # The query is a client's own string and answers nothing about the callback shape.
+    refute_includes logged, 'state=abc'
+  end
+
+  it 'counts them without writing a line for each' do
+    logged = capture_stderr do
+      body = { client_name: 'Many', redirect_uris: ['https://evil.example/a', 'https://evil.example/b'],
+               grant_types: %w[authorization_code], token_endpoint_auth_method: 'none' }
+      post '/register', body.to_json, json_headers
+    end
+
+    assert_includes logged, '(2 of 2 refused)'
+    assert_equal(1, logged.lines.count { |line| line.include?('refused redirect_uri') })
+  end
+
+  it 'stays quiet when the callback is allowed' do
+    assert_empty(capture_stderr { register_client })
   end
 end
 

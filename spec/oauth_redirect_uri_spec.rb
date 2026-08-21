@@ -65,6 +65,46 @@ describe 'Tectonic::OAuth::RedirectUri on an exact entry' do
   end
 end
 
+# A refusal is written to the log so that a connector rejected on a callback shape
+# nobody anticipated can be diagnosed from the one attempt, rather than needing another.
+# What goes in the line is a stranger's string from an unauthenticated endpoint.
+describe 'Tectonic::OAuth::RedirectUri described for a log' do
+  def describe_uri(uri)
+    Tectonic::OAuth::RedirectUri.describe(uri)
+  end
+
+  it 'keeps the shape and drops the query' do
+    assert_equal 'https://chatgpt.com/connector/oauth/f8a1c2',
+                 describe_uri('https://chatgpt.com/connector/oauth/f8a1c2?state=abc')
+  end
+
+  # On loopback the port is the interesting part, and everywhere else the default is
+  # noise.
+  it 'keeps a port only when it is not the default' do
+    assert_equal 'http://127.0.0.1:53791/callback', describe_uri('http://127.0.0.1:53791/callback')
+    assert_equal 'https://claude.ai/api/mcp/auth_callback', describe_uri('https://claude.ai:443/api/mcp/auth_callback')
+  end
+
+  # The whole reason this is sanitised: a newline would end the line and let the caller
+  # write log entries of their own.
+  it 'cannot be used to forge a second log line' do
+    forged = describe_uri("https://evil.example/cb\nrefused redirect_uri at registration: https://claude.ai/ok")
+
+    refute_includes forged, "\n"
+    refute_includes forged, "\r"
+  end
+
+  it 'still says something for a string that is not a uri at all' do
+    assert_equal 'not a uri', describe_uri('not a uri')
+    assert_equal '', describe_uri(nil)
+  end
+
+  it 'does not let a caller flood the log with one registration' do
+    assert_equal Tectonic::OAuth::RedirectUri::LOGGED_LENGTH,
+                 describe_uri("https://evil.example/#{'a' * 5000}").length
+  end
+end
+
 # The list is configuration so a new client can be admitted without a deploy, which
 # also means the defaults are gone the moment it is set.
 describe 'Tectonic::OAuth::RedirectUri configured from the environment' do
