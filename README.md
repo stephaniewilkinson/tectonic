@@ -125,33 +125,38 @@ bundle exec erblint views/*/* views/*
 
 ## The program engine
 
-A program is a plan; workouts and sets are what it produces. Three tables hold the plan —
-`programs`, `program_days`, `program_lifts` — and generating a week turns them into
-ordinary `workouts` and `sets` rows with `is_completed` false. A planned session is not a
+A program is a plan; workouts and sets are what it produces. Four tables hold the plan —
+`programs`, `program_weeks`, `program_days`, `program_lifts` — and generating a week turns
+them into ordinary `workouts` and `sets` rows with `is_completed` false. A planned session is not a
 separate kind of record: lifting a set as written only flips `is_completed`, while lifting
 it differently changes `weight` or `reps` and leaves `planned_weight` and `planned_reps`
 behind as the record of what was asked for.
 
-- **`programs`** — name, block, week, and two preferences the maths below reads:
-  `preferred_reps` (the rep count main work should be expressed at) and `is_ascending`
-  (whether working sets climb to the top weight or sit flat).
+- **`programs`** — the block: a name, a `start_date`, and two preferences the maths below
+  reads: `preferred_reps` (the rep count main work should be expressed at) and
+  `is_ascending` (whether working sets climb to the top weight or sit flat).
+- **`program_weeks`** — a numbered week of the block, and `is_deload`. Dates are derived
+  rather than stored: a week opens seven days after the one before it, counted from the
+  block's start.
 - **`program_days`** — a weekday, in Ruby's numbering where 1 is Monday, and a focus such
-  as "Squat". A day is a weekday rather than a date, so the same program regenerates every
-  week.
+  as "Squat". A day is a weekday rather than a date, so the week it belongs to decides
+  when it actually falls.
 - **`program_lifts`** — an exercise at a position within the day, with `sets`, `reps`,
-  `top_weight`, `is_barbell` (whether it warms up off a bar and shows plate maths) and
-  `is_main` (whether the rep-count preference applies to it). Position is the order it was
-  written, which is the order it is generated and the order it appears in the session.
+  `is_barbell` (whether it warms up off a bar and shows plate maths), `is_main` (whether
+  the rep-count preference applies to it) and a `progression` rule with the load it reads:
+  `top_weight` for `fixed` and `linear`, `percent_of_max` for `percent`. Position is the
+  order it was written, which is the order it is generated and the order it appears in the
+  session.
 
 `Tectonic::ProgramSeed` (`lib/tectonic/program_seed.rb`) is a program written as a frozen
-Ruby hash, until there is a UI for editing one. It creates the program, its days and its
-lifts, creating any exercise it names that the account does not already have, and is
-idempotent on account, name, block and week — reseeding returns the existing program
-untouched.
+Ruby hash, until there is a UI for editing one. It creates the program, its weeks, days
+and lifts, reusing any movement the account can already see — its own or a library one —
+and creating only a name nothing answers to. It is idempotent on account, name and block,
+so reseeding returns the existing program untouched.
 
-`Tectonic::ProgramGenerator` (`lib/tectonic/program_generator.rb`) expands a program into
-a week of workouts. It is idempotent on account and date, so regenerating a week never
-duplicates sets and never overwrites what was actually lifted.
+`Tectonic::ProgramGenerator` (`lib/tectonic/program_generator.rb`) expands one week of a
+program into workouts. It is idempotent on account, program day and date, so regenerating
+a week never duplicates sets and never overwrites what was actually lifted.
 
 The maths it generates through is the interesting part of the app, and each piece is
 specced on its own:
@@ -172,19 +177,36 @@ specced on its own:
   fewest plates. It backtracks rather than giving up, so an awkward rack still loads
   weights a purely greedy walk would call impossible, and returns nil for a weight the
   rack genuinely cannot make, which the session view renders as nothing at all.
+- **`Progression`** (`progression.rb`) — what the next prescription of a lift should be,
+  read off the last one and what was actually done against it. A `linear` lift that was
+  lifted as written gains five pounds; one whose working sets went uncompleted, or came in
+  under the prescription, loses ten; one nobody trained at all repeats. The step down is
+  twice the step up because adding is a guess that costs a session when it is wrong, while
+  subtracting is a response to evidence, and coming back at the weight that just failed
+  wastes the week. A session nobody trained moves nothing in either direction: a missed
+  week is an absence of evidence, and treating it as failure would compound a fortnight
+  away into a load far under what the lifter can do. A `is_deload` week takes a tenth off
+  whatever the rule arrived at, and is not itself progressed from, so a block resumes its
+  climb rather than ratcheting down each time it recovers.
 - **`Rounding`** (`rounding.rb`) — every calculated weight lands on a multiple of 5 before
   it is written, because 2.5s on each side is the smallest change you can actually load.
 
 Today the engine is reachable only from two rake tasks:
 
 ```
-bundle exec rake program:seed                                  # ACCOUNT_ID=1, or the only account
-bundle exec rake 'program:generate[2026-08-17]' PROGRAM_ID=1   # week starting that Monday
+bundle exec rake program:seed                     # ACCOUNT_ID=1, or the only account
+bundle exec rake 'program:generate[1]' PROGRAM_ID=1   # week 1; the current week by default
 ```
 
 Which, from the seeded block 0, writes a Monday whose first lift reads: 45×5, 95×5, 115×3
 and 135×2 as the warmup ramp, then 150, 155, 160 and 165 for 3 — the 4×5 at 155 the
 program asked for, converted and ascended.
+
+Block 0 is four weeks, the last of them a deload, and only week one is written at a load.
+Lift week one as prescribed and week two generates at 170 for 3, week three at 175; fall
+short in week three and the deload comes out at 150 rather than 160. Generate each week
+when you reach it: the load is computed when the week is written and then left alone, so
+regenerating never rewrites a session you have already trained.
 
 ## Deployment
 

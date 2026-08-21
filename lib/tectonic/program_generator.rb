@@ -6,6 +6,7 @@ require_relative 'program_days'
 require_relative 'program_lifts'
 require_relative 'program_weeks'
 require_relative 'programs'
+require_relative 'progression'
 require_relative 'rounding'
 require_relative 'set_scheme'
 require_relative 'sets'
@@ -38,19 +39,19 @@ class Tectonic < Roda
       raise ArgumentError, "Program #{@program.id} has no week #{number}; it has #{@program.weeks}." unless week
 
       DB.transaction do
-        week.program_days.sort_by(&:weekday).map { |day| generate_day(day, week.date_for(day.weekday)) }
+        week.program_days.sort_by(&:weekday).map { |day| generate_day(week, day, week.date_for(day.weekday)) }
       end
     end
 
     private
 
-    def generate_day(day, date)
+    def generate_day(week, day, date)
       existing = existing_workout(day, date)
       return existing if existing
 
       workout = Workout.create(account_id: @program.account_id, date:, program_day_id: day.id,
                                created_by_oauth_application_id: @created_by)
-      day.program_lifts.sort_by(&:position).each { |lift| insert_sets(workout, lift) }
+      day.program_lifts.sort_by(&:position).each { |lift| insert_sets(workout, week, lift) }
       workout
     end
 
@@ -66,24 +67,51 @@ class Tectonic < Roda
                     date: date...(date + 1)).first
     end
 
-    def insert_sets(workout, lift)
-      top = top_weight(lift)
+    def insert_sets(workout, week, lift)
+      top = top_weight(week, lift)
       Warmup.ramp(top, is_barbell: lift.is_barbell).each do |set|
         insert_set(workout, lift, set, is_warmup: true)
       end
       working_sets(lift, top).each { |set| insert_set(workout, lift, set, is_warmup: false) }
     end
 
-    # The load the lift is written at: pounds when it says pounds, and otherwise a
-    # percentage of what the account's own lifting says its max is today. A percentage is
-    # resolved at generation rather than stored, so a week written months ago is generated
-    # against the strength that exists when it is trained. With no completed set the chart
-    # can read there is no max to take a percentage of, and inventing one would write a
-    # whole week of loads off a guess, so the week refuses to generate and says which
-    # movement is missing.
-    def top_weight(lift)
+    # The load this week asks for, which is the lift's rule applied and then a deload's
+    # reduction on top of whatever it arrived at. Deloading last is what lets the rule stay
+    # ignorant of deloads: a lighter week is a lighter version of the week that was due,
+    # not a different prescription.
+    def top_weight(week, lift)
+      planned = prescribed_weight(week, lift)
+      week.is_deload ? Progression.deloaded(planned) : planned
+    end
+
+    # fixed keeps the number it was written with. percent takes one of the account's
+    # estimated max, resolved at generation rather than stored, so a week written months ago
+    # is generated against the strength that exists when it is trained -- and it needs no
+    # step rule, because a max read fresh has already moved by however much the lifting
+    # moved it. linear is the one that steps, off the last session of the movement.
+    def prescribed_weight(week, lift)
+      case lift.progression
+      when 'percent' then percent_of_max_weight(lift)
+      when 'linear' then progressed_weight(week, lift)
+      else written_start(lift)
+      end
+    end
+
+    # A fixed or linear lift needs pounds to hold at or to start from. A row carrying
+    # neither those nor a percentage is one nobody can generate, and it is worth saying so
+    # by name: the alternative is nil reaching the rounding and a NoMethodError naming a
+    # division, three files away from the lift that is actually wrong.
+    def written_start(lift)
       return lift.top_weight if lift.top_weight
 
+      raise ArgumentError, "#{Exercise[lift.exercise_id].name} is written as a #{lift.progression} lift " \
+                           'with no top_weight to start from.'
+    end
+
+    # With no completed set the chart can read there is no max to take a percentage of, and
+    # inventing one would write a whole week of loads off a guess, so the week refuses to
+    # generate and says which movement is missing.
+    def percent_of_max_weight(lift)
       exercise = Exercise[lift.exercise_id]
       max = exercise.estimated_max(account_id: @program.account_id)
       unless max
@@ -92,6 +120,85 @@ class Tectonic < Roda
       end
 
       Rounding.to_increment(max * lift.percent_of_max / 100.0)
+    end
+
+    # The written top_weight is where a lift starts and nothing more: once the movement has
+    # been trained inside this block, the load comes from that session instead. So the first
+    # week of a block, and any movement this block has never trained, generate at exactly
+    # the number they were authored with, which is also what makes a block generatable out
+    # of order.
+    def progressed_weight(week, lift)
+      sessions = previous_sessions(week, lift)
+      return written_start(lift) if sessions.empty?
+
+      Progression.next_top_weight(sessions.first[:top_weight], sessions.map { |s| s[:outcome] },
+                                  increment: load_increment)
+    end
+
+    # The size of one step, which is the smallest change the rack can actually make. Five
+    # pounds is 2.5s on each side, the lightest pair in Plates::DEFAULT_INVENTORY, and the
+    # number Rounding is built around. It is read here, in one place, rather than at the
+    # call site, because equipment is about to become a property of an account (#64): when
+    # it is, this is the method that asks the account what it can load, and the rule above
+    # goes on reading "one increment" without changing.
+    def load_increment
+      Rounding::INCREMENT
+    end
+
+    # This block's sessions of this movement, most recent first, each as the load it
+    # prescribed and what became of it. The rules ask two short questions of them: what
+    # happened last time, and whether the attempt before that also fell short.
+    #
+    # Matched on the movement rather than on the program lift row, because every week writes
+    # lift rows of its own and they are the same lift only in that they name the same
+    # exercise. Confined to this block, because top_weight is the block's own starting point
+    # and a lift that wants to carry strength across blocks is written as a percentage of a
+    # max, which spans them by construction.
+    def previous_sessions(week, lift)
+      previous_workouts(week, lift).filter_map { |workout| session(workout, lift) }
+    end
+
+    # One session as the rules read it: the load it asked for, restated in the lift's own
+    # units, and whether it was met, fallen short of, or never trained. Warmups are left
+    # out -- they are a ramp to the top set and say nothing about whether the top set was
+    # there -- and a session with nothing planned in it is not a prescription at all.
+    def session(workout, lift)
+      sets = Set.where(workout_id: workout.id, exercise_id: lift.exercise_id, is_warmup: false).all
+      heaviest = sets.select(&:planned_weight).max_by(&:planned_weight)
+      return nil unless heaviest
+
+      { top_weight: written_top(heaviest, lift), outcome: Progression.outcome(sets.map(&:values)) }
+    end
+
+    # The previous session's top set, restated at the rep count this lift is written in. A
+    # program that prefers threes generates a lift written as 4x5 to 155 as 4x3 to 165, so
+    # the number on the set rows is not the number the lift was written with. Stepping
+    # from it directly would put the load through the rep conversion a second time every
+    # week and the prescription would run away from the lifter -- 155 became 180 in two
+    # weeks of a block that was meant to add five pounds. Converted back through the same
+    # chart that converted it out, so the step lands in the units it was written for.
+    def written_top(set, lift)
+      SetScheme.convert_weight(set.planned_weight, from_reps: set.planned_reps, to_reps: lift.reps)
+    end
+
+    # Every earlier session of this movement in the block, latest first. Not limited to the
+    # two the strike count needs: weeks nobody trained are skipped when counting, so the
+    # second attempt can sit any distance back, and a window wide enough to be safe is the
+    # whole block anyway -- a handful of rows for a movement trained once a week.
+    def previous_workouts(week, lift)
+      lifted = Set.where(exercise_id: lift.exercise_id).select(:workout_id)
+      Workout.where(account_id: @program.account_id, program_day_id: earlier_days(week), id: lifted)
+             .order(Sequel.desc(:date), Sequel.desc(:id)).all
+    end
+
+    # The days of every earlier week of this block that was not a deload. Deload weeks are
+    # passed over rather than progressed from: their loads are deliberately light, so a
+    # block that stepped off one would carry the reduction into every week after it and
+    # ratchet down a little each time it recovered.
+    def earlier_days(week)
+      weeks = @program.program_weeks_dataset.exclude(is_deload: true)
+                      .where(Sequel[:number] < week.number).select(:id)
+      ProgramDay.where(program_week_id: weeks).select(:id)
     end
 
     # Rep conversion is a main-work preference: accessories keep the reps they

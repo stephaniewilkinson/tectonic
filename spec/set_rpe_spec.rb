@@ -89,7 +89,8 @@ describe 'a lift written as a percentage' do
     week = Tectonic::ProgramWeek.create(program_id: @program.id, number: 1)
     day = Tectonic::ProgramDay.create(program_week_id: week.id, weekday: 1, focus: 'Squat')
     @lift = Tectonic::ProgramLift.create(program_day_id: day.id, exercise_id: @exercise.id, position: 0,
-                                         sets: 3, reps: 5, top_weight: nil, percent_of_max: 80)
+                                         sets: 3, reps: 5, top_weight: nil, percent_of_max: 80,
+                                         progression: 'percent')
   end
 
   it 'takes its load from the estimated max at generation time' do

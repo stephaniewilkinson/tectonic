@@ -13,32 +13,38 @@ require_relative 'programs'
 class Tectonic < Roda
   # A program written as a Ruby hash, until there is a UI for editing one.
   module ProgramSeed
-    # Block 0, one written week. Weeks are a list rather than a scalar because the
-    # block is the unit now: adding week 2 here is adding an entry, not writing a
-    # second program that then has to be remembered as related to this one.
+    # The one written day of block 0. It is written once and used by every week, because
+    # the loads are no longer part of what a week says: each lift carries a progression
+    # rule, and the weight for week two onwards is derived from how week one was actually
+    # lifted. The top_weight here is where each lift starts, which is all it ever was.
+    SQUAT_DAY = {
+      weekday: 1,
+      focus: 'Squat',
+      lifts: [
+        { exercise: 'Back Squat', sets: 4, reps: 5, top_weight: 155, is_barbell: true, is_main: true },
+        { exercise: 'Decline Paused Bench', sets: 3, reps: 8, top_weight: 105, is_barbell: true },
+        { exercise: 'Glute Press Machine', sets: 3, reps: 10, top_weight: 135 },
+        { exercise: 'Heel-Elevated Paused Squat', sets: 3, reps: 5, top_weight: 120, is_barbell: true },
+        { exercise: 'Barbell Good Morning', sets: 3, reps: 8, top_weight: 75, is_barbell: true }
+      ]
+    }.freeze
+
+    # How long the block runs, and which of its weeks recovers. Three weeks of work into a
+    # deload is the shortest arrangement that shows a block doing all three things it can
+    # do -- climbing, responding to a week that went badly, and backing off -- without
+    # anyone editing Ruby to see the second week.
+    WEEKS = 4
+    DELOAD_WEEK = 4
+
+    # Block 0. Weeks are a list rather than a scalar because the block is the unit now:
+    # adding a week here is adding an entry, not writing a second program that then has to
+    # be remembered as related to this one.
     BLOCK_0 = {
       name: 'Block 0',
       block: 0,
       preferred_reps: 3,
       is_ascending: true,
-      weeks: [
-        {
-          number: 1,
-          days: [
-            {
-              weekday: 1,
-              focus: 'Squat',
-              lifts: [
-                { exercise: 'Back Squat', sets: 4, reps: 5, top_weight: 155, is_barbell: true, is_main: true },
-                { exercise: 'Decline Paused Bench', sets: 3, reps: 8, top_weight: 105, is_barbell: true },
-                { exercise: 'Glute Press Machine', sets: 3, reps: 10, top_weight: 135 },
-                { exercise: 'Heel-Elevated Paused Squat', sets: 3, reps: 5, top_weight: 120, is_barbell: true },
-                { exercise: 'Barbell Good Morning', sets: 3, reps: 8, top_weight: 75, is_barbell: true }
-              ]
-            }
-          ]
-        }
-      ]
+      weeks: (1..WEEKS).map { |number| { number:, is_deload: number == DELOAD_WEEK, days: [SQUAT_DAY] } }
     }.freeze
 
     module_function
@@ -73,20 +79,31 @@ class Tectonic < Roda
     end
 
     # Position is the order the lift was written in, which is the order it will be
-    # generated and the order it will appear in the session.
+    # generated and the order it will appear in the session. A lift progresses linearly
+    # unless it says otherwise, so a seeded block climbs off its own results rather than
+    # asking for week one's numbers four times over.
     def seed_lift(day, account_id, lift, position)
       ProgramLift.create(
         program_day_id: day.id, exercise_id: exercise_id(account_id, lift[:exercise]),
         position:, sets: lift[:sets], reps: lift[:reps], top_weight: lift[:top_weight],
+        percent_of_max: lift[:percent_of_max], progression: lift.fetch(:progression, 'linear'),
         is_barbell: lift.fetch(:is_barbell, false), is_main: lift.fetch(:is_main, false)
       )
     end
 
-    # A movement the seed names but the account does not have yet is created here, and is
-    # a barbell movement when the library knows the name -- the same default every path
-    # with nobody to ask uses.
+    # A movement the seed names, resolved among the ones the account can actually select:
+    # its own rows and the shared library. Filtering on account_id alone could never match
+    # a library row, because a library row's account_id is null by design -- that is what
+    # makes it visible to everyone -- so seeding after `rake library:exercises` built a
+    # private second "Back Squat" beside the library one and pointed the whole program at
+    # the copy. Sets logged against the two then aggregated separately, which is the one
+    # thing an exercise row exists to prevent. Oldest first when both exist, the rule the
+    # MCP resolver already uses, so the row a lifter's history is on wins over a later
+    # duplicate. Only a name nothing visible answers to is created, and it is a barbell
+    # movement when the library knows the name -- the default every path with nobody to
+    # ask uses.
     def exercise_id(account_id, name)
-      Exercise.where(account_id:, name:).first&.id ||
+      Exercise.visible_to(account_id).where(name:).order(:id).first&.id ||
         Exercise.insert(account_id:, name:, is_barbell: Exercise.barbell_by_name?(name))
     end
 
