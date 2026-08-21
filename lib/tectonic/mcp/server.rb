@@ -6,6 +6,12 @@ require_relative 'tools/whoami'
 require_relative 'tools/create_exercise'
 require_relative 'tools/create_workout'
 require_relative 'tools/create_set'
+require_relative 'tools/complete_set'
+require_relative 'tools/update_set'
+require_relative 'tools/delete_set'
+require_relative 'tools/rate_workout'
+require_relative 'tools/get_workout'
+require_relative 'tools/exercise_history'
 require_relative 'tools/list_exercises'
 require_relative 'tools/list_workouts'
 require_relative 'tools/list_programs'
@@ -35,7 +41,8 @@ class Tectonic < Roda
       TOOLS = [
         Tools::Whoami,
         Tools::CreateExercise, Tools::CreateWorkout, Tools::CreateSet,
-        Tools::ListExercises, Tools::ListWorkouts,
+        Tools::CompleteSet, Tools::UpdateSet, Tools::DeleteSet, Tools::RateWorkout,
+        Tools::ListExercises, Tools::ListWorkouts, Tools::GetWorkout, Tools::ExerciseHistory,
         Tools::ListPrograms, Tools::GetProgram, Tools::CreateProgram,
         Tools::AddProgramWeek, Tools::AddProgramDay, Tools::UpdateProgramDay,
         Tools::AddProgramLift, Tools::UpdateProgramLift, Tools::DeleteProgramLift,

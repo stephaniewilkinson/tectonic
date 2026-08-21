@@ -220,11 +220,25 @@ token from verifying.
 # MCP server
 
 Tectonic exposes a [Model Context Protocol](https://modelcontextprotocol.io) endpoint
-so an LLM client can act on an account's data through audited, per-account tools:
-`create_exercise`/`create_workout`/`create_set`, `list_exercises`/`list_workouts`,
-`search`/`fetch` (the ChatGPT connector contract), and `whoami`. The framework around
-them — transport, auth, scoping, auditing, guardrails — makes adding a tool cheap; see
-"Adding a tool".
+so an LLM client can act on an account's data through audited, per-account tools. The
+framework around them — transport, auth, scoping, auditing, guardrails — makes adding a
+tool cheap; see "Adding a tool".
+
+| What it is for | Tools |
+| --- | --- |
+| Logging training | `create_exercise`, `create_workout`, `create_set`, `complete_set`, `update_set`, `delete_set`, `rate_workout` |
+| Reading it back | `list_exercises`, `list_workouts`, `get_workout`, `exercise_history` |
+| Writing a plan | `list_programs`, `get_program`, `create_program`, `add_program_week`, `add_program_day`, `update_program_day`, `add_program_lift`, `update_program_lift`, `delete_program_lift`, `generate_program_week` |
+| The connector contract | `search`, `fetch` (handles are `exercise:`, `workout:`, `program:`) |
+| Who am I | `whoami` |
+
+The program tools are the ones that make "plan my training" possible rather than "log
+what I did". `create_program` writes a whole block — weeks, days, lifts — in one call,
+because a block composed one lift at a time is dozens of round trips that can fail
+half-written. Everything after that is per-object, because revising a plan is: change
+this lift, move that day, add a week like the last one. `generate_program_week` turns a
+written week into real sessions with their warmup ramps, and is idempotent on the
+program day, so running it twice changes nothing.
 
 The endpoint is a plain Rack app mounted at `/mcp` in `config.ru`, entirely outside
 Roda's sessions, CSRF, and assets. It uses the `mcp` gem (pinned to `1.2.0`) and is

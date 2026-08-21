@@ -90,6 +90,22 @@ class Tectonic < Roda
                            created_by_oauth_application_id: context.application_id, created_at: Time.now)
         end
 
+        # The account's workout on a date without opening one, for the read and edit
+        # tools: a question about a day that was never trained has to be answerable as
+        # "nothing there" rather than by quietly creating an empty session to answer it.
+        def find_workout(context, date:)
+          day = date.is_a?(Date) ? date : parse_date(date)
+          context.workouts.where(Sequel.cast(:date, :date) => day).order(:id).first
+        end
+
+        # One of the account's sets by id, refusing rather than returning nil: a set id
+        # that belongs to someone else does not resolve here, and a model handed a silent
+        # nil would report success for an edit that never touched anything.
+        def find_set(context, id)
+          context.sets.where(id:).first ||
+            (raise Tool::Refusal, "No set with id #{id.inspect} on this account.")
+        end
+
         # 'today' or nil for the current day, an ISO YYYY-MM-DD otherwise; anything
         # else refuses with a message a model can correct from.
         def parse_date(raw)
