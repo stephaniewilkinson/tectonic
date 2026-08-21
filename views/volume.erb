@@ -1,0 +1,104 @@
+<%# Nothing to plot means nothing to load: the charting libraries are a quarter of a
+    megabyte, and an account with no completed work yet gets a sentence instead. %>
+<%- @charts = !@rows.empty? %>
+<div class="mx-auto max-w-3xl">
+  <h1 class="text-3xl font-semibold text-gray-900">Volume</h1>
+  <p class="mt-2 text-sm text-gray-600">
+    Working sets only &mdash; warmups are not training, and a set that has not been marked
+    done is a plan rather than work, so neither is counted here.
+  </p>
+
+  <form method="get" action="/volume" class="mt-6 flex flex-wrap items-end gap-3">
+    <div>
+      <label for="exercise_id" class="block text-sm font-medium text-gray-900">Lift</label>
+      <%# Only lifts with work in the window: the library ships movements this account
+          has never trained, and offering them means most of the menu draws a blank page. %>
+      <select id="exercise_id" name="exercise_id" onchange="this.form.submit()"
+              class="mt-1 rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300">
+        <option value="">Everything</option>
+        <%- @lifts.each do |id, name| %>
+          <option value="<%= id %>" <%= 'selected' if @lift&.first == id %>><%= h(name) %></option>
+        <%- end %>
+      </select>
+    </div>
+    <div>
+      <label for="weeks" class="block text-sm font-medium text-gray-900">Window</label>
+      <select id="weeks" name="weeks" onchange="this.form.submit()"
+              class="mt-1 rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300">
+        <%- Tectonic::Volume::WINDOWS.each do |window| %>
+          <option value="<%= window %>" <%= 'selected' if @weeks == window %>><%= window %> weeks</option>
+        <%- end %>
+      </select>
+    </div>
+    <noscript><button type="submit" class="rounded-md bg-lime-500 px-3 py-1.5 text-sm font-semibold text-white">Show</button></noscript>
+  </form>
+
+  <%- if @rows.empty? %>
+    <p class="mt-8 text-sm text-gray-500">
+      No completed working sets in the last <%= @weeks %> weeks<%= " for #{@lift.last}" if @lift %>.
+      Warmups and sets still waiting to be marked done are not counted.
+    </p>
+  <%- else %>
+    <dl class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div class="rounded-lg bg-gray-50 px-4 py-3">
+        <dt class="text-sm text-gray-500">Tonnage</dt>
+        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:tonnage].to_i %></dd>
+      </div>
+      <div class="rounded-lg bg-gray-50 px-4 py-3">
+        <dt class="text-sm text-gray-500">Working sets</dt>
+        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:sets] %></dd>
+      </div>
+      <div class="rounded-lg bg-gray-50 px-4 py-3">
+        <dt class="text-sm text-gray-500">Reps</dt>
+        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:reps].to_i %></dd>
+      </div>
+      <div class="rounded-lg bg-gray-50 px-4 py-3">
+        <dt class="text-sm text-gray-500">Weeks trained</dt>
+        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:weeks] %> / <%= @rows.length %></dd>
+      </div>
+    </dl>
+
+    <div class="mt-8">
+      <h2 class="text-sm font-semibold text-gray-900">Weekly tonnage</h2>
+      <p class="mt-1 text-xs text-gray-500">Weight times reps, summed. A week with no training is a real zero, so it is drawn as one.</p>
+      <%= column_chart(Tectonic::Volume.chart(@rows, :tonnage), ytitle: 'Tonnage') %>
+    </div>
+
+    <div class="mt-8">
+      <h2 class="text-sm font-semibold text-gray-900">Weekly working sets</h2>
+      <%= column_chart(Tectonic::Volume.chart(@rows, :sets), ytitle: 'Sets') %>
+    </div>
+
+    <%- if @top_sets.any? %>
+      <div class="mt-8">
+        <h2 class="text-sm font-semibold text-gray-900">Top set each week</h2>
+        <%# Intensity is plotted apart from volume because more work and heavier work are
+            different things, and a block can move one without the other. Unlike the bars
+            above this line skips the weeks a lift was not trained: a week off squats is
+            no tonnage, but it is not a top set of zero, and filling it would draw a dip
+            nobody lifted. min: nil lets the axis fit the weights rather than starting at
+            zero, which nobody lifts and which flattens a season of progress. %>
+        <%# The one chart on the site with a line per lift, and so the one that asks for
+            the full palette: the site default is a single colour, which would leave
+            every lift after the first in Chart.js's own grey. %>
+        <%= line_chart(@top_sets.map { |name, weeks| { name:, data: weeks } },
+                       ytitle: 'Weight', curve: false, min: nil, discrete: true,
+                       colors: Tectonic::CHART_COLORS) %>
+        <%- if @withheld.positive? %>
+          <p class="mt-1 text-xs text-gray-500">
+            Showing the <%= @top_sets.length %> most-trained lifts; <%= @withheld %>
+            more had working sets in this window. Pick one above to see it on its own.
+          </p>
+        <%- end %>
+      </div>
+    <%- end %>
+
+    <%- if @by_exercise&.any? %>
+      <div class="mt-8">
+        <h2 class="text-sm font-semibold text-gray-900">Working sets per lift</h2>
+        <p class="mt-1 text-xs text-gray-500">Where the work went over the last <%= @weeks %> weeks.</p>
+        <%= bar_chart(@by_exercise, ytitle: 'Sets') %>
+      </div>
+    <%- end %>
+  <%- end %>
+</div>
