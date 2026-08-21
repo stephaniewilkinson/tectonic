@@ -15,6 +15,7 @@ require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/connection'
+require_relative 'lib/tectonic/equipment'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
@@ -177,6 +178,25 @@ class Tectonic < Roda
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
       view('home')
+    end
+
+    # The bar and plates this account lifts on. Everything the app calculates rounds to
+    # what this rack can load, so it is the one setting that changes the numbers.
+    r.on 'equipment' do
+      rodauth.require_login
+      @account_id = rodauth.account_from_session[:id]
+
+      r.post do
+        check_csrf!
+        Equipment.replace(@account_id, bar_weight: r.params['bar_weight'],
+                                       plates: r.params['plates'])
+        r.redirect '/equipment'
+      end
+
+      r.get do
+        @equipment = Equipment.for_account(@account_id)
+        view('equipment')
+      end
     end
 
     # The assistants this account has connected, and how to connect another. The app has
@@ -436,12 +456,18 @@ class Tectonic < Roda
     { exercise_id: exercise.id, is_barbell: exercise.barbell? }
   end
 
+  # The rack the signed-in account lifts on, read once per request: the session view asks
+  # for a plate breakdown per set, and every one of them wants the same inventory.
+  def equipment
+    @equipment ||= Equipment.for_account(@account_id)
+  end
+
   # Per-side plate breakdown for the session view, blank for anything not loaded
   # on a bar and for weights this rack cannot make.
   def plate_label(set)
     return '' unless set[:is_barbell]
 
-    Plates.label(Plates.per_side(set[:weight]))
+    equipment.label(set[:weight])
   end
 
   # The heaviest a lift was taken on each day it was recorded, oldest day first, which

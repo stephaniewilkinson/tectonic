@@ -1,0 +1,51 @@
+<div class="mx-auto max-w-md">
+  <h1 class="text-3xl font-semibold text-gray-900">Equipment</h1>
+  <p class="mt-2 text-sm text-gray-600">
+    What you lift with. Every weight the app works out &mdash; warmups, working sets, the
+    plate breakdown, and how much a programme adds after a good week &mdash; is rounded to
+    something this rack can actually load.
+  </p>
+
+  <form method="post" action="/equipment" class="mt-6 space-y-6">
+    <%= csrf_tag('/equipment') %>
+
+    <div>
+      <label for="bar_weight" class="block text-sm font-medium text-gray-900">Bar</label>
+      <div class="mt-1 flex items-center gap-2">
+        <input type="number" id="bar_weight" name="bar_weight" min="1" step="1" autocomplete="off"
+               value="<%= h(@equipment.bar_weight) %>"
+               class="w-28 rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm
+                      ring-1 ring-inset ring-gray-300">
+        <span class="text-sm text-gray-500">lb</span>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend class="text-sm font-medium text-gray-900">Plates</legend>
+      <p class="mt-1 text-sm text-gray-500">
+        Pairs, not single plates &mdash; a bar is loaded on both sides. Set a count to zero
+        to say you no longer own it. Your smallest plate decides the smallest jump you can
+        make: <span class="font-semibold text-gray-900"><%= h(@equipment.increment) %> lb</span>.
+      </p>
+      <div class="mt-3 space-y-2">
+        <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
+          <div class="flex items-center gap-3">
+            <span class="w-16 text-right font-mono text-sm text-gray-900">
+              <%= h(denomination) %> lb
+            </span>
+            <input type="number" min="0" step="1" autocomplete="off"
+                   name="plates[<%= h(denomination) %>]"
+                   value="<%= h(@equipment.pairs.fetch(denomination, 0)) %>"
+                   class="w-20 rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm
+                          ring-1 ring-inset ring-gray-300">
+            <span class="text-sm text-gray-500">pairs</span>
+          </div>
+        <%- end %>
+      </div>
+    </fieldset>
+
+    <button type="submit"
+            class="flex w-full justify-center rounded-md bg-lime-500 px-3 py-1.5 text-sm
+                   font-semibold leading-6 text-white shadow-sm hover:bg-lime-600">Save</button>
+  </form>
+</div>
