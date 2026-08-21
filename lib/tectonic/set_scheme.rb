@@ -18,24 +18,28 @@ class Tectonic < Roda
 
     # Returns [{weight:, reps:}, ...] in the order they should be lifted, climbing
     # to top_weight rather than sitting flat unless is_ascending is false.
-    def working_sets(sets:, reps:, top_weight:, preferred_reps: nil, is_ascending: true)
-      target = target_reps(reps, preferred_reps)
-      top = convert_weight(top_weight, from_reps: reps, to_reps: target)
+    # `shape` carries preferred_reps and is_ascending, which describe how the sets are
+    # laid out rather than what they weigh; they travel together because they are the
+    # programme's business, while sets/reps/top_weight/increment are the lift's.
+    def working_sets(sets:, reps:, top_weight:, increment: Rounding::INCREMENT, **shape)
+      target = target_reps(reps, shape[:preferred_reps])
+      top = convert_weight(top_weight, from_reps: reps, to_reps: target, increment:)
 
+      ascending = shape.fetch(:is_ascending, true)
       Array.new(sets) do |index|
-        below_top = is_ascending ? sets - 1 - index : 0
-        { weight: Rounding.to_increment(top * (1 - (ASCENDING_STEP * below_top))), reps: target }
+        below_top = ascending ? sets - 1 - index : 0
+        { weight: Rounding.to_increment(top * (1 - (ASCENDING_STEP * below_top)), increment:), reps: target }
       end
     end
 
     # The same intensity expressed at a different rep count: fewer reps means more
     # weight for the same effort. 4×5 @ 155 becomes 4×3 @ 165.
-    def convert_weight(top_weight, from_reps:, to_reps:)
+    def convert_weight(top_weight, from_reps:, to_reps:, increment: Rounding::INCREMENT)
       from = RPE8_PERCENTS[from_reps]
       to = RPE8_PERCENTS[to_reps]
-      return Rounding.to_increment(top_weight) unless from && to && from_reps != to_reps
+      return Rounding.to_increment(top_weight, increment:) unless from && to && from_reps != to_reps
 
-      Rounding.to_increment(top_weight * (to / from))
+      Rounding.to_increment(top_weight * (to / from), increment:)
     end
 
     # Converts down to the preferred rep count, never up, and only between rep

@@ -23,7 +23,7 @@ class Tectonic < Roda
     # Returns [{weight:, reps:}, ...] always opening with the empty bar and ending
     # below top_weight. Empty only for work that is not on a barbell: bodyweight,
     # banded and machine lifts ramp differently, if at all.
-    def ramp(top_weight, is_barbell: true, bar_weight: BAR_WEIGHT)
+    def ramp(top_weight, is_barbell: true, bar_weight: BAR_WEIGHT, increment: Rounding::INCREMENT)
       return [] unless is_barbell
 
       # Every barbell lift starts with the bar, including one that works at the
@@ -33,7 +33,7 @@ class Tectonic < Roda
 
       _, ramps = TIERS.find { |minimum, _| top_weight >= minimum }
       ramps.each_with_object(bar) do |(percent, reps), sets|
-        weight = [Rounding.to_increment(top_weight * percent), bar_weight].max
+        weight = [Rounding.to_increment(top_weight * percent, increment:), bar_weight].max
         # Rounding can flatten two ramp steps onto the same weight on a light
         # lift. Lifting the same bar twice is not a ramp, so drop the repeat.
         sets << { weight:, reps: } if weight > sets.last[:weight]

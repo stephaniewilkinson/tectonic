@@ -78,8 +78,8 @@ class Tectonic < Roda
     # A deload's reduction, applied to whatever load the rules above arrived at. Load only:
     # cutting the sets as well is the other half of the usual deload, but it would have to
     # reach inside SetScheme, and a week at ninety percent is already a week that recovers.
-    def deloaded(top_weight)
-      Rounding.to_increment(top_weight * DELOAD_FACTOR)
+    def deloaded(top_weight, increment: Rounding::INCREMENT)
+      Rounding.to_increment(top_weight * DELOAD_FACTOR, increment:)
     end
 
     # Whether a set answered what was asked of it. Lifting more than the prescription, or

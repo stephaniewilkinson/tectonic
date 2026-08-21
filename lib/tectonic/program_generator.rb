@@ -8,6 +8,7 @@ require_relative 'program_weeks'
 require_relative 'programs'
 require_relative 'progression'
 require_relative 'rounding'
+require_relative 'equipment'
 require_relative 'set_scheme'
 require_relative 'sets'
 require_relative 'warmup'
@@ -24,6 +25,9 @@ class Tectonic < Roda
     # from nowhere. Nil for the rake task, which is a person at a command line.
     def initialize(program, created_by: nil)
       @program = program
+      # The rack this account lifts on. Every weight below is rounded to something it can
+      # actually load, and warmups start at its bar rather than at an assumed 45.
+      @equipment = Equipment.for_account(program.account_id)
       @created_by = created_by
     end
 
@@ -69,7 +73,8 @@ class Tectonic < Roda
 
     def insert_sets(workout, week, lift)
       top = top_weight(week, lift)
-      Warmup.ramp(top, is_barbell: lift.is_barbell).each do |set|
+      Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
+                       increment: @equipment.increment).each do |set|
         insert_set(workout, lift, set, is_warmup: true)
       end
       working_sets(lift, top).each { |set| insert_set(workout, lift, set, is_warmup: false) }
@@ -81,7 +86,7 @@ class Tectonic < Roda
     # not a different prescription.
     def top_weight(week, lift)
       planned = prescribed_weight(week, lift)
-      week.is_deload ? Progression.deloaded(planned) : planned
+      week.is_deload ? Progression.deloaded(planned, increment: @equipment.increment) : planned
     end
 
     # fixed keeps the number it was written with. percent takes one of the account's
@@ -119,7 +124,7 @@ class Tectonic < Roda
                              'cannot be worked out. Log a completed set of it first.'
       end
 
-      Rounding.to_increment(max * lift.percent_of_max / 100.0)
+      @equipment.round(max * lift.percent_of_max / 100.0)
     end
 
     # The written top_weight is where a lift starts and nothing more: once the movement has
@@ -208,6 +213,7 @@ class Tectonic < Roda
         sets: lift.sets,
         reps: lift.reps,
         top_weight: top,
+        increment: @equipment.increment,
         preferred_reps: (@program.preferred_reps if lift.is_main),
         is_ascending: @program.is_ascending
       )
