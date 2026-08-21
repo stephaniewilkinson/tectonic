@@ -171,6 +171,10 @@ describe 'exercise_history, session by session' do
     planned_session(@token.account_id, @recent, @exercise, lifted: 185)
   end
 
+  # The movement is deliberately a library row -- a null account_id is what makes one
+  # shared -- so it has to be taken away again. The count of library exercises is an
+  # invariant spec/exercises_spec.rb asserts, and a shared row left behind by this spec
+  # fails it there rather than here, which is a long way from the cause.
   it "never reaches another account's lifting of a shared movement" do
     library = Tectonic::Exercise.create(name: "Shared #{SecureRandom.hex(4)}", is_barbell: true)
     mine = mint(scopes: ['read'])
@@ -179,6 +183,11 @@ describe 'exercise_history, session by session' do
     call_tool('exercise_history', raw: mine.raw, arguments: { exercise: library.name })
     assert_empty tool_result['structuredContent']['sets']
     assert_nil tool_result['structuredContent']['estimated_1rm']
+  ensure
+    if library
+      DB[:sets].where(exercise_id: library.id).delete
+      DB[:exercises].where(id: library.id).delete
+    end
   end
 end
 
