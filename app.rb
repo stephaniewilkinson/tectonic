@@ -280,12 +280,19 @@ class Tectonic < Roda
           @exercises = Exercise.visible_to(@account_id).order(:id)
           r.get('new') { view('sets/new') }
 
+          # The movement has to be one this account may select. The barbell flag was
+          # already read through visible_exercise, but the id itself went in unchecked,
+          # so a guessed id attached a stranger's private movement to a set and rendered
+          # its name back wherever that set appeared.
           r.post 'new' do
             check_csrf!
+            exercise = visible_exercise(r.params['exercise_id'])
+            r.redirect "/workouts/#{workout_id}/sets/new" unless exercise
+
             set_id = Set.insert(weight: r.params['weight'], reps: r.params['reps'],
-                                exercise_id: r.params['exercise_id'], is_warmup: r.params['is_warmup'] || false,
+                                exercise_id: exercise.id, is_warmup: r.params['is_warmup'] || false,
                                 is_completed: r.params['is_completed'] || false, workout_id:,
-                                is_barbell: visible_exercise(r.params['exercise_id'])&.barbell? || false)
+                                is_barbell: exercise.barbell?)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
           end
 

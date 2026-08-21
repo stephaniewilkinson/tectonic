@@ -165,6 +165,44 @@ describe 'MCP tokens die with their grant' do
   end
 end
 
+# Somebody who typed the address into a browser instead of giving it to an assistant.
+# The status and the challenge are unchanged; only what a human is shown differs.
+describe 'the MCP endpoint in a browser' do
+  include Rack::Test::Methods
+
+  def browse
+    get 'http://localhost/mcp', {}, { 'HTTP_ACCEPT' => 'text/html,application/xhtml+xml' }
+  end
+
+  it 'answers a browser with a page rather than a wall of JSON' do
+    browse
+    assert_equal 401, last_response.status
+    assert_includes last_response.headers['content-type'], 'text/html'
+    assert_includes last_response.body, 'This is the MCP endpoint'
+    assert_includes last_response.body, '/connections'
+  end
+
+  it 'still carries the challenge a client needs to discover the authorization server' do
+    browse
+    assert_includes last_response.headers['www-authenticate'], 'resource_metadata='
+  end
+
+  # A client speaking the protocol must be unaffected: it posts, asks for JSON, and gets
+  # the JSON-RPC error it can act on.
+  it 'answers a protocol client with JSON as before' do
+    assert_equal 401, call_tool('whoami', raw: nil).status
+    assert_includes last_response.headers['content-type'], 'application/json'
+    assert_includes last_response.body, 'jsonrpc'
+  end
+
+  # A browser carrying a bad token is a client, not a visitor: it gets the error.
+  it 'does not sign-post a request that presented a token' do
+    get 'http://localhost/mcp', {}, { 'HTTP_ACCEPT' => 'text/html',
+                                      'HTTP_AUTHORIZATION' => 'Bearer nonsense' }
+    assert_includes last_response.headers['content-type'], 'application/json'
+  end
+end
+
 describe 'MCP DNS-rebinding protection' do
   include Rack::Test::Methods
 
