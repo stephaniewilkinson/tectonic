@@ -107,6 +107,43 @@ describe 'a set is reachable only through the workout that owns it' do
   end
 end
 
+# A set points at a movement, and the only movements an account may point at are its own
+# and the shared library. The id arrives from a form, so it cannot be taken on trust.
+describe 'logging a set against a movement you cannot see' do
+  include Rack::Test::Methods
+  include RouteOwnership
+
+  before do
+    @account_id = login
+    @workout = own_workout(@account_id)
+  end
+
+  # A stranger's private movement, reachable only by guessing its id.
+  def strangers_exercise
+    email, = make_account
+    owner = DB[:accounts].where(email:).get(:id)
+    DB[:exercises].insert(name: "Private #{SecureRandom.hex(4)}", account_id: owner)
+  end
+
+  it 'refuses the set rather than attaching a stranger\'s private movement' do
+    hidden = strangers_exercise
+    post "/workouts/#{@workout}/sets/new",
+         { weight: '135', reps: '5', exercise_id: hidden.to_s,
+           '_csrf' => token_for("/workouts/#{@workout}/sets/new") }
+
+    assert_equal 0, DB[:sets].where(workout_id: @workout).count
+  end
+
+  it 'still logs a set against a movement the account can see' do
+    library = DB[:exercises].where(account_id: nil).get(:id)
+    post "/workouts/#{@workout}/sets/new",
+         { weight: '135', reps: '5', exercise_id: library.to_s,
+           '_csrf' => token_for("/workouts/#{@workout}/sets/new") }
+
+    assert_equal 1, DB[:sets].where(workout_id: @workout).count
+  end
+end
+
 describe 'state-changing posts require a CSRF token' do
   include Rack::Test::Methods
   include RouteOwnership

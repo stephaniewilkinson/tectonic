@@ -19,12 +19,35 @@ class Tectonic < Roda
       # `Bearer` then one run of whitespace then a non-empty, whitespace-free token.
       BEARER = /\ABearer[[:space:]]+(?<token>\S+)\z/
 
+      # Deliberately a bare string rather than a rendered template: this middleware runs
+      # in front of the MCP transport, outside the Roda app entirely, and reaching back
+      # into the view layer for one static page would couple the two for nothing.
+      SIGNPOST_HTML = <<~HTML
+        <!DOCTYPE html>
+        <html lang="en"><head><meta charset="utf-8">
+        <title>tectonic plates &mdash; MCP endpoint</title>
+        <meta name="robots" content="noindex, nofollow">
+        <style>
+          body { font: 16px/1.6 system-ui, sans-serif; margin: 4rem auto; max-width: 34rem; padding: 0 1.5rem; color: #1f2937; }
+          code { background: #f3f4f6; border-radius: 4px; padding: .15rem .35rem; font-size: .9em; }
+          a { color: #4d7c0f; }
+        </style></head>
+        <body>
+          <h1>This is the MCP endpoint</h1>
+          <p>It is where an AI assistant talks to tectonic plates, not a page to visit.
+             There is nothing to see here in a browser.</p>
+          <p>To connect an assistant, go to <a href="/connections">assistants</a> and give
+             it the address shown there.</p>
+        </body></html>
+      HTML
+
       def initialize(app)
         @app = app
       end
 
       def call(env)
         claims = claims_for(env)
+        return signpost if claims.nil? && browsing?(env)
         return unauthorized('Missing or invalid bearer token.') unless claims
 
         env[CONTEXT_KEY] = RequestContext.from_claims(claims)
@@ -32,6 +55,23 @@ class Tectonic < Roda
       end
 
       private
+
+      # Somebody who typed this address into a browser rather than a client speaking the
+      # protocol: a GET, asking for HTML, carrying no credential. An MCP client sends
+      # POST and asks for JSON or an event stream, so it never matches.
+      def browsing?(env)
+        env['REQUEST_METHOD'] == 'GET' &&
+          env['HTTP_ACCEPT'].to_s.include?('text/html') &&
+          env['HTTP_AUTHORIZATION'].to_s.empty?
+      end
+
+      # The same 401 a client gets, with a page instead of a JSON-RPC error. This address
+      # is an endpoint for an assistant to talk to, not a page to visit, and a wall of
+      # JSON says that to nobody. The status and the challenge header are unchanged, so
+      # anything speaking the protocol is unaffected by what a browser is shown.
+      def signpost
+        [401, response_headers.merge('content-type' => 'text/html; charset=utf-8'), [SIGNPOST_HTML]]
+      end
 
       # The verified JWT claims for the request's bearer credential, or nil when the
       # header is absent or malformed or the token fails verification.
