@@ -11,6 +11,52 @@ require_relative '../../sets'
 class Tectonic < Roda
   module MCP
     module Tools
+      # The ranges every tool that writes a number checks its arguments against. They
+      # live here rather than on the tool that first needed them because a weight means
+      # the same thing whether it is being logged, revised or prescribed, and because a
+      # refusal a model can act on is one that reads identically wherever it came from.
+      # The check is in the body rather than the schema on purpose: a schema violation
+      # comes back as a validation error, while this names the bound that was crossed.
+      module Bounds
+        WEIGHT = (0..2000)
+        REPS = (1..100)
+        RPE = (1..10)
+        SETS = (1..20)
+        PERCENT = (1..200)
+
+        module_function
+
+        # Checks one optional value. Nil passes: a schema marks what is required, and an
+        # argument that was not supplied has no bound to cross.
+        def check(range, value, name, unit: '')
+          return if value.nil? || range.cover?(value)
+
+          raise Tool::Refusal, "#{name} #{value} is out of range; use #{range.first}-#{range.last}#{unit}."
+        end
+      end
+
+      # What a write actually changed, as field => from/to. An edit tool hands this back
+      # so a model can tell the user exactly what moved -- "top weight 155 to 175" --
+      # without having read the row beforehand and diffed it itself, which is the version
+      # of this that quietly invents changes that did not happen. A field set to the value
+      # it already held is not a change and does not appear.
+      module Changes
+        module_function
+
+        def apply(row, attributes)
+          moved = attributes.reject { |field, value| row[field] == value }
+          record = moved.to_h { |field, value| [field, { from: row[field], to: value }] }
+          row.update(moved) unless moved.empty?
+          record
+        end
+
+        def describe(record)
+          return 'nothing to change' if record.empty?
+
+          record.map { |field, move| "#{field} #{move[:from].inspect} to #{move[:to].inspect}" }.join(', ')
+        end
+      end
+
       # Find-or-create by natural key, shared by every write tool so the three never
       # diverge in how they resolve an exercise or workout or stamp provenance. Each
       # method works only through the request's account-scoped datasets, so a resolved
@@ -71,9 +117,24 @@ class Tectonic < Roda
             .merge(provenance(workout))
         end
 
+        # planned_weight and planned_reps ride along with what was lifted, because the
+        # difference between them is the signal: a set written by a program and lifted
+        # exactly as written reads the same as one lifted heavier unless both are here.
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: set.weight, reps: set.reps,
-            rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed }.merge(provenance(set))
+            rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
+            planned_weight: set.planned_weight, planned_reps: set.planned_reps }.merge(provenance(set))
+        end
+
+        # A workout with its sets in the order they are meant to be lifted, its session
+        # rating, and where it stands. `status` and the program day behind it are what
+        # separate a session that was written from one that was trained, which is the
+        # question every "how did last week go" starts from.
+        def view_workout_detail(workout)
+          view_workout(workout).merge(
+            rpe: workout.rpe, status: workout.status.to_s, program_day_id: workout.program_day_id,
+            sets: workout.sets_dataset.order(:id).all.map { |set| view_set(set) }
+          )
         end
 
         # Who and when, both nil for a human-made row so a client can tell the two apart.
@@ -89,14 +150,15 @@ class Tectonic < Roda
       module Locator
         module_function
 
-        HANDLE = /\A(?<type>exercise|workout):(?<id>\d+)\z/
+        HANDLE = /\A(?<type>exercise|workout|program):(?<id>\d+)\z/
 
-        # Up to 20 matches each across the account's exercises (by name) and workouts
-        # (by date), as the id/title/url rows the connector expects.
+        # Up to 20 matches each across the account's exercises (by name), workouts (by
+        # date) and programs (by name), as the id/title/url rows the connector expects.
         def search(context, query)
           like = "%#{query.to_s.strip}%"
           found_exercises(context, like).map { |e| exercise_result(e) } +
-            found_workouts(context, like).map { |w| workout_result(w) }
+            found_workouts(context, like).map { |w| workout_result(w) } +
+            found_programs(context, like).map { |p| program_result(p) }
         end
 
         def found_exercises(context, like)
@@ -107,16 +169,24 @@ class Tectonic < Roda
           context.workouts.where(Sequel.ilike(Sequel.cast(:date, :text), like)).limit(20).all
         end
 
+        def found_programs(context, like)
+          context.programs.where(Sequel.ilike(:name, like)).limit(20).all
+        end
+
         # The full document for a "type:id" handle, or nil when the handle is unknown or
         # the row is not the account's.
         def fetch(context, handle)
           match = HANDLE.match(handle)
           return unless match
 
-          if match[:type] == 'exercise'
-            exercise_document(context, context.exercises.where(id: match[:id]).first)
-          else
-            workout_document(context.workouts.where(id: match[:id]).first)
+          document(context, match[:type], match[:id])
+        end
+
+        def document(context, type, id)
+          case type
+          when 'exercise' then exercise_document(context, context.exercises.where(id:).first)
+          when 'program' then program_document(context.programs.where(id:).first)
+          else workout_document(context.workouts.where(id:).first)
           end
         end
 
@@ -127,6 +197,12 @@ class Tectonic < Roda
         def workout_result(workout)
           { id: "workout:#{workout.id}", title: "Workout on #{workout.date.strftime('%Y-%m-%d')}",
             url: url('workouts', workout.id) }
+        end
+
+        # A program has no page of its own to link to yet, so the handle points at the
+        # workouts the block writes, which is where a person would go to look at it.
+        def program_result(program)
+          { id: "program:#{program.id}", title: program.name, url: "#{Config.public_base_url}/workouts/" }
         end
 
         # The estimated max rides along with the movement rather than being a tool of its
@@ -141,12 +217,26 @@ class Tectonic < Roda
                                           metadata: { library: exercise.library?, estimated_1rm: estimated })
         end
 
+        # The prose line stays, because that is what a connector renders, but everything
+        # the prose flattens away -- warmup against working set, planned against lifted,
+        # completion, the session rating -- rides in the metadata, which is the only
+        # place a model can read them back as data rather than parse them out of English.
         def workout_document(workout)
           return unless workout
 
+          detail = Presenter.view_workout_detail(workout)
           lines = workout.sets.map { |s| "#{s.exercise.name} #{s.weight}x#{s.reps}" }.join(', ')
           workout_result(workout).merge(text: "Workout on #{workout.date.strftime('%Y-%m-%d')}: #{lines}.",
-                                        metadata: { sets: workout.sets.count })
+                                        metadata: detail)
+        end
+
+        def program_document(program)
+          return unless program
+
+          detail = ProgramView.full_program(program)
+          program_result(program).merge(
+            text: "#{program.name}: #{program.weeks} week(s) from #{program.start_date}.", metadata: detail
+          )
         end
 
         def url(kind, id)

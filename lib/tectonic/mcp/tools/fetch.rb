@@ -3,6 +3,8 @@
 require 'json'
 require_relative '../tool'
 require_relative 'support'
+# Locator resolves a program: handle too, and ProgramView is what it renders one with.
+require_relative 'program_support'
 
 class Tectonic < Roda
   module MCP
