@@ -17,6 +17,7 @@ require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/connection'
 require_relative 'lib/tectonic/equipment'
 require_relative 'lib/tectonic/volume'
+require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/program_editor'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/oauth_keys'
@@ -189,6 +190,12 @@ class Tectonic < Roda
     # GET /
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
+      @account_id = rodauth.account_from_session[:id]
+      @month = Calendar.month_of(r.params['month'])
+      @previous = @month << 1
+      @following = @month >> 1
+      @weeks = Calendar.weeks(@account_id, @month)
+      @tally = Calendar.tally(@weeks)
       view('home')
     end
 

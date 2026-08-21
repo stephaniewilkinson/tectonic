@@ -1,22 +1,68 @@
-<div class="text-7xl">Welcome to Tectonic Plates</div>
+<div class="mx-auto max-w-3xl">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-3xl font-semibold text-gray-900">Welcome to Tectonic Plates</h1>
+    <div class="flex gap-2">
+      <a href="/workouts/new" class="rounded-md bg-lime-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-lime-600">Start a new workout</a>
+      <a href="/workouts/" class="rounded-md bg-sky-800 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-lime-500">Continue a workout</a>
+    </div>
+  </div>
 
-<p class="mt-4 text-lg leading-8 text-gray-600">Built for lifting heavy. Connect your LLM over MCP to plan and edit your workouts.</p>
-
-<div class="mt-16 columns-2">
-  <div class="col">
-    <a href="/workouts/new" class="ml-auto flex items-center gap-x-1 rounded-md bg-lime-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
-      <svg class="-ml-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path d="M10.75 6.75a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" />
-      </svg>
-      Start a new workout
+  <div class="mt-8 flex items-center justify-between">
+    <a href="/?month=<%= @previous.strftime('%Y-%m') %>" rel="prev"
+       class="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+      &larr; <%= @previous.strftime('%b') %>
+    </a>
+    <h2 class="text-lg font-semibold text-gray-900"><%= @month.strftime('%B %Y') %></h2>
+    <a href="/?month=<%= @following.strftime('%Y-%m') %>" rel="next"
+       class="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+      <%= @following.strftime('%b') %> &rarr;
     </a>
   </div>
-  <div class="col">
-    <a href="/workouts/" class="mt-8 ml-auto flex items-center gap-x-1 rounded-md hover:bg-lime-500 px-3 py-2 text-sm font-semibold text-white shadow-sm bg-sky-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
-      <svg class="-ml-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path d="M10.75 6.75a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" />
-      </svg>
-      Continue a workout
-    </a>
+
+  <%- if @tally.empty? %>
+    <p class="mt-2 text-center text-sm text-gray-500">Nothing trained or planned this month.</p>
+  <%- else %>
+    <p class="mt-2 text-center text-sm text-gray-500">
+      <%= [[:performed, 'trained'], [:planned, 'planned'], [:skipped, 'missed']]
+            .filter_map { |status, word| "#{@tally[status]} #{word}" if @tally[status] }.join(' &middot; ') %>
+    </p>
+  <%- end %>
+
+  <div class="mt-4 grid grid-cols-7 gap-px rounded-t-lg bg-gray-200 text-center text-xs font-semibold leading-6 text-gray-500">
+    <%- Tectonic::Calendar::DAY_NAMES.each do |name| %>
+      <div class="bg-gray-50 py-2"><%= name %></div>
+    <%- end %>
+  </div>
+
+  <div class="grid grid-cols-7 gap-px rounded-b-lg bg-gray-200 text-sm">
+    <%- @weeks.each do |week| %>
+      <%- week.each do |cell| %>
+        <%# A day outside the month is still drawn, so a week that straddles a boundary
+            reads as a week; it is just dimmed, because the month is what is being read. %>
+        <div class="min-h-20 p-1 <%= cell[:in_month] ? 'bg-white' : 'bg-gray-50 text-gray-400' %>">
+          <div class="text-right">
+            <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs
+                         <%= 'bg-lime-500 font-semibold text-white' if cell[:today] %>">
+              <%= cell[:date].day %>
+            </span>
+          </div>
+          <%# Performed, planned and skipped are the words a workout already answers
+              with. Skipped is the one a list cannot show: a missed session is simply
+              absent there, and seeing the hole is the point of a calendar. %>
+          <%- Tectonic::Calendar.entries(cell[:workouts]).each do |entry| %>
+            <a href="/workouts/<%= entry[:id] %>" title="<%= entry[:status] %>"
+               class="mt-1 block truncate rounded px-1 py-0.5 text-xs font-medium <%= entry[:style] %>">
+              <%= entry[:word] %>
+            </a>
+          <%- end %>
+        </div>
+      <%- end %>
+    <%- end %>
+  </div>
+
+  <div class="mt-3 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
+    <span><span class="mr-1 inline-block h-2 w-2 rounded-full bg-lime-500"></span>trained</span>
+    <span><span class="mr-1 inline-block h-2 w-2 rounded-full bg-sky-500"></span>planned</span>
+    <span><span class="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500"></span>missed</span>
   </div>
 </div>
