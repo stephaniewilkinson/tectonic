@@ -14,6 +14,7 @@ require_relative 'lib/tectonic/exercise_library'
 require_relative 'lib/tectonic/plates'
 require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
+require_relative 'lib/tectonic/connection'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
@@ -176,6 +177,30 @@ class Tectonic < Roda
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
       view('home')
+    end
+
+    # The assistants this account has connected, and how to connect another. The app has
+    # advertised "connect your LLM over MCP" on two pages since before there was anywhere
+    # to do it, and until now nothing showed what was already connected or took it away.
+    r.on 'connections' do
+      rodauth.require_login
+      @account_id = rodauth.account_from_session[:id]
+
+      r.post String do |application_id|
+        check_csrf!
+        Connection.revoke(@account_id, application_id.to_i)
+        r.redirect '/connections'
+      end
+
+      r.get do
+        @connections = Connection.for_account(@account_id)
+        # Without MCP_PUBLIC_BASE_URL the resource URL is a bare path, which is not an
+        # address anyone can paste into an assistant. Say so rather than render half of
+        # one: a lifter who copies "/mcp" gets an error from their assistant and no idea
+        # that this deployment is misconfigured.
+        @resource_url = MCP::Config.resource_url unless MCP::Config.public_base_url.to_s.empty?
+        view('connections')
+      end
     end
     r.on 'exercises' do
       rodauth.require_login
