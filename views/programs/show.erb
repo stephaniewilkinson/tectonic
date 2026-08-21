@@ -1,0 +1,55 @@
+<div class="mx-auto max-w-2xl">
+  <a href="/programs" class="text-sm text-gray-500 hover:text-gray-700">&larr; programs</a>
+  <h1 class="mt-2 text-3xl font-semibold text-gray-900"><%= h(@program.name) %></h1>
+  <p class="mt-1 text-sm text-gray-500">
+    <%= @program.weeks %> week<%= 's' unless @program.weeks == 1 %>
+    <span class="mx-1">&middot;</span>jumps of <%= h(@equipment.increment) %> lb
+  </p>
+
+  <%- if @error %>
+    <p class="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 ring-1 ring-amber-200">
+      <%= h(@error) %>
+    </p>
+  <%- end %>
+
+  <%- @program.program_weeks.sort_by(&:number).each do |week| %>
+    <section class="mt-8">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-900">
+          Week <%= week.number %><%= ' (deload)' if week.is_deload %>
+        </h2>
+        <form method="post" action="/programs/<%= @program.id %>/generate">
+          <%= csrf_tag("/programs/#{@program.id}/generate") %>
+          <input type="hidden" name="week" value="<%= week.number %>">
+          <button type="submit"
+                  class="rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-gray-700
+                         shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Generate sessions</button>
+        </form>
+      </div>
+
+      <%- week.program_days.sort_by(&:weekday).each do |day| %>
+        <div class="mt-4 rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
+          <h3 class="text-sm font-semibold text-gray-900">
+            <%= Date::DAYNAMES[day.weekday] %><%= " &mdash; #{h(day.focus)}" if day.focus %>
+          </h3>
+
+          <%- day.program_lifts.sort_by(&:position).each do |lift| %>
+            <%= render('programs/_lift', locals: { lift: }) %>
+          <%- end %>
+
+          <%= render('programs/_add_lift', locals: { day: }) %>
+        </div>
+      <%- end %>
+
+      <%= render('programs/_add_day', locals: { week: }) %>
+    </section>
+  <%- end %>
+
+  <form method="post" action="/programs/<%= @program.id %>/weeks" class="mt-8">
+    <%= csrf_tag("/programs/#{@program.id}/weeks") %>
+    <input type="hidden" name="copy_from" value="<%= @program.weeks %>">
+    <button type="submit"
+            class="rounded-md bg-lime-500 px-3 py-1.5 text-sm font-semibold text-white
+                   shadow-sm hover:bg-lime-600">Add a week like the last</button>
+  </form>
+</div>

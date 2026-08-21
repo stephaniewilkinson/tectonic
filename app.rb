@@ -16,6 +16,8 @@ require_relative 'lib/tectonic/sets'
 require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/connection'
 require_relative 'lib/tectonic/equipment'
+require_relative 'lib/tectonic/program_editor'
+require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
@@ -178,6 +180,47 @@ class Tectonic < Roda
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
       view('home')
+    end
+
+    # Training blocks: what is written, and turning a week of it into real sessions. The
+    # common act is adjusting one lift between weeks, so that is a form on the block page
+    # rather than a page of its own; authoring a block from nothing is rarer and is a
+    # week copied and then edited, which is how a block actually gets written.
+    r.on 'programs' do
+      rodauth.require_login
+      @account_id = rodauth.account_from_session[:id]
+      @editor = ProgramEditor.new(@account_id)
+
+      r.on String do |program_id|
+        @program = @editor.program(program_id)
+        r.redirect '/programs' unless @program
+
+        r.post('weeks') { program_action(r) { @editor.add_week(@program, copy_from: r.params['copy_from']) } }
+        r.post('days') { program_action(r) { add_program_day(r) } }
+        r.post('lifts') { program_action(r) { add_program_lift(r) } }
+        r.post('generate') { program_action(r) { generate_program_week(r) } }
+
+        r.on 'lifts', String do |lift_id|
+          @lift = @editor.lift(@program, lift_id)
+          r.redirect "/programs/#{@program.id}" unless @lift
+
+          r.post('delete') { program_action(r) { @editor.remove_lift(@lift) } }
+          r.post { program_action(r) { @editor.update_lift(@lift, r.params.slice(*LIFT_FIELDS)) } }
+        end
+
+        r.get { program_view }
+      end
+
+      r.post do
+        check_csrf!
+        program = @editor.create_program(name: r.params['name'], start_date: r.params['start_date'])
+        r.redirect "/programs/#{program.id}"
+      end
+
+      r.get do
+        @programs = @editor.programs
+        view('programs/index')
+      end
     end
 
     # The bar and plates this account lifts on. Everything the app calculates rounds to
@@ -454,6 +497,52 @@ class Tectonic < Roda
     return {} if exercise.nil? || exercise.id == set.exercise_id
 
     { exercise_id: exercise.id, is_barbell: exercise.barbell? }
+  end
+
+  # The fields a lift edit may set. Named rather than taken wholesale so a form cannot
+  # reach a column it has no business in, and so the pricing rule sees both prices when
+  # one is being swapped for the other.
+  LIFT_FIELDS = %w[sets reps top_weight percent_of_max note].freeze
+
+  # Every programme write is the same shape: check the token, try it, and come back to the
+  # block with either nothing to say or the writer's own refusal to show. The refusal is
+  # stashed in the session because the answer is a redirect -- a lifter who reloads after
+  # a bad edit should not be asked to resubmit it.
+  def program_action(request, &)
+    check_csrf!
+    ok, message = @editor.attempt(&)
+    session['program.error'] = message unless ok
+    request.redirect "/programs/#{@program.id}"
+  end
+
+  def program_view
+    @error = session.delete('program.error')
+    @equipment = Equipment.for_account(@account_id)
+    @exercises = Exercise.visible_to(@account_id).order(:name)
+    view('programs/show')
+  end
+
+  def add_program_day(request)
+    week = @program.week(request.params['week'].to_i)
+    raise MCP::Tool::Refusal, 'That week is not part of this block.' unless week
+
+    @editor.add_day(week, weekday: request.params['weekday'], focus: request.params['focus'])
+  end
+
+  def add_program_lift(request)
+    day = ProgramDay.where(id: request.params['day_id'],
+                           program_week_id: @program.program_weeks_dataset.select(:id)).first
+    raise MCP::Tool::Refusal, 'That day is not part of this block.' unless day
+
+    @editor.add_lift(day, request.params.slice('exercise', *LIFT_FIELDS))
+  end
+
+  # Writing a week into real workouts is the point of a programme, and it is idempotent:
+  # running it twice reuses the sessions rather than doubling them.
+  def generate_program_week(request)
+    ProgramGenerator.new(@program).generate(request.params['week'].to_i)
+  rescue ArgumentError => e
+    raise MCP::Tool::Refusal, e.message
   end
 
   # The rack the signed-in account lifts on, read once per request: the session view asks
