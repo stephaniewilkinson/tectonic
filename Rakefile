@@ -31,25 +31,29 @@ end
 # Brings a database that already carries the squashed schema to the baseline's version
 # without running it. Two kinds arrive here: one predating the migrator, which has the
 # tables but no schema_info to prove it, and one migrated under the old numbering, which
-# records a version far above anything this directory can produce. Left alone the
-# migrator would try to recreate the tables in the first case and to roll the schema
-# back in the second, so both are stamped instead. A database with no tables at all is
-# untouched: it needs the migration actually run.
+# records a version far above anything this directory can produce. Left alone the migrator
+# would try to recreate the tables in the first case and roll the schema back in the
+# second, so both are stamped. An empty database is untouched: it needs the migration run.
 #
-# A version inside the current sequence is left exactly as it is. Adopting on anything
-# but the baseline was harmless while the baseline was the only migration and became a
-# bug the moment a second one existed: a database at version 2 was stamped back to 1 on
-# every run and the migrator then replayed a migration it had already applied. The one
-# version this cannot distinguish is an old-numbering database whose number the sequence
-# has since grown past, which stops mattering long before it reaches 24.
+# A database that has tables but not the baseline's tables is refused rather than stamped.
+# Stamping one skips 001 and leaves it recorded as migrated with 001's tables missing,
+# which raises nothing at the time and everything later.
 def baseline(db)
-  return unless db.table_exists?(:accounts)
+  require_relative 'lib/tectonic/schema_baseline'
+  return unless Tectonic::SchemaBaseline.populated?(db)
+
+  refusal = Tectonic::SchemaBaseline.refusal(db)
+  abort refusal if refusal
 
   db.create_table?(:schema_info) { Integer :version, default: 0, null: false }
   recorded = db[:schema_info].get(:version)
-  return if recorded&.between?(BASELINE_VERSION, LATEST_VERSION)
+  return if Tectonic::SchemaBaseline.current?(recorded, BASELINE_VERSION, LATEST_VERSION)
 
-  # An empty schema_info takes a row; one already carrying a version has it corrected.
+  adopt(db, recorded)
+end
+
+# An empty schema_info takes a row; one already carrying a version has it corrected.
+def adopt(db, recorded)
   if recorded.nil?
     db[:schema_info].insert(version: BASELINE_VERSION)
   else
