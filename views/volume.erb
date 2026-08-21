@@ -78,15 +78,15 @@
             no tonnage, but it is not a top set of zero, and filling it would draw a dip
             nobody lifted. min: nil lets the axis fit the weights rather than starting at
             zero, which nobody lifts and which flattens a season of progress. %>
-        <%- shown = @top_sets.first(Tectonic::Volume::SERIES) %>
         <%# The one chart on the site with a line per lift, and so the one that asks for
             the full palette: the site default is a single colour, which would leave
             every lift after the first in Chart.js's own grey. %>
-        <%= line_chart(shown.map { |name, weeks| { name:, data: weeks } }, ytitle: 'Weight',
-                       curve: false, min: nil, discrete: true, colors: Tectonic::CHART_COLORS) %>
-        <%- if @top_sets.length > shown.length %>
+        <%= line_chart(@top_sets.map { |name, weeks| { name:, data: weeks } },
+                       ytitle: 'Weight', curve: false, min: nil, discrete: true,
+                       colors: Tectonic::CHART_COLORS) %>
+        <%- if @withheld.positive? %>
           <p class="mt-1 text-xs text-gray-500">
-            Showing the <%= shown.length %> most-trained lifts; <%= @top_sets.length - shown.length %>
+            Showing the <%= @top_sets.length %> most-trained lifts; <%= @withheld %>
             more had working sets in this window. Pick one above to see it on its own.
           </p>
         <%- end %>

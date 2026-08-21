@@ -265,7 +265,11 @@ class Tectonic < Roda
         @lift = @lifts.find { |id, _name| id.to_s == r.params['exercise_id'].to_s }
         @rows = Volume.weekly(@account_id, exercise_id: @lift&.first, weeks: @weeks)
         @summary = Volume.summary(@rows)
-        @top_sets = Volume.top_sets(@account_id, exercise_id: @lift&.first, weeks: @weeks)
+        # Only so many lines stay readable at once; the rest are counted so the page can
+        # say what it left out rather than quietly drawing a partial picture.
+        trends = Volume.top_sets(@account_id, exercise_id: @lift&.first, weeks: @weeks)
+        @top_sets = trends.first(Volume::SERIES)
+        @withheld = trends.length - @top_sets.length
         @by_exercise = Volume.by_exercise(@account_id, weeks: @weeks) unless @lift
         view('volume')
       end
