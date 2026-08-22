@@ -23,6 +23,9 @@ class Tectonic < Roda
         RPE = (1..10)
         SETS = (1..20)
         PERCENT = (1..200)
+        # A held position measured in seconds, up to an hour, which covers a plank at one
+        # end and a walk or a bike interval at the other.
+        SECONDS = (1..3600)
 
         module_function
 

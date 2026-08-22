@@ -15,9 +15,11 @@ class Tectonic < Roda
       class AddProgramLift < Tool
         tool_name 'add_program_lift'
         description 'Add a lift to a training day. Give either top_weight in pounds or ' \
-                    'percent_of_max, or is_unloaded for work carrying no external load ' \
-                    '(a plank, a band, a walk). It goes last in the day unless position says ' \
-                    'otherwise.'
+                    'percent_of_max, or is_weighted false for work carrying no external ' \
+                    'load. measure is reps or time; a timed lift gives duration_seconds ' \
+                    'instead of reps. is_per_side says the count is per side. Each defaults ' \
+                    'to how the movement is usually done. It goes last in the day unless ' \
+                    'position says otherwise.'
         scope :write
         input_schema(
           type: 'object',
@@ -25,11 +27,12 @@ class Tectonic < Roda
             program_day_id: { type: 'integer' }, exercise: { type: 'string' },
             sets: { type: 'integer' }, reps: { type: 'integer' },
             top_weight: { type: 'integer' }, percent_of_max: { type: 'integer' },
-            is_unloaded: { type: 'boolean' },
+            is_weighted: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
+            is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, note: { type: 'string' }
           },
-          required: %w[program_day_id exercise sets reps], additionalProperties: false
+          required: %w[program_day_id exercise sets], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)

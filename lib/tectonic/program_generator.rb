@@ -19,9 +19,6 @@ class Tectonic < Roda
   # session is not a separate kind of record: it is ordinary Set rows written
   # ahead of time with is_completed false, which lifting flips to true.
   class ProgramGenerator
-    # The rule for work that carries no external load, and so has no load to decide.
-    UNLOADED = 'unloaded'
-
     # created_by is the OAuth client that asked for this week, when an assistant did. It
     # is stamped onto the rows the same way a set logged over MCP is stamped, so a
     # session an assistant scheduled says so in the UI rather than appearing to have come
@@ -115,7 +112,8 @@ class Tectonic < Roda
     end
 
     def insert_sets(workout, week, lift)
-      return write_unloaded(workout, lift) if lift.progression == UNLOADED
+      return write_flat(workout, lift, nil) unless lift.is_weighted
+      return write_flat(workout, lift, top_weight(week, lift)) if lift.timed?
 
       top = top_weight(week, lift)
       Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
@@ -125,14 +123,22 @@ class Tectonic < Roda
       working_sets(lift, top).each { |set| insert_set(workout, lift, set, is_warmup: false) }
     end
 
-    # Work carrying no external load has no ramp to climb and no ladder to build: there is
-    # nothing to warm up to and nothing to step between, so every set is the same
-    # prescription and the weight stays empty. Empty rather than zero, because tonnage is
-    # summed off that column and a null adds nothing to a sum, where a zero only fails to
-    # add anything by accident of arithmetic.
-    def write_unloaded(workout, lift)
-      Array.new(lift.sets) { { weight: nil, reps: lift.reps } }
+    # Every set at the same load, with no ramp before them. Two kinds of work want this.
+    # Unweighted work has no load to ramp to and nothing to step between, and its weight
+    # column stays empty -- empty rather than zero, because tonnage is summed off it and a
+    # null adds nothing to a sum where a zero only fails to add anything by accident of
+    # arithmetic. Timed work is measured in seconds, and a ladder of durations is not a
+    # warmup: nobody ramps up to a plank.
+    def write_flat(workout, lift, weight)
+      Array.new(lift.sets) { { weight:, **quantity(lift) } }
            .each { |set| insert_set(workout, lift, set, is_warmup: false) }
+    end
+
+    # What this lift counts, as the two columns a set stores it in. The measure names
+    # which one carries the number and the other stays empty, which is the invariant the
+    # table itself holds.
+    def quantity(lift)
+      lift.timed? ? { reps: nil, duration_seconds: lift.duration_seconds } : { reps: lift.reps, duration_seconds: nil }
     end
 
     # The load this week asks for, which is the lift's rule applied and then a deload's
@@ -151,7 +157,6 @@ class Tectonic < Roda
     # moved it. linear is the one that steps, off the last session of the movement.
     def prescribed_weight(week, lift)
       case lift.progression
-      when 'unloaded' then nil
       when 'percent' then percent_of_max_weight(lift)
       when 'linear' then progressed_weight(week, lift)
       else written_start(lift)
@@ -281,8 +286,11 @@ class Tectonic < Roda
     def insert_set(workout, lift, set, is_warmup:)
       Set.insert(
         workout_id: workout.id, exercise_id: lift.exercise_id,
-        weight: set[:weight], reps: set[:reps],
+        weight: set[:weight], reps: set[:reps], duration_seconds: set[:duration_seconds],
         planned_weight: set[:weight], planned_reps: set[:reps],
+        # A set is done the way the lift that wrote it is done, so the two never disagree
+        # about whether it was counted per side or held for time.
+        measure: lift.measure, is_per_side: lift.is_per_side,
         is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
         created_by_oauth_application_id: @created_by
       )

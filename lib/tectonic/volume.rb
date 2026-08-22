@@ -31,8 +31,17 @@ class Tectonic < Roda
     LIFT = Sequel[:sets][:exercise_id]
     NAME = Sequel[:exercises][:name]
     COUNTED = Sequel.as(Sequel.function(:count, Sequel.lit('*')), :sets)
-    REPPED = Sequel.as(Sequel.function(:sum, Sequel[:sets][:reps]), :reps)
-    LIFTED = Sequel.as(Sequel.function(:sum, Sequel[:sets][:weight] * Sequel[:sets][:reps]), :tonnage)
+    # A count taken per side is half the work that happened: 3x8 per side is 48 reps, not
+    # 24. Doubled here rather than at each call site, so nothing can read the raw column
+    # and quietly halve a lifter's unilateral volume.
+    #
+    # Timed work has no reps and contributes none. Its seconds are counted separately
+    # rather than added in: a plank and a set of squats are both training, but neither
+    # converts into the other, and one number holding both would mean nothing.
+    WORKED_REPS = Sequel.lit('CASE WHEN sets.is_per_side THEN sets.reps * 2 ELSE sets.reps END')
+    REPPED = Sequel.as(Sequel.function(:sum, WORKED_REPS), :reps)
+    LIFTED = Sequel.as(Sequel.function(:sum, Sequel[:sets][:weight] * WORKED_REPS), :tonnage)
+    HELD = Sequel.as(Sequel.function(:sum, Sequel[:sets][:duration_seconds]), :seconds)
     HEAVIEST = Sequel.as(Sequel.function(:max, Sequel[:sets][:weight]), :heaviest)
     # The windows worth offering: a block, a half year, a year.
     WINDOWS = [12, 26, 52].freeze
@@ -64,7 +73,7 @@ class Tectonic < Roda
       return [] if recorded.empty?
 
       span(recorded.first[:week], weeks).map do |week|
-        recorded.find { |row| row[:week] == week } || { week:, sets: 0, reps: 0, tonnage: 0 }
+        recorded.find { |row| row[:week] == week } || { week:, sets: 0, reps: 0, tonnage: 0, seconds: 0 }
       end
     end
 
@@ -73,7 +82,7 @@ class Tectonic < Roda
     # back down to three numbers a week.
     def totals(account_id, exercise_id: nil, weeks: DEFAULT_WEEKS)
       working_sets(account_id, exercise_id:, weeks:)
-        .group(WEEK).order(WEEK).select(Sequel.as(WEEK, :week), COUNTED, REPPED, LIFTED)
+        .group(WEEK).order(WEEK).select(Sequel.as(WEEK, :week), COUNTED, REPPED, LIFTED, HELD)
         .all.map { |row| row.merge(week: to_date(row[:week])) }
     end
 
@@ -159,8 +168,9 @@ class Tectonic < Roda
     # The headline numbers for the window, for a page that should say what it means
     # before it draws anything.
     def summary(rows)
-      { sets: rows.sum { |row| row[:sets] }, reps: rows.sum { |row| row[:reps] },
-        tonnage: rows.sum { |row| row[:tonnage] }, weeks: rows.count { |row| row[:sets].positive? } }
+      { sets: rows.sum { |row| row[:sets] }, reps: rows.sum { |row| row[:reps].to_i },
+        tonnage: rows.sum { |row| row[:tonnage].to_i }, seconds: rows.sum { |row| row[:seconds].to_i },
+        weeks: rows.count { |row| row[:sets].positive? } }
     end
   end
 end
