@@ -36,6 +36,10 @@ class Tectonic < Roda
 
     attr_reader :account_id
 
+    # What the last edit did to the session its day had already generated: :rewritten,
+    # :lifted where there was work in it, or :none where there was no session to touch.
+    attr_reader :session
+
     # The blocks this account has written, newest first.
     def programs
       Program.where(account_id:).reverse(:id).all
@@ -114,7 +118,7 @@ class Tectonic < Roda
     end
 
     def add_lift(day, attributes)
-      MCP::Tools::ProgramWriter.lift(@context, day, symbolize(attributes))
+      MCP::Tools::ProgramWriter.lift(@context, day, symbolize(attributes)).tap { refresh_session(day) }
     end
 
     # An edit to one lift: the load, the movement, the sets and reps. This is what a lifter
@@ -124,13 +128,24 @@ class Tectonic < Roda
       MCP::Tools::ProgramWriter.check_load(merged(lift, written))
       lift.update(**written.slice(:sets, :reps, :top_weight, :percent_of_max, :note),
                   progression: MCP::Tools::ProgramWriter.progression_for(merged(lift, written)))
+      refresh_session(lift.program_day)
     end
 
     # Deletion closes the gap the lift leaves, so positions stay 0..n-1 and the session
     # order after a removal reads the way it did before one. Reusing the MCP tool's own
     # step rather than repeating it, for the same reason the rest of this class does.
     def remove_lift(lift)
-      DB.transaction { MCP::Tools::DeleteProgramLift.close_gap(lift, lift.program_day) }
+      day = lift.program_day
+      DB.transaction { MCP::Tools::DeleteProgramLift.close_gap(lift, day) }
+      refresh_session(day)
+    end
+
+    # An edit to the plan reaches the session the plan already wrote, so a lifter who
+    # changes a load on Tuesday does not open Wednesday's session and find the old one.
+    # A session with anything lifted in it is left alone, and the page says so rather than
+    # failing: the edit itself was still wanted.
+    def refresh_session(day)
+      @session = MCP::Tools::SessionRefresh.apply(day)
     end
 
     # The row as it will be once the edit lands, which is what the pricing rule has to be

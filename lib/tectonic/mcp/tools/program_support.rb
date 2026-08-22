@@ -8,6 +8,34 @@ require_relative 'support'
 class Tectonic < Roda
   module MCP
     module Tools
+      # Carrying an edit through to the session the plan already produced. Editing a
+      # prescription used to leave that session exactly as it was, so the only way to
+      # apply a change was to know generation had already happened and then fix every set
+      # by hand -- and nothing anywhere said that it had.
+      #
+      # A session with any completed set is left alone. Once a lifter has answered a
+      # prescription those rows are a record of what happened rather than a plan to be
+      # revised. That refusal is reported rather than raised: the edit to the plan is
+      # still correct and still wanted, and it is only the session that could not follow.
+      module SessionRefresh
+        module_function
+
+        def apply(day)
+          ProgramGenerator.new(day.program_week.program).refresh(day)
+        end
+
+        # What happened to the session, as a sentence to append to whatever the tool was
+        # already saying. Silence where there was no session to touch, because a block
+        # edited before anyone generated it is the ordinary case and needs no remark.
+        def sentence(outcome, day)
+          case outcome
+          when :rewritten then " The planned session on #{Date::DAYNAMES[day.weekday]} was rewritten to match."
+          when :lifted then " The #{Date::DAYNAMES[day.weekday]} session has lifted sets in it, so it was left alone."
+          else ''
+          end
+        end
+      end
+
       # Finding a program object for a request. Every lookup goes through the
       # account-scoped datasets on the context, so an id belonging to someone else's
       # block resolves to nothing rather than to their plan -- the same guarantee the

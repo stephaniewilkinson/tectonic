@@ -31,8 +31,10 @@ class Tectonic < Roda
           removed = ProgramView.lift(lift)
           day = lift.program_day
           DB.transaction { close_gap(lift, day) }
+          refreshed = SessionRefresh.apply(day)
           ok("Removed #{removed[:exercise]} #{removed[:sets]}x#{removed[:reps]} from " \
-             "#{Date::DAYNAMES[day.weekday]}.", structured: { removed: })
+             "#{Date::DAYNAMES[day.weekday]}.#{SessionRefresh.sentence(refreshed, day)}",
+             structured: { removed:, session: refreshed.to_s })
         end
 
         # The lift goes and the ones after it close up, so positions stay 0..n-1 and the

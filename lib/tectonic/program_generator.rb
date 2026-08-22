@@ -50,10 +50,51 @@ class Tectonic < Roda
       end
     end
 
+    # Writes this day's session again from the plan as it now stands, so an edit to a
+    # prescription reaches the session that prescription already produced. Answers what it
+    # did: :rewritten, :lifted for a session with work in it, or :none where the day has
+    # not been generated at all.
+    #
+    # A session with any completed set is left alone, and that is the whole rule. Once a
+    # lifter has answered a prescription the row is a record of what happened, not a plan
+    # to be revised, and rewriting it would delete training. An untrained session is only
+    # ever a copy of the plan, so replacing it wholesale is the same operation as having
+    # generated it a moment later.
+    def refresh(day)
+      workout = existing_workout(day)
+      return :none unless workout
+      return :lifted if lifted?(workout)
+
+      DB.transaction do
+        Set.where(workout_id: workout.id).delete
+        rewrite(day, workout)
+      end
+      :rewritten
+    end
+
     private
 
+    # The date is recomputed as well, because moving a day to another weekday moves the
+    # session it wrote; leaving the old date behind is what used to strand a workout that
+    # nothing could find again.
+    # The lifts are re-read rather than taken off the day, because the caller has usually
+    # just written one: adding a lift asks the day for its lifts to work out the next
+    # position, which caches the association as it was a moment before the new row
+    # existed, and the session would then be rewritten without it.
+    def rewrite(day, workout)
+      week = day.program_week
+      workout.update(date: week.date_for(day.weekday))
+      ProgramLift.where(program_day_id: day.id).order(:position).each do |lift|
+        insert_sets(workout, week, lift)
+      end
+    end
+
+    def lifted?(workout)
+      Set.where(workout_id: workout.id, is_completed: true).limit(1).any?
+    end
+
     def generate_day(week, day, date)
-      existing = existing_workout(day, date)
+      existing = existing_workout(day)
       return existing if existing
 
       workout = Workout.create(account_id: @program.account_id, date:, program_day_id: day.id,
@@ -62,16 +103,15 @@ class Tectonic < Roda
       workout
     end
 
-    # Idempotency on (account_id, program day, date): the workout this day already wrote
-    # for this date is left exactly as it is, so regenerating a week never duplicates
-    # sets and never overwrites what was lifted. Keying on the date alone conflated two
-    # different things -- any workout logged that day silently stood in for this day's
-    # session, and the generator could not recognise its own output as its own. Matched
-    # across the whole day because workouts.date is a timestamp, so equality on a bare
-    # date would never hit.
-    def existing_workout(day, date)
-      Workout.where(account_id: @program.account_id, program_day_id: day.id,
-                    date: date...(date + 1)).first
+    # Idempotency on (account_id, program day): the workout this day already wrote is left
+    # exactly as it is, so regenerating a week never duplicates sets and never overwrites
+    # what was lifted. Keying on the date as well as the day conflated two different
+    # things -- a day moved to another weekday no longer matched the session it had
+    # already written, so regenerating left a second workout behind and the first became
+    # unreachable. A program day belongs to exactly one week and so has exactly one
+    # session; the day is the whole key.
+    def existing_workout(day)
+      Workout.where(account_id: @program.account_id, program_day_id: day.id).first
     end
 
     def insert_sets(workout, week, lift)
