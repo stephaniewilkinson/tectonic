@@ -35,8 +35,13 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           day = ProgramFinder.day(context, arguments[:program_day_id])
           lift = DB.transaction { write(context, day, arguments) }
-          ok("Added #{lift.exercise.name} #{lift.sets}x#{lift.reps} to #{Date::DAYNAMES[day.weekday]} " \
-             "at position #{lift.position}.", structured: ProgramView.lift(lift))
+          refreshed = SessionRefresh.apply(day)
+          ok(added(lift, day, refreshed), structured: ProgramView.lift(lift).merge(session: refreshed.to_s))
+        end
+
+        def self.added(lift, day, refreshed)
+          "Added #{lift.exercise.name} #{lift.sets}x#{lift.reps} to #{Date::DAYNAMES[day.weekday]} " \
+            "at position #{lift.position}.#{SessionRefresh.sentence(refreshed, day)}"
         end
 
         def self.write(context, day, arguments)

@@ -37,8 +37,10 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           lift = ProgramFinder.lift(context, arguments[:program_lift_id])
           changed = DB.transaction { revise(context, lift, arguments) }
-          ok("#{lift.exercise.name}: #{Changes.describe(changed)}.",
-             structured: ProgramView.lift(lift.refresh).merge(changed:))
+          day = lift.program_day
+          refreshed = SessionRefresh.apply(day)
+          ok("#{lift.exercise.name}: #{Changes.describe(changed)}.#{SessionRefresh.sentence(refreshed, day)}",
+             structured: ProgramView.lift(lift.refresh).merge(changed:, session: refreshed.to_s))
         end
 
         def self.revise(context, lift, arguments)
