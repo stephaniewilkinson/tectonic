@@ -104,3 +104,32 @@ describe 'the exercise page with a chart on it' do
   end
 end
 
+
+# A full, unpurged Tailwind v2 build used to be served beside the app's own styles: 3.82 MB
+# uncompressed, on every page load, styling nothing. The v3 CDN does the layout, and the
+# v2 file was not even a fallback for it -- utilities the views rely on do not exist in v2.
+describe 'the stylesheets a page loads' do
+  include Rack::Test::Methods
+  include PageAssets
+
+  before { get '/welcome' }
+
+  it 'serves the app stylesheet and no Tailwind build' do
+    assert_includes last_response.body, 'styles.css'
+    refute_includes last_response.body, 'tailwind.css'
+  end
+
+  it 'no longer has a Tailwind build to serve' do
+    get '/assets/css/tailwind.css'
+
+    assert_equal 404, last_response.status
+  end
+
+  # The one Tailwind that does style the page, so removing the other cannot be mistaken
+  # for removing both.
+  it 'still loads the Tailwind CDN that does the layout' do
+    get '/welcome'
+
+    assert_includes last_response.body, 'cdn.tailwindcss.com'
+  end
+end
