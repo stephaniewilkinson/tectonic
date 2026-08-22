@@ -104,7 +104,6 @@ describe 'the exercise page with a chart on it' do
   end
 end
 
-
 # A full, unpurged Tailwind v2 build used to be served beside the app's own styles: 3.82 MB
 # uncompressed, on every page load, styling nothing. The v3 CDN does the layout, and the
 # v2 file was not even a fallback for it -- utilities the views rely on do not exist in v2.
@@ -133,3 +132,4 @@ describe 'the stylesheets a page loads' do
     assert_includes last_response.body, 'cdn.tailwindcss.com'
   end
 end
+
