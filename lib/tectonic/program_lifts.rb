@@ -1,17 +1,21 @@
 # frozen_string_literal: true
 
 require_relative 'db'
+require_relative 'measured'
 
 class Tectonic < Roda
   class ProgramLift < Sequel::Model
     many_to_one :program_day
     many_to_one :exercise
 
-    # Counted in seconds rather than in reps: a plank, a carry, a walk. The measure
-    # decides which quantity column carries the number, so every reader asks here rather
-    # than guessing from which column happens to be null.
+    # The measure as a symbol; the column stores text. See Measured for why a dataset
+    # filter must still use the string form.
+    def measure
+      Measured.cast(super)
+    end
+
     def timed?
-      measure == 'time'
+      measure == Measured::TIME
     end
 
     # The work of one set, doubled where the count was per side. A Bulgarian split squat

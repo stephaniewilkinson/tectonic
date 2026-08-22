@@ -4,6 +4,7 @@ require 'date'
 require_relative '../tool'
 require_relative 'program_support'
 require_relative 'support'
+require_relative '../../measured'
 
 class Tectonic < Roda
   module MCP
@@ -61,7 +62,7 @@ class Tectonic < Roda
         # press done one arm at a time, or the plank held rather than counted, without
         # changing what the movement usually is for every other block.
         def shape_of(attributes, exercise)
-          measure = attributes.fetch(:measure, exercise.default_measure).to_s
+          measure = Measured.cast(attributes.fetch(:measure, exercise.default_measure))
           { is_weighted: attributes.fetch(:is_weighted, exercise.default_is_weighted),
             measure:,
             is_per_side: attributes.fetch(:is_per_side, exercise.default_is_per_side),
@@ -76,7 +77,7 @@ class Tectonic < Roda
         # the arguments would call that a rep-counted lift and then refuse it for having
         # no reps.
         def quantity(attributes, measure)
-          return { reps: nil, duration_seconds: attributes[:duration_seconds] } if measure == 'time'
+          return { reps: nil, duration_seconds: attributes[:duration_seconds] } if measure == Measured::TIME
 
           { reps: attributes[:reps], duration_seconds: nil }
         end
@@ -109,18 +110,17 @@ class Tectonic < Roda
           Bounds.check(Bounds::SECONDS, shape[:duration_seconds], 'Duration', unit: ' seconds')
           Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
           Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
-          check_measure(shape)
+          check_measure(shape, attributes[:measure])
           check_priced(attributes, shape)
         end
 
         # A lift is counted one way or the other, and the way it is counted decides which
         # quantity it needs. Asking for time without saying how long is a prescription
         # nobody can follow.
-        def check_measure(shape)
-          timed = shape[:measure] == 'time'
-          unless %w[reps time].include?(shape[:measure])
-            raise Tool::Refusal, "Measure #{shape[:measure].inspect} is not one of reps or time."
-          end
+        def check_measure(shape, given)
+          raise Tool::Refusal, "Measure #{given.inspect} is not one of reps or time." unless shape[:measure]
+
+          timed = shape[:measure] == Measured::TIME
           return if timed ? shape[:duration_seconds] : shape[:reps]
 
           raise Tool::Refusal, timed ? 'A timed lift needs duration_seconds.' : 'A lift counted in reps needs reps.'

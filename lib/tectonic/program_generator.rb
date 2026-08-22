@@ -9,6 +9,7 @@ require_relative 'programs'
 require_relative 'progression'
 require_relative 'rounding'
 require_relative 'equipment'
+require_relative 'measured'
 require_relative 'set_scheme'
 require_relative 'sets'
 require_relative 'warmup'
@@ -289,8 +290,10 @@ class Tectonic < Roda
         weight: set[:weight], reps: set[:reps], duration_seconds: set[:duration_seconds],
         planned_weight: set[:weight], planned_reps: set[:reps],
         # A set is done the way the lift that wrote it is done, so the two never disagree
-        # about whether it was counted per side or held for time.
-        measure: lift.measure, is_per_side: lift.is_per_side,
+        # about whether it was counted per side or held for time. Stored form rather than
+        # the symbol: this is a dataset insert, which does not typecast, and Sequel reads a
+        # symbol here as the name of a column.
+        measure: Measured.stored(lift.measure), is_per_side: lift.is_per_side,
         is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
         created_by_oauth_application_id: @created_by
       )

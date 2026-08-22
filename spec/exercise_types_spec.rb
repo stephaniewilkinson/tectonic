@@ -157,7 +157,7 @@ describe 'the default a movement carries' do
                                     default_is_per_side: true)
     lift = write(@account_id, a_day(@program), plank, duration_seconds: 30)
 
-    assert_equal 'time', lift.measure
+    assert_equal :time, lift.measure
     refute lift.is_weighted
     assert lift.is_per_side
   end
