@@ -609,6 +609,16 @@ class Tectonic < Roda
     equipment.label(set[:weight])
   end
 
+  # A set's prescription, as one phrase. Work carrying no external load has no weight
+  # rather than a weight of zero, so there is nothing to put before the reps: "0 × 10" was
+  # the workaround this replaced and read as a mistake, and an empty cell where a number
+  # belongs reads as missing data rather than as the movement being the load.
+  def load_label(set)
+    return "#{set[:reps]} reps" unless set[:weight]
+
+    "#{set[:weight]} &times; #{set[:reps]}"
+  end
+
   # The heaviest a lift was taken on each day it was recorded, oldest day first, which
   # is the line the exercise page draws. Warmups are left out: on any normal day the top
   # set is heavier than the ramp-up and the answer is the same either way, but a day of

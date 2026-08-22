@@ -19,6 +19,9 @@ class Tectonic < Roda
   # session is not a separate kind of record: it is ordinary Set rows written
   # ahead of time with is_completed false, which lifting flips to true.
   class ProgramGenerator
+    # The rule for work that carries no external load, and so has no load to decide.
+    UNLOADED = 'unloaded'
+
     # created_by is the OAuth client that asked for this week, when an assistant did. It
     # is stamped onto the rows the same way a set logged over MCP is stamped, so a
     # session an assistant scheduled says so in the UI rather than appearing to have come
@@ -72,12 +75,24 @@ class Tectonic < Roda
     end
 
     def insert_sets(workout, week, lift)
+      return write_unloaded(workout, lift) if lift.progression == UNLOADED
+
       top = top_weight(week, lift)
       Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
                        increment: @equipment.increment).each do |set|
         insert_set(workout, lift, set, is_warmup: true)
       end
       working_sets(lift, top).each { |set| insert_set(workout, lift, set, is_warmup: false) }
+    end
+
+    # Work carrying no external load has no ramp to climb and no ladder to build: there is
+    # nothing to warm up to and nothing to step between, so every set is the same
+    # prescription and the weight stays empty. Empty rather than zero, because tonnage is
+    # summed off that column and a null adds nothing to a sum, where a zero only fails to
+    # add anything by accident of arithmetic.
+    def write_unloaded(workout, lift)
+      Array.new(lift.sets) { { weight: nil, reps: lift.reps } }
+           .each { |set| insert_set(workout, lift, set, is_warmup: false) }
     end
 
     # The load this week asks for, which is the lift's rule applied and then a deload's
@@ -96,6 +111,7 @@ class Tectonic < Roda
     # moved it. linear is the one that steps, off the last session of the movement.
     def prescribed_weight(week, lift)
       case lift.progression
+      when 'unloaded' then nil
       when 'percent' then percent_of_max_weight(lift)
       when 'linear' then progressed_weight(week, lift)
       else written_start(lift)

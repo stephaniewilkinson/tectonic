@@ -52,17 +52,34 @@ class Tectonic < Roda
             percent_of_max: attributes[:percent_of_max], note: attributes[:note],
             progression: progression_for(attributes),
             is_main: attributes.fetch(:is_main, false),
-            is_barbell: attributes.fetch(:is_barbell, exercise.barbell?) }
+            is_barbell: barbell?(attributes, exercise) }
+        end
+
+        # Unloaded work is never on a bar, whatever the movement's own flag says, and that
+        # one line is what keeps a warmup ramp off it: `Warmup.ramp` returns nothing for
+        # work that is not barbell work. Without it a bodyweight lift flagged barbell drew
+        # a 45 lb ramp above its own weightless sets.
+        def barbell?(attributes, exercise)
+          return false if unloaded?(attributes)
+
+          attributes.fetch(:is_barbell, exercise.barbell?)
         end
 
         # How a lift is priced already says how it should progress, so an assistant is
         # never asked to state both and cannot state them inconsistently. A percentage is
         # read fresh from the estimated max each week and has therefore already moved by
         # whatever the lifting moved it; pounds are a starting point the rules step from.
+        # Unloaded work has no load to decide, so it steps nowhere.
         # Without this a lift written as a percentage would take the column's default and
         # be generated as though it had a weight to step off, which it has not.
         def progression_for(attributes)
+          return 'unloaded' if unloaded?(attributes)
+
           attributes[:percent_of_max] ? 'percent' : 'linear'
+        end
+
+        def unloaded?(attributes)
+          attributes[:is_unloaded] == true
         end
 
         def check_load(attributes)
@@ -70,10 +87,38 @@ class Tectonic < Roda
           Bounds.check(Bounds::REPS, attributes[:reps], 'Reps')
           Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
           Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
+          check_unloaded(attributes)
+          check_priced(attributes)
+        end
+
+        # Unloaded work carries no load of either kind. Calling it unloaded and then
+        # pricing it is two answers to one question, and the row would fail the database's
+        # own check anyway, so it is refused here where the message can name the field to
+        # drop.
+        def check_unloaded(attributes)
+          return unless unloaded?(attributes)
+          return if attributes[:top_weight].nil? && attributes[:percent_of_max].nil?
+
+          raise Tool::Refusal, 'An unloaded lift carries no weight, so it cannot also have a ' \
+                               'top_weight or a percent_of_max. Drop the load, or drop is_unloaded.'
+        end
+
+        # A written zero is the workaround this replaces, and it is not harmless: zero
+        # reads as a real starting load, gains an increment every week the lifter completes
+        # it, and three weeks later the app is prescribing a weighted plank.
+        def check_priced(attributes)
+          return if unloaded?(attributes)
+          raise Tool::Refusal, zero_message if attributes[:top_weight]&.zero?
           return if attributes[:top_weight].nil? ^ attributes[:percent_of_max].nil?
 
           raise Tool::Refusal, 'A lift needs exactly one of top_weight (pounds) or ' \
-                               'percent_of_max (a percentage of the estimated max for that movement).'
+                               'percent_of_max (a percentage of the estimated max for that movement), ' \
+                               'or is_unloaded for work that carries no external load.'
+        end
+
+        def zero_message
+          'A lift cannot weigh zero. For a plank, a band, or anything carrying no external ' \
+            'load, set is_unloaded instead.'
         end
 
         # Sunday is 0 through Saturday is 6, which is the numbering the rest of the app
