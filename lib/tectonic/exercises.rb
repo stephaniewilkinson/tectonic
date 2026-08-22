@@ -2,6 +2,7 @@
 
 require 'date'
 require_relative 'db'
+require_relative 'measured'
 require_relative 'oauth_application'
 require_relative 'one_rep_max'
 require_relative 'sets'
@@ -9,6 +10,11 @@ require_relative 'workouts'
 
 class Tectonic < Roda
   class Exercise < Sequel::Model
+    # The usual way this movement is counted, as a symbol.
+    def default_measure
+      Measured.cast(super)
+    end
+
     one_to_many :sets
     # The OAuth client (LLM) that created this row, or nil for a human-made one.
     # Provenance is displayed only when this resolves, so the web UI's rows stay

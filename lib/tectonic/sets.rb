@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'db'
+require_relative 'measured'
 require_relative 'oauth_application'
 
 class Tectonic < Roda
@@ -11,11 +12,14 @@ class Tectonic < Roda
     many_to_one :created_by_oauth_application, class: 'Tectonic::OAuthApplication',
                                                key: :created_by_oauth_application_id
 
-    # Counted in seconds rather than in reps: a plank, a carry, a walk. The measure
-    # decides which quantity column carries the number, so every reader asks here rather
-    # than guessing from which column happens to be null.
+    # The measure as a symbol; the column stores text. See Measured for why a dataset
+    # filter must still use the string form.
+    def measure
+      Measured.cast(super)
+    end
+
     def timed?
-      measure == 'time'
+      measure == Measured::TIME
     end
 
     # The work of one set, doubled where the count was per side. A Bulgarian split squat
