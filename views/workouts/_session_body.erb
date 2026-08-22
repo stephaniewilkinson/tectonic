@@ -38,7 +38,7 @@
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 hx-target="#session-body" hx-swap="innerHTML">
             <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-            <button type="submit" class="rounded-lg bg-gray-200 px-3 py-1 text-sm font-semibold text-gray-700 hover:bg-gray-300">
+            <button type="submit" class="min-h-11 rounded-lg bg-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-300">
               <%= set[:is_completed] ? 'Undo' : 'Done' %>
             </button>
           </form>
@@ -81,18 +81,21 @@
               you lifted it. %>
           <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-1">
+                hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
             <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
             <span class="mr-1 text-xs uppercase tracking-wide text-gray-400">RPE</span>
+            <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
+                row rather than leaving dead space, so the targets are as wide as the
+                screen allows; min-h-12 is 48px, which clears the 44px minimum. %>
             <%- (6..10).each do |rating| %>
-              <button value="<%= rating %>" class="<%= rpe_style(set, rating) %> w-10 rounded-lg border border-gray-300 py-1.5 text-sm font-semibold" type="submit" name="rpe">
+              <button value="<%= rating %>" class="<%= rpe_style(set, rating) %> min-h-12 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
                 <%= rating %>
               </button>
             <%- end %>
           </form>
 
           <details class="mt-2">
-            <summary class="cursor-pointer text-xs text-gray-500">Lifted something else</summary>
+            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500">Lifted something else</summary>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">

@@ -20,7 +20,10 @@
   <p class="mt-2 text-xs text-gray-400"><%= provenance(@workout) %></p>
 <%- end %>
 
-<dl class="mt-5 grid grid-cols-2 gap-5 lg:grid-cols-3">
+<%# One column on a phone. grid-cols-2 was unprefixed, so it applied at every width and
+    put a 392px table inside a 161px card -- and the card's overflow-hidden ate the rest
+    silently, with no page-level scrollbar to show anything was missing. %>
+<dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
   <%- @array_of_exercise_ids.each do | exercise_id | %>
     <div class="relative overflow-hidden rounded-xl bg-white px-4 pt-5 shadow sm:px-6 sm:pt-6">
       <dt class="inline-flex">
@@ -31,7 +34,10 @@
           <%= Exercise[exercise_id].name %>
         </a>
       </dt>
-      <table class="mt-8 min-w-full divide-y divide-gray-100">
+      <%# The columns do not wrap, so a narrow card still needs somewhere for them to go:
+          scrolling reaches them, where the card's own overflow-hidden only hid them. %>
+      <div class="mt-8 overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-100">
         <thead>
           <tr>
             <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-xs font-semibold sm:pl-0">Weight</th>
@@ -61,6 +67,7 @@
           <%- end %>
         </tbody>
       </table>
+      </div>
     </div>
   <%- end %>
 </dl>

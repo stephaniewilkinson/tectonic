@@ -1,20 +1,27 @@
 <nav class="bg-lime-500 shadow">
   <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-4">
-    <div class="flex h-16 justify-between">
-      <div class="flex">
-        <div class="sm:ml-6 sm:flex sm:space-x-8">
-        <a href="/" class="inline-flex items-center border-b-2 px-1 pt-1 text-xl font-medium text-gray-900">tectonic plates</a>
+    <%# min-h rather than h: below 640px eight links do not fit on one line, and a fixed
+        h-16 clipped the row they wrapped onto instead of growing. Growing alone was not
+        enough -- at the desktop type size the wrap ran to three rows and 156px, a quarter
+        of a phone screen, above the session a lifter is actually reading. The type is
+        smaller on a phone and full size from 640px up, which fits it into two rows. %>
+    <div class="flex min-h-16 min-w-0 justify-between">
+      <%# min-w-0: a flex child will not shrink below its content, so without this the
+          scrolling row pushes the whole page sideways instead of scrolling inside itself. %>
+      <div class="flex min-w-0">
+        <div class="flex flex-nowrap items-center gap-x-5 overflow-x-auto py-2 sm:ml-6 sm:flex-wrap sm:gap-x-8 sm:overflow-x-visible sm:py-0">
+        <a href="/" class="inline-flex min-h-11 shrink-0 items-center border-b-2 px-1 text-base font-medium text-gray-900 sm:text-xl">tectonic plates</a>
           <%- if rodauth.logged_in? %>
-            <a href="/workouts" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">workouts</a>
-            <a href="/exercises" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">exercises</a>
-            <a href="/programs" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">programs</a>
-            <a href="/volume" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">volume</a>
-            <a href="/equipment" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">equipment</a>
-            <a href="/connections" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">assistants</a>
-            <a href="<%= rodauth.logout_path %>" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">exit</a>
+            <a href="/workouts" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">workouts</a>
+            <a href="/exercises" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">exercises</a>
+            <a href="/programs" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">programs</a>
+            <a href="/volume" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">volume</a>
+            <a href="/equipment" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">equipment</a>
+            <a href="/connections" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">assistants</a>
+            <a href="<%= rodauth.logout_path %>" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">exit</a>
           <%- else %>
-            <a href="<%= rodauth.login_path %>" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">log in</a>
-            <a href="<%= rodauth.create_account_path %>" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-xl font-medium text-gray-500 hover:border-gray-300 hover:text-white">sign up</a>
+            <a href="<%= rodauth.login_path %>" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">log in</a>
+            <a href="<%= rodauth.create_account_path %>" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">sign up</a>
           <%- end %>
         </div>
       </div>
