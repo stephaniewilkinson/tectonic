@@ -24,12 +24,40 @@ class Tectonic < Roda
     def working_sets(sets:, reps:, top_weight:, increment: Rounding::INCREMENT, **shape)
       target = target_reps(reps, shape[:preferred_reps])
       top = convert_weight(top_weight, from_reps: reps, to_reps: target, increment:)
+      return Array.new(sets) { { weight: top, reps: target } } unless shape.fetch(:is_ascending, true)
 
-      ascending = shape.fetch(:is_ascending, true)
-      Array.new(sets) do |index|
-        below_top = ascending ? sets - 1 - index : 0
-        { weight: Rounding.to_increment(top * (1 - (ASCENDING_STEP * below_top)), increment:), reps: target }
-      end
+      ladder(top, sets, increment).map { |weight| { weight:, reps: target } }
+    end
+
+    # The loads of an ascending ramp, lightest first.
+    #
+    # The step is a percentage of the top weight, and a percentage stops being expressible
+    # once it rounds to less than the smallest jump the rack can make. At 105 lb a 3% step
+    # is 3.15 lb, so on a rack whose lightest pair is 2.5s every set but the last rounds to
+    # the same 100 and a 3x8 comes out as 100, 100, 105. Two identical sets labelled as a
+    # ramp are worse than a flat prescription: they read as a mistake and invite the lifter
+    # to second-guess the sheet.
+    #
+    # So the percentage is kept wherever it survives rounding, which is every weight heavy
+    # enough for 3% to clear a plate change, and below that the ramp falls back to one
+    # increment a set -- the smallest ascent that rack can express. A rack with lighter
+    # plates therefore ascends where a coarser one cannot, which is the same rule the rest
+    # of the app already follows. Where even one increment a set cannot fit above zero the
+    # lift is too light to ascend at all and sits flat.
+    def ladder(top, sets, increment)
+      stepped = stepped_by_percent(top, sets, increment)
+      return stepped if stepped.uniq.length == stepped.length
+
+      spaced = stepped_by_increment(top, sets, increment)
+      spaced.first.positive? ? spaced : Array.new(sets) { top }
+    end
+
+    def stepped_by_percent(top, sets, increment)
+      Array.new(sets) { |i| Rounding.to_increment(top * (1 - (ASCENDING_STEP * (sets - 1 - i))), increment:) }
+    end
+
+    def stepped_by_increment(top, sets, increment)
+      Array.new(sets) { |i| top - ((sets - 1 - i) * increment) }
     end
 
     # The same intensity expressed at a different rep count: fewer reps means more

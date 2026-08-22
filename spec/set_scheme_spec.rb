@@ -26,6 +26,51 @@ describe Tectonic::SetScheme do
   end
 end
 
+# A 3% step is 3.15 lb at 105 and rounds away entirely on a 5 lb rack, which used to
+# produce two identical sets under an ascending heading.
+describe 'Tectonic::SetScheme on a lift too light for a percentage step' do
+  it 'ascends by one increment a set rather than repeating a load' do
+    sets = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: 105)
+
+    assert_equal([95, 100, 105], sets.map { |set| set[:weight] })
+  end
+
+  it 'reaches the prescribed top weight all the same' do
+    [95, 105, 115].each do |top|
+      weights = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: top).map { |set| set[:weight] }
+
+      assert_equal top, weights.last
+      assert_equal weights.uniq, weights
+    end
+  end
+
+  # The rack decides what is expressible: 3% of 105 is 3.15 lb, which a pair of 1.25s can
+  # nearly make and a pair of 2.5s cannot.
+  it 'keeps the percentage when the rack has plates fine enough for it' do
+    sets = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: 105, increment: 2.5)
+
+    assert_equal([97.5, 102.5, 105], sets.map { |set| set[:weight] })
+  end
+
+  # Nothing above zero can be laid out as a ramp here, and a flat prescription is honest
+  # where an invented one is not.
+  it 'sits flat when even one increment a set cannot fit above zero' do
+    sets = Tectonic::SetScheme.working_sets(sets: 4, reps: 8, top_weight: 10)
+
+    assert_equal([10, 10, 10, 10], sets.map { |set| set[:weight] })
+  end
+end
+
+# The percentage survives rounding on anything heavy, so no block that already generated
+# a sensible ramp is rewritten by this.
+describe 'Tectonic::SetScheme on a lift heavy enough for a percentage step' do
+  it 'still steps by the percentage' do
+    weights = Tectonic::SetScheme.working_sets(sets: 5, reps: 5, top_weight: 405).map { |set| set[:weight] }
+
+    assert_equal [355, 370, 380, 395, 405], weights
+  end
+end
+
 describe 'Tectonic::SetScheme rep conversion' do
   it 'keeps the prescribed reps when the program states no preference' do
     sets = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: 105)
