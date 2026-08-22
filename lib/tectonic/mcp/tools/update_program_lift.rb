@@ -72,7 +72,8 @@ class Tectonic < Roda
         def self.repriced(lift, attributes)
           return attributes unless attributes.key?(:top_weight) || attributes.key?(:percent_of_max)
 
-          attributes.merge(progression: ProgramWriter.progression_for(merged(lift, attributes)))
+          attributes.merge(progression: ProgramWriter.progression_for(merged(lift, attributes),
+                                                                      shape(lift, attributes)))
         end
 
         # Position is applied by renumbering the whole day rather than written as a
@@ -90,12 +91,22 @@ class Tectonic < Roda
         # that sets a percentage without clearing the pounds is refused rather than
         # written into a state the generator would have to guess its way out of.
         def self.check(lift, attributes)
-          ProgramWriter.check_load(merged(lift, attributes))
+          ProgramWriter.check_load(merged(lift, attributes), shape(lift, attributes))
         end
 
+        # The row as it will be, including how it is done. The three shape columns are
+        # spelled out rather than left to the movement's defaults, because this is an edit
+        # to a lift that has already answered them and an unrelated change must not quietly
+        # reset the answer to whatever the movement usually does.
         def self.merged(lift, attributes)
-          { sets: lift.sets, reps: lift.reps, top_weight: lift.top_weight,
-            percent_of_max: lift.percent_of_max }.merge(attributes)
+          { sets: lift.sets, reps: lift.reps, duration_seconds: lift.duration_seconds,
+            top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
+            is_weighted: lift.is_weighted, measure: lift.measure,
+            is_per_side: lift.is_per_side }.merge(attributes)
+        end
+
+        def self.shape(lift, attributes)
+          ProgramWriter.shape_of(merged(lift, attributes), lift.exercise)
         end
       end
     end

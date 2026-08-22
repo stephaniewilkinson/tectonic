@@ -47,20 +47,46 @@ class Tectonic < Roda
         # absolute weight and a percentage has no single reading, and one that is neither
         # cannot be generated at all.
         def load(attributes, exercise)
-          check_load(attributes)
-          { sets: attributes[:sets], reps: attributes[:reps], top_weight: attributes[:top_weight],
+          shape = shape_of(attributes, exercise)
+          check_load(attributes, shape)
+          { sets: attributes[:sets], top_weight: attributes[:top_weight],
             percent_of_max: attributes[:percent_of_max], note: attributes[:note],
-            progression: progression_for(attributes),
+            progression: progression_for(attributes, shape),
             is_main: attributes.fetch(:is_main, false),
-            is_barbell: barbell?(attributes, exercise) }
+            is_barbell: barbell?(attributes, exercise, shape) }.merge(shape)
         end
 
-        # Unloaded work is never on a bar, whatever the movement's own flag says, and that
-        # one line is what keeps a warmup ramp off it: `Warmup.ramp` returns nothing for
-        # work that is not barbell work. Without it a bodyweight lift flagged barbell drew
-        # a 45 lb ramp above its own weightless sets.
-        def barbell?(attributes, exercise)
-          return false if unloaded?(attributes)
+        # The three facts that say how a movement is done, each taken from the movement
+        # itself unless this prescription says otherwise. A block may want the dumbbell
+        # press done one arm at a time, or the plank held rather than counted, without
+        # changing what the movement usually is for every other block.
+        def shape_of(attributes, exercise)
+          measure = attributes.fetch(:measure, exercise.default_measure).to_s
+          { is_weighted: attributes.fetch(:is_weighted, exercise.default_is_weighted),
+            measure:,
+            is_per_side: attributes.fetch(:is_per_side, exercise.default_is_per_side),
+            **quantity(attributes, measure) }
+        end
+
+        # A rep count or a duration, never both: the measure names which one, and the
+        # column the other would go in stays empty.
+        #
+        # Read off the resolved measure rather than the argument, because a movement whose
+        # own default is time can be prescribed with a duration and nothing else -- asking
+        # the arguments would call that a rep-counted lift and then refuse it for having
+        # no reps.
+        def quantity(attributes, measure)
+          return { reps: nil, duration_seconds: attributes[:duration_seconds] } if measure == 'time'
+
+          { reps: attributes[:reps], duration_seconds: nil }
+        end
+
+        # Unweighted work is never on a bar, whatever the movement's own flag says, and
+        # that one line is what keeps a warmup ramp off it: `Warmup.ramp` returns nothing
+        # for work that is not barbell work. Without it a bodyweight lift flagged barbell
+        # drew a 45 lb ramp above its own weightless sets.
+        def barbell?(attributes, exercise, shape)
+          return false unless shape[:is_weighted]
 
           attributes.fetch(:is_barbell, exercise.barbell?)
         end
@@ -69,56 +95,64 @@ class Tectonic < Roda
         # never asked to state both and cannot state them inconsistently. A percentage is
         # read fresh from the estimated max each week and has therefore already moved by
         # whatever the lifting moved it; pounds are a starting point the rules step from.
-        # Unloaded work has no load to decide, so it steps nowhere.
-        # Without this a lift written as a percentage would take the column's default and
-        # be generated as though it had a weight to step off, which it has not.
-        def progression_for(attributes)
-          return 'unloaded' if unloaded?(attributes)
+        # Unweighted work has no load to decide, so it has no rule at all rather than a
+        # rule that means nothing.
+        def progression_for(attributes, shape)
+          return nil unless shape[:is_weighted]
 
           attributes[:percent_of_max] ? 'percent' : 'linear'
         end
 
-        def unloaded?(attributes)
-          attributes[:is_unloaded] == true
-        end
-
-        def check_load(attributes)
+        def check_load(attributes, shape)
           Bounds.check(Bounds::SETS, attributes[:sets], 'Sets')
-          Bounds.check(Bounds::REPS, attributes[:reps], 'Reps')
+          Bounds.check(Bounds::REPS, shape[:reps], 'Reps')
+          Bounds.check(Bounds::SECONDS, shape[:duration_seconds], 'Duration', unit: ' seconds')
           Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
           Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
-          check_unloaded(attributes)
-          check_priced(attributes)
+          check_measure(shape)
+          check_priced(attributes, shape)
         end
 
-        # Unloaded work carries no load of either kind. Calling it unloaded and then
-        # pricing it is two answers to one question, and the row would fail the database's
-        # own check anyway, so it is refused here where the message can name the field to
-        # drop.
-        def check_unloaded(attributes)
-          return unless unloaded?(attributes)
-          return if attributes[:top_weight].nil? && attributes[:percent_of_max].nil?
+        # A lift is counted one way or the other, and the way it is counted decides which
+        # quantity it needs. Asking for time without saying how long is a prescription
+        # nobody can follow.
+        def check_measure(shape)
+          timed = shape[:measure] == 'time'
+          unless %w[reps time].include?(shape[:measure])
+            raise Tool::Refusal, "Measure #{shape[:measure].inspect} is not one of reps or time."
+          end
+          return if timed ? shape[:duration_seconds] : shape[:reps]
 
-          raise Tool::Refusal, 'An unloaded lift carries no weight, so it cannot also have a ' \
-                               'top_weight or a percent_of_max. Drop the load, or drop is_unloaded.'
+          raise Tool::Refusal, timed ? 'A timed lift needs duration_seconds.' : 'A lift counted in reps needs reps.'
         end
 
-        # A written zero is the workaround this replaces, and it is not harmless: zero
-        # reads as a real starting load, gains an increment every week the lifter completes
-        # it, and three weeks later the app is prescribing a weighted plank.
-        def check_priced(attributes)
-          return if unloaded?(attributes)
+        # A written zero was the old workaround for bodyweight work, and it is not
+        # harmless: zero reads as a real starting load, gains an increment every week the
+        # lifter completes it, and three weeks later the app is prescribing a weighted
+        # plank.
+        def check_priced(attributes, shape)
+          return check_unweighted(attributes) unless shape[:is_weighted]
           raise Tool::Refusal, zero_message if attributes[:top_weight]&.zero?
           return if attributes[:top_weight].nil? ^ attributes[:percent_of_max].nil?
 
           raise Tool::Refusal, 'A lift needs exactly one of top_weight (pounds) or ' \
                                'percent_of_max (a percentage of the estimated max for that movement), ' \
-                               'or is_unloaded for work that carries no external load.'
+                               'unless is_weighted is false.'
+        end
+
+        # Unweighted work carries no load of either kind. Saying it is unweighted and then
+        # pricing it is two answers to one question, and the row would fail the database's
+        # own check anyway, so it is refused here where the message can name the field.
+        def check_unweighted(attributes)
+          return if attributes[:top_weight].nil? && attributes[:percent_of_max].nil?
+
+          raise Tool::Refusal, 'An unweighted lift carries no load, so it cannot also have a ' \
+                               'top_weight or a percent_of_max. Drop the load, or set is_weighted.'
         end
 
         def zero_message
           'A lift cannot weigh zero. For a plank, a band, or anything carrying no external ' \
-            'load, set is_unloaded instead.'
+            'load, set is_weighted to false instead.'
         end
 
         # Sunday is 0 through Saturday is 6, which is the numbering the rest of the app

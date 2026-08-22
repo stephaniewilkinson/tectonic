@@ -125,9 +125,11 @@ class Tectonic < Roda
     # actually does between weeks, so it is the one path worth making short.
     def update_lift(lift, attributes)
       written = symbolize(attributes)
-      MCP::Tools::ProgramWriter.check_load(merged(lift, written))
+      whole = merged(lift, written)
+      shape = MCP::Tools::ProgramWriter.shape_of(whole, lift.exercise)
+      MCP::Tools::ProgramWriter.check_load(whole, shape)
       lift.update(**written.slice(:sets, :reps, :top_weight, :percent_of_max, :note),
-                  progression: MCP::Tools::ProgramWriter.progression_for(merged(lift, written)))
+                  progression: MCP::Tools::ProgramWriter.progression_for(whole, shape))
       refresh_session(lift.program_day)
     end
 
@@ -152,8 +154,10 @@ class Tectonic < Roda
     # checked against -- an edit that sets a percentage without clearing the pounds is
     # refused rather than written into a state the generator cannot read.
     def merged(lift, attributes)
-      { sets: lift.sets, reps: lift.reps, top_weight: lift.top_weight,
-        percent_of_max: lift.percent_of_max }.merge(attributes)
+      { sets: lift.sets, reps: lift.reps, duration_seconds: lift.duration_seconds,
+        top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
+        is_weighted: lift.is_weighted, measure: lift.measure,
+        is_per_side: lift.is_per_side }.merge(attributes)
     end
 
     # Form values arrive as strings keyed by strings; blank means "not given" rather than

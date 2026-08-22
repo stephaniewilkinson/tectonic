@@ -26,10 +26,11 @@ class Tectonic < Roda
           properties: {
             exercise: { type: 'string' }, sets: { type: 'integer' }, reps: { type: 'integer' },
             top_weight: { type: 'integer' }, percent_of_max: { type: 'integer' },
-            is_unloaded: { type: 'boolean' },
+            is_weighted: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
+            is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             is_main: { type: 'boolean' }, is_barbell: { type: 'boolean' }, note: { type: 'string' }
           },
-          required: %w[exercise sets reps], additionalProperties: false
+          required: %w[exercise sets], additionalProperties: false
         }.freeze
         DAY = {
           type: 'object',
@@ -48,7 +49,8 @@ class Tectonic < Roda
         description 'Write a whole training block: its weeks, the days in each week (0 is ' \
                     'Sunday, 6 is Saturday) and the lifts of each day, in one call. Each ' \
                     'lift gives either top_weight in pounds or percent_of_max, or ' \
-                    'is_unloaded for work carrying no external load. start_date ' \
+                    'is_weighted false for work carrying no external load; measure is ' \
+                    'reps or time, and a timed lift gives duration_seconds. start_date ' \
                     'defaults to the Monday of the current week; weeks are numbered by ' \
                     'their position unless numbered explicitly.'
         scope :write

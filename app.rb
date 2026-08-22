@@ -614,9 +614,15 @@ class Tectonic < Roda
   # the workaround this replaced and read as a mistake, and an empty cell where a number
   # belongs reads as missing data rather than as the movement being the load.
   def load_label(set)
-    return "#{set[:reps]} reps" unless set[:weight]
+    "#{"#{set[:weight]} &times; " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+  end
 
-    "#{set[:weight]} &times; #{set[:reps]}"
+  # What a set counts. Seconds read as a duration rather than as a rep count, because
+  # "60 reps" of a plank is not what anybody held.
+  def quantity_label(set)
+    return "#{set[:duration_seconds]}s" if set[:duration_seconds]
+
+    set[:weight] ? set[:reps].to_s : "#{set[:reps]} reps"
   end
 
   # The heaviest a lift was taken on each day it was recorded, oldest day first, which

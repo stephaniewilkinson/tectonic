@@ -44,9 +44,16 @@ module VolumeData
     at = Time.new(on.year, on.month, on.day, 18, 0)
     workout_id = DB[:workouts].where(account_id:, date: at).get(:id) ||
                  DB[:workouts].insert(account_id:, date: at)
-    DB[:sets].insert(workout_id:, exercise_id:, weight:, reps:,
-                     is_warmup: flags.fetch(:is_warmup, false),
-                     is_completed: flags.fetch(:is_completed, true))
+    DB[:sets].insert(workout_id:, exercise_id:, weight:, reps:, **shape(flags))
+  end
+
+  # The flags a set carries beyond its load, defaulted here so a spec states only the one
+  # it is about.
+  def shape(flags)
+    { measure: flags.fetch(:measure, 'reps'), duration_seconds: flags[:duration_seconds],
+      is_per_side: flags.fetch(:is_per_side, false),
+      is_warmup: flags.fetch(:is_warmup, false),
+      is_completed: flags.fetch(:is_completed, true) }
   end
 
   def totals_of(rows)
@@ -103,6 +110,45 @@ describe 'what counts as work' do
     log_set lift, weight: 900, reps: 5, on: monday(0), is_completed: nil
 
     assert_equal({ sets: 1, reps: 5, tonnage: 500 }, last_week_of(@account_id))
+  end
+end
+
+# A count taken per side is half the work that happened: 3x8 per side is 48 reps of work,
+# not 24. Summing the stored number is what made unilateral training read as half itself.
+describe 'work counted per side' do
+  include Rack::Test::Methods
+  include VolumeData
+
+  it 'counts the reps that were actually done' do
+    sign_in
+    log_set a_lift, weight: 50, reps: 8, on: monday(0), is_per_side: true
+
+    assert_equal({ sets: 1, reps: 16, tonnage: 800 }, last_week_of(@account_id))
+  end
+
+  it 'leaves a two-sided count alone' do
+    sign_in
+    log_set a_lift, weight: 50, reps: 8, on: monday(0)
+
+    assert_equal({ sets: 1, reps: 8, tonnage: 400 }, last_week_of(@account_id))
+  end
+end
+
+# A plank and a set of squats are both training and neither converts into the other, so
+# seconds are summed apart from reps rather than added into them.
+describe 'work counted in time' do
+  include Rack::Test::Methods
+  include VolumeData
+
+  it 'contributes its seconds, and no reps or tonnage' do
+    sign_in
+    log_set a_lift, on: monday(0), measure: 'time', duration_seconds: 60, reps: nil, weight: nil
+
+    week = Tectonic::Volume.weekly(@account_id).last
+
+    assert_equal 60, week[:seconds]
+    assert_nil week[:reps]
+    assert_nil week[:tonnage]
   end
 end
 
