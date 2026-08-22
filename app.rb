@@ -60,7 +60,12 @@ class Tectonic < Roda
   Chartkick.options = { colors: [CHART_COLORS.first], height: '260px',
                         library: { scales: { y: { ticks: { precision: 0 } } } } }
 
-  plugin :assets, css: ['tailwind.css', 'styles.css']
+  # Only the app's own styles. A full, unpurged Tailwind v2 build used to sit beside them
+  # -- 3.82 MB, uncompressed, on every page load -- while the v3 CDN below did the actual
+  # layout. It was not even a fallback: utilities the views rely on, min-h-20 among them,
+  # do not exist in v2, so the page was already depending on the CDN. Two major versions
+  # of the same framework, and the larger one styling nothing.
+  plugin :assets, css: ['styles.css']
   # frame-ancestors keeps every page out of a third party's iframe, the OAuth consent
   # screen most of all: it is the one page where a click grants an API client access to
   # the account, so it is the one worth framing over a decoy. base-uri and object-src
