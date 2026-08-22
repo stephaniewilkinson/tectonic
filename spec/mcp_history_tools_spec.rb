@@ -45,6 +45,78 @@ describe 'get_workout' do
   end
 end
 
+# The sets have always been in structuredContent. Many clients render only the text, and
+# a tool whose own description promises the sets and then prints a count reads as broken.
+describe 'get_workout in the text a client renders' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: ['read'])
+    @exercise = account_lift(@token.account_id)
+    @workout = planned_session(@token.account_id, Date.new(2027, 2, 1), @exercise, lifted: 185)
+    @workout.update(rpe: 9)
+  end
+
+  def text
+    tool_result['content'].first['text']
+  end
+
+  it 'writes a line per set rather than a count' do
+    call_tool('get_workout', raw: @token.raw, arguments: { workout_id: @workout.id })
+
+    assert_equal 3, text.lines.length
+    assert_includes text, "#{@exercise.name} 185x5"
+    assert_includes text, "#{@exercise.name} 45x5"
+  end
+
+  # 185 was lifted where 155 was written, and that gap is the whole reason both are kept.
+  it 'shows the prescription where it disagrees with what was lifted' do
+    call_tool('get_workout', raw: @token.raw, arguments: { workout_id: @workout.id })
+
+    assert_includes text, '(planned 155x5)'
+  end
+end
+
+# A ramp counted as working sets inflates every volume figure read off this, so the text
+# has to carry the flags the prose used to throw away.
+describe 'get_workout on the flags a prose summary drops' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: ['read'])
+    @workout = planned_session(@token.account_id, Date.new(2027, 2, 1), account_lift(@token.account_id), lifted: 185)
+    @workout.update(rpe: 9)
+    call_tool('get_workout', raw: @token.raw, arguments: { workout_id: @workout.id })
+  end
+
+  it 'marks the warmup, the completion and both ratings' do
+    text = tool_result['content'].first['text']
+
+    assert_includes text, 'warmup'
+    assert_includes text, 'not done'
+    assert_includes text, 'RPE 8'
+    assert_includes text, 'session RPE 9'
+  end
+end
+
+# On a session lifted exactly as written the prescription is the same numbers twice.
+describe 'get_workout on a session lifted as written' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: ['read'])
+    @workout = planned_session(@token.account_id, Date.new(2027, 3, 1), account_lift(@token.account_id))
+  end
+
+  # Matched on the bracket rather than the word, because an untrained session is itself
+  # described as "planned" in the opening line.
+  it 'stays quiet about the prescription' do
+    call_tool('get_workout', raw: @token.raw, arguments: { workout_id: @workout.id })
+
+    refute_includes tool_result['content'].first['text'], '(planned'
+  end
+end
+
 describe 'get_workout by date' do
   include Rack::Test::Methods
 

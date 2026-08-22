@@ -29,8 +29,37 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           workout = find(context, arguments)
           detail = Presenter.view_workout_detail(workout)
-          ok("#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
-             "#{detail[:status]}.", structured: detail)
+          ok([headline(detail), *detail[:sets].map { |set| line(set) }].join("\n"), structured: detail)
+        end
+
+        # The sets have always been in structuredContent, and a client that reads it needs
+        # none of this. But plenty of clients surface only the text, and this tool answered
+        # "how did Monday go" with a count -- promising the sets in its own description and
+        # then printing a summary, which reads as the tool being broken rather than as the
+        # client showing one field of the two it was sent.
+        def self.headline(detail)
+          "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
+            "#{detail[:status]}#{", session RPE #{detail[:rpe]}" if detail[:rpe]}."
+        end
+
+        # One set: what was on the bar, what was asked for when that differs, and how it
+        # went. A warmup says so, because a ramp counted as working sets inflates the
+        # volume of every session read off this.
+        def self.line(set)
+          parts = ["  #{set[:exercise]} #{set[:weight]}x#{set[:reps]}"]
+          parts << "(planned #{set[:planned_weight]}x#{set[:planned_reps]})" if revised?(set)
+          parts << 'warmup' if set[:is_warmup]
+          parts << (set[:is_completed] ? 'done' : 'not done')
+          parts << "RPE #{set[:rpe]}" if set[:rpe]
+          parts.join(' ')
+        end
+
+        # Only worth printing where the prescription and the performance disagree; on a
+        # session lifted as written it is the same two numbers twice.
+        def self.revised?(set)
+          return false unless set[:planned_weight] || set[:planned_reps]
+
+          set[:planned_weight] != set[:weight] || set[:planned_reps] != set[:reps]
         end
 
         # By id when given one, otherwise by date, which defaults to today. A day that was
