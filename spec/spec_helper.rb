@@ -27,11 +27,24 @@ Capybara.register_driver :firefox do |app|
   Capybara::Selenium::Driver.new app, browser: :firefox
 end
 
+# The headless one is now actually headless. It was registered as a byte-for-byte copy of
+# the driver above, so the name promised a window would not open and then opened one, and
+# anybody reaching for it to quieten a run found it did nothing.
 Capybara.register_driver :headless_firefox do |app|
-  Capybara::Selenium::Driver.new app, browser: :firefox
+  # Required here rather than at the top of the file so a run that never asks for a
+  # browser never loads selenium at all. capybara-selenium defers it too, which is why
+  # naming Selenium::WebDriver in this block without the require raised NameError while
+  # the driver above, which only ever calls into Capybara, did not.
+  require 'selenium/webdriver'
+  options = Selenium::WebDriver::Firefox::Options.new
+  options.add_argument('-headless')
+  Capybara::Selenium::Driver.new(app, browser: :firefox, options:)
 end
 
-Capybara.javascript_driver = :firefox
+# HEADED=1 puts the window back, which is the only way to watch a spec argue with the
+# session screen. Everything else runs with no window, including CI, which never had a
+# display to open one on in the first place.
+Capybara.javascript_driver = ENV['HEADED'] ? :firefox : :headless_firefox
 
 # No port is named, so Capybara takes a free one for the run and every visit is
 # relative to the server it started. Pinning 9292 here, and repeating it in app_host,
@@ -41,6 +54,34 @@ Capybara.javascript_driver = :firefox
 Capybara.configure do |config|
   config.server = :puma
   config.run_server = true
-  config.default_driver = :firefox
+  # rack_test rather than a browser, because most of what these specs do is fill a form
+  # and read the markup that comes back, and none of that needs a rendering engine. It
+  # runs in this process: no Selenium, no driver binary, no port, no window. A browser
+  # starts for the specs that genuinely need one and those say so, by assigning
+  # javascript_driver at the top of the describe -- which is the whole list of places in
+  # this suite where JavaScript is load-bearing.
+  config.default_driver = :rack_test
+end
+
+# A describe that genuinely needs a rendering engine says so by including this. It names
+# the driver by role rather than by name, so the HEADED switch above reaches every one of
+# them and no spec hard-codes :firefox; and it puts the default back afterwards, because
+# current_driver is global and a describe that left the browser selected would hand it to
+# whichever file the seed happened to order next.
+#
+# The list of includers is the honest answer to "where is JavaScript load-bearing here":
+# the session screen and its swipe strip, which htmx swaps under; the sign-up walk in
+# system_spec; the escaping specs, which have to ask a real parser whether a name became
+# an element; and the two block-editor specs that measure geometry.
+module BrowserSpec
+  def before_setup
+    super
+    Capybara.current_driver = Capybara.javascript_driver
+  end
+
+  def after_teardown
+    Capybara.use_default_driver
+    super
+  end
 end
 

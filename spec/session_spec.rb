@@ -35,6 +35,7 @@ end
 describe 'the session view' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
 
   it 'marks a set done in place with htmx, without reloading' do
     sign_up_for_session
@@ -57,6 +58,7 @@ end
 describe 'revising a set in the session' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
 
   it 'records the weight actually lifted and marks the set done' do
     sign_up_for_session
@@ -83,6 +85,7 @@ end
 describe 'a weight that is not on the five pound grid' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
 
   # A step is counted from a step base, which with no min attribute is the input's own
   # value. The new-set form counted fives from zero and refused 138 outright; the session
@@ -110,6 +113,7 @@ end
 describe 'a warmup taken differently from the ramp' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
 
   # The ramp is computed from a percentage of the top set, and a warmup row used to carry
   # Done and nothing else -- so a lifter who started on a lighter bar left the session

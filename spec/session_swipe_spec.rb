@@ -95,6 +95,7 @@ end
 describe 'the lifts of a session on a phone' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
   include SwipedPanels
 
   before { open_session(500, 800) }
@@ -118,6 +119,7 @@ end
 describe 'swiping from one lift to the next' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
   include SwipedPanels
 
   before { open_session(500, 800) }
@@ -148,6 +150,7 @@ end
 describe 'completing a set on a lift you swiped to' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
   include SwipedPanels
 
   before { open_session(500, 800, lifts: 4) }
@@ -171,6 +174,7 @@ end
 describe 'the same session on a desktop' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
   include SwipedPanels
 
   before { open_session(1024, 900) }
