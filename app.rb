@@ -667,6 +667,20 @@ class Tectonic < Roda
     equipment.label(set[:weight])
   end
 
+  # A yes-or-no fact about a set, as a box that is ticked or left empty. The workout
+  # record asks two of them side by side, under headings that are already questions, and
+  # the words that used to answer them answered different questions in the same column:
+  # "Warmup set" against "No", a tick against "Incomplete". Neither pair can be scanned
+  # down a column the way two boxes can, and neither says which state is the plain one.
+  #
+  # The glyph is hidden from a screen reader and the answer spelled out beside it: an
+  # empty box means nothing read aloud on its own, and "ballot box" is what a reader
+  # otherwise announces for the one that matters least.
+  def ticked(flag, question)
+    "<span aria-hidden=\"true\">#{flag ? '&#9745;' : '&#9744;'}</span>" \
+      "<span class=\"sr-only\">#{h(flag ? question : "not #{question}")}</span>"
+  end
+
   # A set's prescription, as one phrase. Work carrying no external load has no weight
   # rather than a weight of zero, so there is nothing to put before the reps: "0 × 10" was
   # the workaround this replaced and read as a mistake, and an empty cell where a number
