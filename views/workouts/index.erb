@@ -13,8 +13,8 @@
       account that has never generated a week sees the list it always saw. %>
   <%- unless @upcoming.empty? %>
     <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Upcoming</h2>
-    <%= render('workouts/_table', locals: { workouts: @upcoming }) %>
+    <%== render('workouts/_table', locals: { workouts: @upcoming }) %>
     <h2 class="mt-10 text-sm font-semibold uppercase tracking-wide text-gray-500">History</h2>
   <%- end %>
-  <%= render('workouts/_table', locals: { workouts: @workouts }) %>
+  <%== render('workouts/_table', locals: { workouts: @workouts }) %>
 </div>

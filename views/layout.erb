@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <%= assets(:css) %>
-    <%= assets(:img) %>
+    <%== assets(:css) %>
+    <%== assets(:img) %>
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- HTML Meta Tags -->
@@ -46,10 +46,10 @@
     <script src="/js/htmx.min.js"></script>
   </head>
   <body>
-  <%= render('nav') %>
+  <%== render('nav') %>
     <main>
       <div class="max-w-5xl mx-auto px-4">
-        <%= yield %>
+        <%== yield %>
       </div>
     </main>
   </body>
