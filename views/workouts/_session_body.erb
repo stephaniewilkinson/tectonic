@@ -18,19 +18,28 @@
       <%= @exercises[lift.first[:exercise_id]]&.name %>
     </h2>
 
+    <%# Small caps in gray-500 is this screen's label register -- Warmup, RPE and Plate
+        math all wear it, so that a label is always recognisable as one and never as a
+        value. It was gray-400, which is 2.54:1 on white; a line nobody can read at
+        arm's length with a bar in their hands may as well not be on the screen. %>
     <%- unless lift.select { |set| set[:is_warmup] }.empty? %>
-      <p class="mt-2 text-xs uppercase tracking-wide text-gray-400">Warmup</p>
+      <p class="mt-2 text-xs uppercase tracking-wide text-gray-500">Warmup</p>
     <%- end %>
-    <ul class="opacity-75">
+    <%# A warmup is played down by being smaller, not by being faded. The list carried
+        opacity-75, which would take the Done button on it to 4.24:1 against 7.56:1 at
+        full strength -- a washed-out control, which is what a disabled one looks like,
+        on the button that is the first thing anybody taps in a session. %>
+    <ul>
       <%- lift.select { |set| set[:is_warmup] }.each do |set| %>
         <li class="mt-1 flex justify-between gap-3 rounded-lg border px-3 py-2 <%= row_style(set) %>">
           <div>
             <span class="text-lg text-gray-900">
               <%= load_label(set) %>
             </span>
-            <%- unless plate_label(set).empty? %>
+            <%- if set[:is_barbell] %>
               <span class="ml-2 text-xs text-gray-500">
-                per side <%= plate_label(set) %>
+                <span class="uppercase tracking-wide">Plate math</span>
+                <%= plate_label(set) %>
               </span>
             <%- end %>
           </div>
@@ -38,7 +47,7 @@
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 hx-target="#session-body" hx-swap="innerHTML">
             <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-            <button type="submit" class="min-h-11 rounded-lg bg-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-300">
+            <button type="submit" class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
               <%= set[:is_completed] ? 'Undo' : 'Done' %>
             </button>
           </form>
@@ -54,9 +63,13 @@
               <span class="text-2xl font-semibold text-gray-900">
                 <%= load_label(set) %>
               </span>
-              <%- unless plate_label(set).empty? %>
+              <%# Same words and same treatment as the warmup rows above: a warmup and a
+                  working set are loaded off the same rack, so the line that says how is
+                  not allowed to be a different thing in the two places. %>
+              <%- if set[:is_barbell] %>
                 <div class="text-xs text-gray-500">
-                  per side <%= plate_label(set) %>
+                  <span class="uppercase tracking-wide">Plate math</span>
+                  <%= plate_label(set) %>
                 </div>
               <%- end %>
               <%- if set[:is_completed] && changed_from_plan?(set) %>
@@ -69,7 +82,8 @@
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML">
               <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-              <button type="submit" class="rounded-xl bg-lime-500 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-gray-500">
+              <button type="submit"
+                      class="rounded-xl border px-5 py-3 text-base font-semibold shadow-sm <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
               </button>
             </form>
@@ -83,7 +97,7 @@
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
             <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-            <span class="mr-1 text-xs uppercase tracking-wide text-gray-400">RPE</span>
+            <span class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
             <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
                 row rather than leaving dead space, so the targets are as wide as the
                 screen allows; min-h-12 is 48px, which clears the 44px minimum. %>
@@ -108,7 +122,12 @@
                 Reps
                 <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
               </label>
-              <button type="submit" class="rounded-lg bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-lime-500">
+              <%# Saving an edit is the same kind of thing as tapping Done -- an action,
+                  not a state -- so it wears the same fill. Its hover used to jump to
+                  lime-500, which turned a blue button green under the thumb and said the
+                  set was done before it was. %>
+              <button type="submit"
+                      class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
                 Save
               </button>
             </form>
