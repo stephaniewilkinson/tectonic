@@ -7,7 +7,7 @@ require 'securerandom'
 require 'date'
 
 # The grid is a module so the month arithmetic can be asserted without a browser: whole
-# weeks, Monday first, and the neighbouring days drawn but marked as outside the month.
+# weeks, Sunday first, and the neighbouring days drawn but marked as outside the month.
 # The status a cell carries is the one a workout already answers with, so what matters
 # here is that the calendar reads it rather than inventing a second set of rules.
 module CalendarData
@@ -60,27 +60,79 @@ describe 'the calendar grid' do
   include Rack::Test::Methods
   include CalendarData
 
-  # Whole weeks, so every row has seven days and the grid is rectangular.
-  it 'covers the month in whole weeks beginning on Monday' do
+  # Whole weeks, so every row has seven days and the grid is rectangular. wday 0 is
+  # Sunday and 6 is Saturday, which is the pair the header labels are printed in.
+  it 'covers the month in whole weeks beginning on Sunday' do
     sign_in
-    weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 2, 1))
+    weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 8, 1))
 
     assert(weeks.all? { |week| week.length == 7 })
-    assert_equal 1, weeks.first.first[:date].wday
-    assert_equal 0, weeks.last.last[:date].wday
-    assert_includes cells(weeks).map { |cell| cell[:date] }, Date.new(2026, 2, 1)
-    assert_includes cells(weeks).map { |cell| cell[:date] }, Date.new(2026, 2, 28)
+    assert_equal 0, weeks.first.first[:date].wday
+    assert_equal 6, weeks.last.last[:date].wday
+    assert_includes cells(weeks).map { |cell| cell[:date] }, Date.new(2026, 8, 1)
+    assert_includes cells(weeks).map { |cell| cell[:date] }, Date.new(2026, 8, 31)
   end
 
-  # February 2026 begins on a Sunday, so the first row is almost all January. Those days
-  # are drawn rather than blanked, or a week that straddles the boundary stops reading
-  # as a week, but they are marked so the month still stands out.
+  # The labels are what the columns are read by, so they have to be in the order the days
+  # come out in rather than merely be the seven names.
+  it 'labels the columns in the order the days fall' do
+    sign_in
+    weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 8, 1))
+    labels = weeks.first.map { |cell| cell[:date].strftime('%a') }
+
+    assert_equal Tectonic::Calendar::DAY_NAMES, labels
+  end
+
+  # August 2026 begins on a Saturday, so the first row is almost all July. Those days are
+  # drawn rather than blanked, or a week that straddles the boundary stops reading as a
+  # week, but they are marked so the month still stands out.
   it 'draws the neighbouring days but marks them as outside the month' do
+    sign_in
+    weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 8, 1))
+
+    refute cell_on(weeks, Date.new(2026, 7, 31))[:in_month]
+    assert cell_on(weeks, Date.new(2026, 8, 1))[:in_month]
+  end
+end
+
+# `weeks` slices the range by seven and trusts `bounds` to have returned a whole number of
+# them. The months that would show that trust misplaced are the ones already flush with a
+# week at one end or both, where the grid has nothing to add there and an off-by-one has
+# nowhere to hide but the last row.
+describe 'a month already flush with the week' do
+  include Rack::Test::Methods
+  include CalendarData
+
+  # February 2026 opens on a Sunday and closes on a Saturday: four rows, and not one day
+  # of January or March in the grid.
+  it 'adds nothing to a month that starts on Sunday and ends on Saturday' do
     sign_in
     weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 2, 1))
 
-    refute cell_on(weeks, Date.new(2026, 1, 30))[:in_month]
-    assert cell_on(weeks, Date.new(2026, 2, 1))[:in_month]
+    assert_equal 4, weeks.length
+    assert_equal Date.new(2026, 2, 1), weeks.first.first[:date]
+    assert_equal Date.new(2026, 2, 28), weeks.last.last[:date]
+    assert(cells(weeks).all? { |cell| cell[:in_month] })
+  end
+
+  # March 2026 opens on a Sunday and closes on a Tuesday, so it spills forward only.
+  it 'spills forward from a month that starts on Sunday' do
+    sign_in
+    weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 3, 1))
+
+    assert_equal 5, weeks.length
+    assert_equal Date.new(2026, 3, 1), weeks.first.first[:date]
+    assert_equal Date.new(2026, 4, 4), weeks.last.last[:date]
+  end
+
+  # October 2026 is the mirror: it opens on a Thursday and closes on a Saturday.
+  it 'spills backward from a month that ends on Saturday' do
+    sign_in
+    weeks = Tectonic::Calendar.weeks(@account_id, Date.new(2026, 10, 1))
+
+    assert_equal 5, weeks.length
+    assert_equal Date.new(2026, 9, 27), weeks.first.first[:date]
+    assert_equal Date.new(2026, 10, 31), weeks.last.last[:date]
   end
 end
 
@@ -212,6 +264,24 @@ describe 'the home page' do
     get '/'
 
     assert_equal 302, last_response.status
+  end
+end
+
+describe 'an entry with only its colour showing' do
+  include Rack::Test::Methods
+  include CalendarData
+
+  # Seven columns at phone width leave no room for the word, so below sm the tint is the
+  # whole of what is drawn. The word has to survive somewhere a screen reader still finds
+  # it: the title attribute this replaced was never reachable by a thumb, and deleting the
+  # word outright would leave the link with nothing to be announced as but its href.
+  it 'keeps the word in the markup for a reader that cannot see the colour' do
+    sign_in
+    a_workout(on: Date.today, lifted: true)
+
+    get '/'
+
+    assert_includes last_response.body, '<span class="sr-only sm:not-sr-only">trained</span>'
   end
 end
 

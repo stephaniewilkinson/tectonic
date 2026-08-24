@@ -8,13 +8,17 @@
   </div>
 
   <div class="mt-8 flex items-center justify-between">
+    <%# Paging a month is the one thing this page is tapped for, and at 51x28 it was the
+        smallest target on it. min-h-11 is the 44px a thumb is aimed at; px-3 buys eight
+        more across, which is what an arrow and three characters of a month name need to
+        clear 44 on that axis too without the two of them closing on the heading. %>
     <a href="/?month=<%= @previous.strftime('%Y-%m') %>" rel="prev"
-       class="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+       class="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
       &larr; <%= @previous.strftime('%b') %>
     </a>
     <h2 class="text-lg font-semibold text-gray-900"><%= @month.strftime('%B %Y') %></h2>
     <a href="/?month=<%= @following.strftime('%Y-%m') %>" rel="next"
-       class="rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100">
+       class="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
       <%= @following.strftime('%b') %> &rarr;
     </a>
   </div>
@@ -48,11 +52,21 @@
           </div>
           <%# Performed, planned and skipped are the words a workout already answers
               with. Skipped is the one a list cannot show: a missed session is simply
-              absent there, and seeing the hole is the point of a calendar. %>
+              absent there, and seeing the hole is the point of a calendar.
+
+              "planned" is forty-six pixels of text at text-xs, and a seventh of a phone
+              screen does not leave that much inside a cell -- at 375px it leaves about
+              thirty -- so below sm the tint is the whole of what is drawn and the legend
+              underneath is the key to it. The word stays in the markup rather than being
+              dropped: sr-only keeps it in the accessibility tree at every width, which
+              the title attribute it replaces could not do, because a title has no way of
+              being reached by a thumb. Nothing else is inside the link on a phone, so
+              min-h-11 is what holds it open to a thumb. %>
           <%- Tectonic::Calendar.entries(cell[:workouts]).each do |entry| %>
-            <a href="/workouts/<%= entry[:id] %>" title="<%= entry[:status] %>"
-               class="mt-1 block truncate rounded px-1 py-0.5 text-xs font-medium <%= entry[:style] %>">
-              <%= entry[:word] %>
+            <a href="/workouts/<%= entry[:id] %>"
+               class="mt-1 flex min-h-11 items-center justify-center rounded px-1 text-xs
+                      font-medium sm:min-h-6 <%= entry[:style] %>">
+              <span class="sr-only sm:not-sr-only"><%= entry[:word] %></span>
             </a>
           <%- end %>
         </div>
@@ -60,9 +74,19 @@
     <%- end %>
   </div>
 
+  <%# On a phone this is now the key to the grid rather than a footnote to it, so each
+      swatch is the chip: the same tint, the same rounded rectangle, at a size that can be
+      told apart from the two beside it. The saturated dots it replaces were a colour that
+      appeared nowhere in the calendar they were meant to explain. %>
   <div class="mt-3 flex flex-wrap justify-center gap-4 text-xs text-gray-500">
-    <span><span class="mr-1 inline-block h-2 w-2 rounded-full bg-lime-500"></span>trained</span>
-    <span><span class="mr-1 inline-block h-2 w-2 rounded-full bg-sky-500"></span>planned</span>
-    <span><span class="mr-1 inline-block h-2 w-2 rounded-full bg-rose-500"></span>missed</span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-4 w-6 rounded bg-lime-100 ring-1 ring-inset ring-lime-800/25"></span>trained
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-4 w-6 rounded bg-sky-100 ring-1 ring-inset ring-sky-800/25"></span>planned
+    </span>
+    <span class="flex items-center gap-1.5">
+      <span class="inline-block h-4 w-6 rounded bg-rose-100 ring-1 ring-inset ring-rose-800/25"></span>missed
+    </span>
   </div>
 </div>
