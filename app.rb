@@ -507,10 +507,7 @@ class Tectonic < Roda
             r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
           end
           r.get do
-            # Insertion order is program order: warmups then working sets, lift by
-            # lift in the position the program gave them.
-            @sets = Set.where(workout_id:).order(:id).all
-            @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+            load_session(workout_id)
             view 'workouts/session'
           end
         end
@@ -585,9 +582,21 @@ class Tectonic < Roda
   # buttons -- rendered without the layout so htmx can drop it into #session-body
   # after each tap. Without JS the routes redirect and the full page reloads.
   def session_body(workout_id)
+    load_session(workout_id)
+    render('workouts/_session_body')
+  end
+
+  # What the session screen draws, loaded the one way for both of the places that draw it.
+  # Insertion order is program order: warmups then working sets, lift by lift in the
+  # position the program gave them, so a run of neighbouring rows sharing an exercise is
+  # one lift and not a coincidence. Grouping happens here rather than in the template
+  # because the template now needs the count as well as the groups -- a panel says which
+  # of how many it is -- and counting a chunk_while enumerator twice would walk the sets
+  # twice to answer a question the view asks on every row.
+  def load_session(workout_id)
     @sets = Set.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)
-    render('workouts/_session_body')
+    @lifts = @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.to_a
   end
 
   # A set is only reachable through a workout the logged in account owns, so a set

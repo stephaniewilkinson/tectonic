@@ -1,6 +1,21 @@
 <%# The swappable core of the session view. Every form posts with htmx targeting
     #session-body, so a tap re-renders progress, the set row, and the RPE state
-    together; without JS the same forms post normally and the route redirects. %>
+    together; without JS the same forms post normally and the route redirects.
+
+    Below the progress bar the lifts are a row of panels one screen wide, swiped between
+    rather than scrolled past: five lifts and twenty sets stacked vertically meant that
+    finding the lift you are on took scrolling through the four you are not. The swipe is
+    CSS and nothing else -- overflow-x-auto with scroll-snap on the strip, snap-center on
+    each panel -- which is what makes it worth doing at all. A gesture handler would have
+    to be re-attached after every one of these swaps, and the day it silently failed to be
+    would be a day somebody was under a bar. What restores the strip's scroll offset after
+    a swap is two attributes in views/workouts/session.erb, on the one element out here
+    that htmx never replaces; the argument is written up there.
+
+    The whole thing is the phone treatment and stops at 640px. From sm: up the strip is a
+    plain block and the panels stack exactly as they did before, because a swipe is a
+    thumb gesture with no mouse equivalent -- a wheel does nothing to a horizontal
+    scroller -- and vertical room is the thing a desktop has and a phone does not. %>
 <div class="sticky top-0 bg-gray-100 py-2">
   <div class="flex gap-0.5" aria-label="Session progress">
     <%- @sets.each do |set| %>
@@ -12,195 +27,244 @@
   </p>
 </div>
 
-<%- @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.each do |lift| %>
-  <section class="mt-6">
-    <h2 class="text-xl text-gray-900">
-      <%= @exercises[lift.first[:exercise_id]]&.name %>
-    </h2>
+<%# A swipe surface nobody is told about is worse than the scroll it replaced, so the
+    session says how many lifts it holds before anybody touches it. The dots are links to
+    the panels and not a decoration: they are how the lift you want is reached with a
+    mouse, with a keyboard, or by a lifter who does not think to swipe, and following one
+    scrolls the strip because the browser scrolls the nearest scrollable ancestor.
 
-    <%# Small caps in gray-500 is this screen's label register -- Warmup, RPE and Plate
-        math all wear it, so that a label is always recognisable as one and never as a
-        value. It was gray-400, which is 2.54:1 on white; a line nobody can read at
-        arm's length with a bar in their hands may as well not be on the screen. %>
-    <%- unless lift.select { |set| set[:is_warmup] }.empty? %>
-      <p class="mt-2 text-xs uppercase tracking-wide text-gray-500">Warmup</p>
+    Which dot is the current one is not marked, because nothing here could keep that
+    honest -- CSS cannot read a scroll offset, and the alternative is the JS this screen
+    is built to avoid. The panel says where it is instead, in its own heading, where it is
+    rendered by the same pass that rendered the lift and so cannot disagree with it. %>
+<%- if @lifts.length > 1 %>
+  <nav class="mt-2 flex justify-center gap-1 sm:hidden" aria-label="Lifts in this session">
+    <%- @lifts.each_with_index do |lift, index| %>
+      <a href="#lift-<%= index + 1 %>" class="flex min-h-11 items-center px-2">
+        <span class="block h-2 w-2 rounded-full bg-gray-400"></span>
+        <span class="sr-only">
+          <%= @exercises[lift.first[:exercise_id]]&.name %>, lift <%= index + 1 %> of <%= @lifts.length %>
+        </span>
+      </a>
     <%- end %>
-    <%# A warmup is played down by being smaller, not by being faded. The list carried
-        opacity-75, which would take the Done button on it to 4.24:1 against 7.56:1 at
-        full strength -- a washed-out control, which is what a disabled one looks like,
-        on the button that is the first thing anybody taps in a session. %>
-    <ul>
-      <%- lift.select { |set| set[:is_warmup] }.each do |set| %>
-        <li class="mt-1 rounded-lg border px-3 py-2 <%= row_style(set) %>">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <span class="text-lg text-gray-900">
-                <%= load_label(set) %>
-              </span>
-              <%- if set[:is_barbell] %>
-                <span class="ml-2 text-xs text-gray-500">
-                  <span class="uppercase tracking-wide">Plate math</span>
-                  <%= plate_label(set) %>
-                </span>
-              <%- end %>
-              <%- if set[:is_completed] && changed_from_plan?(set) %>
-                <div class="text-xs text-amber-700">
-                  planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
-                </div>
-              <%- end %>
-            </div>
-            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
-                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                  hx-target="#session-body" hx-swap="innerHTML">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-              <button type="submit" class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
-                <%= set[:is_completed] ? 'Undo' : 'Done' %>
-              </button>
-            </form>
-          </div>
-
-          <%# A warmup used to offer Done and nothing else, so a ramp taken differently could
-              not be said. That is not a small gap: the ramp is computed from a percentage of
-              the top set, and a lifter who adds a step, starts on a 35 lb bar, or finds 115
-              heavy and repeats it leaves the session claiming a ramp nobody lifted. row_style
-              and changed_from_plan? were already willing to tint such a row amber -- the
-              generator writes planned_weight and planned_reps for warmups exactly as it does
-              for working sets -- and there was simply no way to make one.
-
-              The disclosure is the working set's, down to the wording, because a warmup and a
-              working set are the same act at different weights and learning two habits for it
-              is one too many. Closed it stays as quiet as the old row was. The boxes inside
-              are the working set's size too: the rule above is that a warmup is played down
-              by being smaller, but it applies to what is read, not to what is typed one
-              handed with chalk on.
-
-              No RPE row here, though every working set has one. A warmup is submaximal by
-              definition, so its rating is a number nobody will read back, and five buttons at
-              48px would cost each of these rows more height than the whole row costs now. %>
-          <details class="mt-1">
-            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500">Lifted something else</summary>
-            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
-                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                  hx-target="#session-body" hx-swap="innerHTML" class="mt-1 flex items-end gap-2">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-              <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
-                Weight
-                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
-              </label>
-              <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
-                Reps
-                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
-              </label>
-              <button type="submit"
-                      class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
-                Save
-              </button>
-            </form>
-          </details>
-        </li>
-      <%- end %>
-    </ul>
-
-    <ul class="mt-3">
-      <%- lift.reject { |set| set[:is_warmup] }.each do |set| %>
-        <li class="mt-2 rounded-xl border px-3 py-3 <%= row_style(set) %>">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <span class="text-2xl font-semibold text-gray-900">
-                <%= load_label(set) %>
-              </span>
-              <%# Same words and same treatment as the warmup rows above: a warmup and a
-                  working set are loaded off the same rack, so the line that says how is
-                  not allowed to be a different thing in the two places. %>
-              <%- if set[:is_barbell] %>
-                <div class="text-xs text-gray-500">
-                  <span class="uppercase tracking-wide">Plate math</span>
-                  <%= plate_label(set) %>
-                </div>
-              <%- end %>
-              <%- if set[:is_completed] && changed_from_plan?(set) %>
-                <div class="text-xs text-amber-700">
-                  planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
-                </div>
-              <%- end %>
-            </div>
-            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
-                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                  hx-target="#session-body" hx-swap="innerHTML">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-              <button type="submit"
-                      class="rounded-xl border px-5 py-3 text-base font-semibold shadow-sm <%= complete_style(set) %>">
-                <%= set[:is_completed] ? 'Undo' : 'Done' %>
-              </button>
-            </form>
-          </div>
-
-          <%# Rated per set, not just per session: five lifts in a session are five
-              different questions, and the answer decays within seconds of racking the
-              bar. Submitting a rating completes the set, because rating one is saying
-              you lifted it. %>
-          <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
-                hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
-            <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-            <span class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
-            <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
-                row rather than leaving dead space, so the targets are as wide as the
-                screen allows; min-h-12 is 48px, which clears the 44px minimum. %>
-            <%- (6..10).each do |rating| %>
-              <button value="<%= rating %>" class="<%= rpe_style(set, rating) %> min-h-12 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
-                <%= rating %>
-              </button>
-            <%- end %>
-          </form>
-
-          <details class="mt-2">
-            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500">Lifted something else</summary>
-            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
-                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                  hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-              <%# step="5" here was never a 5 lb grid. HTML counts steps from a step base,
-                  which is the min attribute if there is one and otherwise the value
-                  attribute -- and value is this row's own weight. So a row sitting at 138
-                  accepted 143 and 133 and refused 135, 140 and 145, which is the refusal in
-                  the screenshot on #114. A rack with 1 lb plates has an increment of 2, so
-                  weights like 138 are what the generator writes for anybody who owns micro
-                  plates: the trap fires on ordinary data, not on a corner case.
-
-                  min="0" pins the base at zero so a row's own weight can never define the
-                  grid again, and it rules out a negative load while it is there.
-
-                  step="any" would go one further and let 137.5 through, which is what a
-                  lifter with 1.25s actually wants. It is not shipped because sets.weight is
-                  an integer column: posting "137.5" gets PG::InvalidTextRepresentation, the
-                  set is left exactly as it was, and htmx does not swap a 500 -- so Save
-                  would appear to do nothing at all, with no bubble to explain it. Refusing
-                  half a pound in the browser, where it costs one message, beats accepting it
-                  and losing the whole set. Decimal weights want the column widened first. %>
-              <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
-                Weight
-                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
-              </label>
-              <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
-                Reps
-                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
-              </label>
-              <%# Saving an edit is the same kind of thing as tapping Done -- an action,
-                  not a state -- so it wears the same fill. Its hover used to jump to
-                  lime-500, which turned a blue button green under the thumb and said the
-                  set was done before it was. %>
-              <button type="submit"
-                      class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
-                Save
-              </button>
-            </form>
-          </details>
-        </li>
-      <%- end %>
-    </ul>
-  </section>
+  </nav>
 <%- end %>
+
+<div id="lift-strip" class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain sm:block sm:snap-none sm:overflow-x-visible">
+  <%- @lifts.each_with_index do |lift, index| %>
+    <%# w-full is one panel to a screen and shrink-0 is what stops five of them being
+        squeezed into one, which is what a flex row does to its children by default.
+        Vertical scrolling is untouched: the strip has an automatic height, so a lift
+        taller than the phone makes the page taller and the page scrolls as it always
+        has, on whichever panel is showing. %>
+    <section id="lift-<%= index + 1 %>" class="mt-2 w-full shrink-0 snap-center sm:mt-6">
+      <h2 class="text-xl text-gray-900">
+        <%= @exercises[lift.first[:exercise_id]]&.name %>
+        <%# font-sans because the heading is set in the brand serif and this is a label, not
+            part of the name -- and the serif is a display face that at 12px small caps was
+            simply not readable. Naming the face on the element that wants it is what
+            assets/css/styles.css asks for. %>
+        <%- if @lifts.length > 1 %>
+          <span class="ml-1 font-sans text-xs uppercase tracking-wide text-gray-500 sm:hidden">
+            <%= index + 1 %> of <%= @lifts.length %>
+          </span>
+        <%- end %>
+      </h2>
+
+      <%# Small caps in gray-500 is this screen's label register -- Warmup, RPE and Plate
+          math all wear it, so that a label is always recognisable as one and never as a
+          value. It was gray-400, which is 2.54:1 on white; a line nobody can read at
+          arm's length with a bar in their hands may as well not be on the screen. %>
+      <%- unless lift.select { |set| set[:is_warmup] }.empty? %>
+        <p class="mt-2 text-xs uppercase tracking-wide text-gray-500">Warmup</p>
+      <%- end %>
+      <%# A warmup is played down by being smaller, not by being faded. The list carried
+          opacity-75, which would take the Done button on it to 4.24:1 against 7.56:1 at
+          full strength -- a washed-out control, which is what a disabled one looks like,
+          on the button that is the first thing anybody taps in a session. %>
+      <ul>
+        <%- lift.select { |set| set[:is_warmup] }.each do |set| %>
+          <li class="mt-1 rounded-lg border px-3 py-2 <%= row_style(set) %>">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <span class="text-lg text-gray-900">
+                  <%= load_label(set) %>
+                </span>
+                <%- if set[:is_barbell] %>
+                  <span class="ml-2 text-xs text-gray-500">
+                    <span class="uppercase tracking-wide">Plate math</span>
+                    <%= plate_label(set) %>
+                  </span>
+                <%- end %>
+                <%- if set[:is_completed] && changed_from_plan?(set) %>
+                  <div class="text-xs text-amber-700">
+                    planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
+                  </div>
+                <%- end %>
+              </div>
+              <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                    hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                    hx-target="#session-body" hx-swap="innerHTML">
+                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <button type="submit"
+                        class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
+                  <%= set[:is_completed] ? 'Undo' : 'Done' %>
+                </button>
+              </form>
+            </div>
+
+            <%# A warmup used to offer Done and nothing else, so a ramp taken differently could
+                not be said. That is not a small gap: the ramp is computed from a percentage of
+                the top set, and a lifter who adds a step, starts on a 35 lb bar, or finds 115
+                heavy and repeats it leaves the session claiming a ramp nobody lifted. row_style
+                and changed_from_plan? were already willing to tint such a row amber -- the
+                generator writes planned_weight and planned_reps for warmups exactly as it does
+                for working sets -- and there was simply no way to make one.
+
+                The disclosure is the working set's, down to the wording, because a warmup and a
+                working set are the same act at different weights and learning two habits for it
+                is one too many. Closed it stays as quiet as the old row was. The boxes inside
+                are the working set's size too: the rule above is that a warmup is played down
+                by being smaller, but it applies to what is read, not to what is typed one
+                handed with chalk on.
+
+                No RPE row here, though every working set has one. A warmup is submaximal by
+                definition, so its rating is a number nobody will read back, and five buttons at
+                48px would cost each of these rows more height than the whole row costs now. %>
+            <details class="mt-1">
+              <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500">Lifted something else</summary>
+              <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                    hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                    hx-target="#session-body" hx-swap="innerHTML" class="mt-1 flex items-end gap-2">
+                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
+                  Weight
+                  <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                </label>
+                <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
+                  Reps
+                  <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                </label>
+                <button type="submit"
+                        class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
+                  Save
+                </button>
+              </form>
+            </details>
+          </li>
+        <%- end %>
+      </ul>
+
+      <ul class="mt-3">
+        <%- lift.reject { |set| set[:is_warmup] }.each do |set| %>
+          <li class="mt-2 rounded-xl border px-3 py-3 <%= row_style(set) %>">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <span class="text-2xl font-semibold text-gray-900">
+                  <%= load_label(set) %>
+                </span>
+                <%# Same words and same treatment as the warmup rows above: a warmup and a
+                    working set are loaded off the same rack, so the line that says how is
+                    not allowed to be a different thing in the two places. %>
+                <%- if set[:is_barbell] %>
+                  <div class="text-xs text-gray-500">
+                    <span class="uppercase tracking-wide">Plate math</span>
+                    <%= plate_label(set) %>
+                  </div>
+                <%- end %>
+                <%- if set[:is_completed] && changed_from_plan?(set) %>
+                  <div class="text-xs text-amber-700">
+                    planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
+                  </div>
+                <%- end %>
+              </div>
+              <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                    hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                    hx-target="#session-body" hx-swap="innerHTML">
+                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <button type="submit"
+                        class="rounded-xl border px-5 py-3 text-base font-semibold shadow-sm <%= complete_style(set) %>">
+                  <%= set[:is_completed] ? 'Undo' : 'Done' %>
+                </button>
+              </form>
+            </div>
+
+            <%# Rated per set, not just per session: five lifts in a session are five
+                different questions, and the answer decays within seconds of racking the
+                bar. Submitting a rating completes the set, because rating one is saying
+                you lifted it. %>
+            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
+              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <span class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
+              <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
+                  row rather than leaving dead space, so the targets are as wide as the
+                  screen allows; min-h-12 is 48px, which clears the 44px minimum. %>
+              <%- (6..10).each do |rating| %>
+                <button value="<%= rating %>" class="<%= rpe_style(set, rating) %> min-h-12 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
+                  <%= rating %>
+                </button>
+              <%- end %>
+            </form>
+
+            <details class="mt-2">
+              <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500">Lifted something else</summary>
+              <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                    hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                    hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
+                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <%# step="5" here was never a 5 lb grid. HTML counts steps from a step base,
+                    which is the min attribute if there is one and otherwise the value
+                    attribute -- and value is this row's own weight. So a row sitting at 138
+                    accepted 143 and 133 and refused 135, 140 and 145, which is the refusal in
+                    the screenshot on #114. A rack with 1 lb plates has an increment of 2, so
+                    weights like 138 are what the generator writes for anybody who owns micro
+                    plates: the trap fires on ordinary data, not on a corner case.
+
+                    min="0" pins the base at zero so a row's own weight can never define the
+                    grid again, and it rules out a negative load while it is there.
+
+                    step="any" would go one further and let 137.5 through, which is what a
+                    lifter with 1.25s actually wants. It is not shipped because sets.weight is
+                    an integer column: posting "137.5" gets PG::InvalidTextRepresentation, the
+                    set is left exactly as it was, and htmx does not swap a 500 -- so Save
+                    would appear to do nothing at all, with no bubble to explain it. Refusing
+                    half a pound in the browser, where it costs one message, beats accepting it
+                    and losing the whole set. Decimal weights want the column widened first. %>
+                <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
+                  Weight
+                  <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                </label>
+                <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
+                  Reps
+                  <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                </label>
+                <%# Saving an edit is the same kind of thing as tapping Done -- an action,
+                    not a state -- so it wears the same fill. Its hover used to jump to
+                    lime-500, which turned a blue button green under the thumb and said the
+                    set was done before it was. %>
+                <button type="submit"
+                        class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
+                  Save
+                </button>
+              </form>
+            </details>
+          </li>
+        <%- end %>
+      </ul>
+
+      <%# The footer only appears where the panel above it asked a question it answers. A
+          lift that is all warmups has no RPE row -- a submaximal rating is a number nobody
+          reads back -- so help on how to rate would be help with something this panel never
+          asks, and the lifter would have to decide that for themselves five times a
+          session. %>
+      <%- if lift.any? { |set| !set[:is_warmup] } %>
+        <%= render('workouts/_rpe_help') %>
+      <%- end %>
+    </section>
+  <%- end %>
+</div>
 
 <form action="/workouts/<%= @workout[:id] %>/session" method="post"
       hx-post="/workouts/<%= @workout[:id] %>/session"
@@ -216,4 +280,7 @@
       </button>
     <%- end %>
   </div>
+  <%# The session's own rating is the same question the per-set buttons ask, and it is
+      asked out here rather than on any one panel, so it keeps a copy of the answer. %>
+  <%= render('workouts/_rpe_help') %>
 </form>
