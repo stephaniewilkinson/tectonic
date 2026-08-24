@@ -3,6 +3,7 @@
 require_relative 'spec_helper'
 require_relative 'mcp_spec' # reuses its helpers (mint, call_tool, tool_result); idempotent require
 require_relative '../lib/tectonic/mcp'
+require_relative '../lib/tectonic/exercise_library' # Exercise.load_library, for the shared-library specs
 require 'securerandom'
 
 NamedClient = Struct.new(:id, :account_id)
@@ -27,6 +28,116 @@ describe 'create_exercise' do
     first = tool_result['structuredContent']['id']
     call_tool('create_exercise', raw:, arguments: { name: })
     assert_equal first, tool_result['structuredContent']['id']
+  end
+end
+
+# A movement from the shared library: nil account, so every account sees it and none
+# owns it. Taken from the seeded library rather than made here, and the library is
+# seeded first so this file can be run on its own. Inventing a nil-account row instead
+# would leave one behind -- these specs clean up nothing -- and the library is counted
+# by name elsewhere, so a spare would fail a spec in another file on the next run.
+def shared_exercise
+  Tectonic::Exercise.load_library
+  Tectonic::Exercise.where(account_id: nil).order(:id).first
+end
+
+# An account's own movement, made through the tool so provenance and ownership are
+# stamped the way a real call would stamp them.
+def own_exercise(token)
+  call_tool('create_exercise', raw: token.raw, arguments: { name: "Cue #{SecureRandom.hex(4)}" })
+  tool_result['structuredContent']['id']
+end
+
+describe 'create_exercise with a note' do
+  include Rack::Test::Methods
+
+  it 'stores the coaching intent it was given on a movement it creates' do
+    call_tool('create_exercise', raw: mint(scopes: ['write']).raw,
+                                 arguments: { name: "Cue #{SecureRandom.hex(4)}",
+                                              note: 'this helps correct valgus' })
+
+    assert_equal 'this helps correct valgus', tool_result['structuredContent']['note']
+  end
+
+  # This tool deduplicates against the library as well as the account's own movements,
+  # so a note aimed at a shared name comes back holding the row every account reads.
+  # Refusing beats reporting a success that stored nothing, and beats storing it.
+  it 'refuses rather than noting a movement from the shared library' do
+    shared = shared_exercise
+    call_tool('create_exercise', raw: mint(scopes: ['write']).raw,
+                                 arguments: { name: shared.name, note: 'mine alone' })
+
+    assert tool_result['isError']
+    assert_nil shared.refresh.note
+  end
+end
+
+describe 'update_exercise' do
+  include Rack::Test::Methods
+
+  before { @token = mint(scopes: ['write']) }
+
+  it 'writes a note onto a movement the account owns' do
+    id = own_exercise(@token)
+    call_tool('update_exercise', raw: @token.raw, arguments: { exercise_id: id, note: 'ribs down' })
+
+    assert_equal 'ribs down', Tectonic::Exercise[id].note
+    assert_includes tool_result.dig('content', 0, 'text'), 'ribs down'
+  end
+
+  # A field the caller did not send is a field the caller did not mean to touch, or
+  # every rename would quietly take the note with it.
+  it 'leaves the note alone when the edit does not mention it' do
+    id = own_exercise(@token)
+    call_tool('update_exercise', raw: @token.raw, arguments: { exercise_id: id, note: 'ribs down' })
+    call_tool('update_exercise', raw: @token.raw, arguments: { exercise_id: id, name: 'Renamed cue' })
+
+    assert_equal 'ribs down', Tectonic::Exercise[id].note
+  end
+
+  it 'clears the note when sent an empty string' do
+    id = own_exercise(@token)
+    call_tool('update_exercise', raw: @token.raw, arguments: { exercise_id: id, note: 'ribs down' })
+    call_tool('update_exercise', raw: @token.raw, arguments: { exercise_id: id, note: '' })
+
+    assert_nil Tectonic::Exercise[id].note
+  end
+end
+
+# The same ownership rule the exercise form follows, reached the other way in. No
+# account may write a value another account reads, and the library is the whole of the
+# difference between what an account can see and what it owns.
+describe 'update_exercise ownership' do
+  include Rack::Test::Methods
+
+  it 'refuses a library movement and says that is why, not that the id was wrong' do
+    shared = shared_exercise
+    call_tool('update_exercise', raw: mint(scopes: ['write']).raw,
+                                 arguments: { exercise_id: shared.id, note: 'mine alone' })
+
+    assert tool_result['isError']
+    assert_includes tool_result.dig('content', 0, 'text'), 'shared library'
+    assert_nil shared.refresh.note
+  end
+
+  it "refuses another account's private movement" do
+    theirs = own_exercise(mint(scopes: ['write']))
+    call_tool('update_exercise', raw: mint(scopes: ['write']).raw,
+                                 arguments: { exercise_id: theirs, note: 'mine alone' })
+
+    assert tool_result['isError']
+    assert_nil Tectonic::Exercise[theirs].note
+  end
+
+  # Auditing comes from the tool base class rather than from the tool, so what this
+  # really asserts is that the tool is registered and declared a write: one that had
+  # declared a read would land no row here, and would take a read-only token's edit.
+  it 'lands an audit row the way every other write tool does' do
+    token = mint(scopes: ['write'])
+    call_tool('update_exercise', raw: token.raw, arguments: { exercise_id: own_exercise(token), note: 'cue' })
+    row = Tectonic::McpAuditLog.where(oauth_application_id: token.application_id, tool_name: 'update_exercise')
+
+    assert_equal 'success', row.get(:result_status)
   end
 end
 
