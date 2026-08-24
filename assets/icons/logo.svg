@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 72" width="310" height="72"
+     role="img" aria-labelledby="tectonic-logo-title">
+  <title id="tectonic-logo-title">tectonic plates</title>
+  <!-- A loaded barbell sleeve seen end-on. Plates stacked on a sleeve are concentric from
+       that angle, and so is a cut through layered rock, so one shape carries both halves of
+       the name. The rings are deliberately not the same weight: three even rings read as a
+       shooting target, and the heaviest plate on a bar is the outermost one, so the outer
+       ring is the widest and the gap outside the small plate is tighter than the gap inside
+       it. Nothing is filled white: the gaps are transparent, so the mark sits on the gray-100
+       consent background and on white alike, without carrying a plate of its own. -->
+  <g fill="none">
+    <!-- Lime-500 is the app's colour everywhere else, but it reaches only 1.8:1 against
+         gray-100, so it cannot be what defines the silhouette. The outer plate and the
+         sleeve are sky-800 at 6.9:1 and the lime sits inside them, where the sky either
+         side of it is what gives it an edge. -->
+    <circle cx="36" cy="36" r="30" stroke="#075985" stroke-width="10"/>
+    <circle cx="36" cy="36" r="17" stroke="#84cc16" stroke-width="8"/>
+  </g>
+  <circle cx="36" cy="36" r="6.5" fill="#075985"/>
+  <!-- The Blonde faces the site sets its headings in cannot reach this file. An SVG loaded
+       through an img element is a separate document: it gets no webfont and no stylesheet
+       from the page, and on the consent screen default-src 'none' would refuse it anything
+       it tried to fetch for itself. So the words are set in whichever sans the reader's
+       system supplies, and those differ in width by a tenth or more. textLength pins the
+       run to 214 units either way; without it a wide default sans pushes the last letters
+       past the viewBox, which clips them rather than overflowing. -->
+  <text x="88" y="45" textLength="214" lengthAdjust="spacingAndGlyphs" font-size="32" font-weight="600"
+        font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+        fill="#075985">tectonic plates</text>
+</svg>
