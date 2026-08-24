@@ -9,7 +9,16 @@
       <div>
         <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email address</label>
         <div class="mt-2">
-          <input id="email" name="login" id="login" type="email" autocomplete="email" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+          <%# The name is Rodauth's -- it reads the login out of a parameter called
+              "login" and renaming it breaks the post -- but the id and the autofill token
+              are ours. The token is "username" rather than "email": HTML's autofill
+              vocabulary spends "email" on address fields, the kind a checkout form asks
+              for, while "username" is the account identifier a password manager keys a
+              saved credential to, and it is what Safari looks for when deciding whether a
+              form is a sign-in at all. type="email" is unaffected, so the phone keyboard
+              still comes up with the @ on it. This has to match the token on the sign-up
+              form or a credential saved there is not offered back here. %>
+          <input id="email" name="login" type="email" autocomplete="username" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>
       </div>
 
@@ -21,7 +30,7 @@
           </div>
         </div>
         <div class="mt-2">
-          <input id="password" id="password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+          <input id="password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>
       </div>
 
