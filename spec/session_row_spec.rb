@@ -15,12 +15,18 @@ require 'securerandom'
 module SessionRow
   # One warmup and one working set of the same lift, so the two rows can be held against
   # each other. Both are on a bar, since the plate line is the thing under test.
-  def session(weight: 155, warmup_done: false, working_done: false, **working)
+  #
+  # warmup_planned stands in for a generated ramp: ProgramGenerator writes planned_weight
+  # and planned_reps for warmups exactly as it does for working sets, which is what lets an
+  # edited ramp step read as changed. Left out, the warmup is a hand-entered one, which
+  # never had a plan and so can never disagree with it.
+  def session(weight: 155, warmup_done: false, working_done: false, warmup_planned: nil, **working)
     account_id = login
     workout_id = own_workout(account_id)
     exercise_id = DB[:exercises].insert(name: "Back Squat #{SecureRandom.hex(4)}", account_id:)
     common = { workout_id:, exercise_id:, reps: 5, is_barbell: true }
-    DB[:sets].insert(**common, weight: 45, is_warmup: true, is_completed: warmup_done)
+    DB[:sets].insert(**common, weight: 45, is_warmup: true, is_completed: warmup_done,
+                               planned_weight: warmup_planned, planned_reps: (5 if warmup_planned))
     DB[:sets].insert(**common, weight:, is_warmup: false, is_completed: working_done, **working)
     get "/workouts/#{workout_id}/session"
     last_response.body.dup.force_encoding(Encoding::UTF_8)
@@ -127,6 +133,67 @@ describe 'the plate line' do
   it 'costs a row no extra line when the weight loads cleanly' do
     assert_equal 2, session(weight: 155).scan('Plate math').length
     assert_equal 2, session(weight: 124).scan('Plate math').length
+  end
+end
+
+describe 'what a set row will accept as a number' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionRow
+
+  # A step is counted from a step base, which with no min attribute is the input's own
+  # value -- so step="5" on a row already at 138 refused 135, 140 and 145 and offered 133
+  # and 143 instead. That is #114's screenshot, and 138 is ordinary data: a rack with 1 lb
+  # plates has an increment of 2, so the generator writes even weights for anybody who
+  # owns micro plates.
+  it 'no longer counts in fives from whatever the row already holds' do
+    body = session(weight: 138)
+
+    refute_includes body, 'step="5"'
+    assert_equal 2, body.scan(/name="weight"[^>]*step="1"/).length
+  end
+
+  # Zero rather than no min at all, so the grid can never come back from a row's own
+  # weight, and a negative load is refused while we are here.
+  it 'counts from zero rather than from the value in the box' do
+    assert_equal 4, session.scan(/type="number"[^>]*min="0"/).length
+  end
+
+  # The keypad is the whole reason these stay type="number", and the spin buttons are
+  # hidden in assets/css/styles.css for every one of them.
+  it 'still asks for the numeric keypad' do
+    assert_equal 4, session.scan(/type="number"[^>]*inputmode="numeric"/).length
+  end
+end
+
+describe 'a warmup row' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionRow
+
+  # The warmup list is the first bare <ul>; the working sets are in <ul class="mt-3">.
+  def warmup_row(body)
+    body[%r{<ul>\s*<li.*?</li>}m]
+  end
+
+  # A ramp is computed rather than chosen, so a lifter who took an extra step or started
+  # on a lighter bar had Done and nothing else and the session kept a ramp nobody lifted.
+  it 'offers the same disclosure the working sets offer' do
+    assert_includes warmup_row(session), 'Lifted something else'
+  end
+
+  # Submaximal by definition, so a warmup's rating is a number nobody reads back, and five
+  # buttons at 48px would cost the row more height than the row itself costs.
+  it 'leaves RPE to the working sets' do
+    refute_includes warmup_row(session), 'name="rpe"'
+  end
+
+  # Amber says the row went differently; without this line it does not say from what.
+  it 'says what the ramp step was written as once it has been changed' do
+    body = session(warmup_done: true)
+
+    refute_includes warmup_row(body), 'planned'
+    assert_includes warmup_row(session(warmup_done: true, warmup_planned: 55)), 'planned 55'
   end
 end
 

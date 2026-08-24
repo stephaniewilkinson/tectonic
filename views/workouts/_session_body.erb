@@ -31,26 +31,72 @@
         on the button that is the first thing anybody taps in a session. %>
     <ul>
       <%- lift.select { |set| set[:is_warmup] }.each do |set| %>
-        <li class="mt-1 flex justify-between gap-3 rounded-lg border px-3 py-2 <%= row_style(set) %>">
-          <div>
-            <span class="text-lg text-gray-900">
-              <%= load_label(set) %>
-            </span>
-            <%- if set[:is_barbell] %>
-              <span class="ml-2 text-xs text-gray-500">
-                <span class="uppercase tracking-wide">Plate math</span>
-                <%= plate_label(set) %>
+        <li class="mt-1 rounded-lg border px-3 py-2 <%= row_style(set) %>">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <span class="text-lg text-gray-900">
+                <%= load_label(set) %>
               </span>
-            <%- end %>
+              <%- if set[:is_barbell] %>
+                <span class="ml-2 text-xs text-gray-500">
+                  <span class="uppercase tracking-wide">Plate math</span>
+                  <%= plate_label(set) %>
+                </span>
+              <%- end %>
+              <%- if set[:is_completed] && changed_from_plan?(set) %>
+                <div class="text-xs text-amber-700">
+                  planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
+                </div>
+              <%- end %>
+            </div>
+            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-target="#session-body" hx-swap="innerHTML">
+              <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <button type="submit" class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
+                <%= set[:is_completed] ? 'Undo' : 'Done' %>
+              </button>
+            </form>
           </div>
-          <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
-                hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
-                hx-target="#session-body" hx-swap="innerHTML">
-            <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-            <button type="submit" class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
-              <%= set[:is_completed] ? 'Undo' : 'Done' %>
-            </button>
-          </form>
+
+          <%# A warmup used to offer Done and nothing else, so a ramp taken differently could
+              not be said. That is not a small gap: the ramp is computed from a percentage of
+              the top set, and a lifter who adds a step, starts on a 35 lb bar, or finds 115
+              heavy and repeats it leaves the session claiming a ramp nobody lifted. row_style
+              and changed_from_plan? were already willing to tint such a row amber -- the
+              generator writes planned_weight and planned_reps for warmups exactly as it does
+              for working sets -- and there was simply no way to make one.
+
+              The disclosure is the working set's, down to the wording, because a warmup and a
+              working set are the same act at different weights and learning two habits for it
+              is one too many. Closed it stays as quiet as the old row was. The boxes inside
+              are the working set's size too: the rule above is that a warmup is played down
+              by being smaller, but it applies to what is read, not to what is typed one
+              handed with chalk on.
+
+              No RPE row here, though every working set has one. A warmup is submaximal by
+              definition, so its rating is a number nobody will read back, and five buttons at
+              48px would cost each of these rows more height than the whole row costs now. %>
+          <details class="mt-1">
+            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500">Lifted something else</summary>
+            <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
+                  hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-target="#session-body" hx-swap="innerHTML" class="mt-1 flex items-end gap-2">
+              <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
+                Weight
+                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+              </label>
+              <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
+                Reps
+                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+              </label>
+              <button type="submit"
+                      class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
+                Save
+              </button>
+            </form>
+          </details>
         </li>
       <%- end %>
     </ul>
@@ -114,13 +160,31 @@
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%# step="5" here was never a 5 lb grid. HTML counts steps from a step base,
+                  which is the min attribute if there is one and otherwise the value
+                  attribute -- and value is this row's own weight. So a row sitting at 138
+                  accepted 143 and 133 and refused 135, 140 and 145, which is the refusal in
+                  the screenshot on #114. A rack with 1 lb plates has an increment of 2, so
+                  weights like 138 are what the generator writes for anybody who owns micro
+                  plates: the trap fires on ordinary data, not on a corner case.
+
+                  min="0" pins the base at zero so a row's own weight can never define the
+                  grid again, and it rules out a negative load while it is there.
+
+                  step="any" would go one further and let 137.5 through, which is what a
+                  lifter with 1.25s actually wants. It is not shipped because sets.weight is
+                  an integer column: posting "137.5" gets PG::InvalidTextRepresentation, the
+                  set is left exactly as it was, and htmx does not swap a 500 -- so Save
+                  would appear to do nothing at all, with no bubble to explain it. Refusing
+                  half a pound in the browser, where it costs one message, beats accepting it
+                  and losing the whole set. Decimal weights want the column widened first. %>
               <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                 Weight
-                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" step="5" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
               </label>
               <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
                 Reps
-                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
               </label>
               <%# Saving an edit is the same kind of thing as tapping Done -- an action,
                   not a state -- so it wears the same fill. Its hover used to jump to

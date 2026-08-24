@@ -470,6 +470,13 @@ class Tectonic < Roda
               # No revision means the primary tap, which toggles so a mis-tap is
               # undone by tapping again. A revision always completes the set, and a
               # rating counts as one: rating a set is saying you lifted it.
+              #
+              # Nothing here asks whether the set is a warmup, and that stays deliberate now
+              # that the session screen lets a warmup be revised too. A ramp step lifted
+              # differently is the same fact as a working set lifted differently -- the
+              # generator writes planned_weight and planned_reps for both, so row_style and
+              # changed_from_plan? already read an edited warmup correctly -- and a second
+              # branch here would be two ways of recording one thing.
               set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
               r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
             end
