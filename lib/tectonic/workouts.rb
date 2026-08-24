@@ -37,12 +37,20 @@ class Tectonic < Roda
     # A session that has been lifted at all is performed; a generated one still on or
     # ahead of its date is planned, and one whose date has passed with nothing lifted
     # was skipped. A workout typed in by hand is never skipped: it exists because a
-    # person logged it, so it is history as soon as its date arrives, and only a date
-    # still in the future makes it a plan.
+    # person logged it, so once its day is over it reads as history whether or not
+    # anything in it was ticked off.
+    #
+    # Today is not over, which is what the >= on the last line is for. The day is still
+    # running, and a session with nothing lifted in it yet is one you are about to do
+    # rather than a record of having done it. With > it fell through to performed and
+    # the index filed today's session under History, below every session still to come
+    # -- the row a lifter opened the page to start. A generated session dated today was
+    # never affected either way: program_day_id makes it a plan before any date is
+    # compared.
     def status(today = Date.today)
       return :performed if performed?
       return :skipped if program_day_id && date.to_date < today
-      return :planned if program_day_id || date.to_date > today
+      return :planned if program_day_id || date.to_date >= today
 
       :performed
     end
