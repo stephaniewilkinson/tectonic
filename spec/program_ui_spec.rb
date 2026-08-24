@@ -287,6 +287,7 @@ end
 # post into one htmx makes, and htmx follows the redirect and swaps the page back in.
 describe 'removing a lift in a browser that runs the htmx' do
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
   include Programming
 
   before do

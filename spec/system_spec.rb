@@ -6,6 +6,7 @@ require 'securerandom'
 describe Tectonic do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
+  include BrowserSpec
   include Rack::Test::Methods
 
   password = SecureRandom.hex
