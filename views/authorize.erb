@@ -2,28 +2,28 @@
 <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
   <div class="sm:mx-auto sm:w-full sm:max-w-md">
     <h2 class="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
-      Authorize <%= h(@client_name) %>
+      Authorize <%= @client_name %>
     </h2>
     <p class="mt-2 text-center text-sm text-gray-600">
-      <%= h(@client_name) %> wants to connect to your Tectonic account.
+      <%= @client_name %> wants to connect to your Tectonic account.
       Choose what it may do, then authorize it.
     </p>
   </div>
 
   <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
     <form method="post" action="<%= rodauth.authorize_path %>" class="space-y-6" id="authorize-form">
-      <%= rodauth.csrf_tag %>
+      <%== rodauth.csrf_tag %>
       <% rodauth.authorize_form_params.each do |field| %>
-        <input type="<%= h(field['type']) %>" name="<%= h(field['name']) %>" value="<%= h(field['value']) %>">
+        <input type="<%= field['type'] %>" name="<%= field['name'] %>" value="<%= field['value'] %>">
       <% end %>
 
       <fieldset class="space-y-3">
         <legend class="text-sm font-medium leading-6 text-gray-900">Permissions</legend>
         <% rodauth.authorize_scopes.each do |scope| %>
           <label class="flex items-start gap-3 rounded-md border border-gray-200 bg-white p-3">
-            <input type="checkbox" name="scope[]" value="<%= h(scope) %>" checked class="mt-0.5 h-4 w-4 rounded border-gray-300 text-lime-500 focus:ring-lime-500">
+            <input type="checkbox" name="scope[]" value="<%= scope %>" checked class="mt-0.5 h-4 w-4 rounded border-gray-300 text-lime-500 focus:ring-lime-500">
             <span class="text-sm text-gray-700">
-              <span class="font-semibold"><%= h(scope) %></span>
+              <span class="font-semibold"><%= scope %></span>
               <span class="block text-gray-500">
                 <% if scope == 'write' %>
                   Create and update your workouts, exercises, and sets.
@@ -38,9 +38,9 @@
 
       <div class="flex items-center gap-3">
         <button type="submit" class="flex w-full justify-center rounded-md bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-lime-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
-          <%= h(rodauth.oauth_authorize_button) %>
+          <%= rodauth.oauth_authorize_button %>
         </button>
-        <a href="<%= h(rodauth.redirect_uri) %>?error=access_denied" class="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+        <a href="<%= rodauth.redirect_uri %>?error=access_denied" class="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
           Cancel
         </a>
       </div>

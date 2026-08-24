@@ -27,8 +27,12 @@
     <p class="mt-2 text-center text-sm text-gray-500">Nothing trained or planned this month.</p>
   <%- else %>
     <p class="mt-2 text-center text-sm text-gray-500">
+      <%# The separator is the middle dot itself rather than `&middot;`, because the join
+          happens inside an expression whose result this tag escapes, and an escaped entity
+          arrives on the page spelled out rather than drawn. The month arrows further up are
+          left as entities: they sit in static markup, which nothing here escapes. %>
       <%= [[:performed, 'trained'], [:planned, 'planned'], [:skipped, 'missed']]
-            .filter_map { |status, word| "#{@tally[status]} #{word}" if @tally[status] }.join(' &middot; ') %>
+            .filter_map { |status, word| "#{@tally[status]} #{word}" if @tally[status] }.join(' · ') %>
     </p>
   <%- end %>
 
