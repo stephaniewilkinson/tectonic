@@ -140,11 +140,17 @@ describe 'plate math for a set logged by hand' do
     @squat = Tectonic::Exercise.where(account_id: nil, name: 'Back Squat').get(:id)
   end
 
-  it 'breaks a barbell lift down per side in the session view' do
+  # The line used to be headed "per side", which this app spends on a rep count taken per
+  # side; it is headed "Plate math" now, and the heading and the breakdown are asserted
+  # apart because the markup puts them in separate elements.
+  it 'breaks a barbell lift down plate by plate in the session view' do
     assert log_set(@workout, @squat, 135)[:is_barbell]
 
     get "/workouts/#{@workout}/session"
-    assert_includes last_response.body.dup.force_encoding(Encoding::UTF_8), 'per side 1×45'
+    body = last_response.body.dup.force_encoding(Encoding::UTF_8)
+
+    assert_includes body, 'Plate math'
+    assert_includes body, '1×45'
   end
 
   it 'says nothing about plates for a movement that is not loaded on a bar' do

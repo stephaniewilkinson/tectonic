@@ -71,9 +71,17 @@ class Tectonic < Roda
       Plates.per_side(total, bar_weight:, inventory: pairs)
     end
 
-    def label(total)
-      Plates.label(per_side(total))
+    # The nearest weight this rack can load and what it takes, for a weight `per_side`
+    # had to answer nil to. See Plates.closest for why nil is not an answer worth showing.
+    def closest(total)
+      Plates.closest(total, bar_weight:, inventory: pairs)
     end
+
+    # There was a `label(total)` here, folding per_side straight into Plates.label. It is
+    # gone rather than merely unused: what it returned for a weight this rack cannot make
+    # was the empty string, which is the silence #111 was about, and leaving a one-line
+    # convenience that quietly reintroduces the bug is how the bug comes back. A caller
+    # wanting text asks per_side and decides for itself what nil should say.
 
     # The denominations owned, heaviest first, for a view or a form.
     def denominations
