@@ -4,24 +4,36 @@
         h-16 clipped the row they wrapped onto instead of growing. Growing alone was not
         enough -- at the desktop type size the wrap ran to three rows and 156px, a quarter
         of a phone screen, above the session a lifter is actually reading. The type is
-        smaller on a phone and full size from 640px up, which fits it into two rows. %>
+        smaller on a phone and full size from 640px up, which holds the wrap to two rows
+        at its worst -- and since the links took the brand face, which sets about a third
+        narrower than the system sans, that worst case is the 640-840px band and the row
+        comes back to one from roughly 840px up. %>
     <div class="flex min-h-16 min-w-0 justify-between">
       <%# min-w-0: a flex child will not shrink below its content, so without this the
           scrolling row pushes the whole page sideways instead of scrolling inside itself. %>
       <div class="flex min-w-0">
         <div class="flex flex-nowrap items-center gap-x-5 overflow-x-auto py-2 sm:ml-6 sm:flex-wrap sm:gap-x-8 sm:overflow-x-visible sm:py-0">
-        <a href="/" class="inline-flex min-h-11 shrink-0 items-center border-b-2 px-1 text-base font-medium text-gray-900 sm:text-xl">tectonic plates</a>
+        <%# `brand` sits on every link and not once on the row above them, even though
+            font-family inherits and one class on the parent would save nine. What was
+            wrong here was a face arriving from somewhere else and landing on whatever
+            happened to be in its way, so a link that wants the brand face now says so
+            itself rather than catching it from a container. The wordmark takes the same
+            face as the links beside it: the serif is a display face set at 72px and up on
+            the front page, and at the 16px this row runs at on a phone it would be harder
+            to read, not more distinguished. What sets the wordmark apart is what already
+            did -- darker text and a border that is not transparent. %>
+        <a href="/" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 px-1 text-base font-medium text-gray-900 sm:text-xl">tectonic plates</a>
           <%- if rodauth.logged_in? %>
-            <a href="/workouts" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">workouts</a>
-            <a href="/exercises" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">exercises</a>
-            <a href="/programs" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">programs</a>
-            <a href="/volume" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">volume</a>
-            <a href="/equipment" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">equipment</a>
-            <a href="/connections" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">assistants</a>
-            <a href="<%= rodauth.logout_path %>" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">exit</a>
+            <a href="/workouts" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">workouts</a>
+            <a href="/exercises" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">exercises</a>
+            <a href="/programs" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">programs</a>
+            <a href="/volume" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">volume</a>
+            <a href="/equipment" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">equipment</a>
+            <a href="/connections" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">assistants</a>
+            <a href="<%= rodauth.logout_path %>" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">exit</a>
           <%- else %>
-            <a href="<%= rodauth.login_path %>" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">log in</a>
-            <a href="<%= rodauth.create_account_path %>" class="inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">sign up</a>
+            <a href="<%= rodauth.login_path %>" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">log in</a>
+            <a href="<%= rodauth.create_account_path %>" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-500 sm:text-xl hover:border-gray-300 hover:text-white">sign up</a>
           <%- end %>
         </div>
       </div>
