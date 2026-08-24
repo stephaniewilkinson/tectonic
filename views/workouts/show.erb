@@ -62,8 +62,8 @@
                     ticked or not. "Warmup set" against "No" answered two different
                     questions in the same column, and a word has to be read where a
                     column of boxes is scanned. %>
-                <td class="whitespace-nowrap px-3 py-4"><%= ticked(set[:is_warmup], 'warmup') %></td>
-                <td class="whitespace-nowrap px-3 py-4"><%= ticked(set[:is_completed], 'completed') %></td>
+                <td class="whitespace-nowrap px-3 py-4"><%== ticked(set[:is_warmup], 'warmup') %></td>
+                <td class="whitespace-nowrap px-3 py-4"><%== ticked(set[:is_completed], 'completed') %></td>
                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
                   <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/edit" class="text-lime-400 hover:text-lime-300">Edit</a>
                 </td>

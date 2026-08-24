@@ -14,7 +14,7 @@
       <%- @programs.each do |program| %>
         <li class="p-4">
           <a href="/programs/<%= program.id %>" class="text-sm font-semibold text-gray-900 hover:text-lime-700">
-            <%= h(program.name) %>
+            <%= program.name %>
           </a>
           <p class="mt-1 text-sm text-gray-500">
             <%= program.weeks %> week<%= 's' unless program.weeks == 1 %>
@@ -28,7 +28,7 @@
   <%- end %>
 
   <form method="post" action="/programs" class="mt-8 space-y-4">
-    <%= csrf_tag('/programs') %>
+    <%== csrf_tag('/programs') %>
     <h2 class="text-sm font-semibold text-gray-900">Start a block</h2>
     <div class="flex flex-wrap items-end gap-3">
       <div>

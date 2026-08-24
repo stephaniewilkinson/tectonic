@@ -37,7 +37,7 @@
           <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 hx-target="#session-body" hx-swap="innerHTML">
-            <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+            <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
             <button type="submit" class="min-h-11 rounded-lg bg-gray-200 px-4 text-sm font-semibold text-gray-700 hover:bg-gray-300">
               <%= set[:is_completed] ? 'Undo' : 'Done' %>
             </button>
@@ -68,7 +68,7 @@
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <button type="submit" class="rounded-xl bg-lime-500 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-gray-500">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
               </button>
@@ -82,7 +82,7 @@
           <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
-            <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+            <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
             <span class="mr-1 text-xs uppercase tracking-wide text-gray-400">RPE</span>
             <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
                 row rather than leaving dead space, so the targets are as wide as the
@@ -99,7 +99,7 @@
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                 Weight
                 <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" step="5" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
@@ -123,7 +123,7 @@
       hx-post="/workouts/<%= @workout[:id] %>/session"
       hx-target="#session-body" hx-swap="innerHTML"
       class="mt-10 border-t border-gray-300 pt-4">
-  <%= csrf_tag("/workouts/#{@workout[:id]}/session") %>
+  <%== csrf_tag("/workouts/#{@workout[:id]}/session") %>
   <h2 class="text-xl text-gray-900">Session RPE</h2>
   <p class="text-xs text-gray-500">How hard was the whole session?</p>
   <div class="mt-2 flex gap-2">
