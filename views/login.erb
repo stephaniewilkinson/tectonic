@@ -11,14 +11,15 @@
         <div class="mt-2">
           <%# The name is Rodauth's -- it reads the login out of a parameter called
               "login" and renaming it breaks the post -- but the id and the autofill token
-              are ours. The token is "username" rather than "email": HTML's autofill
-              vocabulary spends "email" on address fields, the kind a checkout form asks
-              for, while "username" is the account identifier a password manager keys a
-              saved credential to, and it is what Safari looks for when deciding whether a
-              form is a sign-in at all. type="email" is unaffected, so the phone keyboard
-              still comes up with the @ on it. This has to match the token on the sign-up
-              form or a credential saved there is not offered back here. %>
-          <input id="email" name="login" type="email" autocomplete="username" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+              are ours. The token is "email", which is what this field asks for and the only
+              thing an account is ever identified by here: there is no separate username to
+              key a credential to, so naming one is describing a form this app does not have.
+              "username" was tried and reverted; it is the more common recommendation for a
+              sign-in identifier, and if a password manager is ever found not to offer a
+              saved credential back here, that is the first thing to try again. It has to
+              match the token on the sign-up form either way, which is asserted rather than
+              left to whoever edits one of the two files. %>
+          <input id="email" name="login" type="email" autocomplete="email" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>
       </div>
 

@@ -9,14 +9,14 @@
       <div>
         <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email address</label>
         <div class="mt-2">
-          <%# "username", not "email": the autofill vocabulary treats "email" as an
-              address field and "username" as the account identifier a password manager
-              keys the saved credential to, which is the job this field is doing. It is
-              the same token the sign-in form uses, and it has to be -- what a manager
-              saves here it offers back there only if both forms name the identifier the
-              same way. The confirmation below keeps "email": it is the same address typed
-              twice, not a second account name. %>
-          <input id="email" name="login" type="email" autocomplete="username" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+          <%# "email", the same token the sign-in form uses, and it has to be the same one:
+              what a password manager saves here it offers back there only if both forms
+              name the identifier the same way. An account here is only ever identified by
+              its address, so "email" is what this field is. "username" was tried and
+              reverted; the note on views/login.erb has the argument for it and says when
+              it would be worth trying again. The confirmation below is "email" too, and
+              always was: it is the same address typed twice. %>
+          <input id="email" name="login" type="email" autocomplete="email" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>
       </div>
       <div>

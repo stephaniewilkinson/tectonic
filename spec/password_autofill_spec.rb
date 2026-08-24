@@ -54,10 +54,11 @@ describe 'the sign-in form' do
 
   before { get '/login' }
 
-  # "username" is the identifier token in the autofill vocabulary; "email" is an address
-  # field, the kind a checkout asks for. A manager keys the credential to the former.
+  # "email" rather than "username": an account here is identified by its address and by
+  # nothing else, so there is no username for a manager to key a credential to. The pair
+  # of forms matters more than the token does, which is what the sign-up spec asserts.
   it 'names the account identifier the way a password manager reads it' do
-    assert_equal 'username', autocomplete('login')
+    assert_equal 'email', autocomplete('login')
     assert_includes field('login'), 'type="email"'
   end
 
@@ -88,7 +89,7 @@ describe 'the sign-up form' do
   # A credential saved here is offered back at sign-in only if both forms name the
   # identifier the same way, so the two tokens are asserted against each other.
   it 'names the identifier the same way the sign-in form does' do
-    assert_equal 'username', autocomplete('login')
+    assert_equal 'email', autocomplete('login')
     assert_equal 'email', autocomplete('login-confirm')
   end
 
