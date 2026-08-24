@@ -12,11 +12,53 @@
   </p>
 </div>
 
-<%- @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.each do |lift| %>
-  <section class="mt-6">
-    <h2 class="text-xl text-gray-900">
+<%# One lift a screen, swiped between, rather than five lifts down one scroll. Five lifts
+    and twenty sets is a page nobody can find their place in: the lift you are on is
+    somewhere past the ones you are not.
+
+    Scroll snap and no JavaScript. A flex row that overflows is already a real scroller --
+    momentum, rubber-banding and all -- on every phone, and snap-mandatory makes it stop on
+    a lift rather than between two. A gesture library would have to be re-bound every time
+    htmx swaps this partial out, and would be a worse swipe than the one the platform
+    ships. overscroll-x-contain is the one part that is not obvious: without it a swipe
+    that runs off the last lift is handed to Safari, which reads it as the back gesture and
+    leaves the session.
+
+    Restored to a stack from 640px up, and that is a decision rather than timidity. A swipe
+    is a thumb; a mouse has no horizontal wheel, and the overlay scrollbar that would be the
+    only other way across only appears once you are already scrolling, so on a desktop these
+    panels would be every lift but the first sitting where a mouse cannot reach them. The
+    column is max-w-md at every width -- a desktop was never shown five lifts side by side,
+    it was shown the same narrow column -- so the stack is what a desktop loses nothing by
+    keeping.
+
+    The panels stay in source order and every one of them is full of buttons, so Tab still
+    walks the session lift by lift and the browser scrolls each panel in as it goes -- a
+    scroll container whose contents are all focusable needs no tabindex of its own. %>
+<div id="lift-panels" class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain sm:block sm:overflow-x-visible">
+<%- session_lifts.each_with_index do |lift, position| %>
+  <section class="mt-6 w-full shrink-0 snap-center px-1 sm:px-0" aria-labelledby="lift-<%= position + 1 %>">
+    <h2 id="lift-<%= position + 1 %>" class="text-xl text-gray-900">
       <%= @exercises[lift.first[:exercise_id]]&.name %>
     </h2>
+    <%# A swipe surface nobody knows is there is worse than the scroll it replaced, so each
+        panel says where it sits. The dots say there are others and roughly where; the count
+        says how many, which dots alone never do. Both are written per panel and are true as
+        rendered, which is why neither needs a scroll listener to stay honest.
+
+        Not on a session of one lift, where there is nowhere to swipe to and "1 of 1" is a
+        line of furniture. Not from 640px up either, where the lifts are stacked and every
+        one of them is visibly on the page already. %>
+    <%- if session_lifts.length > 1 %>
+      <div class="mt-1 flex items-center gap-2 sm:hidden">
+        <div class="flex gap-1" aria-hidden="true">
+          <%- session_lifts.each_index do |dot| %>
+            <div class="h-1.5 w-1.5 rounded-full <%= dot == position ? 'bg-gray-500' : 'bg-gray-300' %>"></div>
+          <%- end %>
+        </div>
+        <p class="text-xs uppercase tracking-wide text-gray-500"><%= position + 1 %> of <%= session_lifts.length %></p>
+      </div>
+    <%- end %>
 
     <%# Small caps in gray-500 is this screen's label register -- Warmup, RPE and Plate
         math all wear it, so that a label is always recognisable as one and never as a
@@ -199,8 +241,16 @@
         </li>
       <%- end %>
     </ul>
+
+    <%# The scale belongs under the buttons that ask for it, and only under those. A panel
+        of nothing but warmups asks for no rating -- the ramp rows carry no RPE row -- so
+        it would be a table answering a question that panel never puts. %>
+    <%- unless lift.all? { |set| set[:is_warmup] } %>
+      <%= render('workouts/_rpe_help') %>
+    <%- end %>
   </section>
 <%- end %>
+</div>
 
 <form action="/workouts/<%= @workout[:id] %>/session" method="post"
       hx-post="/workouts/<%= @workout[:id] %>/session"
@@ -217,3 +267,9 @@
     <%- end %>
   </div>
 </form>
+
+<%# The session rating is the same question at a different scale, and it is the last thing
+    on the page, so it gets the scale under it too. It is also the only copy a session of
+    nothing but warmups renders, which is the right answer: that session has no working set
+    to rate, but it still has this form on it. %>
+<%= render('workouts/_rpe_help') %>
