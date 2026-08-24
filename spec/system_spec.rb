@@ -34,6 +34,11 @@ describe Tectonic do
     fill_in 'password', with: password
     fill_in 'password-confirm', with: password
     click_on 'Sign up'
+    # An account a second old lands on the first-run page, not on the calendar: a month
+    # with nothing on it answers a question a brand new account has not asked yet.
+    assert_includes page.body, 'Start here'
+    # The calendar is still where it was, one tap away in the nav.
+    click_on 'tectonic plates'
     assert_includes page.body, 'Start a new workout'
     click_on 'exit'
     assert_includes page.body, 'Log out'

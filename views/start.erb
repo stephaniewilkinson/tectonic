@@ -1,0 +1,56 @@
+<div class="mx-auto max-w-2xl">
+  <h1 class="text-3xl font-semibold text-gray-900">Start here</h1>
+  <p class="mt-2 text-sm text-gray-600">
+    Tectonic Plates is a barbell log. It keeps what you lifted, works out what to load on
+    the bar, and charts whether the weight is going up.
+  </p>
+  <p class="mt-2 text-sm text-gray-600">
+    What makes it more than a list is that a session is written before it is trained: plan
+    the week, then work off a screen at the rack that ticks each set off as you do it.
+  </p>
+
+  <h2 class="mt-8 text-sm font-semibold text-gray-900">Three things worth doing first</h2>
+  <%# Ordered by how soon each one pays back rather than by how much it does. Logging a
+      single session takes a minute and gives the calendar and the charts something to
+      say; writing a block is an evening's work; an assistant is worth little until there
+      is training for it to read. %>
+  <ol class="mt-3 space-y-4">
+    <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
+      <h3 class="text-sm font-semibold text-gray-900">Log a workout</h3>
+      <p class="mt-1 text-sm text-gray-600">
+        Put in a date and the lifts you did, weight by weight. One session is enough for
+        the calendar and the charts to have something to show.
+      </p>
+      <%# Full width on a phone and only as wide as its words from 640px up: a thumb
+          reaching across a phone screen wants the whole line, and a mouse does not. %>
+      <a href="/workouts/new"
+         class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-lime-500 px-4 text-sm font-semibold text-white shadow-sm hover:bg-lime-600 sm:w-auto">Log a workout</a>
+    </li>
+
+    <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
+      <h3 class="text-sm font-semibold text-gray-900">Write a training block</h3>
+      <p class="mt-1 text-sm text-gray-600">
+        A block is weeks, each week days, each day the lifts you will do. The app turns a
+        week of it into real sessions, warmup ramps and all, on the days you said.
+      </p>
+      <a href="/programs"
+         class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-sky-800 px-4 text-sm font-semibold text-white shadow-sm hover:bg-lime-500 sm:w-auto">Write a block</a>
+    </li>
+
+    <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
+      <h3 class="text-sm font-semibold text-gray-900">Connect an assistant</h3>
+      <p class="mt-1 text-sm text-gray-600">
+        Give Claude or ChatGPT this account's address over MCP and it can plan a block, log
+        a session, or correct a set you typed wrong. It sees your account and nothing else.
+      </p>
+      <a href="/connections"
+         class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:w-auto">Connect an assistant</a>
+    </li>
+  </ol>
+
+  <p class="mt-6 text-sm text-gray-500">
+    Everything you log shows up on
+    <a href="/" class="font-medium text-lime-600 hover:text-lime-500">the calendar</a>,
+    which is the home page from here on.
+  </p>
+</div>
