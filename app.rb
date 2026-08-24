@@ -109,6 +109,20 @@ class Tectonic < Roda
     after_login do
       remember_login
     end
+    # Signing in lands on whatever there is to do rather than on the calendar; where that
+    # is is decided in login_destination below.
+    #
+    # Creating an account is set separately because Rodauth keeps a second default for it
+    # and never consults this one. A brand new account is exactly the case the first-run
+    # page was written for, so leaving that unset is how the page would never be seen by
+    # the only person it is for. account_id rather than a fresh lookup: both routes have
+    # already loaded the account by the time they redirect.
+    #
+    # Neither hook overrides a deep link. Rodauth saves the path of a page that demanded a
+    # login and prefers it, so someone who followed a link to a workout, or to the OAuth
+    # consent screen, still arrives where they were going.
+    login_redirect { scope.login_destination(account_id) }
+    create_account_redirect { scope.login_destination(account_id) }
 
     # The scopes an LLM can be granted, and the RSA keypair that signs (private) and
     # verifies (public) the JWT access tokens the resource server checks locally.
@@ -202,6 +216,15 @@ class Tectonic < Roda
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
+    # The first thing an account with nothing logged sees. A calendar of an empty month
+    # is a true answer to "what have I trained" and a useless one to "what do I do now",
+    # which is the only question a new account has. It stays reachable at its own address
+    # rather than only through the login redirect, so it can be linked to and so someone
+    # who has trained for a year can still come back and read what a block is.
+    r.get('start') do
+      rodauth.require_login
+      view('start')
+    end
     # GET /
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
@@ -514,6 +537,36 @@ class Tectonic < Roda
     end
   end
 
+  # Where a login lands, in the order a lifter would ask for it: a session written for
+  # today, failing that the form for writing one, failing that the first-run page.
+  #
+  # Today's session opens on the gym floor screen rather than on the record page. Someone
+  # opening the app on a day they have training written is about to lift, and the session
+  # screen is the one that ticks a set off with a thumb; the record page reads a session
+  # back afterwards and is a tap away from the session anyway. A session already finished
+  # is not treated as a different case: "fully completed" is a guess about intent -- a set
+  # can still be added, corrected or rated, and all three happen on that same screen --
+  # and second-guessing it would mean asking the sets table on every login to arrive
+  # somewhere a lifter can reach in one tap regardless.
+  #
+  # `date` is a timestamp, so the day is compared on the cast the way Calendar.by_day
+  # does. An equality against a Time would match nothing but a session written at exactly
+  # midnight. Two sessions may share a day and nothing forbids it, so the lowest id wins:
+  # the one written first.
+  #
+  # Two queries rather than one. One could answer both by ordering on "is this dated
+  # today", but no index covers that expression, so it would sort every workout the
+  # account owns; these are both a LIMIT 1 lookup and the second only runs on the days
+  # the first finds nothing.
+  def login_destination(account_id)
+    mine = Workout.where(account_id:)
+    today = mine.where(Sequel.cast(:date, :date) => Date.today).order(:id).first
+    return "/workouts/#{today.id}/session" if today
+    return '/workouts/new' unless mine.empty?
+
+    '/start'
+  end
+
   # The swappable core of the session view -- progress, every lift, and the RPE
   # buttons -- rendered without the layout so htmx can drop it into #session-body
   # after each tap. Without JS the routes redirect and the full page reloads.
@@ -612,6 +665,20 @@ class Tectonic < Roda
     return '' unless set[:is_barbell]
 
     equipment.label(set[:weight])
+  end
+
+  # A yes-or-no fact about a set, as a box that is ticked or left empty. The workout
+  # record asks two of them side by side, under headings that are already questions, and
+  # the words that used to answer them answered different questions in the same column:
+  # "Warmup set" against "No", a tick against "Incomplete". Neither pair can be scanned
+  # down a column the way two boxes can, and neither says which state is the plain one.
+  #
+  # The glyph is hidden from a screen reader and the answer spelled out beside it: an
+  # empty box means nothing read aloud on its own, and "ballot box" is what a reader
+  # otherwise announces for the one that matters least.
+  def ticked(flag, question)
+    "<span aria-hidden=\"true\">#{flag ? '&#9745;' : '&#9744;'}</span>" \
+      "<span class=\"sr-only\">#{h(flag ? question : "not #{question}")}</span>"
   end
 
   # A set's prescription, as one phrase. Work carrying no external load has no weight

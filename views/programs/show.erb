@@ -1,5 +1,8 @@
 <div class="mx-auto max-w-2xl">
-  <a href="/programs" class="text-sm text-gray-500 hover:text-gray-700">&larr; programs</a>
+  <%# inline-flex rather than the default inline box: an inline link's height is its line
+      box, so min-h-11 on it alone is ignored and the way back off this page stays a 17px
+      strip of text. %>
+  <a href="/programs" class="inline-flex min-h-11 items-center text-sm text-gray-500 hover:text-gray-700">&larr; programs</a>
   <h1 class="mt-2 text-3xl font-semibold text-gray-900"><%= h(@program.name) %></h1>
   <p class="mt-1 text-sm text-gray-500">
     <%= @program.weeks %> week<%= 's' unless @program.weeks == 1 %>
@@ -22,7 +25,7 @@
           <%= csrf_tag("/programs/#{@program.id}/generate") %>
           <input type="hidden" name="week" value="<%= week.number %>">
           <button type="submit"
-                  class="rounded-md bg-white px-3 py-1.5 text-sm font-semibold text-gray-700
+                  class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                          shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Generate sessions</button>
         </form>
       </div>
@@ -49,7 +52,7 @@
     <%= csrf_tag("/programs/#{@program.id}/weeks") %>
     <input type="hidden" name="copy_from" value="<%= @program.weeks %>">
     <button type="submit"
-            class="rounded-md bg-lime-500 px-3 py-1.5 text-sm font-semibold text-white
+            class="min-h-11 rounded-md bg-lime-500 px-3 text-sm font-semibold text-white
                    shadow-sm hover:bg-lime-600">Add a week like the last</button>
   </form>
 </div>

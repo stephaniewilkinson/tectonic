@@ -1,14 +1,17 @@
 <form method="post" action="/programs/<%= @program.id %>/days" class="mt-3 flex flex-wrap items-end gap-2">
   <%= csrf_tag("/programs/#{@program.id}/days") %>
   <input type="hidden" name="week" value="<%= week.number %>">
+  <%# 44px and 16px type, for the reasons set out in programs/_lift.erb. The select is the
+      one control here a phone answers with its own picker, and a picker that needs a
+      25px strip hit first is the same problem as any other small target. %>
   <select name="weekday" aria-label="weekday"
-          class="rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+          class="min-h-11 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
     <%- Date::DAYNAMES.each_with_index do |name, index| %>
       <option value="<%= index %>"><%= name %></option>
     <%- end %>
   </select>
   <input type="text" name="focus" autocomplete="off" aria-label="focus" placeholder="focus (optional)"
-         class="w-40 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
-  <button type="submit" class="rounded-md bg-white px-2 py-1 text-sm font-semibold text-gray-700
+         class="min-h-11 w-40 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+  <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Add day</button>
 </form>

@@ -5,6 +5,7 @@ require_relative '../lib/tectonic/mcp'
 require 'json'
 require 'base64'
 require 'digest'
+require 'rexml/document'
 require 'securerandom'
 require 'stringio'
 require 'bcrypt'
@@ -352,6 +353,75 @@ describe 'the OAuth consent screen' do
     assert_includes policy, 'script-src https://cdn.tailwindcss.com'
     assert_includes policy, "frame-ancestors 'none'"
     refute_includes policy, 'form-action'
+  end
+end
+
+# This page is opened from claude.ai or ChatGPT and from nowhere on this site, so the mark
+# at the top of it is the whole of the answer to "am I really on Tectonic". It used to be a
+# line of grey 14px text, which is the weakest answer that question has.
+describe 'the brand mark on the OAuth consent screen' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  before do
+    sign_in
+    consent_page(register_client)
+  end
+
+  it 'draws the logo and still says the name where a screen reader reaches it' do
+    assert_includes last_response.body, 'src="/icons/logo.svg"'
+    assert_match(/<img[^>]*\balt="tectonic plates"/, last_response.body)
+  end
+
+  # The name survives as the image's alt and nowhere else. Leaving the paragraph beside the
+  # mark would print the name twice and read it out twice, so its absence is the assertion.
+  it 'no longer sets the name as a line of body text' do
+    refute_match(%r{<p[^>]*>\s*tectonic plates\s*</p>}, last_response.body)
+  end
+end
+
+# Hand-drawn for this page and served out of assets/ by `plugin :public`, the same route
+# views/workouts/show.erb already takes for its exercise pictograms.
+describe 'the logo the consent screen loads' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  before { get '/icons/logo.svg' }
+
+  it 'is served, and served as an SVG rather than a download' do
+    assert_equal 200, last_response.status
+    assert_includes last_response.headers['content-type'], 'image/svg+xml'
+  end
+
+  # A malformed SVG behind an <img> fails silently: the browser draws the alt text, logs
+  # nothing, and the page looks merely unstyled. This spec exists because it happened here.
+  # A dash written the house way, as two hyphens, is illegal inside an XML comment, and the
+  # mark stopped drawing with no other symptom than an image 24px tall.
+  it 'parses as XML and names itself' do
+    root = REXML::Document.new(last_response.body).root
+
+    assert_equal 'svg', root.name
+    assert_equal 'tectonic plates', root.elements['title'].text
+  end
+end
+
+describe 'what the logo has to carry for itself' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  before { get '/icons/logo.svg' }
+
+  # An SVG behind an <img> is a separate document. It gets none of the page's stylesheet
+  # and none of the Blonde webfonts, and on this page default-src 'none' would refuse it
+  # anything it went looking for, so whatever it draws with has to already be in the file.
+  it 'fetches nothing of its own' do
+    refute_match(/<image\b|@font-face|xlink:href|url\(/, last_response.body)
+  end
+
+  # It is part of the first paint of a page someone is sitting in front of mid-handshake,
+  # and it is small enough to stay hand-editable, which an exported one would not be.
+  it 'weighs well under 3 KB' do
+    assert_operator last_response.body.bytesize, :<, 3 * 1024
   end
 end
 
