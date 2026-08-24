@@ -29,8 +29,18 @@ describe 'creating a movement through the form' do
                          '_csrf' => token_for('/exercises/new') }
     refute Tectonic::Exercise.where(account_id: @account_id).order(:id).last.barbell?
   end
+end
 
-  # The gap the column exists to close: plate math for a movement the library cannot name.
+describe 'a movement the library cannot name' do
+  include Rack::Test::Methods
+  include RouteOwnership
+
+  before { @account_id = login }
+
+  # The gap the column exists to close: plate math for a movement nobody has heard of.
+  # The heading and the breakdown are asserted apart because the markup keeps them in
+  # separate elements -- and the heading is "Plate math" now, not "per side", which is a
+  # phrase this app spends on a rep count taken per side.
   it 'gives its sets the plate breakdown a set of a library movement gets' do
     post '/exercises', { 'name' => invented_name, 'icon_url' => '', 'id' => '',
                          'is_barbell' => '1', '_csrf' => token_for('/exercises/new') }
@@ -41,7 +51,10 @@ describe 'creating a movement through the form' do
                  '_csrf' => token_for(path) }
 
     get "/workouts/#{workout_id}/session"
-    assert_includes last_response.body.dup.force_encoding(Encoding::UTF_8), 'per side 1×45'
+    body = last_response.body.dup.force_encoding(Encoding::UTF_8)
+
+    assert_includes body, 'Plate math'
+    assert_includes body, '1×45'
   end
 end
 

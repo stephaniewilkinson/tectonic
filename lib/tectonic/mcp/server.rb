@@ -4,6 +4,7 @@ require 'mcp'
 require_relative 'config'
 require_relative 'tools/whoami'
 require_relative 'tools/create_exercise'
+require_relative 'tools/update_exercise'
 require_relative 'tools/create_workout'
 require_relative 'tools/create_set'
 require_relative 'tools/complete_set'
@@ -40,7 +41,7 @@ class Tectonic < Roda
       # validation, and auditing come from the base class.
       TOOLS = [
         Tools::Whoami,
-        Tools::CreateExercise, Tools::CreateWorkout, Tools::CreateSet,
+        Tools::CreateExercise, Tools::UpdateExercise, Tools::CreateWorkout, Tools::CreateSet,
         Tools::CompleteSet, Tools::UpdateSet, Tools::DeleteSet, Tools::RateWorkout,
         Tools::ListExercises, Tools::ListWorkouts, Tools::GetWorkout, Tools::ExerciseHistory,
         Tools::ListPrograms, Tools::GetProgram, Tools::CreateProgram,

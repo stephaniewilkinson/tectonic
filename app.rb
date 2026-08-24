@@ -367,16 +367,23 @@ class Tectonic < Roda
         # own variation better than a name ever says. The paths with nobody to ask fall
         # back to the library name instead.
         is_barbell = !r.params['is_barbell'].nil?
+        # The textarea is posted whether or not anyone typed in it, so a blank one has to
+        # become a null rather than an empty string; clean_note is where that is decided
+        # for every write path, this one and the MCP tools alike.
+        note = Exercise.clean_note(r.params['note'])
         if r.params['id'].empty?
           exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'],
-                                        account_id: @account_id, is_barbell:)
+                                        account_id: @account_id, is_barbell:, note:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
-          # accounts' rows don't match, so the edit is refused.
-          @exercise = Exercise.where(id: r.params['id'], account_id: @account_id).first
+          # accounts' rows don't match, so the edit is refused. The note is on the same
+          # side of that line as the name, and has to be: a library movement sits on every
+          # account's page, so a note written to one is a value one account wrote and
+          # everybody else reads.
+          @exercise = Exercise.owned_by(@account_id).where(id: r.params['id']).first
           r.redirect '/exercises' unless @exercise
-          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:)
+          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:, note:)
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end
@@ -672,12 +679,25 @@ class Tectonic < Roda
     @equipment ||= Equipment.for_account(@account_id)
   end
 
-  # Per-side plate breakdown for the session view, blank for anything not loaded
-  # on a bar and for weights this rack cannot make.
+  # What to hang on each side of the bar, as plain text. Blank only for work that is not
+  # on a bar at all, where there are no plates to talk about.
+  #
+  # A weight the rack cannot make used to come back blank too, and blank is the one thing
+  # this line must never be. A lifter reads no plate math as nothing to put on, which on a
+  # 124 lb prescription is both wrong and dangerous, and it goes silent at exactly the
+  # moment the arithmetic is hardest -- mid-session, one-handed, with a rack that does not
+  # divide evenly. So a weight that will not load names the nearest one that will, and a
+  # weight under the bar, which no plates can reach downwards, says that in words.
+  #
+  # The text is plain on purpose: no markup and no entities, so the caller can escape it.
   def plate_label(set)
     return '' unless set[:is_barbell]
 
-    equipment.label(set[:weight])
+    breakdown = equipment.per_side(set[:weight])
+    return Plates.label(breakdown) if breakdown
+
+    weight, nearest = equipment.closest(set[:weight])
+    nearest ? "closest #{weight}: #{Plates.label(nearest)}" : "lighter than your #{equipment.bar_weight} lb bar"
   end
 
   # A yes-or-no fact about a set, as a box that is ticked or left empty. The workout
@@ -748,8 +768,34 @@ class Tectonic < Roda
   # Fill for one of the RPE buttons, highlighting the current rating. Session and set
   # both keep their rating in an rpe column, and the two rows of buttons ask the same
   # question at different scopes, so one helper answers for either.
+  #
+  # Neutral rather than coloured. The selected rating is a third kind of fact, neither the
+  # state the row tint carries nor the action complete_style offers, and it used to be the
+  # very same lime-500 as the Done button beside it -- so one lime meant "tap me" and the
+  # other "already chosen". Black says only "this is the number on record": 17.74:1 on
+  # white, where white on lime-500 was 1.98:1.
   def rpe_style(rated, rpe)
-    rated[:rpe] == rpe ? 'bg-lime-500 text-white' : 'bg-white text-gray-700'
+    rated[:rpe] == rpe ? 'bg-gray-900 text-white' : 'bg-white text-gray-700'
+  end
+
+  # Fill for the button that completes a set or takes it back. The row tint already says
+  # which state the set is in, so this says what tapping will do rather than repeating the
+  # answer: filled for the action on offer, outlined for the one that reverses it.
+  #
+  # Sky and not lime, though a green Done is the obvious choice, because lime is already
+  # spoken for on this screen -- it is the completed state, in the progress bar and in
+  # row_style -- and a lime button sits only on rows that are not done yet. That was the
+  # whole of the muddle: the same green meaning "done" as a tint and "not done" as a
+  # button. One hue for state, one for action, and neither borrows the other's.
+  #
+  # Both states carry a border so the two are the same size and a row does not shift under
+  # the thumb as it toggles. White on sky-800 is 7.56:1 and sky-900 on white is 9.46:1;
+  # the white on lime-500 this replaces was 1.98:1, and the grey it replaces on warmups
+  # was the disabled look worn by an enabled button.
+  def complete_style(set)
+    return 'border-sky-800 bg-white text-sky-900 hover:bg-sky-50' if set[:is_completed]
+
+    'border-sky-800 bg-sky-800 text-white hover:bg-sky-900'
   end
 
   # Border and fill for a set row: still to do, done as written, or done

@@ -16,6 +16,17 @@
     <p class="mt-1 text-xs text-gray-400"><%= provenance(@exercise) %></p>
   <%- end %>
 
+  <%# Above the chart rather than below the sets, because the note is why the movement is
+      in the program and the chart is how it is going -- one is read before the other.
+      A note is free prose, typed either by the account or by the assistant it connected,
+      and what was typed is rendered as the words that were typed -- the tag escapes it,
+      so an h() here would escape it a second time and put the ampersands on the page.
+      whitespace-pre-line keeps the line breaks somebody put between two cues while still
+      wrapping a long line on a phone, which is the one thing pre would not do. %>
+  <%- if @exercise.note %>
+    <p class="mt-4 whitespace-pre-line text-sm text-gray-700"><%= @exercise.note %></p>
+  <%- end %>
+
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>

@@ -17,12 +17,56 @@ class Tectonic < Roda
     # weight cannot be loaded from this inventory at all. `inventory` maps a denomination
     # to the pairs owned; a bare list is read as one pair of each.
     def per_side(total, bar_weight: BAR_WEIGHT, inventory: DEFAULT_INVENTORY)
+      remaining = beyond_the_bar(total, bar_weight)
+      return nil if remaining.nil?
+
+      load(remaining, stock(inventory))
+    end
+
+    # The weight nearest `total` that this rack can actually load, as [weight, breakdown],
+    # or nil for a total under the bar, which no arrangement of plates reaches.
+    #
+    # This exists because `per_side` answers nil for a weight the rack cannot make, and
+    # nil is the one answer that cannot be shown to somebody standing at the bar: no plate
+    # math reads as nothing to put on. Naming the nearest weight the rack can make, and
+    # what it takes, is the answer to the question actually being asked, which is not
+    # "what does 124 need" but "what do I load".
+    #
+    # A tie goes to the lighter bar. Overshooting a prescription adds work nobody asked
+    # for and can turn a planned single into a miss; undershooting by the same amount
+    # costs a little stimulus and nothing else, so the two errors are not worth the same.
+    def closest(total, bar_weight: BAR_WEIGHT, inventory: DEFAULT_INVENTORY)
+      remaining = beyond_the_bar(total, bar_weight)
+      return nil if remaining.nil?
+
+      plates = stock(inventory)
+      best = reachable(remaining, plates).min_by { |sum| [(sum - remaining).abs, sum] }
+      [numeric(bar_weight.to_r + (best * 2)), load(best, plates)]
+    end
+
+    # Half of whatever goes on the bar past the bar itself, or nil when the total is
+    # lighter than the bar and there is no such thing.
+    def beyond_the_bar(total, bar_weight)
       return nil if total.nil?
 
       remaining = (total.to_r - bar_weight.to_r) / 2
-      return nil if remaining.negative?
+      remaining.negative? ? nil : remaining
+    end
 
-      load(remaining, stock(inventory))
+    # Every per-side load this rack can make, in no particular order, always including the
+    # bare bar's zero. A rack is small enough to enumerate outright: two pairs each of five
+    # denominations is 243 arrangements, and `uniq` collapses those to a few dozen distinct
+    # weights, which is why this stays cheap as denominations are added.
+    #
+    # No more of a plate is counted than it takes to reach `target`, since one more than
+    # that already overshoots and can never be the nearest. That cap is also what keeps a
+    # rack given as a bare list -- as many of each as the weight needs -- from enumerating
+    # forever against an infinite pair count.
+    def reachable(target, plates)
+      plates.reduce([0r]) do |sums, (plate, pairs)|
+        most = [pairs, (target / plate).ceil].min
+        (0..most).flat_map { |count| sums.map { |sum| sum + (plate * count) } }.uniq
+      end
     end
 
     # [[denomination, pairs], ...] heaviest first. A hash states how many pairs of each

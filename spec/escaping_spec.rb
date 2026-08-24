@@ -108,6 +108,37 @@ describe 'the helpers that exist to emit markup' do
   end
 end
 
+describe 'a movement note' do
+  include Capybara::DSL
+  include Minitest::Capybara::Behaviour
+
+  # A note is free prose an account or its assistant typed, so it is both the thing that
+  # most needs escaping and the thing most likely to contain an ampersand innocently.
+  # It arrived with h() on it, written before the tag escaped anything, which is the
+  # exact shape of the second mistake: escaped twice and the ampersands reach the page.
+  it 'renders an ampersand as one character rather than as an entity' do
+    account_id = escaping_sign_up
+    exercise = Tectonic::Exercise.create(name: 'Front Squat', account_id:, is_barbell: true,
+                                         note: 'knees out & chest up')
+
+    visit "/exercises/#{exercise.id}"
+
+    assert_includes page.text, 'knees out & chest up'
+    refute_includes page.body, '&amp;amp;'
+  end
+
+  it 'renders markup in a note as text' do
+    account_id = escaping_sign_up
+    exercise = Tectonic::Exercise.create(name: 'Front Squat', account_id:, is_barbell: true,
+                                         note: 'watch <b>valgus</b>')
+
+    visit "/exercises/#{exercise.id}"
+
+    assert_includes page.text, 'watch <b>valgus</b>'
+    assert_equal 0, page.evaluate_script("document.querySelectorAll('p b').length")
+  end
+end
+
 describe 'an entity that passes through an expression' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour

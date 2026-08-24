@@ -8,6 +8,14 @@
       <a href="/workouts/<%= @workout[:id] %>/sets/new" class="block rounded-md bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-gray-500">Add a set</a>
     </div>
   </div>
+  <%# Seven nowrap columns do not fit a phone, and the two that fall off the end are the
+      two a lifter came here to press: this list is the way back to a set typed wrong. The
+      wrapper below scrolls sideways rather than clipping, but a horizontal drag inside a
+      page that scrolls vertically is a gesture nothing on the screen offers -- iOS draws
+      no scrollbar until the drag has already begun. So Warmup and Done stand down below
+      Tailwind's 640px `sm` and come back above it. Neither fact is lost in the meantime:
+      both ride under the exercise name, on a 12px line the column already has the room
+      for -- the two columns are worth more width than the line spends. %>
   <div class="mt-8 flow-root">
     <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
       <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
@@ -17,8 +25,8 @@
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Exercise</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Weight</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Reps</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Warmup</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Done</th>
+              <th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-gray-900 sm:table-cell">Warmup</th>
+              <th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-gray-900 sm:table-cell">Done</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Edit</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Show</th>
             </tr>
@@ -26,11 +34,22 @@
           <tbody class="divide-y divide-gray-200 bg-white">
             <%- @workout.sets.each do |set| %>
               <tr>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900"><%= set.exercise[:name] %></td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
+                  <%= set.exercise[:name] %>
+                  <%- if set[:is_warmup] || set[:is_completed] %>
+                    <div class="text-xs text-gray-400 sm:hidden">
+                      <%= [('warmup' if set[:is_warmup]), ('done' if set[:is_completed])].compact.join(' · ') %>
+                    </div>
+                  <%- end %>
+                </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:weight] %></td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:reps] %></td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:is_warmup] ? 'Warmup' : '—' %></td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:is_completed] ? 'Done' : '—' %></td>
+                <td class="hidden whitespace-nowrap px-3 py-4 text-sm text-gray-500 sm:table-cell">
+                  <%= set[:is_warmup] ? 'Warmup' : '—' %>
+                </td>
+                <td class="hidden whitespace-nowrap px-3 py-4 text-sm text-gray-500 sm:table-cell">
+                  <%= set[:is_completed] ? 'Done' : '—' %>
+                </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                   <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/edit" class="font-medium text-lime-600 hover:text-lime-500">Edit</a>
                 </td>
