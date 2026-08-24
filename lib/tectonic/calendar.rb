@@ -14,8 +14,13 @@ class Tectonic < Roda
   # Skipped is the one worth drawing. A missed session is invisible in a list, because a
   # list only shows what is there, and the whole use of a calendar is seeing the hole.
   module Calendar
-    # Weeks begin on Monday, as they do everywhere else that buckets training.
-    DAY_NAMES = %w[Mon Tue Wed Thu Fri Sat Sun].freeze
+    # Weeks begin on Sunday here and on Monday everywhere that buckets training -- the
+    # volume chart, and the Monday a seeded block opens on. They are not the same week. A
+    # training week is a unit of work and starts where the block starts; a month grid is
+    # read against the calendar already on the wall or the phone, and that one starts on
+    # Sunday. The columns therefore run in Date#wday order, which is why both ends of
+    # `bounds` are a plain subtraction.
+    DAY_NAMES = %w[Sun Mon Tue Wed Thu Fri Sat].freeze
     MONTH = /\A(?<year>\d{4})-(?<month>\d{2})\z/
     # A calendar is a way of reading training, not an archive to wander: far enough back
     # to cover any real history, and far enough forward for a written block.
@@ -56,11 +61,12 @@ class Tectonic < Roda
       end
     end
 
-    # Back to the Monday on or before the first, forward to the Sunday on or after the
-    # last, so the grid is rectangular.
+    # Back to the Sunday on or before the first, forward to the Saturday on or after the
+    # last, so the grid is rectangular. Date#wday counts from Sunday, so each end is one
+    # subtraction; a Monday-first grid had to shift the origin by a modulo at both.
     def bounds(month)
       last = Date.new(month.year, month.month, -1)
-      [month - ((month.wday - 1) % 7), last + ((7 - last.wday) % 7)]
+      [month - month.wday, last + (6 - last.wday)]
     end
 
     def cell(date, month, today, workouts)
