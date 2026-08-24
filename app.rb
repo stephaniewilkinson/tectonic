@@ -603,6 +603,18 @@ class Tectonic < Roda
     render('workouts/_session_body')
   end
 
+  # The session's sets grouped into the lifts they belong to. Insertion order is program
+  # order, so consecutive sets of one movement are one lift and a movement that comes
+  # round twice in a session is two.
+  #
+  # It lives here rather than in the template it serves because the panel row asks for it
+  # three times over -- once to walk it, then inside every panel to number that panel and
+  # to draw a dot per lift -- and a local assigned in one ERB tag and read in the next is
+  # an offence to erb_lint, which hands each tag to rubocop as a program of its own.
+  def session_lifts
+    @session_lifts ||= @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.to_a
+  end
+
   # A set is only reachable through a workout the logged in account owns, so a set
   # id belonging to someone else's workout does not resolve.
   def own_set(set_id, workout_id)
