@@ -1,25 +1,44 @@
 <%# The one thing a lifter does between weeks is change a load, so it is an inline form
     rather than a page of its own. Both prices are shown because they are exclusive: the
     writer refuses a lift that carries neither or both, and the message comes back here. %>
+<%# min-h-11 is 44px, and it is unprefixed on purpose: Tailwind's sm: asks how wide the
+    window is, not what is pointing at it, so resetting the height above 640px would hand
+    the compact row back to a tablet held in landscape, which is all thumb. A pointer
+    loses nothing to a taller box. text-base on the inputs is 16px, the threshold below
+    which iOS Safari zooms the page when a field takes focus and leaves it zoomed; the
+    buttons stay text-sm because nothing focuses them. %>
 <form method="post" action="/programs/<%= @program.id %>/lifts/<%= lift.id %>"
       class="mt-3 flex flex-wrap items-end gap-2 border-t border-gray-100 pt-3">
   <%= csrf_tag("/programs/#{@program.id}/lifts/#{lift.id}") %>
   <span class="w-36 truncate text-sm font-medium text-gray-900"><%= h(lift.exercise.name) %></span>
   <input type="number" name="sets" value="<%= h(lift.sets) %>" min="1" autocomplete="off"
-         aria-label="sets" class="w-14 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+         aria-label="sets" class="min-h-11 w-14 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
   <span class="text-sm text-gray-400">&times;</span>
   <input type="number" name="reps" value="<%= h(lift.reps) %>" min="1" autocomplete="off"
-         aria-label="reps" class="w-14 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+         aria-label="reps" class="min-h-11 w-14 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
   <input type="number" name="top_weight" value="<%= h(lift.top_weight) %>" step="any" autocomplete="off"
          aria-label="pounds" placeholder="lb"
-         class="w-20 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+         class="min-h-11 w-20 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
   <input type="number" name="percent_of_max" value="<%= h(lift.percent_of_max) %>" step="any" autocomplete="off"
          aria-label="percent of max" placeholder="%"
-         class="w-16 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
-  <button type="submit" class="rounded-md bg-white px-2 py-1 text-sm font-semibold text-gray-700
+         class="min-h-11 w-16 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+  <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Save</button>
 </form>
-<form method="post" action="/programs/<%= @program.id %>/lifts/<%= lift.id %>/delete" class="mt-1">
+<%# Deleting a lift cannot be undone, and this used to be a 16px run of red text four
+    pixels of margin under the form holding Save -- the two likeliest taps on the row, with
+    the irreversible one the smaller. It is a button now, 44px tall, and justify-end puts
+    it at the opposite end of the row from Save rather than directly beneath it.
+    Size alone does not make an unconfirmed delete safe, so it asks. hx-confirm only fires
+    on a request htmx owns, and this route answers with a redirect to the whole page rather
+    than a fragment, so hx-boost is what hands htmx the submission: it posts the form,
+    follows the redirect and swaps the page back in, which is what the plain form did
+    anyway. With scripting off the form posts as before and nothing asks -- a gap, but a
+    smaller one than a delete button that does nothing at all without JavaScript. %>
+<form method="post" action="/programs/<%= @program.id %>/lifts/<%= lift.id %>/delete"
+      hx-boost="true" hx-confirm="Remove <%= h(lift.exercise.name) %> from this day? This cannot be undone."
+      class="mt-2 flex justify-end">
   <%= csrf_tag("/programs/#{@program.id}/lifts/#{lift.id}/delete") %>
-  <button type="submit" class="text-xs text-red-700 hover:underline">remove</button>
+  <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-red-700
+                               shadow-sm ring-1 ring-inset ring-red-200 hover:bg-red-50">Remove</button>
 </form>

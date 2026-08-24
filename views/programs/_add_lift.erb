@@ -4,18 +4,20 @@
   <input type="hidden" name="day_id" value="<%= day.id %>">
   <%# A name rather than an id, because the writer resolves a movement by name and creates
       one the account has never used before -- the same rule an assistant gets. %>
+  <%# Sized to match the row this form writes: 44px tall, 16px type in the fields so iOS
+      Safari does not zoom the page when one takes focus. See programs/_lift.erb. %>
   <input type="text" name="exercise" list="movements" required autocomplete="off"
          aria-label="movement" placeholder="movement"
-         class="w-36 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+         class="min-h-11 w-36 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
   <input type="number" name="sets" value="3" min="1" required autocomplete="off"
-         aria-label="sets" class="w-14 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+         aria-label="sets" class="min-h-11 w-14 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
   <span class="text-sm text-gray-400">&times;</span>
   <input type="number" name="reps" value="5" min="1" required autocomplete="off"
-         aria-label="reps" class="w-14 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
+         aria-label="reps" class="min-h-11 w-14 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
   <input type="number" name="top_weight" step="any" autocomplete="off"
          aria-label="pounds" placeholder="lb"
-         class="w-20 rounded-md border-0 px-2 py-1 text-sm shadow-sm ring-1 ring-inset ring-gray-300">
-  <button type="submit" class="rounded-md bg-white px-2 py-1 text-sm font-semibold text-gray-700
+         class="min-h-11 w-20 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+  <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Add lift</button>
 </form>
 <datalist id="movements">
