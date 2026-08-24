@@ -29,10 +29,31 @@ class Tectonic < Roda
       where(account_id:).or(account_id: nil)
     end
 
+    # Rows an account may write to: its own, and never a library row. Reads go through
+    # visible_to, which folds the shared library in, and a write cannot -- a library row
+    # is on every account's page, so a value written to one is a value one account wrote
+    # and every other account reads. The IS NOT NULL is not redundant beside the
+    # equality: a nil account_id arriving here, from a token that resolved no account,
+    # would otherwise mean where(account_id: nil), which is the entire library, handed
+    # back as writable. That is precisely the thing this method exists to refuse.
+    def self.owned_by(account_id)
+      where(account_id:).exclude(account_id: nil)
+    end
+
     # A nil account_id marks a shared library exercise, visible to everyone; any
     # other value is a single account's own.
     def library?
       account_id.nil?
+    end
+
+    # A note as it should be stored: nil when there is nothing in it. The textarea is
+    # posted whether or not anyone typed in it, so "left blank" arrives as an empty
+    # string, and the two spellings read differently afterwards -- '' is truthy, so a
+    # blank note would draw its own empty paragraph above the chart forever. Stripping
+    # first means a note of nothing but whitespace does not count as one either.
+    def self.clean_note(raw)
+      text = raw.to_s.strip
+      text.empty? ? nil : text
     end
 
     # The best estimated max an account's completed sets of this movement support as of a

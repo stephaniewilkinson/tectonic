@@ -17,6 +17,19 @@ h6,
 .serif {
     font-family: Blonde Serif;
 }
+
+/* Names the brand face on the element that wants it, which is the only way the nav can
+   have it. The size rules above are keyed on the class token `text-xl`, and the nav
+   writes `sm:text-xl` -- a different token, which that selector does not match -- so the
+   links rendered in the system sans at every width, phone and desktop alike. Widening
+   the size rule to cover the responsive variants would fix the nav and hand the brand
+   face to every future element that merely happens to be 20px, which is the same bug
+   again. The generic fallback is here and not on the rules above on purpose: the nav is
+   on every page, and if /fonts/ is slow or missing, links dropping to the default serif
+   read as a broken page in a way that a heading doing the same does not. */
+.brand {
+    font-family: "Blonde Sans", sans-serif;
+}
 .myteal {
     background-color: teal;
 }

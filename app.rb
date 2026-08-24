@@ -354,16 +354,23 @@ class Tectonic < Roda
         # own variation better than a name ever says. The paths with nobody to ask fall
         # back to the library name instead.
         is_barbell = !r.params['is_barbell'].nil?
+        # The textarea is posted whether or not anyone typed in it, so a blank one has to
+        # become a null rather than an empty string; clean_note is where that is decided
+        # for every write path, this one and the MCP tools alike.
+        note = Exercise.clean_note(r.params['note'])
         if r.params['id'].empty?
           exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'],
-                                        account_id: @account_id, is_barbell:)
+                                        account_id: @account_id, is_barbell:, note:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
-          # accounts' rows don't match, so the edit is refused.
-          @exercise = Exercise.where(id: r.params['id'], account_id: @account_id).first
+          # accounts' rows don't match, so the edit is refused. The note is on the same
+          # side of that line as the name, and has to be: a library movement sits on every
+          # account's page, so a note written to one is a value one account wrote and
+          # everybody else reads.
+          @exercise = Exercise.owned_by(@account_id).where(id: r.params['id']).first
           r.redirect '/exercises' unless @exercise
-          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:)
+          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:, note:)
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end
