@@ -11,7 +11,15 @@
   <body>
     <main>
       <div class="max-w-5xl mx-auto px-4">
-        <p class="pt-6 text-center text-sm font-medium text-gray-500">tectonic plates</p>
+        <%# This page is reached from claude.ai or ChatGPT and from nowhere on this site, and
+            one tap on it hands an API client the account, so the mark at the top is the whole
+            of the answer to "am I really on Tectonic". A line of grey 14px text was the
+            weakest answer available. The alt is the name rather than "logo" because when the
+            image does not draw, that is all that is left to say whose consent screen this is.
+            It is deliberately not a link: the only ways out of this flow should be the two
+            buttons at the bottom of the form. 224px wide on a phone and 256px from 640px up,
+            which reads as a brand mark rather than a favicon without becoming the page. %>
+        <img src="/icons/logo.svg" alt="tectonic plates" class="mx-auto mt-6 w-56 sm:w-64">
         <%= yield %>
       </div>
     </main>

@@ -61,8 +61,44 @@ describe 'a workout logged by hand' do
     assert_equal :performed, workout_for(@account_id, date: Date.today - 30).status
   end
 
-  it 'is planned only when it was deliberately dated ahead' do
+  it 'is planned when it was deliberately dated ahead' do
     assert_equal :planned, workout_for(@account_id, date: Date.today + 5).status
+  end
+end
+
+# Today is the boundary this whole distinction turns on, so it gets a block of its own:
+# both kinds of session dated today, before anything has been lifted and after.
+describe 'a session dated today' do
+  before do
+    @account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
+  end
+
+  # The row from the issue. Nothing has been lifted in it and there is no program day to
+  # mark it as written, so it used to fall past every clause and come out as history.
+  it 'is a plan when it was logged by hand and nothing has been lifted' do
+    assert_equal :planned, workout_for(@account_id, date: Date.today).status
+  end
+
+  # A generated session dated today already read as a plan, and through program_day_id
+  # rather than through its date at all. Pinned so that what today's programmed session
+  # rests on is visibly not the comparison this fix changed.
+  it 'is a plan when it came from a program day' do
+    day = program_day_for(@account_id)
+    assert_equal :planned, workout_for(@account_id, date: Date.today, program_day_id: day.id).status
+  end
+
+  it 'turns into history as soon as one set in it is lifted' do
+    workout = workout_for(@account_id, date: Date.today)
+    log_one_set(workout, is_completed: true)
+    assert_equal :performed, workout.status
+  end
+
+  # Both neighbours, so the boundary cannot quietly move by a day again: yesterday is
+  # over, and an untouched session logged for it is a record of a day that has been and
+  # gone, while tomorrow has not started.
+  it 'sits between a yesterday that is history and a tomorrow that is a plan' do
+    assert_equal :performed, workout_for(@account_id, date: Date.today - 1).status
+    assert_equal :planned, workout_for(@account_id, date: Date.today + 1).status
   end
 end
 
@@ -88,6 +124,21 @@ describe 'the workouts index' do
     workout_for(account_id, date: Date.today - 2)
     get '/workouts'
     positions = ['Upcoming', (Date.today + 2).strftime('%b %d, %Y'), 'History',
+                 (Date.today - 2).strftime('%b %d, %Y')].map { |text| last_response.body.index(text) }
+    assert_equal positions.compact.sort, positions
+  end
+
+  # The issue as a lifter meets it. Opening the page mid-morning, before anything has
+  # been lifted, the row wanted is the one for today, and it used to be filed under
+  # History with the sessions that are over. Asserted through the rendered page rather
+  # than against the status symbol, because the partition is what actually decides
+  # which of the two tables a session is drawn into.
+  it "puts today's untouched session under Upcoming and not under History" do
+    account_id = login
+    workout_for(account_id, date: Date.today)
+    workout_for(account_id, date: Date.today - 2)
+    get '/workouts'
+    positions = ['Upcoming', Date.today.strftime('%b %d, %Y'), 'History',
                  (Date.today - 2).strftime('%b %d, %Y')].map { |text| last_response.body.index(text) }
     assert_equal positions.compact.sort, positions
   end
