@@ -47,8 +47,8 @@ describe 'signing in with nothing logged' do
   it 'lands there when the account was made a moment ago, not on an empty calendar' do
     email = "#{SecureRandom.hex}@example.com"
     get '/create-account'
-    post '/create-account', { login: email, 'login-confirm' => email, password: 'pw12345678',
-                              'password-confirm' => 'pw12345678', '_csrf' => token_from(last_response.body) }
+    post '/create-account', { login: email, password: 'pw12345678',
+                              '_csrf' => token_from(last_response.body) }
     assert_equal '/start', last_response.headers['location']
   end
 end

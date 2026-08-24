@@ -26,13 +26,23 @@ describe Tectonic do
     assert_includes last_response.body, 'stephanie'
   end
 
+  # The sign-in page carried a "Forgot password?" link at href="#" from the day it was
+  # written. reset_password is not in the enable list and this app configures no mailer, so
+  # there was nothing behind it and nothing to put behind it. It is pinned rather than
+  # trusted because a dead link and a live one are the same shape on the page, and the
+  # cheapest way to make this promise again is to paste the markup back.
+  it 'promises no way back into an account that it cannot deliver' do
+    get '/login'
+
+    assert last_response.ok?
+    refute_includes last_response.body, 'href="#"'
+  end
+
   it 'lets new user sign up' do
     visit '/'
     click_on 'Sign up'
     fill_in 'email', with: email
-    fill_in 'email-confirm', with: email
     fill_in 'password', with: password
-    fill_in 'password-confirm', with: password
     click_on 'Sign up'
     # An account a second old lands on the first-run page, not on the calendar: a month
     # with nothing on it answers a question a brand new account has not asked yet.
@@ -52,9 +62,7 @@ describe Tectonic do
     visit '/'
     click_on 'Sign up'
     fill_in 'email', with: mail
-    fill_in 'email-confirm', with: mail
     fill_in 'password', with: pw
-    fill_in 'password-confirm', with: pw
     click_on 'Sign up'
 
     visit '/workouts/new'

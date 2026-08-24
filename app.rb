@@ -119,6 +119,21 @@ class Tectonic < Roda
            :oauth_client_credentials_grant, :oauth_jwt,
            :oauth_resource_indicators, :oauth_dynamic_client_registration,
            :oauth_token_introspection, :oauth_token_revocation
+    # Sign-up asks for the address once and the password once. Rodauth defaults both of
+    # these to true and enforces them on the post rather than in the template, so deleting
+    # the two confirmation boxes from views/create-account.erb without turning these off
+    # leaves every sign-up rejected for disagreeing with a parameter the form no longer
+    # sends -- and the message names a field that is not on the page.
+    #
+    # What the password confirmation was buying is a typo nobody can see, and it is not
+    # bought anywhere else: reset_password is not in the enable list above and there is no
+    # mailer in this app, so an account created under a mistyped password is gone. The
+    # remaining box says autocomplete="new-password", which asks a password manager to
+    # generate and keep the credential instead of leaving a human to type it twice; that
+    # is the whole of the mitigation, and it is worth reading the note in
+    # views/create-account.erb before removing it.
+    require_login_confirmation? false
+    require_password_confirmation? false
     after_login do
       remember_login
     end
