@@ -18,12 +18,13 @@
 
   <%# Above the chart rather than below the sets, because the note is why the movement is
       in the program and the chart is how it is going -- one is read before the other.
-      h() because a note is free prose, typed either by the account or by the assistant
-      it connected, and what was typed is rendered as the words that were typed.
+      A note is free prose, typed either by the account or by the assistant it connected,
+      and what was typed is rendered as the words that were typed -- the tag escapes it,
+      so an h() here would escape it a second time and put the ampersands on the page.
       whitespace-pre-line keeps the line breaks somebody put between two cues while still
       wrapping a long line on a phone, which is the one thing pre would not do. %>
   <%- if @exercise.note %>
-    <p class="mt-4 whitespace-pre-line text-sm text-gray-700"><%= h(@exercise.note) %></p>
+    <p class="mt-4 whitespace-pre-line text-sm text-gray-700"><%= @exercise.note %></p>
   <%- end %>
 
   <%- if @sets.empty? %>
@@ -40,7 +41,7 @@
             in January and again in June draws two points either side of an empty plot.
             min: nil lets the axis fit the weights instead of starting at zero, which
             nobody lifts and which flattens a season of progress into the top inch. %>
-        <%= line_chart(@heaviest_by_day, ytitle: 'Weight', curve: false, min: nil, discrete: true) %>
+        <%== line_chart(@heaviest_by_day, ytitle: 'Weight', curve: false, min: nil, discrete: true) %>
       </div>
     <%- end %>
 

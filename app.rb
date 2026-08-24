@@ -85,7 +85,20 @@ class Tectonic < Roda
   plugin :json
   plugin :json_parser
   plugin :public, root: 'assets'
-  plugin :render
+  # Escaping is the default and markup is the exception that has to say so. Roda's render
+  # plugin leaves `<%= %>` raw unless told otherwise, which made every safe view look
+  # exactly like an unsafe one and rested the whole of this app's HTML safety on somebody
+  # remembering `h()` at each of a hundred-odd sites. Seventeen of them had not, two inside
+  # a `value="..."`, where a name holding a double quote leaves the attribute, and five
+  # behind a helper that reads as text at its call sites but interpolates a client-supplied
+  # name. That last one is the argument for the default rather than for seventeen fixes: a
+  # site can be safe on the day it is written and stop being safe when a helper changes
+  # under it, and nothing about the call site would show it.
+  # Inverted, a forgotten call is no longer a hole, and the places that genuinely emit
+  # markup -- the layout's asset tags, every partial and `yield`, the CSRF tags, the chart
+  # helpers, `ticked` -- are written `<%==`, which can be grepped for in a way that the
+  # absence of a call never could.
+  plugin :render, escape: true
   # A failed CSRF check is a refusal, not a crash: Roda's default raises, which reaches
   # the client as a 500 and reads like a server fault rather than the rejection it is.
   # This matters most on the OAuth authorize POST, the one form here whose forgery is
@@ -712,6 +725,10 @@ class Tectonic < Roda
   # The glyph is hidden from a screen reader and the answer spelled out beside it: an
   # empty box means nothing read aloud on its own, and "ballot box" is what a reader
   # otherwise announces for the one that matters least.
+  #
+  # This is one of the few things here that really is markup, so its call sites are
+  # `<%==`. The question is escaped on the way in, since a caller could one day pass one
+  # that came from an account rather than from the two literals in the workout record.
   def ticked(flag, question)
     "<span aria-hidden=\"true\">#{flag ? '&#9745;' : '&#9744;'}</span>" \
       "<span class=\"sr-only\">#{h(flag ? question : "not #{question}")}</span>"
@@ -721,8 +738,12 @@ class Tectonic < Roda
   # rather than a weight of zero, so there is nothing to put before the reps: "0 × 10" was
   # the workaround this replaced and read as a mistake, and an empty cell where a number
   # belongs reads as missing data rather than as the movement being the load.
+  #
+  # The times sign is the character and not `&times;`, because this phrase is a value that
+  # a template escapes rather than markup a template trusts. An entity written here would
+  # arrive on the page spelled out rather than drawn.
   def load_label(set)
-    "#{"#{set[:weight]} &times; " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+    "#{"#{set[:weight]} × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
   end
 
   # What a set counts. Seconds read as a duration rather than as a rep count, because

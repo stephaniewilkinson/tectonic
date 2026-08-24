@@ -51,7 +51,7 @@
                       hx-post="/workouts/<%= workout[:id] %>/delete"
                       hx-target="closest tr"
                       hx-swap="outerHTML">
-                  <%= csrf_tag("/workouts/#{workout[:id]}/delete") %>
+                  <%== csrf_tag("/workouts/#{workout[:id]}/delete") %>
                   <button type="submit" class="font-medium text-red-600 hover:text-red-800">Delete</button>
                 </form>
               </td>

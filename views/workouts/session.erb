@@ -24,6 +24,6 @@
   <div id="session-body"
        hx-on::before-swap="this.dataset.stripScroll = this.querySelector('#lift-strip').scrollLeft"
        hx-on::after-swap="this.querySelector('#lift-strip').scrollLeft = this.dataset.stripScroll">
-    <%= render('workouts/_session_body') %>
+    <%== render('workouts/_session_body') %>
   </div>
 </div>

@@ -1,5 +1,5 @@
 <form method="post" action="/programs/<%= @program.id %>/days" class="mt-3 flex flex-wrap items-end gap-2">
-  <%= csrf_tag("/programs/#{@program.id}/days") %>
+  <%== csrf_tag("/programs/#{@program.id}/days") %>
   <input type="hidden" name="week" value="<%= week.number %>">
   <%# 44px and 16px type, for the reasons set out in programs/_lift.erb. The select is the
       one control here a phone answers with its own picker, and a picker that needs a

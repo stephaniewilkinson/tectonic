@@ -105,7 +105,7 @@
               <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                     hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                     hx-target="#session-body" hx-swap="innerHTML">
-                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
                 <button type="submit"
                         class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
                   <%= set[:is_completed] ? 'Undo' : 'Done' %>
@@ -136,7 +136,7 @@
               <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                     hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                     hx-target="#session-body" hx-swap="innerHTML" class="mt-1 flex items-end gap-2">
-                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
                 <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                   Weight
                   <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
@@ -181,7 +181,7 @@
               <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                     hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                     hx-target="#session-body" hx-swap="innerHTML">
-                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
                 <button type="submit"
                         class="rounded-xl border px-5 py-3 text-base font-semibold shadow-sm <%= complete_style(set) %>">
                   <%= set[:is_completed] ? 'Undo' : 'Done' %>
@@ -196,7 +196,7 @@
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
-              <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <span class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
               <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
                   row rather than leaving dead space, so the targets are as wide as the
@@ -213,7 +213,7 @@
               <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                     hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                     hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
-                <%= csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+                <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
                 <%# step="5" here was never a 5 lb grid. HTML counts steps from a step base,
                     which is the min attribute if there is one and otherwise the value
                     attribute -- and value is this row's own weight. So a row sitting at 138
@@ -260,7 +260,7 @@
           asks, and the lifter would have to decide that for themselves five times a
           session. %>
       <%- if lift.any? { |set| !set[:is_warmup] } %>
-        <%= render('workouts/_rpe_help') %>
+        <%== render('workouts/_rpe_help') %>
       <%- end %>
     </section>
   <%- end %>
@@ -270,7 +270,7 @@
       hx-post="/workouts/<%= @workout[:id] %>/session"
       hx-target="#session-body" hx-swap="innerHTML"
       class="mt-10 border-t border-gray-300 pt-4">
-  <%= csrf_tag("/workouts/#{@workout[:id]}/session") %>
+  <%== csrf_tag("/workouts/#{@workout[:id]}/session") %>
   <h2 class="text-xl text-gray-900">Session RPE</h2>
   <p class="text-xs text-gray-500">How hard was the whole session?</p>
   <div class="mt-2 flex gap-2">
@@ -282,5 +282,5 @@
   </div>
   <%# The session's own rating is the same question the per-set buttons ask, and it is
       asked out here rather than on any one panel, so it keeps a copy of the answer. %>
-  <%= render('workouts/_rpe_help') %>
+  <%== render('workouts/_rpe_help') %>
 </form>
