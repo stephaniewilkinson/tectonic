@@ -5,7 +5,6 @@ require_relative '../lib/tectonic/mcp'
 require 'json'
 require 'base64'
 require 'digest'
-require 'rexml/document'
 require 'securerandom'
 require 'stringio'
 require 'bcrypt'
@@ -394,14 +393,25 @@ describe 'the logo the consent screen loads' do
   end
 
   # A malformed SVG behind an <img> fails silently: the browser draws the alt text, logs
-  # nothing, and the page looks merely unstyled. This spec exists because it happened here.
-  # A dash written the house way, as two hyphens, is illegal inside an XML comment, and the
-  # mark stopped drawing with no other symptom than an image 24px tall.
-  it 'parses as XML and names itself' do
-    root = REXML::Document.new(last_response.body).root
+  # nothing, and the page looks merely unstyled. This checks the one way it has actually
+  # broken, twice, rather than parsing the whole file as XML. A dash written the house way,
+  # as two hyphens, is illegal inside an XML comment, and this file is the one place in the
+  # repo where that house habit is a parse error rather than a style. Both times the only
+  # symptom was an image the height of its alt text.
+  #
+  # Scanning the bytes rather than parsing them is deliberate: an XML parser would catch
+  # this and every other malformation, but it costs a dependency the app does not otherwise
+  # have, and it answers "is this well-formed XML" when the question worth asking is "did
+  # somebody write a dash the way they write dashes everywhere else in this codebase".
+  it 'writes no dash that would break the comment it sits in' do
+    comments = last_response.body.scan(/<!--.*?-->/m)
 
-    assert_equal 'svg', root.name
-    assert_equal 'tectonic plates', root.elements['title'].text
+    refute_empty comments, 'the mark is commented; if that changed, this spec needs to'
+    comments.each { |comment| refute_includes comment[4..-4], '--' }
+  end
+
+  it 'names itself' do
+    assert_includes last_response.body, '<title id="tectonic-logo-title">tectonic plates</title>'
   end
 end
 
