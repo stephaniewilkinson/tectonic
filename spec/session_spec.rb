@@ -13,9 +13,7 @@ def sign_up_for_session
   visit '/'
   click_on 'Sign up'
   fill_in 'email', with: email
-  fill_in 'email-confirm', with: email
   fill_in 'password', with: password
-  fill_in 'password-confirm', with: password
   click_on 'Sign up'
   DB[:accounts].where(email:).get(:id)
 end

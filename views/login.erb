@@ -24,12 +24,15 @@
       </div>
 
       <div>
-        <div class="flex items-center justify-between">
-          <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
-          <div class="text-sm">
-            <a href="#" class="font-semibold text-lime-500 hover:text-lime-500">Forgot password?</a>
-          </div>
-        </div>
+        <%# A "Forgot password?" sat beside this label at href="#" for as long as the page
+            existed. reset_password is not in the enable list in app.rb and this app
+            configures no mailer, so there has never been anything behind it: it promised a
+            way back in at the one moment somebody needs one, and then declined. Nothing
+            replaces it, not even a line saying recovery does not exist, because that
+            sentence would sit under every sign-in forever to deliver a verdict rather than
+            a remedy. The link belongs here again once reset_password is enabled and a mail
+            provider is wired up, and not before. %>
+        <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
         <div class="mt-2">
           <input id="password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>

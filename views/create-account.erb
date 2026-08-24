@@ -14,35 +14,26 @@
               name the identifier the same way. An account here is only ever identified by
               its address, so "email" is what this field is. "username" was tried and
               reverted; the note on views/login.erb has the argument for it and says when
-              it would be worth trying again. The confirmation below is "email" too, and
-              always was: it is the same address typed twice. %>
+              it would be worth trying again. %>
           <input id="email" name="login" type="email" autocomplete="email" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>
       </div>
-      <div>
-        <label for="email-confirm" class="block text-sm font-medium leading-6 text-gray-900">Confirm email address</label>
-        <div class="mt-2">
-          <input id="email-confirm" name="login-confirm" type="email" autocomplete="email" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
-        </div>
-      </div>
-      <%# Both password boxes say "new-password". They said "off", which on a sign-up form
-          is the instruction not to save the password -- and Safari and iOS Keychain obey
-          it, so the phone declined to remember an account it had just watched being
-          created. "new-password" is the opposite instruction: no such credential exists
-          yet, offer to generate one and offer to keep it. The confirmation box carries
-          the same token deliberately, because that is what lets a manager put the
-          generated password into both boxes rather than into one and leave the form
-          refusing to submit. %>
+      <%# The password box says "new-password". It said "off", which on a sign-up form is
+          the instruction not to save the password -- and Safari and iOS Keychain obey it,
+          so the phone declined to remember an account it had just watched being created.
+          "new-password" is the opposite instruction: no such credential exists yet, offer
+          to generate one and offer to keep it.
+
+          It carries more weight than it did when there were two boxes. This form used to
+          catch a typo by asking for the password again and no longer does, and nothing
+          else catches one either, because there is no password reset in this app. A
+          manager that generates the password and keeps it is the whole of what stands
+          between a slip here and an account nobody can open. app.rb turns Rodauth's
+          confirmation requirements off to match the boxes this form actually renders. %>
       <div>
         <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
         <div class="mt-2">
           <input id="password" name="password" type="password" autocomplete="new-password" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
-        </div>
-      </div>
-      <div>
-        <label for="password-confirm" class="block text-sm font-medium leading-6 text-gray-900">Confirm password</label>
-        <div class="mt-2">
-          <input id="password-confirm" name="password-confirm" type="password" autocomplete="new-password" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
         </div>
       </div>
       <div>

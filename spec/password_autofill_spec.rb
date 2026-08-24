@@ -5,8 +5,8 @@ require 'rack/test'
 require 'securerandom'
 
 # What the two account forms tell a password manager to do with the credential. iOS
-# Keychain would not offer to save an account created here, and the markup said why: both
-# password boxes on the sign-up form carried autocomplete="off", which is precisely the
+# Keychain would not offer to save an account created here, and the markup said why: every
+# password box on the sign-up form carried autocomplete="off", which is precisely the
 # instruction not to save a password. These tokens are asserted rather than looked at
 # because nothing on the page moves when one of them is wrong -- the form renders the
 # same, submits the same and passes every other spec, and the damage only appears on
@@ -78,11 +78,13 @@ describe 'the sign-up form' do
 
   before { get '/create-account' }
 
-  # The confirmation box takes the same token on purpose: it is what lets a manager put a
-  # generated password into both boxes instead of one, leaving the form unsubmittable.
+  # This token carries more weight than it used to. The form no longer asks for the
+  # password twice, and nothing else in this app catches a typo in it: there is no
+  # password reset, so a slip on this one box costs the account. "new-password" is the
+  # instruction that makes a manager offer to generate the password and keep it, which is
+  # the only thing standing in for the confirmation box that used to be here.
   it 'offers the new credential for saving instead of refusing it' do
     assert_equal 'new-password', autocomplete('password')
-    assert_equal 'new-password', autocomplete('password-confirm')
     refute_includes last_response.body, 'autocomplete="off"'
   end
 
@@ -90,11 +92,18 @@ describe 'the sign-up form' do
   # identifier the same way, so the two tokens are asserted against each other.
   it 'names the identifier the same way the sign-in form does' do
     assert_equal 'email', autocomplete('login')
-    assert_equal 'email', autocomplete('login-confirm')
+  end
+
+  # Nobody types either of these twice any more. Asserting the boxes are gone is cheap
+  # next to what putting one back silently costs: Rodauth stops requiring a confirmation
+  # it is not shown, so a re-added box would be collected, ignored and never compared.
+  it 'asks for neither the address nor the password a second time' do
+    assert_nil field('login-confirm')
+    assert_nil field('password-confirm')
   end
 
   it 'writes one id per field and no id twice' do
-    assert_one_id_each 'login', 'login-confirm', 'password', 'password-confirm'
+    assert_one_id_each 'login', 'password'
     assert_labels_resolve
   end
 end
@@ -104,10 +113,15 @@ describe 'the names an account form posts under' do
   include AuthForm
 
   # The ids on these forms are ours, but the names are Rodauth's: it reads the address out
-  # of a parameter called "login" and the two confirmations out of "login-confirm" and
-  # "password-confirm", none of which this app overrides. Tidying an id is one careless
-  # keystroke away from renaming a field, so the form is filled in from the names it
-  # actually renders and Rodauth is asked whether it recognised them.
+  # of a parameter called "login", which this app does not override. Tidying an id is one
+  # careless keystroke away from renaming a field, so the form is filled in from the names
+  # it actually renders and Rodauth is asked whether it recognised them.
+  #
+  # That question is now the one that matters most on this file. Removing the confirmation
+  # boxes from the markup is not what removed the confirmations: Rodauth defaults to
+  # demanding "login-confirm" and "password-confirm" on the post and refuses without them,
+  # so this passes only while require_login_confirmation? and require_password_confirmation?
+  # are both false in app.rb. Undo either and every sign-up in the app fails here.
   it 'creates an account from exactly the fields it renders' do
     get '/create-account'
     email = "#{SecureRandom.hex}@example.com"

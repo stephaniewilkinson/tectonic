@@ -26,9 +26,7 @@ def escaping_sign_up
   password = SecureRandom.hex
   visit '/create-account'
   fill_in 'email', with: email
-  fill_in 'email-confirm', with: email
   fill_in 'password', with: password
-  fill_in 'password-confirm', with: password
   click_on 'Sign up'
   DB[:accounts].where(email:).get(:id)
 end
