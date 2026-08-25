@@ -1,13 +1,17 @@
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
   <h3 class="text-5xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h3>
   <div class="flex flex-col gap-2">
-    <a href="/workouts/<%= @workout[:id] %>/session" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-gray-500 bg-sky-800 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
+    <%# Both of these used to hover to gray-500, which on a control means disabled. It kept
+        surviving review because white on gray-500 is 4.83:1 and white on lime-500 is 1.98:1,
+        so the broken state was the more legible one. Each colour steps one down its own scale
+        now, sky included -- a secondary that turns primary under the pointer is no hierarchy. %>
+    <a href="/workouts/<%= @workout[:id] %>/session" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-sky-900 bg-sky-800 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
         <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm14.024-.983a1.125 1.125 0 010 1.966l-5.603 3.113A1.125 1.125 0 019 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113z" clip-rule="evenodd" />
       </svg>
       Run session
     </a>
-    <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-gray-500 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
+    <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="inline-flex items-center gap-x-1.5 rounded-xl hover:bg-lime-600 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-500">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
         <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z" clip-rule="evenodd" />
       </svg>
