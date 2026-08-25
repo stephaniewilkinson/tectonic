@@ -67,19 +67,6 @@ module Programming
   def classes_of(control)
     control.last[/class="([^"]*)"/, 1].to_s
   end
-
-  # The same account the Rack::Test helpers make, made through the forms instead, because
-  # a browser spec needs the cookie in the browser rather than in a Rack::Test session.
-  def sign_up_in_the_browser
-    password = SecureRandom.hex
-    email = "#{SecureRandom.hex}@example.com"
-    visit '/'
-    click_on 'Sign up'
-    fill_in 'email', with: email
-    fill_in 'password', with: password
-    click_on 'Sign up'
-    DB[:accounts].where(email:).get(:id)
-  end
 end
 
 describe 'the programs list' do
@@ -269,49 +256,35 @@ describe 'the two controls in the editor that are not a field' do
     assert_includes classes_of(back), 'inline-flex'
   end
 
-  # Removing a lift cannot be undone and the button sits on the same row as Save, so it
-  # asks. hx-confirm only fires on a request htmx owns, and this route answers with a
-  # redirect rather than a fragment, so hx-boost is what hands htmx the submission.
-  it 'asks before the delete it cannot undo' do
+  # Removing a lift cannot be undone and it asked for a while, through an hx-confirm that
+  # needed hx-boost to fire. Deleting a whole session asks nothing, so the app disagreed
+  # with itself about "this cannot be undone"; it now agrees, at the end that does not ask.
+  # This pins the plain post, because the way back is two attributes on one line.
+  it 'posts the delete as an ordinary form, asking nothing' do
     form = last_response.body[%r{<form[^>]*/delete"[^>]*>}]
 
-    assert_includes form, 'hx-confirm='
-    assert_includes form, 'hx-boost='
+    refute_includes form, 'hx-confirm='
+    refute_includes form, 'hx-boost='
   end
 end
 
-# Whether the dialog actually appears is not something the HTML can be read for, and it is
-# the part of this that had to be tried before it was believed: hx-boost turns the plain
-# post into one htmx makes, and htmx follows the redirect and swaps the page back in.
-describe 'removing a lift in a browser that runs the htmx' do
-  include Minitest::Capybara::Behaviour
-  include BrowserSpec
+# This used to be a browser spec, because a confirm dialog is not something the markup can
+# be read for and hx-boost swapping the page back in had to be watched. Neither is here
+# now: the post is an ordinary browser navigation, and Rack::Test can follow one.
+describe 'removing a lift' do
+  include Rack::Test::Methods
   include Programming
 
-  before do
-    account = sign_up_in_the_browser
-    @program, _week, @day = block_for(account, name: "Block #{SecureRandom.hex(4)}")
-    lift_in(@day, account)
-    visit "/programs/#{@program.id}"
-  end
+  it 'takes the lift off the day and lands back on the block' do
+    account = sign_up
+    program, _week, day = block_for(account)
+    lift = lift_in(day, account)
+    action = "/programs/#{program.id}/lifts/#{lift.id}/delete"
+    post action, { '_csrf' => token_for("/programs/#{program.id}", action) }
 
-  it 'leaves the lift alone when the question is refused' do
-    dismiss_confirm { click_button 'Remove' }
-    visit "/programs/#{@program.id}"
-
-    assert_equal 1, Tectonic::ProgramLift.where(program_day_id: @day.id).count
-    assert page.has_button?('Remove')
-  end
-
-  # The flag survives an htmx swap and dies in a page load, which is what tells the two
-  # apart and proves the confirmed delete never navigated away from the block.
-  it 'removes it once the question is answered, without leaving the page' do
-    page.execute_script('window.stayedOnPage = true')
-    accept_confirm { click_button 'Remove' }
-
-    assert page.has_no_button?('Remove'), 'the removed lift should leave the day'
-    assert page.evaluate_script('window.stayedOnPage === true')
-    assert_equal 0, Tectonic::ProgramLift.where(program_day_id: @day.id).count
+    assert_equal 302, last_response.status
+    assert_includes last_response.headers['Location'], "/programs/#{program.id}"
+    assert_equal 0, Tectonic::ProgramLift.where(program_day_id: day.id).count
   end
 end
 
