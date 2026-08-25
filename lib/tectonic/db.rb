@@ -16,6 +16,17 @@ DB.extension :date_arithmetic
 # Hash and can be written with Sequel.pg_jsonb.
 DB.extension :pg_json
 
-# Hide sequel's logging unless we're in test mode
-DB.loggers << Logger.new($stdout) unless ENV['RACK_ENV'] == 'test'
+# Sequel logs each statement with its bound values, so a logger attached here writes out
+# the email address on an accounts row and every weight and rep somebody has recorded.
+# That is fine on your own machine, where the data is yours and reading the SQL is the
+# point, and wrong on a deployment, where the lines go to a log store nobody chose to keep
+# a training log in, are retained and billed by the host, and cost a formatted line per
+# query on the request path. This read `unless RACK_ENV == 'test'` for years, which
+# quietened the suite and left development and production both logging everything.
+#
+# DB_LOG turns the log on wherever it is set, which is what makes tracing a real query
+# against a deployment possible for as long as it takes and no longer. Empty counts as
+# unset, as it does everywhere else here, because a name listed in a .env without a value
+# arrives as "".
+DB.loggers << Logger.new($stdout) if ENV['RACK_ENV'] == 'development' || !ENV.fetch('DB_LOG', nil).to_s.empty?
 

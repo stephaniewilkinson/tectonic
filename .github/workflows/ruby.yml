@@ -46,8 +46,6 @@ jobs:
       # Roda's sessions plugin rejects a secret under 64 bytes, and app.rb builds
       # the app at require time, so a short one fails the suite before it starts.
       SESSION_SECRET: ci-only-session-secret-not-a-real-credential-padded-to-roda-64-byte-minimum
-      # The system spec drives a real Firefox; there is no display on a runner.
-      MOZ_HEADLESS: '1'
 
     steps:
       - uses: actions/checkout@v4
@@ -62,14 +60,63 @@ jobs:
           ruby-version: .ruby-version
           bundler-cache: true # runs 'bundle install' and caches installed gems automatically
 
+      - name: Migrate the test database
+        run: DATABASE_URL="$TEST_DATABASE_URL" bundle exec rake db:migrate
+
+      - name: Run the specs that never open a browser
+        run: bundle exec rake test:rack
+
+  # The handful of files that drive a real Firefox run here instead, because a runner is a
+  # small shared machine and a browser discarded under the driver on a busy one --
+  # NoSuchWindowError, which the same commit does not produce on a quiet machine -- used
+  # to take the report on the other forty-odd files down with it. This does not stop the
+  # flake; it keeps it legible as one, and leaves a re-run cheap.
+  #
+  # Everything the two jobs share is written out twice on purpose: Actions does not read
+  # YAML anchors, and a matrix would name the checks "test (rack)" and "test (browser)",
+  # which is not what branch protection asks for.
+  browser:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tectonic
+          POSTGRES_PASSWORD: tectonic
+          POSTGRES_DB: tectonic_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      RACK_ENV: test
+      TEST_DATABASE_URL: postgres://tectonic:tectonic@localhost:5432/tectonic_test
+      SESSION_SECRET: ci-only-session-secret-not-a-real-credential-padded-to-roda-64-byte-minimum
+      # These specs drive a real Firefox; there is no display on a runner.
+      MOZ_HEADLESS: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+          bundler-cache: true
+
       - name: Show browser versions
         run: firefox --version && geckodriver --version | head -1
 
       - name: Migrate the test database
         run: DATABASE_URL="$TEST_DATABASE_URL" bundle exec rake db:migrate
 
-      - name: Run tests
-        run: bundle exec rake test
+      - name: Run the specs that drive a real Firefox
+        run: bundle exec rake test:browser
 
   lint:
     runs-on: ubuntu-latest
