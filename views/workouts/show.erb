@@ -1,5 +1,5 @@
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-  <h3 class="text-5xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h3>
+  <h1 class="text-3xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h1>
   <div class="flex flex-col gap-2">
     <%# Both of these used to hover to gray-500, which on a control means disabled. It kept
         surviving review because white on gray-500 is 4.83:1 and white on lime-500 is 1.98:1,
