@@ -58,36 +58,35 @@ end
 # symptom reads as "the site is down" rather than as one slow query. Twenty seconds is far
 # above anything here honestly takes: Volume.weekly and Volume.top_sets aggregate an
 # account's whole history and ProgramGenerator writes a week of workouts inside one
-# transaction, and none of them is within an order of magnitude of it. It is also far
-# below forever, which is the only other setting on offer today.
+# transaction, and neither is within an order of magnitude of it. It is also far below
+# forever, which is the only other setting on offer today. The name is rack-timeout's own,
+# so the number moves without editing this file, and 0 switches it off, which is what a
+# local run sitting in a debugger wants.
 #
 # It is not free. rack-timeout interrupts with Thread#raise, so the error lands wherever
 # the thread happened to be, including in the middle of a query, and unwinding from there
 # is less orderly than raising somewhere the code expected to be raised at. That is the
 # price of interrupting at all, and the alternative on offer is not interrupting.
 #
-# The variable is rack-timeout's own, so the number moves without editing this file, and
-# 0 switches the timeout off, which is what a local run sitting in a debugger wants.
-service_timeout = ENV.fetch('RACK_TIMEOUT_SERVICE_TIMEOUT', 20).to_i
+# It sits above the URLMap so that both legs take it, the MCP endpoint included: an LLM
+# drives that one, so nobody has watched its request pattern, and its tools hold the same
+# four connections every page does. Exempting it to spare the transport's
+# subscriptions/listen SSE streams would not have spared them -- rack-timeout times
+# `app.call` and cancels the job in that method's ensure, and a listen stream is a Rack
+# streaming body written after `call` has returned. Those, and anything else still running
+# once the response is handed back, are the Puma worker_timeout in #150's job.
+#
+# Sentry, when it is on, is used above this and so wraps it, which is the one thing the
+# order has to get right: the error reaches it and arrives as a report with a backtrace
+# pointing at whatever was still running. With the timeout outside, it would pass unseen.
+use Rack::Timeout, service_timeout: ENV.fetch('RACK_TIMEOUT_SERVICE_TIMEOUT', 20).to_i
 
 # The MCP endpoint is mounted alongside the Roda app but entirely outside it: its own
 # bearer-token auth and the plain-Rack transport never touch Roda's sessions, CSRF, or
 # assets. URLMap routes by path prefix -- the endpoint path to the MCP stack,
 # everything else to Roda.
-#
-# The timeout wraps the Roda leg only, rather than going on with `use` above where it
-# would cover both. The MCP transport serves subscriptions/listen as an SSE stream held
-# open for as long as the client wants it, with a keepalive every fifteen seconds, so any
-# finite service timeout would sever every one of those on schedule; that leg's backstop
-# is the Puma worker_timeout in #150, which is the other half of this. OAuth is inside
-# Roda and does take the timeout -- a bcrypt compare and an RSA signature are the whole of
-# what it does, and neither is slow enough to want an exemption it would then hide behind.
-#
-# Sentry, when it is on, is used above and so wraps this: the error rack-timeout raises
-# propagates up through it and arrives as a report with a backtrace pointing at whatever
-# was still running. That is the point of raising rather than just dropping the request.
 run Rack::URLMap.new(
   Tectonic::MCP::Config.endpoint_path => Tectonic::MCP.rack_app,
-  '/' => Rack::Timeout.new(Tectonic.freeze.app, service_timeout:)
+  '/' => Tectonic.freeze.app
 )
 
