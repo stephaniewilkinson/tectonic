@@ -30,9 +30,6 @@ h6,
 .brand {
     font-family: "Blonde Sans", sans-serif;
 }
-.myteal {
-    background-color: teal;
-}
 
 /* Weight and reps are typed on a touch keypad, so the native number spinners
    just clutter the inputs. Tailwind has no utility for the spin-button
