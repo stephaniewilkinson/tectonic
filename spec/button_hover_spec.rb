@@ -19,6 +19,10 @@ require 'securerandom'
 # lime-500 to lime-600, lime-600 to lime-700, sky-800 to sky-900, one step down its own
 # scale -- rather than left to be noticed.
 module ButtonHover
+  # Any step on the scale, not only the ones buttons rest at: the calendar's day tints are
+  # bg-lime-100 and bg-sky-100 and they already hover a step down, so they are held to the
+  # rule here too rather than excluded by a pattern that only knows about buttons. A
+  # calendar change that fails this file is failing for that reason.
   RESTING = /\Abg-(lime|sky)-(\d00)\z/
   # Deliberately any hue: a grey or a lime hover on a sky button has to reach the
   # assertion to be caught, rather than being filtered out before it gets there.
