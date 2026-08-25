@@ -23,8 +23,9 @@ end
 # The two halves of the suite, told apart by the module a describe includes when it wants
 # a browser rather than by a list kept here, which would go stale the first time a describe
 # started needing one. The cut is by file because a file is the unit rake hands minitest,
-# so a file that mixes the two -- program_ui_spec, where one describe of many drives a
-# browser -- runs whole with the browser half.
+# so the two files that mix them -- program_ui_spec, where one describe of ten drives a
+# browser, and session_swipe_spec, where two of six do not -- run whole with the browser
+# half, and eleven rack_test describes ride along in the slower job.
 BROWSER_SPECS, RACK_SPECS =
   Dir['spec/**/*_spec.rb'].partition { |file| File.read(file).include?('include BrowserSpec') }
 
