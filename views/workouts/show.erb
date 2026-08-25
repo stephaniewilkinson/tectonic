@@ -34,7 +34,11 @@
         <div class="absolute rounded-md bg-lime-500 p-2">
           <img src="/icons/mommy-fitness_white.svg" alt="Plank icon" class="h-12 w-12 text-white">
         </div>
-        <a href="/exercises/<%= exercise_id %>" class="ml-20 md:ml-20 text-xl sm:text-4xl text-gray-500 hover:text-lime-500">
+        <%# `brand` because this card title is an anchor and not a heading, so it has to
+            ask. It read in the display face before only because `text-xl` happened to be
+            in the font rule, which meant the day it became `sm:text-xl` the face would
+            have gone with nobody touching a font. %>
+        <a href="/exercises/<%= exercise_id %>" class="brand ml-20 md:ml-20 text-xl sm:text-4xl text-gray-500 hover:text-lime-500">
           <%= Exercise[exercise_id].name %>
         </a>
       </dt>
