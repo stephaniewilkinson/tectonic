@@ -56,7 +56,7 @@
     <%== csrf_tag("/programs/#{@program.id}/weeks") %>
     <input type="hidden" name="copy_from" value="<%= @program.weeks %>">
     <button type="submit"
-            class="min-h-11 rounded-md bg-lime-500 px-3 text-sm font-semibold text-white
-                   shadow-sm hover:bg-lime-600">Add a week like the last</button>
+            class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                   text-white hover:bg-lime-600">Add a week like the last</button>
   </form>
 </div>
