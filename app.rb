@@ -804,15 +804,16 @@ class Tectonic < Roda
   # rings across two dozen sites -- and thirteen of those buttons named no focus style at
   # all, so tabbing onto one drew Firefox's own blue ring on a lime button, blue being a
   # colour this brand does not otherwise contain. rounded-md and shadow-sm are what the
-  # majority already had; outline-lime-500 is the ring the other eleven had already
-  # chosen. One of the odd ones out was not even a decision: `shadow-ss`, which Tailwind
-  # does not define and therefore silently ignored, left the Save on the exercise form
-  # flat while every other Save in the app was raised.
+  # majority already had; outline-lime-500 is what ten of the twelve that named a ring at
+  # all had already chosen, the other two being welcome.erb's, a step darker at lime-600
+  # for no reason anyone wrote down. One of the odd ones out was not even a decision:
+  # `shadow-ss`, which Tailwind does not define and therefore silently ignored, left the
+  # Save on the exercise form flat while every other Save in the app was raised.
   #
   # Shape only. Fill stays at the call site because lime and sky mean different things
   # there, and so does padding, because several of these were sized for a thumb on
   # purpose and folding them in here would quietly undo that. The white secondary button
-  # is left alone: it is already the same at all eight of its sites, which is what this
+  # is left alone: it is already the same at all seven of its sites, which is what this
   # is trying to make the primary one.
   def button_style
     'rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 ' \
