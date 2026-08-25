@@ -26,9 +26,11 @@ module NavBranding
 
   def wordmark = nav_links.find { |link| link.include?('href="/"') }
 
+  # Comments stripped, because the comments in styles.css name the selectors they are
+  # about and a spec that reads selectors would count those too.
   def stylesheet
     get '/assets/css/styles.css'
-    last_response.body
+    last_response.body.gsub(%r{/\*.*?\*/}m, '')
   end
 
   def sign_in
@@ -99,12 +101,16 @@ describe 'the stylesheet behind the brand class' do
     assert_match(/\.brand\s*\{[^}]*font-family:\s*"Blonde Sans"/, stylesheet)
   end
 
-  # Additive, on purpose. Pages all over the app take the face from a heading or from a
-  # bare size utility, and moving the nav off that rule must not take the rule with it.
-  it 'leaves the headings and the size utilities on Blonde Sans' do
+  # This rule was left additive when `brand` was added, with the size utilities still in
+  # it, and the trap they set went off twice more on pages that are not the nav. They are
+  # gone now: a heading takes the face, `brand` takes the face, and being 24px takes
+  # nothing. Asserted as an absence because that is the shape of the bug -- putting
+  # `.text-2xl` back would re-brand a column of weights and break no other spec.
+  it 'hangs Blonde Sans off the headings and off no size utility' do
     rule = stylesheet.split('}').find { |block| block.include?('font-family: Blonde Sans;') }
 
-    %w[h1 h2 h3 h4 h5 h6 .text-xl .text-2xl .text-7xl].each { |selector| assert_includes rule, selector }
+    %w[h1 h2 h3 h4 h5 h6].each { |selector| assert_includes rule, selector }
+    refute_match(/\.text-/, rule)
   end
 end
 

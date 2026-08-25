@@ -20,6 +20,35 @@ Rake::TestTask.new do |test|
   test.warning = false
 end
 
+# The two halves of the suite, told apart by the module a describe includes when it wants
+# a browser rather than by a list kept here, which would go stale the first time a describe
+# started needing one. The cut is by file because a file is the unit rake hands minitest,
+# so the two files that mix them -- program_ui_spec, where one describe of ten drives a
+# browser, and session_swipe_spec, where two of six do not -- run whole with the browser
+# half, and eleven rack_test describes ride along in the slower job.
+BROWSER_SPECS, RACK_SPECS =
+  Dir['spec/**/*_spec.rb'].partition { |file| File.read(file).include?('include BrowserSpec') }
+
+namespace :test do
+  # CI runs these two rather than the task above, so a browser that is discarded under the
+  # driver on a loaded runner -- NoSuchWindowError, and the machine was busy, not the app
+  # broken -- fails a job holding only the files that drive one, instead of taking the
+  # report on the forty-odd that never open a window down with it. It does not stop the
+  # flake happening; it stops it hiding everything else. `rake test` still runs the lot,
+  # which is what a local run wants.
+  Rake::TestTask.new(:rack) do |test|
+    test.description = 'Run the specs that never open a browser'
+    test.test_files = RACK_SPECS
+    test.warning = false
+  end
+
+  Rake::TestTask.new(:browser) do |test|
+    test.description = 'Run the specs that drive a real Firefox'
+    test.test_files = BROWSER_SPECS
+    test.warning = false
+  end
+end
+
 # Connects and loads the migration extension. Kept out of the task bodies so tasks
 # that never touch the database don't open a connection just by being loaded.
 def migrator_db

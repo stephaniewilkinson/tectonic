@@ -30,13 +30,17 @@
       <dt class="text-gray-500">Reps</dt>
       <dd class="text-gray-900"><%= @set[:reps] %></dd>
     </div>
+    <%# The box the list and the record answer with. `Yes` and `No` read as a sentence
+        here, which a box does not, and that sentence is what this gives up: a lifter
+        who arrives from either of the other two screens should not have to learn a
+        third way of reading the same two booleans on the way. %>
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Warmup</dt>
-      <dd class="text-gray-900"><%= @set[:is_warmup] ? 'Yes' : 'No' %></dd>
+      <dd class="text-gray-900"><%== ticked(@set[:is_warmup], 'warmup') %></dd>
     </div>
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Completed</dt>
-      <dd class="text-gray-900"><%= @set[:is_completed] ? 'Yes' : 'No' %></dd>
+      <dd class="text-gray-900"><%== ticked(@set[:is_completed], 'completed') %></dd>
     </div>
   </dl>
 </div>

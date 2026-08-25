@@ -54,6 +54,19 @@ describe 'the list of tables the teardown empties' do
   end
 end
 
+describe 'the CI workflow' do
+  # The suite runs as two jobs, so a browser discarded under the driver fails only the
+  # job that drives one. The Rakefile cuts both halves from a single glob, so no spec file
+  # can fall between them -- but a workflow that stopped naming a half would quietly drop
+  # that half whole, and a green build is exactly what that looks like.
+  it 'runs both halves of the suite' do
+    workflow = File.read(File.expand_path('../.github/workflows/ruby.yml', __dir__))
+
+    assert_includes workflow, 'rake test:rack'
+    assert_includes workflow, 'rake test:browser'
+  end
+end
+
 describe 'the Capybara server' do
   # Capybara takes a free port when none is named. Naming one is what made a second
   # suite collide with the first, and app_host repeated the number, so fixing either

@@ -5,7 +5,7 @@
       <p class="mt-2 text-sm text-gray-700"><%= @workout[:date].strftime('%A %B %-d, %Y') %></p>
     </div>
     <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-      <a href="/workouts/<%= @workout[:id] %>/sets/new" class="block rounded-md bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-gray-500">Add a set</a>
+      <a href="/workouts/<%= @workout[:id] %>/sets/new" class="block rounded-md bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm hover:bg-lime-600">Add a set</a>
     </div>
   </div>
   <%# Seven nowrap columns do not fit a phone, and the two that fall off the end are the
@@ -44,11 +44,17 @@
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:weight] %></td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:reps] %></td>
+                <%# One fact, one spelling: the workout record answers these two with a
+                    box, so this list does too. `Warmup` / `—` and `Done` / `—` were a
+                    second vocabulary for the same pair of booleans, and a dash in a
+                    column reads as "not applicable" rather than as no. The word read
+                    aloud follows the heading above it, which is why this one says
+                    `done` where the record says `completed`. %>
                 <td class="hidden whitespace-nowrap px-3 py-4 text-sm text-gray-500 sm:table-cell">
-                  <%= set[:is_warmup] ? 'Warmup' : '—' %>
+                  <%== ticked(set[:is_warmup], 'warmup') %>
                 </td>
                 <td class="hidden whitespace-nowrap px-3 py-4 text-sm text-gray-500 sm:table-cell">
-                  <%= set[:is_completed] ? 'Done' : '—' %>
+                  <%== ticked(set[:is_completed], 'done') %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                   <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/edit" class="font-medium text-lime-600 hover:text-lime-500">Edit</a>
