@@ -74,6 +74,35 @@ class Tectonic < Roda
     # spelling rather than of which row an account happens to be holding.
     BARBELL_NAMES = LIBRARY.map(&:downcase).freeze
 
+    # The picture beside a movement on the workout record, keyed by the end of its name
+    # and paired with what the drawing actually shows. The end of the name is where the
+    # movement itself is in every name the library uses -- "Paused Bench Press" is a bench
+    # press, "Snatch-Grip Deadlift" is a deadlift -- so four of these lines cover thirty-one
+    # of the fifty-four, and they go on being right for a lifter's own "Belted Back Squat",
+    # which a list of the library's names could never be. The fifth draws nothing built in:
+    # every library movement is loaded on a bar and none of them is a pull-up, so that icon
+    # waits for a movement somebody adds. Deciding this by name is what barbell? below
+    # stopped doing and for good reason; it is allowed here because being wrong costs a
+    # small drawing rather than a plate breakdown, and because icon_url overrides it.
+    #
+    # The alt text is kept beside the file rather than built from the movement's name,
+    # because that is the bug this replaces: one figure holding a dumbbell for every lift,
+    # under an alt that said "Plank icon". An alt describing the drawing cannot drift from
+    # the drawing.
+    ICONS = {
+      'squat' => { src: '/icons/squat.svg', alt: 'Squat icon' },
+      'deadlift' => { src: '/icons/deadlift.svg', alt: 'Deadlift icon' },
+      'bench press' => { src: '/icons/benchpress.svg', alt: 'Bench press icon' },
+      'row' => { src: '/icons/row.svg', alt: 'Barbell row icon' },
+      'pull-up' => { src: '/icons/pullup.svg', alt: 'Pull-up icon' }
+    }.freeze
+
+    # For everything the five do not draw: the presses that are not bench presses, the
+    # hinges that are not deadlifts, the olympic lifts, and whatever a lifter invents. A
+    # figure holding a barbell is true of all of them, which is more than the figure
+    # holding a dumbbell managed in an app that models only the bar.
+    GENERIC_ICON = { src: '/icons/gym.svg', alt: 'Barbell icon' }.freeze
+
     # Whether this movement is loaded on a bar, which is what decides if a set of it gets
     # plate math and a warmup ramp. It is a property of the movement, so it is a column on
     # the movement; every write path still asks here rather than each of them remembering
@@ -83,6 +112,28 @@ class Tectonic < Roda
     # movement an assistant invented, was a barbell lift or not by spelling alone.
     def barbell?
       is_barbell
+    end
+
+    # What to draw beside this movement: a src, and the alt that goes with it. An icon_url
+    # of the account's own wins, which is the whole of what that column on the exercise
+    # form has ever been for -- it has been collected and stored since the beginning and
+    # read by nothing. The form posts an empty string when the field is left alone, so
+    # blank has to count as unset here or every movement added through the UI would draw a
+    # broken image.
+    #
+    # What somebody else's picture shows is not knowable from here, so its alt names the
+    # movement it was chosen for and claims nothing about what is in it. A value that could
+    # never be an image -- javascript:, data: -- is refused before it is drawn rather than
+    # after. The check is here and not on the way in because no write path has ever had
+    # one, and one added to them now would still leave every row already stored to be
+    # drawn unchecked.
+    def icon
+      url = icon_url.to_s.strip
+      return { src: url, alt: "#{name} icon" } if url.start_with?('/', 'http://', 'https://')
+
+      folded = name.to_s.strip.downcase
+      _, drawing = ICONS.find { |movement, _| folded == movement || folded.end_with?(" #{movement}") }
+      drawing || GENERIC_ICON
     end
 
     # What a movement of this name is, for the paths that create one with nobody to ask:

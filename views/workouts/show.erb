@@ -25,13 +25,24 @@
     silently, with no page-level scrollbar to show anything was missing. %>
 <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
   <%- @array_of_exercise_ids.each do | exercise_id | %>
+    <%# The row itself, rather than the id twice over: the card names the movement and now
+        draws it too, and Exercise[] is a query each time it is written. An instance
+        variable rather than a local, as in views/sets/_exercise_options.erb, because
+        erb_lint hands each tag to rubocop as a snippet of its own and a local assigned in
+        one tag and read in the next is a useless assignment to every cop that sees it. %>
+    <%- @exercise = Exercise[exercise_id] %>
     <div class="relative overflow-hidden rounded-xl bg-white px-4 pt-5 shadow sm:px-6 sm:pt-6">
       <dt class="inline-flex">
         <div class="absolute rounded-md bg-lime-500 p-2">
-          <img src="/icons/mommy-fitness_white.svg" alt="Plank icon" class="h-12 w-12 text-white">
+          <%# The movement's own icon, not one figure for all of them. The icons the app
+              ships are black; text-white sat here for the white-filled figure they replace
+              and never reached inside the img in any case, CSS colour not crossing into a
+              document loaded through src. Black on lime-500 is 11.4:1 where white on it is
+              1.98:1, which is the arithmetic that took white off the session buttons. %>
+          <img src="<%= @exercise.icon[:src] %>" alt="<%= @exercise.icon[:alt] %>" class="h-12 w-12">
         </div>
         <a href="/exercises/<%= exercise_id %>" class="ml-20 md:ml-20 text-xl sm:text-4xl text-gray-500 hover:text-lime-500">
-          <%= Exercise[exercise_id].name %>
+          <%= @exercise.name %>
         </a>
       </dt>
       <%# The columns do not wrap, so a narrow card still needs somewhere for them to go:
