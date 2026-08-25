@@ -22,6 +22,9 @@ gem 'mcp', '1.2.0'
 gem 'logger'
 gem 'puma'
 gem 'rack'
+# Caps how long a request may occupy a thread. Required in config.ru rather than here,
+# since nothing in this app calls Bundler.require.
+gem 'rack-timeout'
 gem 'rackup'
 gem 'rake'
 gem 'roda'
