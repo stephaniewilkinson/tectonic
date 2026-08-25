@@ -734,19 +734,24 @@ class Tectonic < Roda
     nearest ? "closest #{weight}: #{Plates.label(nearest)}" : "lighter than your #{equipment.bar_weight} lb bar"
   end
 
-  # A yes-or-no fact about a set, as a box that is ticked or left empty. The workout
-  # record asks two of them side by side, under headings that are already questions, and
-  # the words that used to answer them answered different questions in the same column:
-  # "Warmup set" against "No", a tick against "Incomplete". Neither pair can be scanned
-  # down a column the way two boxes can, and neither says which state is the plain one.
+  # A yes-or-no fact about a set, as a box that is ticked or left empty. Three screens
+  # show the same two facts -- the workout record and the set list in a pair of columns,
+  # the set detail in a definition list -- and each had answered in a vocabulary of its
+  # own: "Warmup set" against "No", `Warmup` against an em dash, `Yes` against `No`. None
+  # of those can be scanned down a column the way boxes can, an em dash reads as "not
+  # applicable" rather than as no, and none says which state is the plain one.
   #
   # The glyph is hidden from a screen reader and the answer spelled out beside it: an
   # empty box means nothing read aloud on its own, and "ballot box" is what a reader
   # otherwise announces for the one that matters least.
   #
+  # The word is the caller's rather than this helper's, so that what is read aloud
+  # answers the heading it sits under: `completed` where a column is headed Completed,
+  # `done` where the set list heads the same column Done to fit a phone.
+  #
   # This is one of the few things here that really is markup, so its call sites are
   # `<%==`. The question is escaped on the way in, since a caller could one day pass one
-  # that came from an account rather than from the two literals in the workout record.
+  # that came from an account rather than from the literals its call sites hold today.
   def ticked(flag, question)
     "<span aria-hidden=\"true\">#{flag ? '&#9745;' : '&#9744;'}</span>" \
       "<span class=\"sr-only\">#{h(flag ? question : "not #{question}")}</span>"
