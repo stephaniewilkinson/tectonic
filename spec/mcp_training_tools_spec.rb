@@ -34,8 +34,9 @@ end
 # A movement from the shared library: nil account, so every account sees it and none
 # owns it. Taken from the seeded library rather than made here, and the library is
 # seeded first so this file can be run on its own. Inventing a nil-account row instead
-# would leave one behind -- these specs clean up nothing -- and the library is counted
-# by name elsewhere, so a spare would fail a spec in another file on the next run.
+# would leave one behind -- a null account_id is the one thing the teardown in
+# spec_helper keeps -- and the library is counted by name elsewhere, so a spare would
+# fail a spec in another file rather than in this one.
 def shared_exercise
   Tectonic::Exercise.load_library
   Tectonic::Exercise.where(account_id: nil).order(:id).first
