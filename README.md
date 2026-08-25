@@ -103,9 +103,11 @@ bundle exec ruby -Ispec spec/set_scheme_spec.rb  # one file
 Neither variable has to be passed in. `spec_helper` sets `RACK_ENV` and then names the
 database itself — `TEST_DATABASE_URL` when a run wants one of its own, and
 `postgres:///tectonic_test` otherwise — whatever the shell, a `.env` or the `Rakefile` had
-already chosen, which is what keeps a suite that cleans up after nothing away from your
-development database. `rake 'db:reset[name]'` rebuilds one an earlier run has already
-seeded.
+already chosen. That matters more than it looks: `spec_helper` empties every table after
+every test, so a suite pointed at your development database would not seed it, it would
+clear it. The built-in exercise library is the one thing kept, because a deployed database
+holds it before anybody signs up. `rake 'db:reset[name]'` still rebuilds a database whose
+schema has gone wrong, but a run no longer leaves rows behind for it to clear away.
 
 Two prerequisites, neither obvious from the failure you get without them:
 

@@ -3,12 +3,14 @@
 ENV['RACK_ENV'] = 'test'
 # The suite names its own database rather than inheriting whichever one the shell, a
 # .env file or the Rakefile has already chosen for the app. It has to: these specs
-# create accounts, workouts, exercises, sets, OAuth grants and audit rows and clean none
-# of them up, and inheriting is how a bare `rake test` came to seed the development
-# database -- the Rakefile requires .env.rb, which resolves a URL from RACK_ENV, long
-# before this line runs. The connection is opened by app.rb below, so setting it here is
-# early enough. TEST_DATABASE_URL is for a run that wants a database of its own, which
-# is what two suites at once need.
+# create accounts, workouts, exercises, sets, OAuth grants and audit rows, and the
+# teardown below empties every table between tests, so a run pointed at the development
+# database would no longer merely seed it -- it would empty it. Inheriting is how a bare
+# `rake test` came to seed the development database in the first place: the Rakefile
+# requires .env.rb, which resolves a URL from RACK_ENV, long before this line runs. The
+# connection is opened by app.rb below, so setting it here is early enough.
+# TEST_DATABASE_URL is for a run that wants a database of its own, which is what two
+# suites at once need.
 ENV['DATABASE_URL'] = ENV.fetch('TEST_DATABASE_URL', 'postgres:///tectonic_test')
 # The OAuth resource identifier the MCP endpoint verifies tokens against and advertises
 # in its discovery document; tests sign and expect tokens for this audience.
@@ -21,6 +23,60 @@ require 'minitest/pride'
 require 'rack/test'
 
 require_relative '../app'
+
+# Every test starts against empty tables, because no spec here cleans up by hand and rows
+# that outlive their test are how a spec comes to pass for the wrong reason: it reads an
+# account or an exercise an earlier file left behind, and then fails on its own, or under
+# a different seed, with nothing in it to say why. Rows only ever accumulated before this,
+# too, so `Exercise.load_library` and the OAuth queries ran against tables that grew with
+# every run and `rake db:reset` was the only way back.
+#
+# Deletes rather than a transaction rolled back around each test, which is the usual
+# answer and cannot work here. The browser specs drive the app on a Puma server in another
+# thread, and that thread takes its own connection out of the pool: rows written inside
+# the test's own uncommitted transaction do not exist as far as the server is concerned,
+# so the page the browser fetches comes back without them. Sharing one connection between
+# the two threads is the standard way round that, and trades an ordering bug for a race --
+# two threads issuing queries on one Postgres connection with nothing serialising them.
+module CleanDatabase
+  # Children before parents, which is what the foreign keys require; a wrong order raises
+  # rather than leaks. test_isolation_spec asserts this still names every table, since a
+  # migration that adds one and forgets it here would go back to leaking quietly.
+  TABLES = %i[
+    sets program_lifts workouts program_days program_weeks programs mcp_audit_log
+    oauth_grants account_plates account_remember_keys exercises oauth_applications accounts
+  ].freeze
+
+  # Prepended below rather than included, because Minitest::Test defines after_teardown
+  # itself and a copy from an included module would sit behind it and never run. The
+  # delete happens after `super` so that Capybara has already reset its session: the
+  # cookie a browser is holding names an account that is about to stop existing.
+  def after_teardown
+    super
+    CleanDatabase.clean
+  end
+
+  def self.clean
+    DB.transaction do
+      TABLES.each do |table|
+        rows = DB[table]
+        # The built-in library is not test data. It is what `rake library:exercises`
+        # leaves in a deployed database before anybody signs up, the spec files that read
+        # it seed it once at load time, and reseeding those fifty-odd rows between every
+        # test would buy nothing. A movement with an account behind it is somebody's,
+        # and goes.
+        rows = rows.exclude(account_id: nil) if table == :exercises
+        rows.delete
+      end
+    end
+  end
+end
+
+Minitest::Test.prepend CleanDatabase
+# And once before anything runs, because the database this run inherited was very likely
+# filled by a run that predates the teardown above, and a spec that asserts what a test
+# starts with would fail on the first one for a reason nothing in this run caused.
+CleanDatabase.clean
 
 Capybara.app = Tectonic
 Capybara.register_driver :firefox do |app|
