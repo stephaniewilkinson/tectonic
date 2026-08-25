@@ -7,12 +7,14 @@ require 'securerandom'
 
 # Colour that belongs to no part of this brand, asserted out of the markup. Two vendor
 # accents rode in with the templates they came from and survived for years because
-# neither one is loud: Tailwind UI's indigo sits on the two set checkboxes and paints
+# neither one is loud: Tailwind UI's indigo sat on the two set checkboxes and painted
 # nothing at all, since @tailwindcss/forms is not loaded and a native checkbox takes no
-# tint from `text-*`; Flowbite's blue only appears while the date field has focus. A
-# wrong token breaks no page and fails no other spec -- the indigo is still wrong, and
-# it is what a forms plugin would start painting the day one arrives -- so the class is
-# asserted against the rendered HTML rather than looked at.
+# tint from `text-*`; Flowbite's blue only appeared while the date field had focus. A
+# wrong token breaks no page and fails no other spec, which is how the indigo lasted,
+# so the classes are asserted against the rendered HTML rather than looked at. The
+# `accent-*` assertions are the ones that stand for something on screen; the `text-*`
+# and `focus:ring-*` ones only matter if a forms plugin ever arrives, and they are
+# pinned so that arrival does not reopen this.
 module BrandColour
   def app = Tectonic.app
 
@@ -40,10 +42,11 @@ describe 'the checkboxes on the new set form' do
     get "/workouts/#{workout_id}/sets/new"
   end
 
-  # The same pair every other checkbox in the app already carries -- see
-  # views/exercises/_form.erb and views/authorize.erb.
+  # accent-lime-500 is the one that reaches the screen: without it a native checkbox
+  # draws in the browser's default blue whatever `text-*` says.
   it 'tints both boxes lime and rings them lime' do
     %w[is_completed is_warmup].each do |id|
+      assert_includes classes_of(input(id)), 'accent-lime-500'
       assert_includes classes_of(input(id)), 'text-lime-500'
       assert_includes classes_of(input(id)), 'focus:ring-lime-500'
     end
@@ -51,6 +54,22 @@ describe 'the checkboxes on the new set form' do
 
   it 'carries no indigo anywhere on the page' do
     refute_includes last_response.body, 'indigo'
+  end
+end
+
+describe 'the checkbox on the exercise form' do
+  include Rack::Test::Methods
+  include BrandColour
+
+  before do
+    sign_in
+    get '/exercises/new'
+  end
+
+  # This one was already lime and still drew blue, for want of the accent utility.
+  it 'accents lime like the set form does' do
+    assert_includes classes_of(input('is_barbell')), 'accent-lime-500'
+    assert_includes classes_of(input('is_barbell')), 'text-lime-500'
   end
 end
 
@@ -74,7 +93,12 @@ describe 'the date field on the new workout form' do
   # Tailwind's CDN defaults darkMode to media, so these were live on a phone set to dark
   # and drew one grey input in the middle of a page layout.erb keeps at bg-gray-100.
   it 'carries no dark variants for a theme that does not exist' do
-    classes_of(input('date')).each { |token| refute_match(/\Adark:/, token) }
+    tokens = classes_of(input('date'))
+
+    # An empty list would walk this loop zero times and pass, which is the one way a
+    # renamed id could quietly retire the assertion.
+    refute_empty tokens
+    tokens.each { |token| refute_match(/\Adark:/, token) }
   end
 end
 
