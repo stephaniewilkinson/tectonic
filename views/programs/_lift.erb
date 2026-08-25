@@ -29,14 +29,13 @@
     pixels of margin under the form holding Save -- the two likeliest taps on the row, with
     the irreversible one the smaller. It is a button now, 44px tall, and justify-end puts
     it at the opposite end of the row from Save rather than directly beneath it.
-    Size alone does not make an unconfirmed delete safe, so it asks. hx-confirm only fires
-    on a request htmx owns, and this route answers with a redirect to the whole page rather
-    than a fragment, so hx-boost is what hands htmx the submission: it posts the form,
-    follows the redirect and swaps the page back in, which is what the plain form did
-    anyway. With scripting off the form posts as before and nothing asks -- a gap, but a
-    smaller one than a delete button that does nothing at all without JavaScript. %>
+    It does not ask. It carried an hx-confirm for a while, with hx-boost to hand htmx a
+    submission the browser would otherwise have made on its own, and that left this the
+    only destructive action in the app that asked anything: deleting a whole session and
+    every set in it goes through on one tap. One answer for both was worth more than the
+    dialog and this is the answer, so the size and the distance from Save are the whole of
+    what stands between a thumb and a lift that is gone, with no undo behind it. %>
 <form method="post" action="/programs/<%= @program.id %>/lifts/<%= lift.id %>/delete"
-      hx-boost="true" hx-confirm="Remove <%= lift.exercise.name %> from this day? This cannot be undone."
       class="mt-2 flex justify-end">
   <%== csrf_tag("/programs/#{@program.id}/lifts/#{lift.id}/delete") %>
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-red-700
