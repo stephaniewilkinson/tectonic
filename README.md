@@ -60,6 +60,8 @@ reaches `Sequel.connect` and raises rather than falling back to a default.
 | `SESSION_SECRET` | yes | **At least 64 bytes.** Roda's sessions plugin refuses a shorter one, and `app.rb` builds the app at require time, so a short or missing secret raises before a single route is reached. `.env-example` carries one that is long enough and says in its own text that it is for development; generate a real one with `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'` for anything deployed. |
 | `RACK_ENV` | no | `development` unless set. `test` quiets Sequel's query log; `production` and `staging` initialise Sentry and require real OAuth keys. |
 | `SENTRY_DSN` | no | The Sentry project DSN, read only when `RACK_ENV` is `production` or `staging`. Without it — unset or empty — the app boots and serves with error reporting switched off and says so once on stderr: losing error reporting is not a reason to refuse to start, which is why this behaves unlike `OAUTH_JWT_PRIVATE_KEY`. |
+| `RAILS_MAX_THREADS` | no | `5` unless set, and read twice: `config/puma.rb` gives Puma that many threads and `lib/tectonic/db.rb` gives Sequel that many connections. One variable because the pool used to be Sequel's default of four against Puma's five threads, and a fifth request thread waiting on a connection is a `Sequel::PoolTimeout` on a request that had nothing wrong with it. The name is the host's convention rather than a claim about Rails. |
+| `WEB_CONCURRENCY` | no | Puma workers, `0` unless set — one process, which is what `rackup` was already running, and as much as half a CPU has to offer. Above zero Puma forks, so the app is preloaded and each worker disconnects Sequel on boot rather than sharing the parent's connections. Every worker multiplies the connection count by `RAILS_MAX_THREADS`. |
 
 The MCP and OAuth variables are all optional in development and are documented in the
 table further down.
@@ -212,10 +214,17 @@ regenerating never rewrites a session you have already trained.
 
 `render.yaml` is the checked-in Render blueprint: `bundle install` to build, `bundle exec
 rake db:migrate && bundle exec rake library:exercises` as the pre-deploy command, and
-`bundle exec rackup config.ru -p $PORT` to start. Secrets are marked `sync: false` so the
+`bundle exec puma -C config/puma.rb` to start. Secrets are marked `sync: false` so the
 values already set in the dashboard are left alone — regenerating `SESSION_SECRET` would
 log everyone out, and regenerating `OAUTH_JWT_PRIVATE_KEY` would stop every issued access
 token from verifying.
+
+`config/puma.rb` holds the thread count, the worker count and the hook forked workers need,
+and binds `$PORT` itself, which is why the start command carries no `-p`. Puma finds that
+file by name rather than by flag, so a local `bundle exec rackup config.ru` picks up the
+same thread count and keeps its own port. The one thing production does differently is
+that `WEB_CONCURRENCY` can be turned above zero there, and then the app is preloaded and
+each worker drops the Postgres connections it inherited.
 
 # MCP server
 
