@@ -60,6 +60,7 @@ reaches `Sequel.connect` and raises rather than falling back to a default.
 | `SESSION_SECRET` | yes | **At least 64 bytes.** Roda's sessions plugin refuses a shorter one, and `app.rb` builds the app at require time, so a short or missing secret raises before a single route is reached. `.env-example` carries one that is long enough and says in its own text that it is for development; generate a real one with `ruby -rsecurerandom -e 'puts SecureRandom.hex(64)'` for anything deployed. |
 | `RACK_ENV` | no | `development` unless set. `test` quiets Sequel's query log; `production` and `staging` initialise Sentry and require real OAuth keys. |
 | `SENTRY_DSN` | no | The Sentry project DSN, read only when `RACK_ENV` is `production` or `staging`. Without it — unset or empty — the app boots and serves with error reporting switched off and says so once on stderr: losing error reporting is not a reason to refuse to start, which is why this behaves unlike `OAUTH_JWT_PRIVATE_KEY`. |
+| `RACK_TIMEOUT_SERVICE_TIMEOUT` | no | Seconds a request may hold a thread before `rack-timeout` raises inside it, `20` unless set, `0` to switch it off — which is what you want locally the moment you stop in a debugger. Read only by `config.ru`, so the suite never sees it; and only the Roda leg is wrapped, because the MCP endpoint holds `subscriptions/listen` streams open indefinitely by design. |
 
 The MCP and OAuth variables are all optional in development and are documented in the
 table further down.
