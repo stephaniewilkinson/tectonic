@@ -74,7 +74,11 @@ end
 # subscriptions/listen SSE streams would not have spared them -- rack-timeout times
 # `app.call` and cancels the job in that method's ensure, and a listen stream is a Rack
 # streaming body written after `call` has returned. Those, and anything else still running
-# once the response is handed back, are the Puma worker_timeout in #150's job.
+# once the response is handed back, are `config/puma.rb`'s worker_timeout to reap -- but
+# only where there is a worker to reap. worker_timeout is enforced in Puma's cluster mode
+# alone, and WEB_CONCURRENCY defaults to zero, so the deployment as it ships runs in single
+# mode and nothing collects a stream that never ends. Raising WEB_CONCURRENCY is what turns
+# that backstop on; until then this timeout is the only one there is.
 #
 # Sentry, when it is on, is used above this and so wraps it, which is the one thing the
 # order has to get right: the error reaches it and arrives as a report with a backtrace

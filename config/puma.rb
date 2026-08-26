@@ -42,5 +42,22 @@ cluster do
   # It runs in the worker after the preload, so DB is loaded: this drops the inherited
   # handles and Sequel opens the worker its own on first use.
   before_worker_boot { DB.disconnect }
+
+  # The backstop rack-timeout cannot be. rack-timeout raises inside `app.call`, so it
+  # reaches nothing that outlives the call -- an MCP subscriptions/listen stream is a Rack
+  # streaming body written after `call` returns, and a thread wedged in a C extension takes
+  # no interrupt at all. This is what reaps the worker holding one: fail to check in for
+  # this many seconds and the master kills and replaces it.
+  #
+  # 60 is Puma's own default, restated rather than changed so the number is visible next
+  # to the request timeout it has to clear. Three times RACK_TIMEOUT_SERVICE_TIMEOUT's 20
+  # is the whole of the reasoning: below it, a request rack-timeout is about to interrupt
+  # cleanly would instead take the worker down with it, which turns a 500 on one request
+  # into a dropped connection for every request that worker was serving.
+  #
+  # It is declared in here because that is the truth about it: worker_timeout is enforced
+  # in Puma's cluster mode and nowhere else, so with WEB_CONCURRENCY at its default of zero
+  # there is no worker to reap and nothing below reaps anything. config.ru says so too.
+  worker_timeout 60
 end
 
