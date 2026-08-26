@@ -149,7 +149,7 @@ The linters, both of which CI runs:
 
 ```
 bundle exec rubocop
-bundle exec erblint views/*/* views/*
+bundle exec erb_lint views/*/* views/*
 ```
 
 ## The program engine

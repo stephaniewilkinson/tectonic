@@ -157,5 +157,5 @@ jobs:
       - name: rubocop
         run: bundle exec rubocop
 
-      - name: erblint
-        run: bundle exec erblint views/*/* views/*
+      - name: erb_lint
+        run: bundle exec erb_lint views/*/* views/*
