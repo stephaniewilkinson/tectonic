@@ -118,7 +118,7 @@ class Tectonic < Roda
 
       top = top_weight(week, lift)
       Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
-                       increment: @equipment.increment).each do |set|
+                       loading: loading(lift)).each do |set|
         insert_set(workout, lift, set, is_warmup: true)
       end
       working_sets(lift, top).each { |set| insert_set(workout, lift, set, is_warmup: false) }
@@ -186,7 +186,7 @@ class Tectonic < Roda
                              'cannot be worked out. Log a completed set of it first.'
       end
 
-      @equipment.round(max * lift.percent_of_max / 100.0)
+      @equipment.loadable(max * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell)
     end
 
     # The written top_weight is where a lift starts and nothing more: once the movement has
@@ -275,10 +275,20 @@ class Tectonic < Roda
         sets: lift.sets,
         reps: lift.reps,
         top_weight: top,
-        increment: @equipment.increment,
+        loading: loading(lift),
         preferred_reps: (@program.preferred_reps if lift.is_main),
         is_ascending: @program.is_ascending
       )
+    end
+
+    # How this lift's calculated loads become numbers to put on the bar: the rack's own
+    # rule, which lands on a weight it can build, and which knows to leave a lift that is
+    # not on a barbell alone. Every weight this generator writes goes through it, which is
+    # what makes "the plate math can express every set here" true by construction rather
+    # than by luck -- and the ramp and the working sets are handed the same one, so the two
+    # halves of a lift cannot round differently.
+    def loading(lift)
+      @equipment.loading(is_barbell: lift.is_barbell)
     end
 
     # Weight and reps start out equal to the planned values. Lifting the set as

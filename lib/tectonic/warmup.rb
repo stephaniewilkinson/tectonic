@@ -23,7 +23,11 @@ class Tectonic < Roda
     # Returns [{weight:, reps:}, ...] always opening with the empty bar and ending
     # below top_weight. Empty only for work that is not on a barbell: bodyweight,
     # banded and machine lifts ramp differently, if at all.
-    def ramp(top_weight, is_barbell: true, bar_weight: BAR_WEIGHT, increment: Rounding::INCREMENT)
+    # `loading` is how a percentage of the top weight becomes a number to put on the bar.
+    # Given a rack's own -- Equipment#loading -- every rung lands on a weight that rack can
+    # build; given nothing it rounds to a multiple of the increment, which is what this did
+    # unconditionally and is what wrote the unloadable 124 in #140.
+    def ramp(top_weight, is_barbell: true, bar_weight: BAR_WEIGHT, loading: Rounding::Loading.by_increment)
       return [] unless is_barbell
 
       # Every barbell lift starts with the bar, including one that works at the
@@ -33,7 +37,7 @@ class Tectonic < Roda
 
       _, ramps = TIERS.find { |minimum, _| top_weight >= minimum }
       ramps.each_with_object(bar) do |(percent, reps), sets|
-        weight = [Rounding.to_increment(top_weight * percent, increment:), bar_weight].max
+        weight = [loading.call(top_weight * percent), bar_weight].max
         # Rounding can flatten two ramp steps onto the same weight on a light
         # lift. Lifting the same bar twice is not a ramp, so drop the repeat.
         sets << { weight:, reps: } if weight > sets.last[:weight]

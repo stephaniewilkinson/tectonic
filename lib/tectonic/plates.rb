@@ -69,6 +69,25 @@ class Tectonic < Roda
       end
     end
 
+    # Every total this rack can load, ascending, the bar included as the lightest of them.
+    # The whole set rather than one answer, because the generator asks "what can this rack
+    # make" dozens of times for a single week and the enumeration is the expensive half of
+    # `closest` -- paid once here, against once per call there.
+    #
+    # nil for a rack given as a bare list, which means "as many of each as the weight
+    # needs" and so has no finite set of totals. A caller that gets nil has asked a
+    # question its inventory cannot answer and should fall back rather than guess.
+    def totals(bar_weight: BAR_WEIGHT, inventory: DEFAULT_INVENTORY)
+      plates = stock(inventory)
+      return nil if plates.any? { |_, pairs| pairs == Float::INFINITY }
+
+      # Every plate in the rack on one side is the most it can hold, so nothing is capped
+      # away: `reachable` trims counts that overshoot its target, and this target cannot be
+      # overshot.
+      ceiling = plates.sum { |plate, pairs| plate * pairs }
+      reachable(ceiling, plates).sort.map { |side| numeric(bar_weight.to_r + (side * 2)) }
+    end
+
     # [[denomination, pairs], ...] heaviest first. A hash states how many pairs of each
     # the rack holds; a bare list states only which denominations exist, and says nothing
     # about how many, so it means as many as the weight needs. That is what the list form
