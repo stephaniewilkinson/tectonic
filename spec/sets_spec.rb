@@ -99,6 +99,33 @@ describe 'saving the set edit form' do
   end
 end
 
+# Both forms are one partial now, and this is the difference it keeps: logging a set with
+# neither a weight nor a rep count records nothing, so the new-set form makes the browser
+# say so before it posts. Whether saving an existing row may empty those fields is a
+# separate question that the edit form has never asked, and merging is not the moment to
+# start -- so the flag has to follow which form is on screen, not the markup they share.
+describe 'the fields the set forms insist on' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SetForm
+
+  before { @workout, @set, = account_with_a_logged_set }
+
+  it 'asks the new-set form for a weight and a rep count' do
+    get "/workouts/#{@workout}/sets/new"
+
+    assert_includes field(last_response.body, 'weight'), 'required'
+    assert_includes field(last_response.body, 'reps'), 'required'
+  end
+
+  it 'asks the edit form for neither, which is saving a row that has both already' do
+    get "/workouts/#{@workout}/sets/#{@set}/edit"
+
+    refute_includes field(last_response.body, 'weight'), 'required'
+    refute_includes field(last_response.body, 'reps'), 'required'
+  end
+end
+
 describe 'substituting the exercise on a set' do
   include Rack::Test::Methods
   include RouteOwnership
