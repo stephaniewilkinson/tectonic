@@ -6,6 +6,19 @@
     <%== assets(:css) %>
     <%== assets(:img) %>
     <script src="https://cdn.tailwindcss.com"></script>
+    <%# Fathom rather than Google Analytics, which is the whole point of the choice: it sets
+        no cookie, records no personal data and needs no consent banner, so counting visits
+        costs the reader nothing. `defer` keeps it off the critical path -- it is the last
+        thing on a page that should delay the first paint.
+
+        Not in views/oauth_layout.erb, and not by oversight. That page's CSP names
+        cdn.tailwindcss.com as the only script source it will run, so this would be refused
+        there anyway -- but the reason to leave it out is that it is the one page where a
+        tap hands an API client the account, and the fewer origins involved in that moment
+        the better. The consent screen going uncounted is the right trade. %>
+    <%- if analytics? %>
+      <script src="https://cdn.usefathom.com/script.js" data-site="VXQDPBHH" defer></script>
+    <%- end %>
 
     <!-- HTML Meta Tags -->
     <title>tectonic plates, a lifting app</title>
