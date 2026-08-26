@@ -71,8 +71,8 @@ end
 #
 # The list of includers is the honest answer to "where is JavaScript load-bearing here":
 # the session screen and its swipe strip, which htmx swaps under; the sign-up walk in
-# system_spec; the escaping specs, which have to ask a real parser whether a name became
-# an element; and the two block-editor specs that measure geometry.
+# system_spec; and the escaping specs, which have to ask a real parser whether a name
+# became an element. The block editor was on this list until its delete stopped asking.
 module BrowserSpec
   def before_setup
     super

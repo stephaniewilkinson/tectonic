@@ -14,9 +14,12 @@ require 'securerandom'
 module SetList
   # Left to right, which is what lets a column be found by name.
   COLUMNS = %w[Exercise Weight Reps Warmup Done Edit Show].freeze
+  TICKED = '&#9745;'
+  EMPTY = '&#9744;'
 
   # The set list of a workout holding a single set, logged as told. The body is UTF-8
-  # because the table is: an em dash stands in for a flag a set does not carry.
+  # because the table is: the marker line under a movement name joins its two words
+  # with a middle dot.
   def list(is_warmup: false, is_completed: false)
     account_id = login
     workout = own_workout(account_id)
@@ -35,6 +38,11 @@ module SetList
 
   def cell(body, column)
     body.scan(/<td[^>]*>/)[COLUMNS.index(column)]
+  end
+
+  # What a cell holds, where `cell` gives back the tag that opens it.
+  def cell_body(body, column)
+    body.scan(%r{<td[^>]*>(.*?)</td>}m)[COLUMNS.index(column)].first
   end
 
   # Everything the Exercise cell holds, which on a phone is the name and the markers.
@@ -103,9 +111,46 @@ describe 'what phone width keeps of the columns it drops' do
   end
 
   # A working set still to be lifted is the common row, and it carries no marker at all:
-  # the em dash the hidden columns show for it says nothing worth a second line.
+  # the empty boxes the hidden columns show for it say nothing worth a second line.
   it 'says nothing under a set that is neither' do
     refute_includes exercise_cell(list), '<div'
+  end
+end
+
+# The two columns themselves, which now answer with the box the workout record answers
+# with rather than with words of their own. Which box belongs to which column is the
+# whole of what goes wrong with two adjacent columns that look alike, so that is what
+# this asserts rather than the presence of a glyph.
+describe 'how the set list answers Warmup and Done' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SetList
+
+  def boxes(body)
+    %w[Warmup Done].map { |column| cell_body(body, column)[/#{SetList::TICKED}|#{SetList::EMPTY}/] }
+  end
+
+  it 'ticks the box of the fact that is true and leaves the other empty' do
+    assert_equal [SetList::TICKED, SetList::EMPTY], boxes(list(is_warmup: true))
+    assert_equal [SetList::EMPTY, SetList::TICKED], boxes(list(is_completed: true))
+  end
+
+  # The words these replaced were the bug: an em dash in a column reads as "not
+  # applicable" rather than as no, and it stood for no in both columns at once.
+  it 'answers with a box rather than a word or a dash' do
+    body = list
+
+    refute_includes body, '—'
+    assert_equal [SetList::EMPTY, SetList::EMPTY], boxes(body)
+  end
+
+  # A box says nothing read aloud, so the answer is spelled out beside it -- in the
+  # words of the heading it sits under, which on this screen is Done and not Completed.
+  it 'spells both answers out for a screen reader' do
+    body = list(is_warmup: true)
+
+    assert_includes body, '<span class="sr-only">warmup</span>'
+    assert_includes body, '<span class="sr-only">not done</span>'
   end
 end
 

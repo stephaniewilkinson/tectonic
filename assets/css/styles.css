@@ -1,37 +1,37 @@
+/* A heading, and nothing else that is merely large. The size utilities from 20px up used
+   to sit in this selector list too, which made the typeface a property of how big a thing
+   happens to be and settled questions nobody asked. The session screen printed a working
+   set at text-2xl and the warmup above it at text-lg, so one column of four weights came
+   out in two faces; every figure on /volume took the display face and every label beside
+   it did not. It failed the other way as well: a class selector matches whole tokens, so
+   `sm:text-xl` is not `text-xl` and anything asking for a size behind a breakpoint got no
+   face at all -- which is what the nav did, at every width. Widening the rule to cover the
+   responsive variants would have fixed the nav and handed the face to every future element
+   that merely happens to be 20px, which is the same bug again. The question is whether a
+   thing is a heading or a brand surface, so that is what the selectors ask. */
 h1,
 h2,
 h3,
 h4,
 h5,
-h6,
-.text-7xl,
-.text-6xl,
-.text-5xl,
-.text-4xl,
-.text-3xl,
-.text-2xl,
-.text-xl {
+h6 {
     font-family: Blonde Sans;
 }
 
+/* Outranks the heading rule on specificity, a class against an element, so the front
+   page's h1 is Blonde Serif wherever it sits in the file. It used to depend on coming
+   after the size rules at equal weight. */
 .serif {
     font-family: Blonde Serif;
 }
 
-/* Names the brand face on the element that wants it, which is the only way the nav can
-   have it. The size rules above are keyed on the class token `text-xl`, and the nav
-   writes `sm:text-xl` -- a different token, which that selector does not match -- so the
-   links rendered in the system sans at every width, phone and desktop alike. Widening
-   the size rule to cover the responsive variants would fix the nav and hand the brand
-   face to every future element that merely happens to be 20px, which is the same bug
-   again. The generic fallback is here and not on the rules above on purpose: the nav is
-   on every page, and if /fonts/ is slow or missing, links dropping to the default serif
-   read as a broken page in a way that a heading doing the same does not. */
+/* Names the brand face on the element that wants it, which is how anything that is not a
+   heading gets it: the nav links, and the two titles that are an anchor and a div. The
+   generic fallback is here and not on the rule above on purpose: the nav is on every
+   page, and if /fonts/ is slow or missing, links dropping to the default serif read as a
+   broken page in a way that a heading doing the same does not. */
 .brand {
     font-family: "Blonde Sans", sans-serif;
-}
-.myteal {
-    background-color: teal;
 }
 
 /* Weight and reps are typed on a touch keypad, so the native number spinners
