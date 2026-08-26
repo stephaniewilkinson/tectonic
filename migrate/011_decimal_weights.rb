@@ -30,6 +30,10 @@ Sequel.migration do
       set_column_type :planned_weight, 'numeric(7, 2)'
     end
     alter_table(:program_lifts) { set_column_type :top_weight, 'numeric(7, 2)' }
+    # The bar is a weight like any other, and it is the one every plate calculation starts
+    # from: a 15 kg bar is 33.07 lb and a 20 kg is 44.09, so leaving this whole would have
+    # kept the app in pounds by arithmetic rather than by choice.
+    alter_table(:accounts) { set_column_type :bar_weight, 'numeric(7, 2)' }
   end
 
   down do
@@ -39,6 +43,9 @@ Sequel.migration do
     end
     alter_table(:program_lifts) do
       set_column_type :top_weight, Integer, using: Sequel.lit('round(top_weight)::integer')
+    end
+    alter_table(:accounts) do
+      set_column_type :bar_weight, Integer, using: Sequel.lit('round(bar_weight)::integer')
     end
   end
 end

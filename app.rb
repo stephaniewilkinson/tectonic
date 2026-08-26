@@ -731,7 +731,9 @@ class Tectonic < Roda
     return Plates.label(breakdown) if breakdown
 
     weight, nearest = equipment.closest(set[:weight])
-    nearest ? "closest #{weight}: #{Plates.label(nearest)}" : "lighter than your #{equipment.bar_weight} lb bar"
+    return "closest #{weight}: #{Plates.label(nearest)}" if nearest
+
+    "lighter than your #{weight_label(equipment.bar_weight)} lb bar"
   end
 
   # A yes-or-no fact about a set, as a box that is ticked or left empty. Three screens

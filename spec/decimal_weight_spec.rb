@@ -114,3 +114,46 @@ describe 'what the weight inputs will now accept' do
   end
 end
 
+# The bar is a weight too, and it is the one every plate calculation starts from. A 15 kg
+# bar is 33.07 lb and a 20 kg is 44.09, so leaving this column whole would have kept the
+# app in pounds by arithmetic rather than by choice.
+describe 'the weight of the bar itself' do
+  include Rack::Test::Methods
+  include RouteOwnership
+
+  before { @account_id = login }
+
+  it 'takes a decimal through the equipment form' do
+    get '/equipment'
+    token = last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1]
+    post '/equipment', { bar_weight: '33.07', plates: { '45' => '2' }, '_csrf' => token }
+
+    assert_equal BigDecimal('33.07'), DB[:accounts].where(id: @account_id).get(:bar_weight)
+  end
+
+  # Integer() refused "33.07" outright and left the bar at whatever it already was, without
+  # saying so -- which is the silent-loss failure the whole issue is about, one column over.
+  it 'no longer silently keeps the old bar when given a decimal' do
+    DB[:accounts].where(id: @account_id).update(bar_weight: 45)
+    Tectonic::Equipment.replace(@account_id, bar_weight: '33.07', plates: { '45' => '2' })
+
+    refute_equal BigDecimal('45'), DB[:accounts].where(id: @account_id).get(:bar_weight)
+  end
+
+  it 'is offered as a field that will accept one' do
+    get '/equipment'
+
+    assert_match(/name="bar_weight"[^>]*step="any"/, last_response.body)
+  end
+
+  # Everything downstream starts here: a 33.07 bar has to reach the plate math as 33.07.
+  it 'reaches the plate math, so a loadable weight is worked out from it' do
+    Tectonic::Equipment.replace(@account_id, bar_weight: '33.07', plates: { '10' => '2' })
+    rack = Tectonic::Equipment.for_account(@account_id)
+
+    assert_in_delta 33.07, rack.bar_weight.to_f
+    assert_equal [], rack.per_side(33.07)
+    assert_equal [[10, 1]], rack.per_side(53.07)
+  end
+end
+

@@ -139,7 +139,10 @@ class Tectonic < Roda
     # no pairs is simply not owned, which is how a plate is taken away.
     def self.replace(account_id, bar_weight:, plates:)
       DB.transaction do
-        bar = Integer(bar_weight.to_s, 10, exception: false)
+        # Float() rather than Integer(), which refused "33.07" outright and left the bar
+        # at whatever it already was without saying so. Stored through the numeric column,
+        # so the two decimal places are exact rather than the nearest binary fraction.
+        bar = Float(bar_weight.to_s, exception: false)
         DB[:accounts].where(id: account_id).update(bar_weight: bar) if bar&.positive?
         DB[:account_plates].where(account_id:).delete
         owned(plates).each do |denomination, count|
