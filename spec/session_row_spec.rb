@@ -94,9 +94,14 @@ describe 'what the button colour says' do
 
   # Lime is the completed state on this screen -- the progress bar and the row tint -- so
   # a lime button, which only ever sits on a row that is not done, meant the opposite.
+  #
+  # Paint rather than every class holding the word: the keyboard ring is lime on every
+  # button in the app, sky ones included, and has been on the workout record's Run session
+  # since before this screen shared it. A ring is drawn only while the button has focus and
+  # is drawn the same on all of them, so it says "this is what you are on", not "done".
   it 'leaves lime to the row tint and the progress bar' do
     complete_buttons(session(warmup_done: true)).each do |button|
-      assert_empty button.last.grep(/lime/)
+      assert_empty paint(button.last).grep(/lime/)
     end
   end
 

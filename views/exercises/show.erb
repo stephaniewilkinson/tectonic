@@ -6,7 +6,7 @@
   <div class="flex items-center justify-between">
     <h1 class="text-3xl font-semibold text-gray-900"><%= @exercise[:name] %></h1>
     <%- if @exercise.account_id == @account_id %>
-      <a href="/exercises/<%= @exercise[:id] %>/edit" class="rounded-md bg-lime-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-lime-600">Edit</a>
+      <a href="/exercises/<%= @exercise[:id] %>/edit" class="<%= button_style %> bg-lime-500 px-3 py-2 text-sm font-semibold text-white hover:bg-lime-600">Edit</a>
     <%- else %>
       <span class="rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-500">Built-in exercise</span>
     <%- end %>

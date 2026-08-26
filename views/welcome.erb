@@ -27,8 +27,8 @@
         <%# Log in rests a step darker than the primary button everywhere else, so its hover is
             lime-700 rather than the usual lime-600. It hovered to lime-500 before, which made it
             the one button in the app that got lighter when you pointed at it. %>
-        <a href="/login" class="rounded-md bg-lime-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-lime-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-600">Log in</a>
-        <a href="/create-account" class="rounded-md bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lime-600">Sign up</a>
+        <a href="/login" class="<%= button_style %> bg-lime-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-lime-700">Log in</a>
+        <a href="/create-account" class="<%= button_style %> bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">Sign up</a>
         <a href="/about" class="text-sm font-semibold leading-6 text-sky-800">Learn more <span aria-hidden="true">→</span></a>
       </div>
     </div>

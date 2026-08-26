@@ -95,7 +95,8 @@
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-              <button type="submit" class="min-h-11 rounded-lg border px-4 text-sm font-semibold <%= complete_style(set) %>">
+              <button type="submit"
+                      class="<%= button_style %> min-h-11 border px-4 text-sm font-semibold <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
               </button>
             </form>
@@ -134,7 +135,7 @@
                 <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
               </label>
               <button type="submit"
-                      class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
+                      class="<%= button_style %> border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">
                 Save
               </button>
             </form>
@@ -171,7 +172,7 @@
                   hx-target="#session-body" hx-swap="innerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <button type="submit"
-                      class="rounded-xl border px-5 py-3 text-base font-semibold shadow-sm <%= complete_style(set) %>">
+                      class="<%= button_style %> border px-5 py-3 text-base font-semibold <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
               </button>
             </form>
@@ -233,7 +234,7 @@
                   lime-500, which turned a blue button green under the thumb and said the
                   set was done before it was. %>
               <button type="submit"
-                      class="rounded-lg border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-sky-900">
+                      class="<%= button_style %> border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">
                 Save
               </button>
             </form>
