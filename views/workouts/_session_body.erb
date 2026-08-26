@@ -1,12 +1,31 @@
 <%# The swappable core of the session view. Every form posts with htmx targeting
     #session-body, so a tap re-renders progress, the set row, and the RPE state
     together; without JS the same forms post normally and the route redirects. %>
+<%# One segment per lift, not per set. A set is the wrong unit for a bar: five movements
+    of six sets drew thirty dashes twelve pixels wide on a phone, which is a barcode, and
+    it disagreed with the panel directly beneath it saying "1 of 5" over five dots. The
+    bar now counts what the session is made of, which is what #176 asks for.
+
+    A segment fills with its own sets rather than flipping whole, so a lift four sets into
+    six is two thirds lime and reads as underway -- the distinction an all-or-nothing
+    segment throws away, and the one that matters most while you are in the middle of a
+    lift. The slices are the sets themselves, laid out with no gap inside a rounded,
+    clipped track, so they read as one bar filling rather than as six dashes. That keeps
+    every set the old bar showed and needs no width computed into a style attribute or an
+    arbitrary class -- either of which would have to survive htmx swapping this partial
+    out from under the CDN's JIT on every tap. %>
 <div class="sticky top-0 bg-gray-100 py-2">
   <div class="flex gap-0.5" aria-label="Session progress">
-    <%- @sets.each do |set| %>
-      <div class="h-2 flex-1 rounded-sm <%= set[:is_completed] ? 'bg-lime-500' : 'bg-gray-300' %>"></div>
+    <%- session_lifts.each do |lift| %>
+      <div class="flex h-2 flex-1 overflow-hidden rounded-sm bg-gray-300">
+        <%- lift.each do |set| %>
+          <div class="flex-1 <%= set[:is_completed] ? 'bg-lime-500' : '' %>"></div>
+        <%- end %>
+      </div>
     <%- end %>
   </div>
+  <%# Sets rather than lifts, and deliberately: the bar is now the answer to "how many
+      movements", so the line under it is where the exact set count still has to live. %>
   <p class="mt-1 text-xs text-gray-500">
     <%= @sets.count { |set| set[:is_completed] } %> of <%= @sets.length %> sets
   </p>
