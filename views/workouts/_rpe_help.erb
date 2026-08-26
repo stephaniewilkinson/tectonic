@@ -1,8 +1,12 @@
-<%# The rating scale, rendered once per question that asks for a rating: the footer of
-    every lift panel with a working set in it, and the session rating at the end. It used
-    to sit once at the bottom of the page, which was a scroll away from the buttons it
-    explains even when the lifts were stacked, and is a swipe and a scroll away now that
+<%# The rating scale, rendered as the footer of every lift panel with a working set in it.
+    It used to sit once at the bottom of the page, which was a scroll away from the buttons
+    it explains even when the lifts were stacked, and is a swipe and a scroll away now that
     they are panels. Warmup-only panels do not carry it, because they ask nothing.
+
+    A panel is the unit, so there is one copy per screenful and never two. The session
+    rating at the foot of the page used to render its own on top of the last panel's, which
+    is two of these one form apart (#175); it now renders one only when no panel did, which
+    is a session of nothing but warmups.
 
     Closed by default, and it has to stay that way -- five open tables is a worse page
     than one distant one. The cost of repeating it is about 2 KB of markup a copy, which

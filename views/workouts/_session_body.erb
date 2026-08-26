@@ -269,8 +269,16 @@
   </div>
 </form>
 
-<%# The session rating is the same question at a different scale, and it is the last thing
-    on the page, so it gets the scale under it too. It is also the only copy a session of
-    nothing but warmups renders, which is the right answer: that session has no working set
-    to rate, but it still has this form on it. %>
-<%== render('workouts/_rpe_help') %>
+<%# The session rating is the same question at a different scale, so it wants the scale
+    under it -- but the last lift panel's copy is already immediately above this form, and
+    rendering a second one here put two identical disclosures on screen with nothing but
+    the rating buttons between them. That is what #175 is a picture of. The panel's copy
+    answers both questions from where it already sits.
+
+    Unless no panel rendered one. A session of nothing but warmups asks for no per-set
+    rating, so no panel carries the scale, and this form is still on the page -- so here it
+    is the only copy there is rather than a second one. A session with no sets at all takes
+    it for the same reason: `all?` is true of nothing, which is the answer that wants. %>
+<%- if @sets.all? { |set| set[:is_warmup] } %>
+  <%== render('workouts/_rpe_help') %>
+<%- end %>

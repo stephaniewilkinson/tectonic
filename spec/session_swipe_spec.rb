@@ -207,10 +207,11 @@ describe 'where the rating scale sits' do
     @body = last_response.body
   end
 
-  # Two lifts with working sets on them, plus the session rating at the end of the page,
-  # which is the same question about the whole session.
-  it 'is under every question that asks for a rating' do
-    assert_equal 3, @body.scan('How do I rate this?').length
+  # Two lifts with working sets on them, and no third copy under the session rating: that
+  # form sits directly below the last panel, so its own copy would be the same disclosure
+  # twice with only the rating buttons in between, which is #175.
+  it 'is under every panel that asks for a rating, and nowhere twice over' do
+    assert_equal 2, @body.scan('How do I rate this?').length
   end
 
   it 'is not on a lift of nothing but warmups' do
@@ -218,8 +219,42 @@ describe 'where the rating scale sits' do
     refute_includes panels(@body).last, 'How do I rate this?'
   end
 
+  # #175 is a picture of the foot of this page: the scale, the session rating buttons, and
+  # the scale again. What went wrong is visible only below the last panel, so that is where
+  # this looks -- the copies inside panels are the ones that are supposed to be there.
+  it 'puts none of them below the last panel, where the duplicate showed' do
+    tail = @body.split('</section>').last
+
+    assert_includes tail, 'Session RPE'
+    refute_includes tail, 'How do I rate this?'
+  end
+
   it 'stays closed, because five open tables is worse than one far away' do
     refute_includes @body, '<details open'
+  end
+end
+
+# The one session that still wants a copy at the foot of the page. No panel carries the
+# scale, because no panel asks for a rating, and yet the session rating form is on the page
+# putting exactly that question -- so dropping the trailing copy unconditionally would have
+# left this session asking how hard it was with nothing to answer it against.
+describe 'the rating scale on a session of nothing but warmups' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SwipeableSession
+
+  before do
+    account_id = login
+    workout_id = DB[:workouts].insert(account_id:, date: Time.now)
+    write_lift(workout_id, account_id, working: false)
+    get "/workouts/#{workout_id}/session"
+    @body = last_response.body
+  end
+
+  it 'renders once, under the session rating that is the only question left' do
+    assert_equal 1, @body.scan('How do I rate this?').length
+    refute_includes panels(@body).first, 'How do I rate this?'
+    assert_includes @body, 'Session RPE'
   end
 end
 
