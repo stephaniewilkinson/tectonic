@@ -1,9 +1,19 @@
 # frozen_string_literal: true
 
 require_relative 'spec_helper'
+require_relative '../lib/tectonic/exercise_library'
 require 'rack/test'
 require 'bcrypt'
 require 'securerandom'
+
+# Seeded here, as five other spec files do, because the last spec in this file logs a set
+# against a library movement and this file seeded none. It passed anyway in a full run:
+# another file seeds the library at load time and the teardown deliberately keeps the rows
+# with no account behind them, so whichever file ran first left one lying there. Run on its
+# own -- which is how the README says to run a single file -- there was no library row,
+# `get(:id)` came back nil, the post was refused for a movement that did not resolve, and
+# the assertion after it failed on a suite that is otherwise green.
+Tectonic::Exercise.load_library
 
 # The workout and set routes, driven as a logged-in browser would drive them. Two
 # accounts exist throughout: the one signed in, and a stranger whose rows it must not
