@@ -1,6 +1,6 @@
 <div class="mx-auto max-w-md">
   <h1 class="text-3xl font-semibold text-gray-900">
-    <%= @set.exercise[:name] %> &mdash; <%= @set[:weight] %> &times; <%= @set[:reps] %>
+    <%= @set.exercise[:name] %> &mdash; <%= weight_label(@set[:weight]) %> &times; <%= @set[:reps] %>
   </h1>
   <%- if provenance(@set) %>
     <p class="mt-1 text-xs text-gray-400"><%= provenance(@set) %></p>
@@ -24,7 +24,7 @@
     </div>
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Weight</dt>
-      <dd class="text-gray-900"><%= @set[:weight] %></dd>
+      <dd class="text-gray-900"><%= weight_label(@set[:weight]) %></dd>
     </div>
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Reps</dt>

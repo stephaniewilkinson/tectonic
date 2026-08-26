@@ -5,16 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <%== assets(:css) %>
     <%== assets(:img) %>
-    <script src="https://cdn.tailwindcss.com"></script>
     <%# Fathom rather than Google Analytics: no cookie, no personal data, no consent
         banner. Development and staging are kept out of the numbers by the allowed-domains
         firewall on the Fathom site rather than by a condition here, which is Fathom's own
-        advice and is better than a condition here -- it filters every hostname that is not
-        the live one, including a local run that happens to boot with RACK_ENV=production.
+        advice and is better than one -- it filters every hostname that is not the live
+        one, including a local run that happens to boot with RACK_ENV=production.
 
         Deliberately not in views/oauth_layout.erb. That is the one page where a tap hands
-        an API client the account, and the fewer origins in that moment the better; its CSP
-        would refuse this anyway. Separate layouts, so leaving it out is the whole of it. %>
+        an API client the account, and the fewer origins in that moment the better. Since
+        #142 that page's policy is default-src 'none' with no script-src at all, so this
+        would be refused there outright; separate layouts mean leaving it out is the whole
+        of it, and analytics_spec keeps it that way.
+
+        This is now the only third-party script the site loads: the Tailwind CDN that used
+        to sit above it went with #142. %>
     <script src="https://cdn.usefathom.com/script.js" data-site="VXQDPBHH" defer></script>
 
     <!-- HTML Meta Tags -->

@@ -93,10 +93,16 @@ class Tectonic < Roda
     # A day's sessions as the view draws them. The mapping from status to word and
     # colour lives here rather than in the template, which would otherwise have to hold
     # a local across ERB tags to do it.
+    # `label` rides along because a cell holding two workouts drew the same word twice
+    # with nothing between them: performed, performed. The word says what happened to a
+    # session and the label says which session it was, and a day with two of them needs
+    # both. Nil for a workout that has neither a name nor a program day behind it, which
+    # is every session anybody logged before #143 and is why the view has to handle its
+    # absence rather than assume one.
     def entries(workouts, today = Date.today)
       workouts.map do |workout|
         status = workout.status(today)
-        { id: workout.id, status:, word: WORDS[status], style: STYLES[status] }
+        { id: workout.id, status:, word: WORDS[status], style: STYLES[status], label: workout.label }
       end
     end
 

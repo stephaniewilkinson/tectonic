@@ -98,7 +98,7 @@ describe 'the stylesheet behind the brand class' do
   include NavBranding
 
   it 'defines .brand as Blonde Sans' do
-    assert_match(/\.brand\s*\{[^}]*font-family:\s*"Blonde Sans"/, stylesheet)
+    assert_match(/\.brand\s*\{[^}]*font-family:\s*"?Blonde Sans"?/, stylesheet)
   end
 
   # This rule was left additive when `brand` was added, with the size utilities still in
@@ -107,7 +107,9 @@ describe 'the stylesheet behind the brand class' do
   # nothing. Asserted as an absence because that is the shape of the bug -- putting
   # `.text-2xl` back would re-brand a column of weights and break no other spec.
   it 'hangs Blonde Sans off the headings and off no size utility' do
-    rule = stylesheet.split('}').find { |block| block.include?('font-family: Blonde Sans;') }
+    rule = stylesheet.split('}').find { |block| block.match?(/h1.*font-family:\s*"?Blonde Sans"?;?\z/m) }
+
+    refute_nil rule, 'no heading rule names Blonde Sans'
 
     %w[h1 h2 h3 h4 h5 h6].each { |selector| assert_includes rule, selector }
     refute_match(/\.text-/, rule)
@@ -123,7 +125,8 @@ describe 'the files the brand face is delivered in' do
   # invisible failure this whole file exists to catch. Every URL the stylesheet asks for
   # is fetched, so a renamed or deleted file fails here rather than on a phone.
   it 'serves every font file styles.css asks for' do
-    urls = stylesheet.scan(/url\("([^"]+)"\)/).flatten.map { |url| url.split(/[?#]/).first }.uniq
+    # Quotes optional: the build is minified, and a minifier drops them from a url().
+    urls = stylesheet.scan(/url\(\s*"?([^)"]+)"?\s*\)/).flatten.map { |url| url.split(/[?#]/).first }.uniq
 
     refute_empty urls
     urls.each do |url|
@@ -135,8 +138,9 @@ describe 'the files the brand face is delivered in' do
   end
 
   it 'declares both faces in the format a current browser will pick' do
-    assert_includes stylesheet, 'url("/fonts/blonde_sans-webfont.woff2") format("woff2")'
-    assert_includes stylesheet, 'url("/fonts/blonde_serif-webfont.woff2") format("woff2")'
+    %w[sans serif].each do |face|
+      assert_match(%r{url\(\s*"?/fonts/blonde_#{face}-webfont\.woff2"?\s*\)\s*format\(\s*"woff2"\s*\)}, stylesheet)
+    end
   end
 end
 

@@ -17,14 +17,14 @@
       <%# step="5" was wrong here in two different ways, one per copy. With no value and no
           min the new-set form counted fives from zero, so it took 135 and 140 and refused
           137 outright; the edit form counted them from the row's own weight, so a set at
-          138 could go to 143 but not to 140. step is 1 and min is 0 for the same reasons as
-          on the session screen; the long version of the argument, including why it is not
-          "any", is in views/workouts/_session_body.erb. %>
+          138 could go to 143 but not to 140. step is "any" and min is 0 for the same
+          reasons as on the session screen, where the long version of the argument is --
+          including why it stopped being 1 when #141 widened the column. %>
       <div>
         <label for="weight" class="block text-sm font-medium text-gray-900">Weight</label>
-        <input type="number" id="weight" name="weight" autocomplete="off" min="0" step="1" inputmode="numeric"
+        <input type="number" id="weight" name="weight" autocomplete="off" min="0" step="any" inputmode="numeric"
           <%= 'required' unless @set %>
-          value="<%= @set&.weight %>"
+          value="<%= weight_label(@set&.weight) %>"
           class="mt-1 block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
       </div>
       <div>

@@ -22,7 +22,7 @@ class Tectonic < Roda
         scope :write
         input_schema(
           type: 'object',
-          properties: { set_id: { type: 'integer' }, weight: { type: 'integer' },
+          properties: { set_id: { type: 'integer' }, weight: { type: 'number' },
                         reps: { type: 'integer' }, rpe: { type: 'integer' },
                         completed: { type: 'boolean' } },
           required: ['set_id'], additionalProperties: false

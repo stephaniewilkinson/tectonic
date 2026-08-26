@@ -66,11 +66,19 @@
               the title attribute it replaces could not do, because a title has no way of
               being reached by a thumb. Nothing else is inside the link on a phone, so
               min-h-11 is what holds it open to a thumb. %>
+          <%# A cell holding two sessions drew the same word twice with nothing between
+              them, which is #143: the morning lift and the evening walk both read
+              "performed". Where a session has a name, or a program day whose focus can
+              stand in for one, the chip shows that instead -- the word is what happened
+              to it, the label is which one it is, and the label is the half that tells
+              two apart. The word stays in the accessibility tree either way, because
+              "morning lift" alone does not say whether it was trained. %>
           <%- Tectonic::Calendar.entries(cell[:workouts]).each do |entry| %>
             <a href="/workouts/<%= entry[:id] %>"
                class="mt-1 flex min-h-11 items-center justify-center rounded px-1 text-xs
                       font-medium sm:min-h-6 <%= entry[:style] %>">
-              <span class="sr-only sm:not-sr-only"><%= entry[:word] %></span>
+              <span class="sr-only"><%= [entry[:word], entry[:label]].compact.join(', ') %></span>
+              <span class="hidden truncate sm:inline" aria-hidden="true"><%= entry[:label] || entry[:word] %></span>
             </a>
           <%- end %>
         </div>

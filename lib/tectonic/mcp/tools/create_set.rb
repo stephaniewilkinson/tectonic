@@ -21,7 +21,7 @@ class Tectonic < Roda
           type: 'object',
           properties: {
             exercise: { type: 'string' }, date: { type: 'string' },
-            weight: { type: 'integer' }, reps: { type: 'integer' }, rpe: { type: 'integer' },
+            weight: { type: 'number' }, reps: { type: 'integer' }, rpe: { type: 'integer' },
             is_warmup: { type: 'boolean' }, is_completed: { type: 'boolean' }
           },
           required: %w[exercise weight reps], additionalProperties: false

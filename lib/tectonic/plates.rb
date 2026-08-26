@@ -41,7 +41,7 @@ class Tectonic < Roda
 
       plates = stock(inventory)
       best = reachable(remaining, plates).min_by { |sum| [(sum - remaining).abs, sum] }
-      [numeric(bar_weight.to_r + (best * 2)), load(best, plates)]
+      [numeric(exact(bar_weight) + (best * 2)), load(best, plates)]
     end
 
     # Half of whatever goes on the bar past the bar itself, or nil when the total is
@@ -49,7 +49,7 @@ class Tectonic < Roda
     def beyond_the_bar(total, bar_weight)
       return nil if total.nil?
 
-      remaining = (total.to_r - bar_weight.to_r) / 2
+      remaining = (exact(total) - exact(bar_weight)) / 2
       remaining.negative? ? nil : remaining
     end
 
@@ -85,7 +85,7 @@ class Tectonic < Roda
       # away: `reachable` trims counts that overshoot its target, and this target cannot be
       # overshot.
       ceiling = plates.sum { |plate, pairs| plate * pairs }
-      reachable(ceiling, plates).sort.map { |side| numeric(bar_weight.to_r + (side * 2)) }
+      reachable(ceiling, plates).sort.map { |side| numeric(exact(bar_weight) + (side * 2)) }
     end
 
     # [[denomination, pairs], ...] heaviest first. A hash states how many pairs of each
@@ -94,7 +94,7 @@ class Tectonic < Roda
     # has always meant, and a rack described that way should keep loading what it did.
     def stock(inventory)
       counted = inventory.is_a?(Hash) ? inventory : inventory.to_h { |plate| [plate, Float::INFINITY] }
-      counted.map { |plate, pairs| [plate.to_r, pairs] }.uniq(&:first).sort_by(&:first).reverse
+      counted.map { |plate, pairs| [exact(plate), pairs] }.uniq(&:first).sort_by(&:first).reverse
     end
 
     # Depth first, heaviest plate first and most of it first, so the first exact
@@ -122,6 +122,16 @@ class Tectonic < Roda
       return '—' if breakdown.empty?
 
       breakdown.map { |plate, count| "#{count}×#{plate}" }.join(' ')
+    end
+
+    # A weight as an exact rational. The subtlety is Float: 33.07.to_r is the binary
+    # fraction nearest 33.07, which is not 3307/100, so a Float bar weight and a BigDecimal
+    # one of the same name differ by about 1e-15 -- enough for `beyond_the_bar` to make a
+    # bar loaded to exactly its own weight come out very slightly negative, and answer nil
+    # to a weight it can obviously make. Read through its decimal spelling instead, which
+    # is what the number on a plate means. BigDecimal and Rational are already exact.
+    def exact(value)
+      value.is_a?(Float) ? Rational(value.to_s) : value.to_r
     end
 
     # Rationals keep the 2.5s exact through the arithmetic; weights come back out

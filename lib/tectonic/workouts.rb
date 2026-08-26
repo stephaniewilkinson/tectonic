@@ -26,6 +26,32 @@ class Tectonic < Roda
       end
     end
 
+    # What a name is once a form has been through it. A text input posts an empty string
+    # whether or not anybody typed in it, and '' is truthy in Ruby, so a blank name stored
+    # as itself would draw its own empty element beside every date forever. Null is the
+    # one a reader can test for, so it is the one that is stored. Stripping first means a
+    # name of nothing but whitespace does not count as one either.
+    #
+    # The same shape as Exercise.clean_note, and deliberately so: two columns that both
+    # mean "the lifter may say something here, or not" should not disagree about what
+    # saying nothing looks like.
+    def self.clean_name(raw)
+      text = raw.to_s.strip
+      text.empty? ? nil : text
+    end
+
+    # What to call this session in a list or a calendar cell. The name when there is one,
+    # and otherwise the focus of the program day that wrote it -- which is free, already
+    # written by the program editor, and already shown on /programs/:id, so the feature
+    # arrives populated for anybody running a block rather than empty for everybody.
+    #
+    # Read through rather than copied onto the row at generation, so that renaming a
+    # program day renames the sessions it has already written. A session that wants to
+    # disagree with its day says so by carrying a name of its own, which wins here.
+    def label
+      name || program_day&.focus
+    end
+
     # Whether any set has been lifted, which is what separates a session that happened
     # from one that was only written. Taken from the row when the list already asked
     # (with_performance), and otherwise one EXISTS of its own.

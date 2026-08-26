@@ -12,8 +12,8 @@
     <div>
       <label for="bar_weight" class="block text-sm font-medium text-gray-900">Bar</label>
       <div class="mt-1 flex items-center gap-2">
-        <input type="number" id="bar_weight" name="bar_weight" min="1" step="1" autocomplete="off"
-               value="<%= @equipment.bar_weight %>"
+        <input type="number" id="bar_weight" name="bar_weight" min="1" step="any" autocomplete="off"
+               value="<%= weight_label(@equipment.bar_weight) %>"
                class="w-28 rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm
                       ring-1 ring-inset ring-gray-300">
         <span class="text-sm text-gray-500">lb</span>

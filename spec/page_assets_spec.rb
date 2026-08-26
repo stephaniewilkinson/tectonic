@@ -124,12 +124,15 @@ describe 'the stylesheets a page loads' do
     assert_equal 404, last_response.status
   end
 
-  # The one Tailwind that does style the page, so removing the other cannot be mistaken
-  # for removing both.
-  it 'still loads the Tailwind CDN that does the layout' do
+  # This asserted the Play CDN was still there, so that removing the vendored v2 build
+  # could not be mistaken for removing the thing doing the layout. #142 removed the CDN
+  # too -- the stylesheet is compiled and served from this origin now -- so the assertion
+  # inverts: what has to be true is that the page has styles and gets them from us.
+  it 'loads its styles from this origin rather than from a CDN' do
     get '/welcome'
 
-    assert_includes last_response.body, 'cdn.tailwindcss.com'
+    refute_includes last_response.body, 'cdn.tailwindcss.com'
+    assert_match(%r{<link[^>]*rel="stylesheet"[^>]*href="/assets/css/styles\.css}, last_response.body)
   end
 end
 

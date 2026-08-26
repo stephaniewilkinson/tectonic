@@ -275,13 +275,29 @@ describe 'an entry with only its colour showing' do
   # whole of what is drawn. The word has to survive somewhere a screen reader still finds
   # it: the title attribute this replaced was never reachable by a thumb, and deleting the
   # word outright would leave the link with nothing to be announced as but its href.
+  #
+  # Two spans rather than one since #143. The chip shows a session's name where it has one,
+  # so what is read and what is drawn are no longer the same string, and the visible half is
+  # aria-hidden to keep a named session from being announced twice over.
   it 'keeps the word in the markup for a reader that cannot see the colour' do
     sign_in
     a_workout(on: Date.today, lifted: true)
 
     get '/'
 
-    assert_includes last_response.body, '<span class="sr-only sm:not-sr-only">trained</span>'
+    assert_includes last_response.body, '<span class="sr-only">trained</span>'
+  end
+
+  # A session with no name and no program day behind it, which is every session logged
+  # before #143: the chip goes on showing what it always showed.
+  it 'still draws the word itself when there is no name to draw instead' do
+    sign_in
+    a_workout(on: Date.today, lifted: true)
+
+    get '/'
+
+    assert_includes last_response.body,
+                    '<span class="hidden truncate sm:inline" aria-hidden="true">trained</span>'
   end
 end
 

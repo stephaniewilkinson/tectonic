@@ -32,13 +32,20 @@ class Tectonic < Roda
   # bytes; this leaves room for a long client name and a jwks document and nothing more.
   REGISTRATION_BODY_LIMIT = 16 * 1024
   # The consent screen's own policy. It is the one page where a single click hands an
-  # API client the account, and the only script it needs is the stylesheet CDN the site
-  # is written against, so everything else is denied outright rather than left open the
-  # way the site-wide policy has to leave it. form-action is deliberately absent: the
-  # consent POST is answered with a 302 to the client's callback, and browsers disagree
-  # about whether form-action applies across a redirect, so naming it would risk
-  # breaking the exchange it is supposed to protect.
-  CONSENT_SECURITY_POLICY = "default-src 'none'; script-src https://cdn.tailwindcss.com; " \
+  # API client the account, so everything is denied outright rather than left open the way
+  # the site-wide policy has to leave it.
+  #
+  # It ran one script until #142: the stylesheet was https://cdn.tailwindcss.com, a
+  # compiler shipped to the browser, and it had to be named here for the page to have any
+  # layout at all. The stylesheet is a stylesheet now, so this page runs no script from
+  # anywhere -- script-src is gone and default-src 'none' covers it, which is the strictest
+  # this can be said. That is the whole of what #142 unblocks on this page; the rest of the
+  # site still renders inline chart scripts and cannot say the same yet.
+  #
+  # form-action is deliberately absent: the consent POST is answered with a 302 to the
+  # client's callback, and browsers disagree about whether form-action applies across a
+  # redirect, so naming it would risk breaking the exchange it is supposed to protect.
+  CONSENT_SECURITY_POLICY = "default-src 'none'; " \
                             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " \
                             "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 
@@ -563,8 +570,12 @@ class Tectonic < Roda
       r.post do
         check_csrf!
         id = r.params['id']
+        # Blank is stored as null rather than as '', so "unnamed" has one spelling. It
+        # also means clearing the field on an edit puts a generated session back to
+        # reading its program day's focus rather than pinning it to an empty string.
+        name = Workout.clean_name(r.params['name'])
         if id.empty?
-          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'])
+          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'], name:)
           r.redirect "/workouts/#{workout_id}/"
         else
           # Rescheduling is owner-only. This route sits outside the nested ownership
@@ -572,7 +583,7 @@ class Tectonic < Roda
           # account's workout could be moved to a new date.
           @workout = Workout.where(id:, account_id: @account_id).first
           r.redirect '/workouts' unless @workout
-          @workout.update(date: r.params['date'])
+          @workout.update(date: r.params['date'], name:)
           r.redirect "/workouts/#{@workout.id}/"
         end
       end
@@ -731,7 +742,9 @@ class Tectonic < Roda
     return Plates.label(breakdown) if breakdown
 
     weight, nearest = equipment.closest(set[:weight])
-    nearest ? "closest #{weight}: #{Plates.label(nearest)}" : "lighter than your #{equipment.bar_weight} lb bar"
+    return "closest #{weight}: #{Plates.label(nearest)}" if nearest
+
+    "lighter than your #{weight_label(equipment.bar_weight)} lb bar"
   end
 
   # A yes-or-no fact about a set, as a box that is ticked or left empty. Three screens
@@ -766,7 +779,19 @@ class Tectonic < Roda
   # a template escapes rather than markup a template trusts. An entity written here would
   # arrive on the page spelled out rather than drawn.
   def load_label(set)
-    "#{"#{set[:weight]} × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+    "#{"#{weight_label(set[:weight])} × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+  end
+
+  # A weight as somebody would write it on a sheet: 225 rather than 225.0, and 137.5 as
+  # itself. #141 widened the three weight columns to numeric(7, 2), so Sequel hands back a
+  # BigDecimal, and every site that printed the value raw would otherwise show 0.225e3 --
+  # which is the correct rendering of a BigDecimal and no use at all to a lifter.
+  #
+  # Plates.numeric rather than a format string, because it is already the answer to this
+  # exact question for the plate breakdown and gives the same 2.5 in both places. It reads
+  # the denominator, which BigDecimal, Float, Integer and Rational all answer.
+  def weight_label(weight)
+    weight && Plates.numeric(weight)
   end
 
   # What a set counts. Seconds read as a duration rather than as a rep count, because
@@ -793,7 +818,7 @@ class Tectonic < Roda
     heaviest = Sequel.function(:max, Sequel[:sets][:weight])
     sets.exclude(is_warmup: true).join(:workouts, id: :workout_id).group(recorded).order(recorded)
         .select_map([Sequel.as(recorded, :day), Sequel.as(heaviest, :heaviest)])
-        .map { |day, weight| [day.strftime('%b %-d, %Y'), weight] }
+        .map { |day, weight| [day.strftime('%b %-d, %Y'), weight_label(weight)] }
   end
 
   # The window the volume page is asked for, or a block's worth. Only the offered
