@@ -820,19 +820,6 @@ class Tectonic < Roda
   # purpose and folding them in here would quietly undo that. The white secondary button
   # is left alone: it is already the same at all seven of its sites, which is what this
   # is trying to make the primary one.
-  # Whether this boot should be counted by Fathom. Production only, and deliberately not
-  # staging: both would report into the same site id, and a staging deploy exercised by
-  # nobody but us would be indistinguishable from real traffic in the numbers we are
-  # collecting it to read. A development or test run is the same argument at a smaller
-  # scale -- every `rake test` would otherwise be a few hundred pageviews.
-  #
-  # Read from the environment on each call rather than frozen into a constant at require
-  # time, because app.rb is required once and the suite needs to be able to ask what the
-  # other answer looks like.
-  def analytics?
-    ENV.fetch('RACK_ENV', nil) == 'production'
-  end
-
   def button_style
     'rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 ' \
       'focus-visible:outline-offset-2 focus-visible:outline-lime-500'
