@@ -14,12 +14,16 @@
         <%# This page is reached from claude.ai or ChatGPT and from nowhere on this site, and
             one tap on it hands an API client the account, so the mark at the top is the whole
             of the answer to "am I really on Tectonic". A line of grey 14px text was the
-            weakest answer available. The alt is the name rather than "logo" because when the
-            image does not draw, that is all that is left to say whose consent screen this is.
-            It is deliberately not a link: the only ways out of this flow should be the two
-            buttons at the bottom of the form. 224px wide on a phone and 256px from 640px up,
-            which reads as a brand mark rather than a favicon without becoming the page. %>
-        <img src="/icons/logo.svg" alt="tectonic plates" class="mx-auto mt-6 w-56 sm:w-64">
+            weakest answer available. It is deliberately not a link: the only ways out of this
+            flow should be the two buttons at the bottom of the form. 224px wide on a phone and
+            256px from 640px up, which reads as a brand mark rather than a favicon without
+            becoming the page.
+
+            Drawn into the page rather than fetched, which is what lets the wordmark be set in
+            Blonde Sans; views/_logo.erb has the whole of that argument. The name is still
+            reachable by anything that is not eyes, through the title the mark carries and the
+            role that makes it an image, which is what the alt used to do. %>
+        <%== render('_logo', locals: { classes: 'mx-auto mt-6 w-56 sm:w-64' }) %>
         <%== yield %>
       </div>
     </main>
