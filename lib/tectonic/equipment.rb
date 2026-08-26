@@ -61,9 +61,52 @@ class Tectonic < Roda
       Plates.numeric(lightest.to_r * 2)
     end
 
-    # Rounds a calculated weight to something this rack can actually load.
-    def round(weight)
-      Rounding.to_increment(weight, increment:)
+    # The nearest weight this rack can actually load.
+    #
+    # This is what `round` said it did and did not. It put a weight on a multiple of
+    # `increment`, and a multiple of the increment is a different claim: `increment` reads
+    # `pairs.keys.min` and throws the counts away, so it answers "what is the smallest step
+    # this rack has a plate for" where loading asks "what can this rack build". A rack with
+    # one pair of 1 lb plates has an increment of 2, which admits 124 -- 39.5 a side, needing
+    # two pairs of 1s -- and the plate math could then only answer nil to a weight the
+    # generator had just written. That is #140, and it ran both ways: the same rack could
+    # not be prescribed 47, which it loads with a single pair, because 47 is not a multiple
+    # of 2.
+    #
+    # No increment can fix that, which is why this does not try to pick a better one.
+    # Whether a weight is loadable is a question about subsets of the rack, not about
+    # divisibility, and only the enumeration answers it.
+    #
+    # A tie goes to the lighter weight, following Plates.closest: overshooting a
+    # prescription adds work nobody asked for and can turn a planned single into a miss,
+    # where undershooting by the same amount costs a little stimulus and nothing else.
+    #
+    # `is_barbell` is not decoration. A machine stack or a dumbbell is not loaded from this
+    # rack at all, and putting its weight through barbell plate math would be a new wrong
+    # answer in place of the old one, so those keep the increment rounding they had.
+    def loadable(weight, is_barbell: true)
+      return weight if weight.nil?
+      return Rounding.to_increment(weight, increment:) unless is_barbell
+      return Rounding.to_increment(weight, increment:) if loadable_totals.empty?
+
+      loadable_totals.min_by { |total| [(total - weight).abs, total] }
+    end
+
+    # How this rack loads, for the modules that work a prescription out. Warmup and
+    # SetScheme are handed one of these rather than a bare increment, because a percentage
+    # of a top weight has to land somewhere loadable and neither of them can be asked to
+    # know what this rack holds. The increment rides along because a ramp still has to know
+    # how far apart to space its rungs, which is a question the increment answers correctly.
+    def loading(is_barbell: true)
+      Rounding::Loading.new(increment, ->(weight) { loadable(weight, is_barbell:) })
+    end
+
+    # Every weight this rack can load, worked out once and kept. A week's generation asks
+    # for a few dozen roundings and every one of them would otherwise re-enumerate the same
+    # rack. Empty for an inventory with no counts on it, which is the case `loadable` falls
+    # back to the increment for.
+    def loadable_totals
+      @loadable_totals ||= Plates.totals(bar_weight:, inventory: pairs) || []
     end
 
     # The per-side breakdown, or nil when this rack cannot make the weight.

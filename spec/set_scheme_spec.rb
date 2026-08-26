@@ -47,7 +47,8 @@ describe 'Tectonic::SetScheme on a lift too light for a percentage step' do
   # The rack decides what is expressible: 3% of 105 is 3.15 lb, which a pair of 1.25s can
   # nearly make and a pair of 2.5s cannot.
   it 'keeps the percentage when the rack has plates fine enough for it' do
-    sets = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: 105, increment: 2.5)
+    sets = Tectonic::SetScheme.working_sets(sets: 3, reps: 8, top_weight: 105,
+                                            loading: Tectonic::Rounding::Loading.by_increment(2.5))
 
     assert_equal([97.5, 102.5, 105], sets.map { |set| set[:weight] })
   end

@@ -21,12 +21,16 @@ class Tectonic < Roda
     # `shape` carries preferred_reps and is_ascending, which describe how the sets are
     # laid out rather than what they weigh; they travel together because they are the
     # programme's business, while sets/reps/top_weight/increment are the lift's.
-    def working_sets(sets:, reps:, top_weight:, increment: Rounding::INCREMENT, **shape)
+    # `loading` turns a calculated load into a number to put on the bar, and says how far
+    # apart two rungs sit. Given a rack's own -- Equipment#loading -- every weight here
+    # lands on something that rack can build; given nothing it rounds to a multiple of the
+    # increment, which is what it always did and what #140 is about.
+    def working_sets(sets:, reps:, top_weight:, loading: Rounding::Loading.by_increment, **shape)
       target = target_reps(reps, shape[:preferred_reps])
-      top = convert_weight(top_weight, from_reps: reps, to_reps: target, increment:)
+      top = convert_weight(top_weight, from_reps: reps, to_reps: target, loading:)
       return Array.new(sets) { { weight: top, reps: target } } unless shape.fetch(:is_ascending, true)
 
-      ladder(top, sets, increment).map { |weight| { weight:, reps: target } }
+      ladder(top, sets, loading).map { |weight| { weight:, reps: target } }
     end
 
     # The loads of an ascending ramp, lightest first.
@@ -44,30 +48,39 @@ class Tectonic < Roda
     # plates therefore ascends where a coarser one cannot, which is the same rule the rest
     # of the app already follows. Where even one increment a set cannot fit above zero the
     # lift is too light to ascend at all and sits flat.
-    def ladder(top, sets, increment)
-      stepped = stepped_by_percent(top, sets, increment)
+    # The increment-spaced fallback is rounded now too, so that every rung is a weight the
+    # rack can build rather than only the ones the percentage produced. That can collapse
+    # two rungs onto one weight where the exact arithmetic did not -- a rack whose small
+    # plates run out has gaps in it, and one increment of nominal space can fall inside a
+    # gap -- so it is checked for repeats on the same terms as the percentage ladder, and
+    # falls flat when it has them. Two identical sets labelled as a ramp were the thing
+    # this method was written to avoid.
+    def ladder(top, sets, loading)
+      stepped = stepped_by_percent(top, sets, loading)
       return stepped if stepped.uniq.length == stepped.length
 
-      spaced = stepped_by_increment(top, sets, increment)
-      spaced.first.positive? ? spaced : Array.new(sets) { top }
+      spaced = stepped_by_increment(top, sets, loading)
+      return spaced if spaced.first.positive? && spaced.uniq.length == spaced.length
+
+      Array.new(sets) { top }
     end
 
-    def stepped_by_percent(top, sets, increment)
-      Array.new(sets) { |i| Rounding.to_increment(top * (1 - (ASCENDING_STEP * (sets - 1 - i))), increment:) }
+    def stepped_by_percent(top, sets, loading)
+      Array.new(sets) { |i| loading.call(top * (1 - (ASCENDING_STEP * (sets - 1 - i)))) }
     end
 
-    def stepped_by_increment(top, sets, increment)
-      Array.new(sets) { |i| top - ((sets - 1 - i) * increment) }
+    def stepped_by_increment(top, sets, loading)
+      Array.new(sets) { |i| loading.call(top - ((sets - 1 - i) * loading.increment)) }
     end
 
     # The same intensity expressed at a different rep count: fewer reps means more
     # weight for the same effort. 4×5 @ 155 becomes 4×3 @ 165.
-    def convert_weight(top_weight, from_reps:, to_reps:, increment: Rounding::INCREMENT)
+    def convert_weight(top_weight, from_reps:, to_reps:, loading: Rounding::Loading.by_increment)
       from = RPE8_PERCENTS[from_reps]
       to = RPE8_PERCENTS[to_reps]
-      return Rounding.to_increment(top_weight, increment:) unless from && to && from_reps != to_reps
+      return loading.call(top_weight) unless from && to && from_reps != to_reps
 
-      Rounding.to_increment(top_weight * (to / from), increment:)
+      loading.call(top_weight * (to / from))
     end
 
     # Converts down to the preferred rep count, never up, and only between rep
