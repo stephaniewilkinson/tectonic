@@ -31,6 +31,13 @@
                 <%- if workout.status == :skipped %>
                   <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">skipped</span>
                 <%- end %>
+                <%# Under the date rather than in a column of its own: most days have one
+                    session and would leave that column empty, and the name is a caption on
+                    the date rather than a fact standing beside it. Two sessions on one day
+                    were the same date twice here, which is the other half of #143. %>
+                <%- if workout.label %>
+                  <div class="text-sm text-gray-900"><%= workout.label %></div>
+                <%- end %>
                 <%- if provenance(workout) %>
                   <div class="text-xs text-gray-400"><%= provenance(workout) %></div>
                 <%- end %>
