@@ -151,11 +151,15 @@ describe 'what a set row will accept as a number' do
   # and 143 instead. That is #114's screenshot, and 138 is ordinary data: a rack with 1 lb
   # plates has an increment of 2, so the generator writes even weights for anybody who
   # owns micro plates.
+  # step is "any" since #141 widened sets.weight to numeric: it was 1 only because the
+  # column was an integer, and posting a decimal against one lost the whole set rather
+  # than the half pound. What this spec is really about is that the grid no longer counts
+  # from the row's own value, which "any" satisfies more completely than 1 did.
   it 'no longer counts in fives from whatever the row already holds' do
     body = session(weight: 138)
 
     refute_includes body, 'step="5"'
-    assert_equal 2, body.scan(/name="weight"[^>]*step="1"/).length
+    assert_equal 2, body.scan(/name="weight"[^>]*step="any"/).length
   end
 
   # Zero rather than no min at all, so the grid can never come back from a row's own
