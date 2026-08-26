@@ -32,13 +32,20 @@ class Tectonic < Roda
   # bytes; this leaves room for a long client name and a jwks document and nothing more.
   REGISTRATION_BODY_LIMIT = 16 * 1024
   # The consent screen's own policy. It is the one page where a single click hands an
-  # API client the account, and the only script it needs is the stylesheet CDN the site
-  # is written against, so everything else is denied outright rather than left open the
-  # way the site-wide policy has to leave it. form-action is deliberately absent: the
-  # consent POST is answered with a 302 to the client's callback, and browsers disagree
-  # about whether form-action applies across a redirect, so naming it would risk
-  # breaking the exchange it is supposed to protect.
-  CONSENT_SECURITY_POLICY = "default-src 'none'; script-src https://cdn.tailwindcss.com; " \
+  # API client the account, so everything is denied outright rather than left open the way
+  # the site-wide policy has to leave it.
+  #
+  # It ran one script until #142: the stylesheet was https://cdn.tailwindcss.com, a
+  # compiler shipped to the browser, and it had to be named here for the page to have any
+  # layout at all. The stylesheet is a stylesheet now, so this page runs no script from
+  # anywhere -- script-src is gone and default-src 'none' covers it, which is the strictest
+  # this can be said. That is the whole of what #142 unblocks on this page; the rest of the
+  # site still renders inline chart scripts and cannot say the same yet.
+  #
+  # form-action is deliberately absent: the consent POST is answered with a 302 to the
+  # client's callback, and browsers disagree about whether form-action applies across a
+  # redirect, so naming it would risk breaking the exchange it is supposed to protect.
+  CONSENT_SECURITY_POLICY = "default-src 'none'; " \
                             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " \
                             "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 

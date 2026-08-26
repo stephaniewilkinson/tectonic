@@ -25,9 +25,14 @@ module DisplayFace
   # Every class token the stylesheet hands a Blonde face to, read out of the stylesheet
   # rather than written down here. A list written down here would go on passing the day
   # `.text-2xl` came back into the font rule, which is the whole thing being guarded.
+  #
+  # Blonde rather than any font-family since #142: the stylesheet is a compiled Tailwind
+  # build now and carries `.font-mono`, which grants a face and has nothing to do with this
+  # brand. "Names a font-family" was only ever a proxy for "grants the brand face" and the
+  # two stopped being the same thing the moment the utilities arrived.
   def face_classes
     @face_classes ||= stylesheet.split('}')
-                                .select { |block| block.include?('font-family') }
+                                .grep(/font-family:\s*"?Blonde/)
                                 .flat_map { |block| block.split('{').first.to_s.scan(/\.([\w-]+)/) }
                                 .flatten.uniq
   end

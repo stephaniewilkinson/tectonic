@@ -1,0 +1,11 @@
+{
+  "name": "tectonic",
+  "private": true,
+  "description": "The stylesheet build. Everything else here is Ruby.",
+  "scripts": {
+    "build:css": "tailwindcss -i assets/css/app.css -o assets/css/styles.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}

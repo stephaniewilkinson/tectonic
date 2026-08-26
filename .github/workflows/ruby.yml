@@ -118,6 +118,31 @@ jobs:
       - name: Run the specs that drive a real Firefox
         run: bundle exec rake test:browser
 
+  # The stylesheet is compiled from the views and committed, so it can go stale the moment
+  # somebody adds a class and does not rebuild -- and a stale stylesheet fails in the one
+  # place nobody is looking, which is production, silently, for that one element. Rebuilding
+  # here and refusing a difference is what keeps the committed file honest.
+  #
+  # Committed rather than built on deploy because Render's ruby runtime is a ruby runtime:
+  # asking it for a Node toolchain to produce a file the repo can just as well carry is a
+  # deploy step that can fail at the worst moment for no benefit.
+  styles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - run: npm ci
+
+      - name: Rebuild the stylesheet
+        run: npm run build:css
+
+      - name: Fail if the committed stylesheet is not what the views compile to
+        run: git diff --exit-code -- assets/css/styles.css
+
   lint:
     runs-on: ubuntu-latest
     steps:
