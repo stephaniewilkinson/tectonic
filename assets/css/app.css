@@ -1,0 +1,92 @@
+/* The source this stylesheet is built from. `npm run build:css` compiles it to
+   assets/css/styles.css, which is what the app serves and what is committed.
+
+   The three directives below are Tailwind's, and replacing them was the point of #142.
+   The layout used to load https://cdn.tailwindcss.com, which is the Play CDN: it ships a
+   compiler to the browser and generates the stylesheet at runtime, which Tailwind's own
+   documentation says is not for production. Two things followed. With JavaScript off
+   there was no CSS at all -- not degraded, none, because the stylesheet was a script. And
+   it was a third party on every page, including /authorize, where one tap hands an API
+   client the account.
+
+   Everything below the directives is this app's own and predates the build. It is here
+   rather than in a separate file so that the fonts and the spin-button rules go through
+   the same compile and the page loads one stylesheet rather than two. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* A heading, and nothing else that is merely large. The size utilities from 20px up used
+   to sit in this selector list too, which made the typeface a property of how big a thing
+   happens to be and settled questions nobody asked. The session screen printed a working
+   set at text-2xl and the warmup above it at text-lg, so one column of four weights came
+   out in two faces; every figure on /volume took the display face and every label beside
+   it did not. It failed the other way as well: a class selector matches whole tokens, so
+   `sm:text-xl` is not `text-xl` and anything asking for a size behind a breakpoint got no
+   face at all -- which is what the nav did, at every width. Widening the rule to cover the
+   responsive variants would have fixed the nav and handed the face to every future element
+   that merely happens to be 20px, which is the same bug again. The question is whether a
+   thing is a heading or a brand surface, so that is what the selectors ask. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: Blonde Sans;
+}
+
+/* Outranks the heading rule on specificity, a class against an element, so the front
+   page's h1 is Blonde Serif wherever it sits in the file. It used to depend on coming
+   after the size rules at equal weight. */
+.serif {
+    font-family: Blonde Serif;
+}
+
+/* Names the brand face on the element that wants it, which is how anything that is not a
+   heading gets it: the nav links, and the exercise link on a workout card. The exercise
+   edit title was a third, until #129 made every page title an h1 and it took the face
+   from the rule above instead. The generic fallback is here and not on that rule on
+   purpose: the nav is on every page, and if /fonts/ is slow or missing, links dropping to
+   the default serif read as a broken page in a way that a heading doing the same does
+   not. */
+.brand {
+    font-family: "Blonde Sans", sans-serif;
+}
+
+/* Weight and reps are typed on a touch keypad, so the native number spinners
+   just clutter the inputs. Tailwind has no utility for the spin-button
+   pseudo-elements, so hide them here for every number field. */
+input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+@font-face {
+    font-family: "Blonde Serif";
+    src: url("/fonts/blonde_serif-webfont.eot");
+    src:
+        url("/fonts/blonde_serif-webfont.eot?#iefix")
+            format("embedded-opentype"),
+        url("/fonts/blonde_serif-webfont.woff2") format("woff2"),
+        url("/fonts/blonde_serif-webfont.woff") format("woff"),
+        url("/fonts/blonde_serif-webfont.svg#blonde_serifblonde") format("svg");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: "Blonde Sans";
+    src: url("/fonts/blonde_sans-webfont.eot");
+    src:
+        url("/fonts/blonde_sans-webfont.eot?#iefix") format("embedded-opentype"),
+        url("/fonts/blonde_sans-webfont.woff2") format("woff2"),
+        url("/fonts/blonde_sans-webfont.woff") format("woff"),
+        url("/fonts/blonde_sans-webfont.svg#blondeblonde") format("svg");
+    font-weight: normal;
+    font-style: normal;
+}

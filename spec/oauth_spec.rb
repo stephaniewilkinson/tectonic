@@ -345,11 +345,15 @@ describe 'the OAuth consent screen' do
 
   # form-action stays out: the consent POST is answered with a 302 to the client's
   # callback, and browsers disagree about whether it applies across a redirect.
-  it 'carries a policy naming only the script origin it needs' do
+  # It named one script origin, the stylesheet CDN, because the stylesheet was a script.
+  # #142 made it a stylesheet, so this page runs nothing from anywhere and the policy no
+  # longer has to make an exception -- default-src 'none' covers scripts on its own.
+  it 'carries a policy that allows no script at all' do
     policy = last_response.headers['Content-Security-Policy']
 
     assert_includes policy, "default-src 'none'"
-    assert_includes policy, 'script-src https://cdn.tailwindcss.com'
+    refute_includes policy, 'script-src'
+    refute_includes policy, 'cdn.tailwindcss.com'
     assert_includes policy, "frame-ancestors 'none'"
     refute_includes policy, 'form-action'
   end

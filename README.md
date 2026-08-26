@@ -42,6 +42,7 @@ geckodriver.
 
 ```
 bundle install
+npm install        # only for the stylesheet; see below
 ```
 
 ### Environment
@@ -96,6 +97,28 @@ bundle exec rackup config.ru        # http://localhost:9292
 which has its own bearer-token auth and never touches Roda's sessions or CSRF, and the
 Roda app at everything else. `/` redirects to `/welcome` until you are logged in, so start
 by signing up at `/create-account`.
+
+### The stylesheet
+
+```
+npm run build:css   # assets/css/app.css -> assets/css/styles.css
+```
+
+`assets/css/styles.css` is compiled from `assets/css/app.css` and **committed**, so nothing
+but a stylesheet edit needs Node at all — `bundle install` and a database are enough to run
+the app and the suite.
+
+Rebuild it after adding a Tailwind class that was not already in use. CI rebuilds and fails
+on a difference, so a stale file is caught before it ships rather than after: a purged class
+breaks nothing anywhere except on the page it was meant to style, in production, silently.
+
+`tailwind.config.js` scans `app.rb` and `lib/**/*.rb` as well as the templates, because
+`button_style`, `rpe_style`, `row_style` and the calendar's `STYLES` table build class names
+in Ruby and appear in no template.
+
+It used to be `<script src="https://cdn.tailwindcss.com">` — the Play CDN, which compiles in
+the browser. That meant no CSS at all with JavaScript off, and a third party on every page
+including the consent screen.
 
 ## Running the tests
 
