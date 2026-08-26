@@ -62,6 +62,8 @@ reaches `Sequel.connect` and raises rather than falling back to a default.
 | `DB_LOG` | no | Attaches Sequel's query log to stdout whatever `RACK_ENV` says — set it to anything non-empty to trace queries against a deployment, and unset it again afterwards. Sequel logs statements with their bound values, so those lines carry email addresses and everybody's weights and reps, which is why nothing but development logs by default. |
 | `SENTRY_DSN` | no | The Sentry project DSN, read only when `RACK_ENV` is `production` or `staging`. Without it — unset or empty — the app boots and serves with error reporting switched off and says so once on stderr: losing error reporting is not a reason to refuse to start, which is why this behaves unlike `OAUTH_JWT_PRIVATE_KEY`. |
 | `RACK_TIMEOUT_SERVICE_TIMEOUT` | no | Seconds a request may hold a thread before `rack-timeout` raises inside it, `20` unless set, `0` to switch it off — which is what you want locally the moment you stop in a debugger. Read only by `config.ru`, so the suite never sees it. It covers both legs of the URLMap, MCP included; the MCP endpoint's long-lived `subscriptions/listen` streams are unaffected either way, because rack-timeout times `app.call` and a streaming body is written after that has returned. |
+| `RAILS_MAX_THREADS` | no | `5` unless set, and read twice: `config/puma.rb` gives Puma that many threads and `lib/tectonic/db.rb` gives Sequel that many connections. One variable because the pool used to be Sequel's default of four against Puma's five threads, and a fifth request thread waiting on a connection is a `Sequel::PoolTimeout` on a request that had nothing wrong with it. The name is the host's convention rather than a claim about Rails. |
+| `WEB_CONCURRENCY` | no | Puma workers, `0` unless set — one process, which is what `rackup` was already running, and as much as half a CPU has to offer. Above zero Puma forks, so the app is preloaded and each worker disconnects Sequel on boot rather than sharing the parent's connections. Every worker multiplies the connection count by `RAILS_MAX_THREADS`. |
 
 The MCP and OAuth variables are all optional in development and are documented in the
 table further down.
@@ -216,10 +218,17 @@ regenerating never rewrites a session you have already trained.
 
 `render.yaml` is the checked-in Render blueprint: `bundle install` to build, `bundle exec
 rake db:migrate && bundle exec rake library:exercises` as the pre-deploy command, and
-`bundle exec rackup config.ru -p $PORT` to start. Secrets are marked `sync: false` so the
+`bundle exec puma -C config/puma.rb` to start. Secrets are marked `sync: false` so the
 values already set in the dashboard are left alone — regenerating `SESSION_SECRET` would
 log everyone out, and regenerating `OAUTH_JWT_PRIVATE_KEY` would stop every issued access
 token from verifying.
+
+`config/puma.rb` holds the thread count, the worker count and the hook forked workers need,
+and binds `$PORT` itself, which is why the start command carries no `-p`. Puma finds that
+file by name rather than by flag, so a local `bundle exec rackup config.ru` picks up the
+same thread count and keeps its own port. The one thing production does differently is
+that `WEB_CONCURRENCY` can be turned above zero there, and then the app is preloaded and
+each worker drops the Postgres connections it inherited.
 
 # MCP server
 

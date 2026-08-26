@@ -15,7 +15,12 @@ services:
     plan: starter # preDeployCommand requires a paid instance type
     buildCommand: bundle install
     preDeployCommand: bundle exec rake db:migrate && bundle exec rake library:exercises
-    startCommand: bundle exec rackup config.ru -p $PORT
+    # Puma with a config file rather than rackup on stock defaults, so the thread count
+    # and Sequel's pool are sized from one variable and the fork hook is somewhere.
+    # config/puma.rb reads $PORT itself, which is why the flag rackup needed is gone. Like
+    # preDeployCommand above, this governs nothing until the Blueprint is linked: until
+    # then the change that matters is putting it in the service's "Start Command" field.
+    startCommand: bundle exec puma -C config/puma.rb
     envVars:
       - key: DATABASE_URL
         sync: false
