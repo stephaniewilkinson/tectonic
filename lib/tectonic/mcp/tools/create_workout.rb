@@ -11,16 +11,24 @@ class Tectonic < Roda
       class CreateWorkout < Tool
         tool_name 'create_workout'
         description "Open the account's workout for a date ('today' or YYYY-MM-DD), " \
-                    'reusing an existing one on that day instead of creating a duplicate.'
+                    'reusing an existing one on that day instead of creating a duplicate. ' \
+                    'An optional name says which session it is, for a day with more than one.'
         scope :write
         input_schema(
           type: 'object',
-          properties: { date: { type: 'string' } },
+          properties: { date: { type: 'string' }, name: { type: 'string' } },
           required: ['date'], additionalProperties: false
         )
 
+        # The name is applied whether the workout was opened or found, because this tool is
+        # idempotent on the day and the second call is the one that usually carries it: an
+        # assistant opens today's session, logs a set, and only then is told it was the
+        # evening walk. Absent, the name is left exactly as it was rather than cleared --
+        # `key?` rather than a nil check, so "do not touch it" and "empty it" stay
+        # different requests, the second spelled as an empty string.
         def self.perform(context:, arguments:)
           workout = Resolver.workout(context, date: Resolver.parse_date(arguments[:date]))
+          workout.update(name: Workout.clean_name(arguments[:name])) if arguments.key?(:name)
           ok("Workout on #{workout.date.strftime('%Y-%m-%d')} is ready (id #{workout.id}).",
              structured: Presenter.view_workout(workout))
         end

@@ -131,8 +131,14 @@ class Tectonic < Roda
             .merge(provenance(exercise))
         end
 
+        # `name` is what the row carries and `label` is what a reader would call it, which
+        # differ for a generated session: that one is named by its program day's focus and
+        # has no name of its own. An assistant asked to "add a set to the evening walk"
+        # needs the second to match on, and an assistant asked to rename one needs the
+        # first to know whether there is anything there to replace.
         def view_workout(workout)
-          { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), sets: workout.sets.count }
+          { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), name: workout.name,
+            label: workout.label, sets: workout.sets.count }
             .merge(provenance(workout))
         end
 

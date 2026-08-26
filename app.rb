@@ -570,8 +570,12 @@ class Tectonic < Roda
       r.post do
         check_csrf!
         id = r.params['id']
+        # Blank is stored as null rather than as '', so "unnamed" has one spelling. It
+        # also means clearing the field on an edit puts a generated session back to
+        # reading its program day's focus rather than pinning it to an empty string.
+        name = Workout.clean_name(r.params['name'])
         if id.empty?
-          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'])
+          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'], name:)
           r.redirect "/workouts/#{workout_id}/"
         else
           # Rescheduling is owner-only. This route sits outside the nested ownership
@@ -579,7 +583,7 @@ class Tectonic < Roda
           # account's workout could be moved to a new date.
           @workout = Workout.where(id:, account_id: @account_id).first
           r.redirect '/workouts' unless @workout
-          @workout.update(date: r.params['date'])
+          @workout.update(date: r.params['date'], name:)
           r.redirect "/workouts/#{@workout.id}/"
         end
       end
