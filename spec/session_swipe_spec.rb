@@ -207,10 +207,11 @@ describe 'where the rating scale sits' do
     @body = last_response.body
   end
 
-  # Two lifts with working sets on them, plus the session rating at the end of the page,
-  # which is the same question about the whole session.
-  it 'is under every question that asks for a rating' do
-    assert_equal 3, @body.scan('How do I rate this?').length
+  # Two lifts with working sets on them, and no third copy under the session rating: that
+  # form sits directly below the last panel, so its own copy would be the same disclosure
+  # twice with only the rating buttons in between, which is #175.
+  it 'is under every panel that asks for a rating, and nowhere twice over' do
+    assert_equal 2, @body.scan('How do I rate this?').length
   end
 
   it 'is not on a lift of nothing but warmups' do
@@ -218,8 +219,46 @@ describe 'where the rating scale sits' do
     refute_includes panels(@body).last, 'How do I rate this?'
   end
 
+  # #175 is a picture of the foot of this page: the scale, the session rating buttons, and
+  # the scale again. What went wrong is visible only below the last panel, so that is where
+  # this looks -- the copies inside panels are the ones that are supposed to be there.
+  it 'puts none of them below the last panel, where the duplicate showed' do
+    tail = @body.split('</section>').last
+
+    assert_includes tail, 'Session RPE'
+    refute_includes tail, 'How do I rate this?'
+  end
+
   it 'stays closed, because five open tables is worse than one far away' do
     refute_includes @body, '<details open'
+  end
+end
+
+# A warmup is submaximal by definition and asks for no rating, which is why the ramp rows
+# carry no RPE row and a warmup-only panel carries no scale. A session that is all ramp
+# therefore has nothing on it the scale would be explaining, and renders none at all.
+describe 'the rating scale on a session of nothing but warmups' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SwipeableSession
+
+  before do
+    account_id = login
+    workout_id = DB[:workouts].insert(account_id:, date: Time.now)
+    write_lift(workout_id, account_id, working: false)
+    get "/workouts/#{workout_id}/session"
+    @body = last_response.body
+  end
+
+  it 'is not on the page at all' do
+    assert_equal 0, @body.scan('How do I rate this?').length
+  end
+
+  # The page still renders, and still renders as a session rather than as an error, which
+  # is the thing an assertion about something being absent can otherwise be passing on.
+  it 'still draws the session it was asked for' do
+    assert_equal 200, last_response.status
+    assert_equal 1, panels(@body).length
   end
 end
 

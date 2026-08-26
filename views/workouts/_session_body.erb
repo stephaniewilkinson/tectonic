@@ -269,8 +269,11 @@
   </div>
 </form>
 
-<%# The session rating is the same question at a different scale, and it is the last thing
-    on the page, so it gets the scale under it too. It is also the only copy a session of
-    nothing but warmups renders, which is the right answer: that session has no working set
-    to rate, but it still has this form on it. %>
-<%== render('workouts/_rpe_help') %>
+<%# No copy of the rating scale here. The last lift panel's is immediately above this form,
+    so a second one put two identical disclosures on screen with nothing between them but
+    the five rating buttons, which is what #175 is a picture of.
+
+    Nor is one rendered when no panel carried it, which is a session of nothing but
+    warmups. A warmup is submaximal by definition and asks for no rating -- that is why the
+    ramp rows have no RPE row and warmup-only panels have no scale -- so a session that is
+    all ramp has nothing on it the scale would be explaining. %>
