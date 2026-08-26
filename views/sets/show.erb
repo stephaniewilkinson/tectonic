@@ -9,7 +9,7 @@
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Workout</dt>
       <dd>
-        <a href="/workouts/<%= @set.workout[:id] %>" class="font-medium text-lime-600 hover:text-lime-500">
+        <a href="/workouts/<%= @set.workout[:id] %>" class="font-medium text-lime-700 hover:text-lime-800">
           <%= @set.workout[:date].strftime('%A %B %-d, %Y') %>
         </a>
       </dd>
@@ -17,7 +17,7 @@
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Exercise</dt>
       <dd>
-        <a href="/exercises/<%= @set.exercise[:id] %>" class="font-medium text-lime-600 hover:text-lime-500">
+        <a href="/exercises/<%= @set.exercise[:id] %>" class="font-medium text-lime-700 hover:text-lime-800">
           <%= @set.exercise[:name] %>
         </a>
       </dd>

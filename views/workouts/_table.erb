@@ -36,13 +36,18 @@
                 <%- end %>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout.sets.count %></td>
+              <%# These two carried no class at all, so Tailwind's preflight left them the
+                  cell's text-gray-500 and they read as two more facts about the row, next
+                  to the set count, rather than as the two ways into a workout. lime-700 is
+                  the link colour throughout the app: 4.99:1 on white, the only step in this
+                  scale that clears WCAG AA for body text. %>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <a href="/workouts/<%= workout[:id] %>/">
+                <a href="/workouts/<%= workout[:id] %>/" class="font-medium text-lime-700 hover:text-lime-800">
                   Show
                 </a>
               </td>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <a href="/workouts/<%= workout[:id] %>/edit/">
+                <a href="/workouts/<%= workout[:id] %>/edit/" class="font-medium text-lime-700 hover:text-lime-800">
                   Edit
                 </a>
               </td>

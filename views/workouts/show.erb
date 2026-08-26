@@ -83,8 +83,12 @@
                     column of boxes is scanned. %>
                 <td class="whitespace-nowrap px-3 py-4"><%== ticked(set[:is_warmup], 'warmup') %></td>
                 <td class="whitespace-nowrap px-3 py-4"><%== ticked(set[:is_completed], 'completed') %></td>
+                <%# lime-700, the same link colour as everywhere else. This was lime-400
+                    hovering to lime-300 -- 1.51:1 on white going to 1.31:1 -- so the only
+                    way to correct a set from the workout record faded as you reached for
+                    it. Hover now darkens to lime-800 rather than lightening. %>
                 <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-0">
-                  <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/edit" class="text-lime-400 hover:text-lime-300">Edit</a>
+                  <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/edit" class="text-lime-700 hover:text-lime-800">Edit</a>
                 </td>
               </tr>
           <%- end %>
