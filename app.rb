@@ -766,7 +766,19 @@ class Tectonic < Roda
   # a template escapes rather than markup a template trusts. An entity written here would
   # arrive on the page spelled out rather than drawn.
   def load_label(set)
-    "#{"#{set[:weight]} × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+    "#{"#{weight_label(set[:weight])} × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+  end
+
+  # A weight as somebody would write it on a sheet: 225 rather than 225.0, and 137.5 as
+  # itself. #141 widened the three weight columns to numeric(7, 2), so Sequel hands back a
+  # BigDecimal, and every site that printed the value raw would otherwise show 0.225e3 --
+  # which is the correct rendering of a BigDecimal and no use at all to a lifter.
+  #
+  # Plates.numeric rather than a format string, because it is already the answer to this
+  # exact question for the plate breakdown and gives the same 2.5 in both places. It reads
+  # the denominator, which BigDecimal, Float, Integer and Rational all answer.
+  def weight_label(weight)
+    weight && Plates.numeric(weight)
   end
 
   # What a set counts. Seconds read as a duration rather than as a rep count, because
@@ -793,7 +805,7 @@ class Tectonic < Roda
     heaviest = Sequel.function(:max, Sequel[:sets][:weight])
     sets.exclude(is_warmup: true).join(:workouts, id: :workout_id).group(recorded).order(recorded)
         .select_map([Sequel.as(recorded, :day), Sequel.as(heaviest, :heaviest)])
-        .map { |day, weight| [day.strftime('%b %-d, %Y'), weight] }
+        .map { |day, weight| [day.strftime('%b %-d, %Y'), weight_label(weight)] }
   end
 
   # The window the volume page is asked for, or a block's worth. Only the offered

@@ -106,7 +106,7 @@
               <%- end %>
               <%- if set[:is_completed] && changed_from_plan?(set) %>
                 <div class="text-xs text-amber-700">
-                  planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
+                  planned <%= weight_label(set[:planned_weight]) %> &times; <%= set[:planned_reps] %>
                 </div>
               <%- end %>
             </div>
@@ -147,7 +147,7 @@
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                 Weight
-                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
               </label>
               <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
                 Reps
@@ -182,7 +182,7 @@
               <%- end %>
               <%- if set[:is_completed] && changed_from_plan?(set) %>
                 <div class="text-xs text-amber-700">
-                  planned <%= set[:planned_weight] %> &times; <%= set[:planned_reps] %>
+                  planned <%= weight_label(set[:planned_weight]) %> &times; <%= set[:planned_reps] %>
                 </div>
               <%- end %>
             </div>
@@ -233,16 +233,22 @@
                   min="0" pins the base at zero so a row's own weight can never define the
                   grid again, and it rules out a negative load while it is there.
 
-                  step="any" would go one further and let 137.5 through, which is what a
-                  lifter with 1.25s actually wants. It is not shipped because sets.weight is
-                  an integer column: posting "137.5" gets PG::InvalidTextRepresentation, the
-                  set is left exactly as it was, and htmx does not swap a 500 -- so Save
-                  would appear to do nothing at all, with no bubble to explain it. Refusing
-                  half a pound in the browser, where it costs one message, beats accepting it
-                  and losing the whole set. Decimal weights want the column widened first. %>
+                  step is "any" since #141 widened sets.weight to numeric(7, 2). It was 1,
+                  and the reason was the column: posting "137.5" against an integer got
+                  PG::InvalidTextRepresentation, the set was left exactly as it was, and htmx
+                  does not swap a 500 -- so Save appeared to do nothing at all, with no bubble
+                  to explain it. Refusing half a pound in the browser, where it cost one
+                  message, beat accepting it and losing the whole set. The column holds it
+                  now, so the refusal has nothing left to protect.
+
+                  "any" rather than "0.25", because this box records what was lifted rather
+                  than what was prescribed. A machine stack is whatever it is, and a lifter
+                  who has just moved a pin has no reason to argue with the browser about
+                  whether the number is on somebody's grid. What a rack can be loaded to is a
+                  different question, asked at generation, and #140 is where it is answered. %>
               <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                 Weight
-                <input value="<%= set[:weight] %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
               </label>
               <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
                 Reps

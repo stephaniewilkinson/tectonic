@@ -73,7 +73,7 @@
               <tr>
                 <td class="whitespace-nowrap px-3 py-4">
                   <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>">
-                    <%= set[:weight] || 'Bodyweight' %>
+                    <%= weight_label(set[:weight]) || 'Bodyweight' %>
                   </a>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4"><%= set[:reps] %></td>

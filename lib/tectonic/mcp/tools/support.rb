@@ -48,9 +48,17 @@ class Tectonic < Roda
 
         def apply(row, attributes)
           moved = attributes.reject { |field, value| row[field] == value }
-          record = moved.to_h { |field, value| [field, { from: row[field], to: value }] }
+          record = moved.to_h { |field, value| [field, { from: plain(row[field]), to: value }] }
           row.update(moved) unless moved.empty?
           record
+        end
+
+        # A numeric column hands back a BigDecimal, which reports as "0.155e3" and reads
+        # to an assistant as a string rather than as the weight it moved from. The
+        # comparison above is left alone: BigDecimal(155) == 155 already, so a field set to
+        # the value it held is still not a change.
+        def plain(value)
+          value.is_a?(BigDecimal) ? Plates.numeric(value) : value
         end
 
         def describe(record)
@@ -139,10 +147,19 @@ class Tectonic < Roda
         # planned_weight and planned_reps ride along with what was lifted, because the
         # difference between them is the signal: a set written by a program and lifted
         # exactly as written reads the same as one lifted heavier unless both are here.
+        # The weights go out as plain numbers rather than as the BigDecimal the numeric
+        # column hands back, which would serialise as "0.1375e3" and reach an assistant as a
+        # string it has to parse. Plates.numeric gives 225 back as an Integer and 137.5 as a
+        # Float, which is what JSON wants of each.
         def view_set(set)
-          { id: set.id, exercise: set.exercise.name, weight: set.weight, reps: set.reps,
+          { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
             rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            planned_weight: set.planned_weight, planned_reps: set.planned_reps }.merge(provenance(set))
+            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps }
+            .merge(provenance(set))
+        end
+
+        def weight(value)
+          value && Plates.numeric(value)
         end
 
         # A workout with its sets in the order they are meant to be lifted, its session
