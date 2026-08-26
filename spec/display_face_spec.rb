@@ -117,14 +117,9 @@ describe 'the surfaces that do want the display face' do
     assert_equal ['brand'], face_of(tags_matching(%r{<a href="/exercises/\d+"[^>]*>}).first)
   end
 
-  it 'names it on the exercise edit title, which is a div and not a heading' do
-    account_id = login
-    exercise_id = DB[:exercises].insert(name: "Deadlift #{SecureRandom.hex(4)}", account_id:)
-
-    get "/exercises/#{exercise_id}/edit"
-
-    assert_equal ['brand'], face_of(tags_matching(/<div class="brand[^"]*">/).first)
-  end
+  # The exercise edit title was the other one, a div carrying `brand`. It is an h1 now, so
+  # it takes the face from the element and there is nothing here left to name: what it has
+  # to be is pinned in page_title_spec with the rest of the titles.
 
   # The front page headline is Blonde Serif and 128px on a desktop. It took the serif from
   # a class that beat the size rules on source order alone; with those gone it beats the

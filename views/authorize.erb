@@ -1,9 +1,9 @@
 <% @client_name = rodauth.oauth_application[rodauth.oauth_applications_name_column] %>
 <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
   <div class="sm:mx-auto sm:w-full sm:max-w-md">
-    <h2 class="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-gray-900">
+    <h1 class="mt-6 text-center text-3xl font-semibold tracking-tight text-gray-900">
       Authorize <%= @client_name %>
-    </h2>
+    </h1>
     <p class="mt-2 text-center text-sm text-gray-600">
       <%= @client_name %> wants to connect to your Tectonic account.
       Choose what it may do, then authorize it.
