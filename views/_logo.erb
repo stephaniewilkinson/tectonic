@@ -1,0 +1,38 @@
+<%# The mark, drawn into the page rather than fetched as an image.
+
+    It was an <img src="/icons/logo.svg"> and the wordmark was therefore set in whatever
+    sans the reader's system happened to supply, because an SVG behind an <img> is a
+    separate document: it gets no webfont, no stylesheet, and on this page default-src
+    'none' would refuse it anything it went looking for. So the one place the brand states
+    its own name was the one place it could not do it in the brand's own face.
+
+    Outlining the glyphs would have kept the <img> and cost about 2.2 KB of path data for
+    the ten distinct letters, against a file that is meant to stay well under 3 KB because
+    it is part of the first paint of a page somebody is sitting in front of mid-handshake.
+    Inline, the text is text: it takes Blonde Sans off the page's own stylesheet, which the
+    consent CSP already allows with font-src 'self', and costs nothing to fetch at all
+    because there is no second document to fetch.
+
+    Two plates rather than four. Four was a stack and the stack is what made the tilts read
+    as strata; two says the same thing more quietly and leaves the mark legible at the
+    224px this is actually drawn at. The bottom one is flat because it is still lying where
+    it was put, and the top one is tilted and offset because everything above the bottom
+    plate has moved. That is the whole idea and it survives losing half the plates.
+
+    The holes are real holes, cut with fill-rule evenodd rather than painted in the page's
+    background colour, so the mark keeps working on any surface it is ever put on. A plate
+    without one reads as a disc, and a disc is the target this mark stopped being. %>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 72" role="img"
+     aria-labelledby="tectonic-logo-title" class="<%= classes %>">
+  <title id="tectonic-logo-title">tectonic plates</title>
+  <path fill-rule="evenodd" fill="#075985"
+        d="M4 52a28 10 0 1 0 56 0a28 10 0 1 0 -56 0ZM24.5 52a7.5 2.7 0 1 0 15 0a7.5 2.7 0 1 0 -15 0Z" />
+  <path fill-rule="evenodd" fill="#84cc16" transform="rotate(-8 40 26)"
+        d="M13 26a27 10 0 1 0 54 0a27 10 0 1 0 -54 0ZM32.8 26a7.2 2.6 0 1 0 14.4 0a7.2 2.6 0 1 0 -14.4 0Z" />
+  <%# `brand` is the same class every heading on the site takes, so the mark cannot drift
+      from the rest of the type: change the face there and it changes here. The fallback in
+      that rule is a plain sans, and Blonde Sans is narrower than most of them -- the run is
+      about 170px of the 222 there is room for at this size, so even a fallback a fifth
+      wider still lands inside the viewBox rather than being clipped by it. %>
+  <text x="88" y="52" class="brand" font-size="34" fill="#075985">tectonic plates</text>
+</svg>

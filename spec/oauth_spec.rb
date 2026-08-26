@@ -367,71 +367,87 @@ describe 'the brand mark on the OAuth consent screen' do
     consent_page(register_client)
   end
 
-  it 'draws the logo and still says the name where a screen reader reaches it' do
-    assert_includes last_response.body, 'src="/icons/logo.svg"'
-    assert_match(/<img[^>]*\balt="tectonic plates"/, last_response.body)
+  # Drawn into the page rather than fetched. The name reaches a screen reader through the
+  # title the mark carries and the role that makes it an image, which is the job the alt on
+  # the old <img> was doing.
+  it 'draws the mark and still says the name where a screen reader reaches it' do
+    assert_match(/<svg[^>]*\brole="img"/, last_response.body)
+    assert_includes last_response.body, '<title id="tectonic-logo-title">tectonic plates</title>'
+    assert_match(/<svg[^>]*\baria-labelledby="tectonic-logo-title"/, last_response.body)
   end
 
-  # The name survives as the image's alt and nowhere else. Leaving the paragraph beside the
-  # mark would print the name twice and read it out twice, so its absence is the assertion.
+  # The name survives as the mark's title and nowhere else. Leaving the paragraph beside it
+  # would print the name twice and read it out twice, so its absence is the assertion.
   it 'no longer sets the name as a line of body text' do
     refute_match(%r{<p[^>]*>\s*tectonic plates\s*</p>}, last_response.body)
   end
 end
 
-# Hand-drawn for this page and served out of assets/ by `plugin :public`, the same route
-# views/workouts/show.erb already takes for its exercise pictograms.
-describe 'the logo the consent screen loads' do
+# The mark is drawn in the page now, so what it is made of is asserted against the page
+# that draws it rather than against a file fetched on its own. The two describes this
+# replaces read /icons/logo.svg, which no longer exists: it was a separate document, and
+# being a separate document is exactly what kept the wordmark out of the brand's face.
+describe 'what the mark is made of' do
   include Rack::Test::Methods
   include OAuthFlow
 
-  before { get '/icons/logo.svg' }
-
-  it 'is served, and served as an SVG rather than a download' do
-    assert_equal 200, last_response.status
-    assert_includes last_response.headers['content-type'], 'image/svg+xml'
+  before do
+    sign_in
+    consent_page(register_client)
+    @mark = last_response.body[%r{<svg\b.*?</svg>}m].to_s
   end
 
-  # A malformed SVG behind an <img> fails silently: the browser draws the alt text, logs
-  # nothing, and the page looks merely unstyled. This checks the one way it has actually
-  # broken, twice, rather than parsing the whole file as XML. A dash written the house way,
-  # as two hyphens, is illegal inside an XML comment, and this file is the one place in the
-  # repo where that house habit is a parse error rather than a style. Both times the only
-  # symptom was an image the height of its alt text.
-  #
-  # Scanning the bytes rather than parsing them is deliberate: an XML parser would catch
-  # this and every other malformation, but it costs a dependency the app does not otherwise
-  # have, and it answers "is this well-formed XML" when the question worth asking is "did
-  # somebody write a dash the way they write dashes everywhere else in this codebase".
-  it 'writes no dash that would break the comment it sits in' do
-    comments = last_response.body.scan(/<!--.*?-->/m)
-
-    refute_empty comments, 'the mark is commented; if that changed, this spec needs to'
-    comments.each { |comment| refute_includes comment[4..-4], '--' }
+  it 'is there at all, so the rest of this is checking something' do
+    refute_empty @mark
   end
 
-  it 'names itself' do
-    assert_includes last_response.body, '<title id="tectonic-logo-title">tectonic plates</title>'
+  # The whole point of inlining it. `brand` is the class every heading on the site takes,
+  # so the mark reads in Blonde Sans off the page's own stylesheet -- which the consent
+  # CSP allows with font-src 'self' -- rather than in whichever sans the reader's system
+  # happened to supply to a document that could fetch nothing.
+  it 'sets the wordmark in the brand face by asking for it by name' do
+    assert_match(/<text[^>]*\bclass="brand"/, @mark)
+    assert_includes @mark, '>tectonic plates</text>'
+  end
+
+  # #139: two, where there were four.
+  it 'draws two plates' do
+    assert_equal 2, @mark.scan(/<path\b/).length
+  end
+
+  # #139 again, and the reason it matters: a plate without a hole is a disc, and a disc is
+  # the target this mark stopped being. Cut with fill-rule evenodd rather than painted in
+  # the page's background colour, so the mark survives being put on any other surface --
+  # which a hole filled with #f3f4f6 would not.
+  it 'cuts a real hole in each of them' do
+    assert_equal 2, @mark.scan('fill-rule="evenodd"').length
+    assert_equal 2, @mark.scan(/<path\b[^>]*\bd="[^"]*Z[^"]*Z"/).length
   end
 end
 
-describe 'what the logo has to carry for itself' do
+# What the mark has to carry for itself, which inlining changes the reason for rather than
+# the answer to.
+describe 'what the mark costs the page' do
   include Rack::Test::Methods
   include OAuthFlow
 
-  before { get '/icons/logo.svg' }
-
-  # An SVG behind an <img> is a separate document. It gets none of the page's stylesheet
-  # and none of the Blonde webfonts, and on this page default-src 'none' would refuse it
-  # anything it went looking for, so whatever it draws with has to already be in the file.
-  it 'fetches nothing of its own' do
-    refute_match(/<image\b|@font-face|xlink:href|url\(/, last_response.body)
+  before do
+    sign_in
+    consent_page(register_client)
+    @mark = last_response.body[%r{<svg\b.*?</svg>}m].to_s
   end
 
-  # It is part of the first paint of a page someone is sitting in front of mid-handshake,
-  # and it is small enough to stay hand-editable, which an exported one would not be.
+  # It is part of the first paint of a page somebody is sitting in front of mid-handshake.
+  # Inline it costs no request at all, and the budget it used to be held to as a file is
+  # worth keeping as a ceiling on the markup instead.
   it 'weighs well under 3 KB' do
-    assert_operator last_response.body.bytesize, :<, 3 * 1024
+    assert_operator @mark.bytesize, :<, 3 * 1024
+  end
+
+  # It draws with what the page already has. An external reference here would be a second
+  # request on this page and, for anything default-src 'none' does not name, a refused one.
+  it 'fetches nothing of its own' do
+    refute_match(/<image\b|@font-face|xlink:href|url\((?!#)/, @mark)
   end
 end
 
