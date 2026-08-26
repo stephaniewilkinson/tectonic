@@ -269,16 +269,11 @@
   </div>
 </form>
 
-<%# The session rating is the same question at a different scale, so it wants the scale
-    under it -- but the last lift panel's copy is already immediately above this form, and
-    rendering a second one here put two identical disclosures on screen with nothing but
-    the rating buttons between them. That is what #175 is a picture of. The panel's copy
-    answers both questions from where it already sits.
+<%# No copy of the rating scale here. The last lift panel's is immediately above this form,
+    so a second one put two identical disclosures on screen with nothing between them but
+    the five rating buttons, which is what #175 is a picture of.
 
-    Unless no panel rendered one. A session of nothing but warmups asks for no per-set
-    rating, so no panel carries the scale, and this form is still on the page -- so here it
-    is the only copy there is rather than a second one. A session with no sets at all takes
-    it for the same reason: `all?` is true of nothing, which is the answer that wants. %>
-<%- if @sets.all? { |set| set[:is_warmup] } %>
-  <%== render('workouts/_rpe_help') %>
-<%- end %>
+    Nor is one rendered when no panel carried it, which is a session of nothing but
+    warmups. A warmup is submaximal by definition and asks for no rating -- that is why the
+    ramp rows have no RPE row and warmup-only panels have no scale -- so a session that is
+    all ramp has nothing on it the scale would be explaining. %>

@@ -234,10 +234,9 @@ describe 'where the rating scale sits' do
   end
 end
 
-# The one session that still wants a copy at the foot of the page. No panel carries the
-# scale, because no panel asks for a rating, and yet the session rating form is on the page
-# putting exactly that question -- so dropping the trailing copy unconditionally would have
-# left this session asking how hard it was with nothing to answer it against.
+# A warmup is submaximal by definition and asks for no rating, which is why the ramp rows
+# carry no RPE row and a warmup-only panel carries no scale. A session that is all ramp
+# therefore has nothing on it the scale would be explaining, and renders none at all.
 describe 'the rating scale on a session of nothing but warmups' do
   include Rack::Test::Methods
   include RouteOwnership
@@ -251,10 +250,15 @@ describe 'the rating scale on a session of nothing but warmups' do
     @body = last_response.body
   end
 
-  it 'renders once, under the session rating that is the only question left' do
-    assert_equal 1, @body.scan('How do I rate this?').length
-    refute_includes panels(@body).first, 'How do I rate this?'
-    assert_includes @body, 'Session RPE'
+  it 'is not on the page at all' do
+    assert_equal 0, @body.scan('How do I rate this?').length
+  end
+
+  # The page still renders, and still renders as a session rather than as an error, which
+  # is the thing an assertion about something being absent can otherwise be passing on.
+  it 'still draws the session it was asked for' do
+    assert_equal 200, last_response.status
+    assert_equal 1, panels(@body).length
   end
 end
 
