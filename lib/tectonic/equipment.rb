@@ -98,7 +98,7 @@ class Tectonic < Roda
     # know what this rack holds. The increment rides along because a ramp still has to know
     # how far apart to space its rungs, which is a question the increment answers correctly.
     def loading(is_barbell: true)
-      Rounding::Loading.new(increment, ->(weight) { loadable(weight, is_barbell:) })
+      Rounding::Loading.new(increment:, round: ->(weight) { loadable(weight, is_barbell:) })
     end
 
     # Every weight this rack can load, worked out once and kept. A week's generation asks
