@@ -68,9 +68,16 @@ describe 'a weight on the session screen' do
   # 45 x 5 and 225 x 5 are the same kind of thing said twice, and the state of a set is
   # already carried by the row tint and by the Done button, so the typeface was left
   # saying nothing while looking like it said something.
+  #
+  # Matched on the pair of classes that make a span a load -- a size first, and gray-900,
+  # which no other span on the row wears -- rather than on the sizes themselves. It named
+  # text-lg and text-2xl, which was the difference #207 has since removed, so a pattern
+  # written that way found one span instead of two and failed on a nil rather than on the
+  # faces. The sizes are this spec's subject only in that it must not depend on them.
   it 'reads in the same face as the warmup above it' do
-    warmup, working = tags_matching(/<span class="text-(?:lg|2xl)[^"]*">/)
+    warmup, working = tags_matching(/<span class="text-[^"]*text-gray-900">/)
 
+    refute_nil working, 'both the warmup and the working set should carry a load'
     assert_equal face_of(warmup), face_of(working)
     assert_empty face_of(working)
   end

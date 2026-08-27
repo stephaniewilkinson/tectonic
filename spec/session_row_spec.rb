@@ -40,9 +40,11 @@ module SessionRow
     end
   end
 
-  # A class that paints rather than one that sizes. This is the list that has to agree
-  # between a warmup button and a working-set button: px-4 against px-5 is a difference
-  # in emphasis and is allowed, bg-gray-200 against bg-lime-500 is the bug.
+  # A class that paints rather than one that sizes. Every class agrees between the two
+  # buttons since #207, so this no longer separates what must match from what may differ --
+  # it narrows a failure to the kind that matters. bg-gray-200 against bg-lime-500 is two
+  # vocabularies for one state; px-4 against px-5 is a difference in emphasis, which used
+  # to be allowed and is now simply absent.
   PAINT = /\A(bg-|border-[a-z]|text-(white|black|(gray|sky|lime|amber)-)|hover:)/
 
   def paint(classes)
@@ -55,9 +57,8 @@ describe 'the button that completes a set' do
   include RouteOwnership
   include SessionRow
 
-  # The size may differ -- a working set is the bigger thing on the screen -- but nothing
-  # that carries meaning may. A warmup Done that is grey while a working Done is lime is
-  # two vocabularies on one screen, and grey is also what a disabled control looks like.
+  # A warmup Done that is grey while a working Done is lime is two vocabularies on one
+  # screen, and grey is also what a disabled control looks like.
   it 'paints a warmup and a working set alike when the two are in the same state' do
     [true, false].each do |done|
       warmup, working = complete_buttons(session(warmup_done: done, working_done: done))
@@ -67,11 +68,15 @@ describe 'the button that completes a set' do
     end
   end
 
-  it 'sizes a warmup smaller than a working set all the same' do
+  # This used to assert the opposite -- text-sm on a warmup against text-base on a working
+  # set -- on the reasoning that a working set is the bigger thing on the screen. #207
+  # settled that it is not: a ramp step and a working set are one kind of thing, and the
+  # "Warmup" label above the list is what tells them apart. Every class now matches, not
+  # only the ones that carry meaning.
+  it 'sizes a warmup and a working set alike too' do
     warmup, working = complete_buttons(session)
 
-    assert_includes warmup.last, 'text-sm'
-    assert_includes working.last, 'text-base'
+    assert_equal working.last.sort, warmup.last.sort
   end
 end
 
@@ -222,6 +227,46 @@ describe 'the other per side' do
 
     assert_includes body, '5 per side'
     assert_includes body, 'Plate math'
+  end
+end
+
+# #207: a warmup row and a working-set row are one kind of thing, and now look like it.
+#
+# They used to differ in four ways at once -- text-lg against text-2xl font-semibold,
+# rounded-lg against rounded-xl, py-2 against py-3, mt-1 against mt-2 -- which made a ramp
+# step and a working set read as two different objects when both are a set with a load, a
+# rep count and a Done button. What tells them apart is the "Warmup" label above the list,
+# in words, where it was already being said.
+#
+# The size was not decoration: it is what replaced the opacity-75 that #133 removed, which
+# took the Done button on a warmup to 4.24:1. The label is what replaces the size, so the
+# fade must not come back with it -- asserted below rather than left implied.
+describe 'a warmup row against a working-set row' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionRow
+
+  # The <li> of each list, by their opening tags. The warmup list is rendered first.
+  def rows(body)
+    body.scan(/<li class="([^"]*)"/).flatten
+  end
+
+  it 'wears the same classes on the row itself' do
+    warmup, working = rows(session)
+
+    assert_equal working, warmup
+  end
+
+  it 'prints the load at the same size and weight in both' do
+    body = session
+    sizes = body.scan(/<span class="(text-\S+[^"]*text-gray-900)"/).flatten
+
+    assert_equal 2, sizes.length, 'a warmup and a working set, one load apiece'
+    assert_equal sizes.last, sizes.first
+  end
+
+  it 'still does not fade a warmup, which is what the size replaced' do
+    refute_includes session, 'opacity-'
   end
 end
 
