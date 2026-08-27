@@ -14,10 +14,20 @@
     every set the old bar showed and needs no width computed into a style attribute or an
     arbitrary class -- either of which would have to survive htmx swapping this partial
     out from under the CDN's JIT on every tap. %>
+<%# data-lift-segment marks each segment with the lift it belongs to, so the script at the
+    foot of session.erb can say which one you are looking at. The bar answers "how much of
+    this session is done"; on its own it could not answer "and where am I in it", which is
+    the question a swipe asks -- the bar sat perfectly still while the screen moved, which
+    is #212. Marking the current segment makes one bar answer both.
+
+    Which panel is centred is a scroll position, and CSS cannot see one, so this is set from
+    JS. It degrades to the bar exactly as it was: without the script every segment is
+    unmarked, which is what it looked like before, and the per-panel dots and "3 of 5" are
+    rendered server-side and go on saying where you are regardless. %>
 <div class="sticky top-0 bg-gray-100 py-2">
   <div class="flex gap-0.5" aria-label="Session progress">
-    <%- session_lifts.each do |lift| %>
-      <div class="flex h-2 flex-1 overflow-hidden rounded-sm bg-gray-300">
+    <%- session_lifts.each_with_index do |lift, position| %>
+      <div data-lift-segment="<%= position %>" class="flex h-2 flex-1 overflow-hidden rounded-sm bg-gray-300">
         <%- lift.each do |set| %>
           <div class="flex-1 <%= set[:is_completed] ? 'bg-lime-500' : '' %>"></div>
         <%- end %>

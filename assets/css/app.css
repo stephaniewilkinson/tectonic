@@ -54,6 +54,23 @@ h6 {
     font-family: "Blonde Sans", sans-serif;
 }
 
+/* The segment of the session progress bar belonging to the lift on screen, marked as you
+   swipe between them. A halo rather than a different fill, because the fill inside a
+   segment already means something -- how many of that lift's sets are done -- and a second
+   meaning painted over it would make the bar answer two questions in one colour.
+
+   Two shadows rather than a border: a border would change the segment's width and shove
+   the rest of the bar sideways every time you swiped. The inner ring is the sticky header's
+   own gray-100, so the halo reads as a gap around the segment rather than as a thick grey
+   edge, which matters at the 2px gap the segments sit at.
+
+   Written here rather than toggled as Tailwind utilities because it is one named state, and
+   because class names that only ever appear inside a JS string are the kind of thing a
+   purge is entitled to drop. */
+[data-lift-segment][data-current="true"] {
+    box-shadow: 0 0 0 2px #f3f4f6, 0 0 0 3px #6b7280;
+}
+
 /* Weight and reps are typed on a touch keypad, so the native number spinners
    just clutter the inputs. Tailwind has no utility for the spin-button
    pseudo-elements, so hide them here for every number field. */
