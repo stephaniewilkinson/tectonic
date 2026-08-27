@@ -7,7 +7,18 @@ require_relative 'program_days'
 
 class Tectonic < Roda
   class Workout < Sequel::Model
-    one_to_many :sets, class: 'Tectonic::WorkoutSet'
+    # Ordered, because a one_to_many with no order emits SQL with no ORDER BY, and a
+    # SELECT without one may come back in any order Postgres likes. It is free to change
+    # that order after an UPDATE -- which on this table is every "Lifted something else"
+    # save and every Done tap -- so the set list was stable right up until somebody
+    # trained, and then quietly was not. That is #217: sets that will not stay put.
+    #
+    # id rather than anything cleverer. Insertion order is program order here: the
+    # generator writes a lift's warmups and then its working sets, lift by lift, in the
+    # order the program gives them, and a set added by hand later belongs at the end
+    # because that is when it happened. It also matches what the session screen and the
+    # MCP get_workout tool already sort by, so all three now agree.
+    one_to_many :sets, class: 'Tectonic::WorkoutSet', order: :id
     # The program day this workout was generated from, nil for one logged by hand or
     # over MCP. That null is the whole distinction between a plan and a record of
     # training, so every reading of "is this a planned session" starts here.

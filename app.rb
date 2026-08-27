@@ -551,7 +551,20 @@ class Tectonic < Roda
         end
         r.get('edit') { view('workouts/edit') }
         r.is do
-          @sets = WorkoutSet.where(workout_id:).order(:exercise_id)
+          # By id, which is the order the session was trained in, rather than by
+          # exercise_id, which was the order the movements happen to sit in the exercises
+          # table. Sorting by exercise_id put a workout's cards in library-id order: a
+          # session written as squat, bench, row came back in whatever order those three
+          # rows were created in, the same wrong order every time, and a movement the
+          # account added itself sorted after every library movement no matter when it
+          # was lifted.
+          #
+          # It also had no tiebreaker, and the view re-queries per card with the same
+          # non-unique key, so the rows inside a card were unordered outright -- warmups
+          # and working sets interleaved however Postgres felt, and free to change after
+          # any UPDATE. uniq below keeps first-occurrence order, so the cards now come
+          # out in the order the lifts were first performed.
+          @sets = WorkoutSet.where(workout_id:).order(:id)
           @array_of_exercise_ids = @sets.map(:exercise_id).uniq
           view 'workouts/show'
         end
