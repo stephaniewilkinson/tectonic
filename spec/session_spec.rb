@@ -32,6 +32,31 @@ def generated_session(account_id)
   [workout_id, warmup_id]
 end
 
+# A logged session with one working set in it, typed in through the forms rather than
+# inserted -- what is being tested is what the session screen does to a set somebody
+# logged, and the new-set form is how they logged it. Top level beside the two helpers
+# above, which is where this file keeps them.
+def a_session_with_one_set_at(weight)
+  sign_up_for_session
+  visit '/workouts/new'
+  click_on 'Save'
+  workout = current_path
+  visit "#{workout}sets/new"
+  select 'Back Squat', from: 'exercise_id'
+  fill_in 'weight', with: weight.to_s
+  fill_in 'reps', with: '5'
+  click_on 'Save'
+  visit "#{workout}session"
+end
+
+# The "Lifted something else" disclosure, opened and saved: a correction, and since #215
+# nothing more than one.
+def correct_the_weight_to(weight)
+  find('summary', text: 'Lifted something else').click
+  fill_in 'Weight', with: weight.to_s
+  click_button 'Save'
+end
+
 describe 'the session view' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
@@ -60,22 +85,28 @@ describe 'revising a set in the session' do
   include Minitest::Capybara::Behaviour
   include BrowserSpec
 
-  it 'records the weight actually lifted and marks the set done' do
-    sign_up_for_session
-    visit '/workouts/new'
-    click_on 'Save'
-    workout = current_path
-    visit "#{workout}sets/new"
-    select 'Back Squat', from: 'exercise_id'
-    fill_in 'weight', with: '135'
-    fill_in 'reps', with: '5'
-    click_on 'Save'
-    visit "#{workout}session"
-    find('summary', text: 'Lifted something else').click
-    fill_in 'Weight', with: '145'
-    click_button 'Save'
+  # #215: the correction and the completion are two statements, and this form only makes
+  # the first. Saving 145 says the bar had 145 on it, not that the set is over -- so the
+  # row takes the new weight and the button still reads Done.
+  it 'records the weight actually lifted without marking the set done' do
+    a_session_with_one_set_at 135
+    correct_the_weight_to 145
+
     assert_includes page.body, '145'
-    assert page.has_button?('Undo')
+    assert page.has_button?('Done'), 'a correction is not a claim that the set is finished'
+    refute page.has_button?('Undo')
+  end
+
+  # And the other half of it: a set already done stays done when its weight is corrected.
+  # The old rule forced is_completed true on any revision, which hid this case; the new one
+  # leaves the flag alone, so it has to be said that "alone" means both ways.
+  it 'leaves a finished set finished when its weight is corrected' do
+    a_session_with_one_set_at 135
+    click_button 'Done'
+    correct_the_weight_to 145
+
+    assert_includes page.body, '145'
+    assert page.has_button?('Undo'), 'correcting a finished set should not un-finish it'
   end
 end
 
@@ -120,16 +151,20 @@ describe 'a warmup taken differently from the ramp' do
   # claiming a ramp that did not happen, with nothing to say otherwise.
   #
   # What says otherwise is the "planned" line, not the row's colour. #214 took the amber
-  # tint out: the row is the same lime as any other finished set, because that is what it
-  # is, and the sentence under it is what carries the difference.
+  # tint out: a row is done or it is not, and the sentence under it carries the difference.
+  #
+  # #215 is why that sentence is asserted on a row that is still to do. Saving the ramp step
+  # you actually took no longer completes it, so this is the case the old guard on the line
+  # -- is_completed && changed_from_plan? -- would have hidden, and it is the case where the
+  # line is worth most: 75 on the bar, 95 on the sheet, and the set not yet done.
   it 'records what was lifted and says what it was changed from' do
     _account_id, warmup_id = editable_warmup
     fill_in "weight-#{warmup_id}", with: '75'
     click_button 'Save'
 
-    assert page.has_css?('li.bg-lime-50', text: '75 × 5'), 'the warmup row should read as done'
-    refute page.has_css?('li.bg-amber-50'), 'and should not wear a third state'
+    assert page.has_text?('75 × 5'), 'the warmup row should carry what was lifted'
     assert page.has_text?('planned 95 × 5'), 'and should say what it was changed from'
+    refute page.has_css?('li.bg-amber-50'), 'and should not wear a third state'
   end
 
   # The first summary on the page belongs to the warmup: the warmup list is rendered
