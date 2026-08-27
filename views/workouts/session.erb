@@ -35,13 +35,45 @@
     exactly the scroller's own width, so the offset before the swap already names a snap
     point, and the browser re-snaps to it anyway if a swipe was in flight.
 
-    None of this runs without JavaScript and none of it is wanted: Tailwind arrives from
-    the play CDN, which is a script, so with JS off there is no flex row and no snapping
-    either. The lifts are plain blocks in source order, the forms post normally and the
-    route redirects, which is the page this screen has always degraded to. %>
+    None of this runs without JavaScript and none of it needs to. The stylesheet is a
+    stylesheet since #188 -- it was the Tailwind play CDN, a script, when this was written,
+    so the claim used to be that JS off meant no flex row and no snapping at all. It is
+    compiled now, so with JS off the panels are still a real horizontal snap scroller; what
+    is lost is the offset restore below, and the forms post normally and the route
+    redirects, which is the page this screen has always degraded to. %>
+<%# The second thing in here is #212: the progress bar did not move when you swiped. It
+    could not -- it is rendered from what is completed, and swiping completes nothing -- so
+    a bar sitting still above a screen that had just changed read as a bar that had stopped
+    working. markCurrentLift marks the segment belonging to the lift you are looking at, so
+    the one bar says both how much of the session is done and where in it you are.
+
+    Which panel that is comes from the scroll offset over the panel width, both read off the
+    scroller itself rather than from a stored index, so it stays right when the width changes
+    under it -- a rotation, or the 640px breakpoint where the panels become a stack. It is
+    called on scroll, after every swap, and once on load, which is every way the answer can
+    change.
+
+    The scroll listener is on document in the capture phase because scroll events do not
+    bubble: a listener on the scroller itself would have to be re-bound after every htmx
+    swap destroys it, which is the same trap the offset restore above avoids. %>
 <script>
   (function () {
     var offset = 0;
+
+    function markCurrentLift() {
+      var panels = document.getElementById('lift-panels');
+      var segments = document.querySelectorAll('[data-lift-segment]');
+      if (!panels || !panels.clientWidth || !segments.length) { return; }
+      var current = Math.round(panels.scrollLeft / panels.clientWidth);
+      for (var i = 0; i < segments.length; i++) {
+        segments[i].setAttribute('data-current', i === current ? 'true' : 'false');
+      }
+    }
+
+    document.addEventListener('scroll', function (event) {
+      if (event.target && event.target.id === 'lift-panels') { markCurrentLift(); }
+    }, true);
+
     document.body.addEventListener('htmx:beforeSwap', function () {
       var panels = document.getElementById('lift-panels');
       if (panels) { offset = panels.scrollLeft; }
@@ -49,6 +81,9 @@
     document.body.addEventListener('htmx:afterSwap', function () {
       var panels = document.getElementById('lift-panels');
       if (panels) { panels.scrollLeft = offset; }
+      markCurrentLift();
     });
+
+    markCurrentLift();
   })();
 </script>
