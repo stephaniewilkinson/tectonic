@@ -393,8 +393,15 @@ class Tectonic < Roda
         # become a null rather than an empty string; clean_note is where that is decided
         # for every write path, this one and the MCP tools alike.
         note = Exercise.clean_note(r.params['note'])
+        # icon_url is deliberately not read here. #199 took the field off the form -- every
+        # library movement draws a shipped icon since #171, so the field was a way to point
+        # every visitor's browser at a third party to override a working default. The column
+        # stays, and the MCP tools still write it, which is why this must not pass the param
+        # through: the form no longer sends one, so reading it would set the column to nil
+        # and quietly erase an icon an assistant had chosen every time somebody used the
+        # browser to fix a typo in the name.
         if r.params['id'].empty?
-          exercise_id = Exercise.insert(name: r.params['name'], icon_url: r.params['icon_url'],
+          exercise_id = Exercise.insert(name: r.params['name'],
                                         account_id: @account_id, is_barbell:, note:)
           r.redirect "/exercises/#{exercise_id}/"
         else
@@ -405,7 +412,7 @@ class Tectonic < Roda
           # everybody else reads.
           @exercise = Exercise.owned_by(@account_id).where(id: r.params['id']).first
           r.redirect '/exercises' unless @exercise
-          @exercise.update(name: r.params['name'], icon_url: r.params['icon_url'], is_barbell:, note:)
+          @exercise.update(name: r.params['name'], is_barbell:, note:)
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end

@@ -71,8 +71,11 @@ describe 'the icon a movement draws on the workout record' do
   end
 end
 
-# icon_url has been on the exercise form since the beginning, stored by every write path
-# and read by nothing.
+# icon_url was on the exercise form from the beginning. #199 took the field off it: since
+# #171 every movement draws a shipped icon, so the field's only remaining job was to point
+# every visitor's browser at a third party to override a default that works. The column and
+# the override live on -- the MCP tools write it, and rows written through the old form
+# still carry values -- so what is drawn is still tested here.
 describe 'an icon the account chose for itself' do
   include Rack::Test::Methods
   include RouteOwnership
@@ -86,8 +89,9 @@ describe 'an icon the account chose for itself' do
     assert_includes record, '<img src="https://example.com/curl.png" alt="Barbell Curl icon"'
   end
 
-  # The field is posted whether or not anyone typed in it, so a row carries an empty
-  # string rather than a null, and an empty src is a broken image on every card.
+  # The old form posted the field whether or not anyone typed in it, so rows created
+  # through it carry an empty string rather than a null, and an empty src is a broken image
+  # on every card. Those rows outlive the field, and an MCP tool can still send one.
   it 'counts a field left blank as no icon at all' do
     log 'Barbell Curl', icon_url: ''
 
@@ -107,6 +111,35 @@ describe 'an icon the account chose for itself' do
 
     assert_includes body, '/icons/gym.svg'
     refute_includes body, 'javascript:alert'
+  end
+end
+
+# #199 asked the field to go and the column to stay. The gap between those two is the thing
+# worth a test: the route used to read r.params['icon_url'] on the way past, and a form that
+# no longer sends one would have handed it a nil. Renaming a movement in the browser would
+# then have wiped an icon an assistant chose, with nothing on the page to say a picture had
+# been part of what was saved.
+describe 'a movement whose icon was set by something other than the form' do
+  include Rack::Test::Methods
+  include RouteOwnership
+
+  before { @account_id = login }
+
+  it 'is not offered the field on the form' do
+    get '/exercises/new'
+
+    refute_includes last_response.body, 'name="icon_url"'
+  end
+
+  it 'keeps the icon when the movement is edited in the browser' do
+    id = DB[:exercises].insert(name: 'Zercher Squat', account_id: @account_id,
+                               icon_url: 'https://example.com/zercher.png')
+
+    post '/exercises', { id: id.to_s, name: 'Zercher Squat (belt)', note: '',
+                         '_csrf' => token_for('/exercises/new') }
+
+    assert_equal 'Zercher Squat (belt)', DB[:exercises].where(id:).get(:name)
+    assert_equal 'https://example.com/zercher.png', DB[:exercises].where(id:).get(:icon_url)
   end
 end
 

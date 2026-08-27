@@ -5,10 +5,6 @@
     <div class="mt-2">
       <input value="<%= @exercise&.name || nil %>" name="name" id="name" class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
     </div>
-    <label for="icon_url" class="block text-sm font-medium leading-6 text-gray-900">Icon URL</label>
-    <div class="mt-2">
-      <input value="<%= @exercise&.icon_url || nil %>" name="icon_url" id="icon_url" class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
-    </div>
     <%# Coaching intent for the movement itself: why it is in the program, what to
         watch for, the cue that makes it work. It belongs here rather than on a set
         because "this helps correct valgus" is true of the lift every time it is done,
