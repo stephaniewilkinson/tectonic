@@ -33,9 +33,22 @@ describe 'row_style' do
                  app.row_style({ is_completed: true, planned_weight: 155, planned_reps: 5, weight: 155, reps: 5 })
   end
 
-  it 'is amber when completed differently from the plan' do
-    assert_equal 'border-amber-300 bg-amber-50',
+  # #214 took the third state out. A set lifted 150 against a written 155 is a set that
+  # got done, and it is the same lime as one lifted as written -- what changed is said in
+  # words under the row rather than by a tint over it.
+  it 'is the same lime when completed differently from the plan' do
+    assert_equal 'border-lime-300 bg-lime-50',
                  app.row_style({ is_completed: true, planned_weight: 155, planned_reps: 5, weight: 150, reps: 5 })
+  end
+
+  # The point of the change, rather than a restatement of the two cases above: whatever a
+  # row is doing, there are two answers and neither of them is amber.
+  it 'never paints a row amber' do
+    [{ is_completed: false },
+     { is_completed: true, planned_weight: 155, planned_reps: 5, weight: 155, reps: 5 },
+     { is_completed: true, planned_weight: 155, planned_reps: 5, weight: 150, reps: 5 }].each do |set|
+      refute_includes app.row_style(set), 'amber'
+    end
   end
 end
 

@@ -105,7 +105,12 @@
                 </span>
               <%- end %>
               <%- if set[:is_completed] && changed_from_plan?(set) %>
-                <div class="text-xs text-amber-700">
+                <%# Grey, and not the amber it wore until #214. This line is the whole of how
+                    a changed set is now marked -- the row tint went to two states, done and
+                    not -- and it says what changed in words, which a colour never did. Grey
+                    is what the plate-math line above it uses, and this is the same kind of
+                    thing: a fact about the set, read after the load rather than instead. %>
+                <div class="text-xs text-gray-500">
                   planned <%= weight_label(set[:planned_weight]) %> &times; <%= set[:planned_reps] %>
                 </div>
               <%- end %>
@@ -181,7 +186,12 @@
                 </div>
               <%- end %>
               <%- if set[:is_completed] && changed_from_plan?(set) %>
-                <div class="text-xs text-amber-700">
+                <%# Grey, and not the amber it wore until #214. This line is the whole of how
+                    a changed set is now marked -- the row tint went to two states, done and
+                    not -- and it says what changed in words, which a colour never did. Grey
+                    is what the plate-math line above it uses, and this is the same kind of
+                    thing: a fact about the set, read after the load rather than instead. %>
+                <div class="text-xs text-gray-500">
                   planned <%= weight_label(set[:planned_weight]) %> &times; <%= set[:planned_reps] %>
                 </div>
               <%- end %>

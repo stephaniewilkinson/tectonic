@@ -117,13 +117,18 @@ describe 'a warmup taken differently from the ramp' do
 
   # The ramp is computed from a percentage of the top set, and a warmup row used to carry
   # Done and nothing else -- so a lifter who started on a lighter bar left the session
-  # claiming a ramp that did not happen, with no tint to say otherwise.
-  it 'records what was lifted and tints the row as changed' do
+  # claiming a ramp that did not happen, with nothing to say otherwise.
+  #
+  # What says otherwise is the "planned" line, not the row's colour. #214 took the amber
+  # tint out: the row is the same lime as any other finished set, because that is what it
+  # is, and the sentence under it is what carries the difference.
+  it 'records what was lifted and says what it was changed from' do
     _account_id, warmup_id = editable_warmup
     fill_in "weight-#{warmup_id}", with: '75'
     click_button 'Save'
 
-    assert page.has_css?('li.bg-amber-50', text: '75 × 5'), 'the warmup row should read as changed'
+    assert page.has_css?('li.bg-lime-50', text: '75 × 5'), 'the warmup row should read as done'
+    refute page.has_css?('li.bg-amber-50'), 'and should not wear a third state'
     assert page.has_text?('planned 95 × 5'), 'and should say what it was changed from'
   end
 
