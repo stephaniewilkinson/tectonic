@@ -15,7 +15,7 @@ class Tectonic < Roda
       Measured.cast(super)
     end
 
-    one_to_many :sets
+    one_to_many :sets, class: 'Tectonic::WorkoutSet'
     # The OAuth client (LLM) that created this row, or nil for a human-made one.
     # Provenance is displayed only when this resolves, so the web UI's rows stay
     # unadorned.
@@ -70,7 +70,7 @@ class Tectonic < Roda
     # this number.
     def lifted_sets(account_id, on)
       mine = Workout.where(account_id:).where { date < (on + 1) }.select(:id)
-      Set.where(exercise_id: id, workout_id: mine, is_completed: true).select(:weight, :reps, :rpe).all
+      WorkoutSet.where(exercise_id: id, workout_id: mine, is_completed: true).select(:weight, :reps, :rpe).all
     end
   end
 end

@@ -26,7 +26,7 @@ module SessionRefreshing
 
   def working_weights(day)
     workout = Tectonic::Workout.where(program_day_id: day.id).first
-    Tectonic::Set.where(workout_id: workout.id).exclude(is_warmup: true).order(:id).map(&:weight)
+    Tectonic::WorkoutSet.where(workout_id: workout.id).exclude(is_warmup: true).order(:id).map(&:weight)
   end
 end
 
@@ -66,7 +66,7 @@ describe 'editing a lift whose session has been lifted' do
     @token = mint(scopes: %w[read write])
     _program, @day, @lift = a_block(@token.account_id)
     workout = Tectonic::Workout.where(program_day_id: @day.id).first
-    Tectonic::Set.where(workout_id: workout.id).exclude(is_warmup: true).first.update(is_completed: true)
+    Tectonic::WorkoutSet.where(workout_id: workout.id).exclude(is_warmup: true).first.update(is_completed: true)
   end
 
   it 'leaves the session alone' do
@@ -95,7 +95,7 @@ describe 'adding and removing a lift after generation' do
   end
 
   def set_count
-    Tectonic::Set.where(workout_id: Tectonic::Workout.where(program_day_id: @day.id).select(:id)).count
+    Tectonic::WorkoutSet.where(workout_id: Tectonic::Workout.where(program_day_id: @day.id).select(:id)).count
   end
 
   it 'puts a newly added lift into the session' do

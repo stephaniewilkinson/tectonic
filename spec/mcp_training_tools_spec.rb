@@ -161,7 +161,7 @@ describe 'create_set stamping' do
     token = mint(scopes: ['write'])
     call_tool('create_set', raw: token.raw,
                             arguments: { exercise: 'Back Squat', date: 'today', weight: 135, reps: 5 })
-    set = Tectonic::Set[tool_result['structuredContent']['id']]
+    set = Tectonic::WorkoutSet[tool_result['structuredContent']['id']]
     assert_equal token.application_id, set.created_by_oauth_application_id
   end
 end
@@ -176,9 +176,9 @@ describe 'create_set plate math' do
   it 'takes the barbell flag from the movement rather than from the caller' do
     raw = mint(scopes: ['write']).raw
     call_tool('create_set', raw:, arguments: { exercise: 'Back Squat', weight: 135, reps: 5 })
-    assert Tectonic::Set[tool_result['structuredContent']['id']].is_barbell
+    assert Tectonic::WorkoutSet[tool_result['structuredContent']['id']].is_barbell
     call_tool('create_set', raw:, arguments: { exercise: 'Cable Fly', weight: 40, reps: 12 })
-    refute Tectonic::Set[tool_result['structuredContent']['id']].is_barbell
+    refute Tectonic::WorkoutSet[tool_result['structuredContent']['id']].is_barbell
   end
 end
 
@@ -213,7 +213,7 @@ describe 'create_set isolation' do
     other_workout = tool_result['structuredContent']['id']
     call_tool('create_set', raw: mint(scopes: ['write']).raw,
                             arguments: { exercise: 'Back Squat', date: '2027-05-05', weight: 135, reps: 5 })
-    set = Tectonic::Set[tool_result['structuredContent']['id']]
+    set = Tectonic::WorkoutSet[tool_result['structuredContent']['id']]
     refute_equal other_workout, set.workout_id
   end
 end

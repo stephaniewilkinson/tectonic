@@ -154,8 +154,8 @@ describe 'an entity that passes through an expression' do
     account_id = escaping_sign_up
     exercise = Tectonic::Exercise.create(name: 'Back Squat', account_id:, is_barbell: true)
     workout = Tectonic::Workout.create(account_id:, date: Time.now)
-    Tectonic::Set.create(workout_id: workout.id, exercise_id: exercise.id, weight: 225,
-                         reps: 5, is_warmup: false, is_completed: false, is_barbell: true)
+    Tectonic::WorkoutSet.create(workout_id: workout.id, exercise_id: exercise.id, weight: 225,
+                                reps: 5, is_warmup: false, is_completed: false, is_barbell: true)
 
     visit "/workouts/#{workout.id}/session"
 

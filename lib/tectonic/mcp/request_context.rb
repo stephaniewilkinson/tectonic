@@ -61,7 +61,7 @@ class Tectonic < Roda
 
       # Sets belonging to the account, reached only through its own workouts.
       def sets
-        Set.where(workout_id: workouts.select(:id))
+        WorkoutSet.where(workout_id: workouts.select(:id))
       end
 
       # The account's training blocks, and the three tables hanging off them. Each is

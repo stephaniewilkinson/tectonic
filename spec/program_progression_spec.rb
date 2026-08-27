@@ -26,11 +26,11 @@ module Progressing
   end
 
   def top_planned(workout)
-    Tectonic::Set.where(workout_id: workout.id, is_warmup: false).map(:planned_weight).max
+    Tectonic::WorkoutSet.where(workout_id: workout.id, is_warmup: false).map(:planned_weight).max
   end
 
   def working_sets(workout)
-    Tectonic::Set.where(workout_id: workout.id, is_warmup: false).all
+    Tectonic::WorkoutSet.where(workout_id: workout.id, is_warmup: false).all
   end
 
   # Lifts every working set exactly as written, which is the week that earns an increase.

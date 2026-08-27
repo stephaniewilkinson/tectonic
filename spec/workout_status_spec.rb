@@ -21,8 +21,8 @@ end
 
 def log_one_set(workout, is_completed:)
   exercise_id = Tectonic::Exercise.insert(account_id: workout.account_id, name: "L#{SecureRandom.hex(4)}")
-  Tectonic::Set.insert(workout_id: workout.id, exercise_id:, weight: 100, reps: 5,
-                       is_warmup: false, is_completed:)
+  Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id:, weight: 100, reps: 5,
+                              is_warmup: false, is_completed:)
 end
 
 describe 'a generated session' do

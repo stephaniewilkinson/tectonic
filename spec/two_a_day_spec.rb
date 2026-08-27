@@ -308,7 +308,7 @@ describe 'opening a second session on a day over MCP' do
     call_tool('create_set', raw: token.raw,
                             arguments: { exercise: 'Walk', date: '2027-07-08', weight: 0, reps: 1 })
 
-    assert_equal morning.id, Tectonic::Set[tool_result['structuredContent']['id']].workout_id
+    assert_equal morning.id, Tectonic::WorkoutSet[tool_result['structuredContent']['id']].workout_id
   end
 end
 

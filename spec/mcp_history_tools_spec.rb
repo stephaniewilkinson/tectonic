@@ -11,11 +11,11 @@ require 'date'
 # exist because a program put them there.
 def planned_session(account_id, date, exercise, lifted: nil)
   workout = Tectonic::Workout.create(account_id:, date:)
-  Tectonic::Set.insert(workout_id: workout.id, exercise_id: exercise.id, weight: lifted || 155, reps: 5,
-                       planned_weight: 155, planned_reps: 5, rpe: (8 if lifted), is_warmup: false,
-                       is_completed: !lifted.nil?)
-  Tectonic::Set.insert(workout_id: workout.id, exercise_id: exercise.id, weight: 45, reps: 5,
-                       planned_weight: 45, planned_reps: 5, is_warmup: true, is_completed: false)
+  Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id: exercise.id, weight: lifted || 155, reps: 5,
+                              planned_weight: 155, planned_reps: 5, rpe: (8 if lifted), is_warmup: false,
+                              is_completed: !lifted.nil?)
+  Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id: exercise.id, weight: 45, reps: 5,
+                              planned_weight: 45, planned_reps: 5, is_warmup: true, is_completed: false)
   workout
 end
 

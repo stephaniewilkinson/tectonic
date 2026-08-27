@@ -64,7 +64,7 @@ class Tectonic < Roda
       return :lifted if lifted?(workout)
 
       DB.transaction do
-        Set.where(workout_id: workout.id).delete
+        WorkoutSet.where(workout_id: workout.id).delete
         rewrite(day, workout)
       end
       :rewritten
@@ -88,7 +88,7 @@ class Tectonic < Roda
     end
 
     def lifted?(workout)
-      Set.where(workout_id: workout.id, is_completed: true).limit(1).any?
+      WorkoutSet.where(workout_id: workout.id, is_completed: true).limit(1).any?
     end
 
     def generate_day(week, day, date)
@@ -230,7 +230,7 @@ class Tectonic < Roda
     # out -- they are a ramp to the top set and say nothing about whether the top set was
     # there -- and a session with nothing planned in it is not a prescription at all.
     def session(workout, lift)
-      sets = Set.where(workout_id: workout.id, exercise_id: lift.exercise_id, is_warmup: false).all
+      sets = WorkoutSet.where(workout_id: workout.id, exercise_id: lift.exercise_id, is_warmup: false).all
       heaviest = sets.select(&:planned_weight).max_by(&:planned_weight)
       return nil unless heaviest
 
@@ -253,7 +253,7 @@ class Tectonic < Roda
     # second attempt can sit any distance back, and a window wide enough to be safe is the
     # whole block anyway -- a handful of rows for a movement trained once a week.
     def previous_workouts(week, lift)
-      lifted = Set.where(exercise_id: lift.exercise_id).select(:workout_id)
+      lifted = WorkoutSet.where(exercise_id: lift.exercise_id).select(:workout_id)
       Workout.where(account_id: @program.account_id, program_day_id: earlier_days(week), id: lifted)
              .order(Sequel.desc(:date), Sequel.desc(:id)).all
     end
@@ -295,7 +295,7 @@ class Tectonic < Roda
     # written only flips is_completed; lifting it differently changes weight or
     # reps and leaves the planned columns behind as the record of the prescription.
     def insert_set(workout, lift, set, is_warmup:)
-      Set.insert(
+      WorkoutSet.insert(
         workout_id: workout.id, exercise_id: lift.exercise_id,
         weight: set[:weight], reps: set[:reps], duration_seconds: set[:duration_seconds],
         planned_weight: set[:weight], planned_reps: set[:reps],
