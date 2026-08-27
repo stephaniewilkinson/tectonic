@@ -312,22 +312,6 @@
 <%- end %>
 </div>
 
-<form action="/workouts/<%= @workout[:id] %>/session" method="post"
-      hx-post="/workouts/<%= @workout[:id] %>/session"
-      hx-target="#session-body" hx-swap="innerHTML"
-      class="mt-10 border-t border-gray-300 pt-4">
-  <%== csrf_tag("/workouts/#{@workout[:id]}/session") %>
-  <h2 class="text-xl text-gray-900">Session RPE</h2>
-  <p class="text-xs text-gray-500">How hard was the whole session?</p>
-  <div class="mt-2 flex gap-2">
-    <%- (6..10).each do |rpe| %>
-      <button value="<%= rpe %>" class="<%= rpe_style(@workout, rpe) %> w-12 rounded-lg border border-gray-300 py-3 text-lg font-semibold" type="submit" name="rpe">
-        <%= rpe %>
-      </button>
-    <%- end %>
-  </div>
-</form>
-
 <%# No copy of the rating scale here. The last lift panel's is immediately above this form,
     so a second one put two identical disclosures on screen with nothing between them but
     the five rating buttons, which is what #175 is a picture of.

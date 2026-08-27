@@ -168,13 +168,17 @@ class Tectonic < Roda
           value && Plates.numeric(value)
         end
 
-        # A workout with its sets in the order they are meant to be lifted, its session
-        # rating, and where it stands. `status` and the program day behind it are what
-        # separate a session that was written from one that was trained, which is the
-        # question every "how did last week go" starts from.
+        # A workout with its sets in the order they are meant to be lifted, and where it
+        # stands. `status` and the program day behind it are what separate a session that
+        # was written from one that was trained, which is the question every "how did last
+        # week go" starts from.
+        #
+        # No session rating: #209 removed it. A rating per set survives and is on view_set,
+        # which is the finer-grained answer to the same question and the one the session
+        # screen actually collects.
         def view_workout_detail(workout)
           view_workout(workout).merge(
-            rpe: workout.rpe, status: workout.status.to_s, program_day_id: workout.program_day_id,
+            status: workout.status.to_s, program_day_id: workout.program_day_id,
             sets: workout.sets_dataset.order(:id).all.map { |set| view_set(set) }
           )
         end

@@ -30,14 +30,13 @@ describe 'get_workout' do
     @token = mint(scopes: ['read'])
     @exercise = account_lift(@token.account_id)
     @workout = planned_session(@token.account_id, Date.new(2027, 2, 1), @exercise, lifted: 185)
-    @workout.update(rpe: 9)
   end
 
   it 'returns the sets in order with what was prescribed beside what was lifted' do
     call_tool('get_workout', raw: @token.raw, arguments: { workout_id: @workout.id })
     detail = tool_result['structuredContent']
     working = detail['sets'].first
-    assert_equal 9, detail['rpe']
+    refute detail.key?('rpe'), 'the session rating went with #209; the per-set one below is what is left'
     assert_equal 'performed', detail['status']
     assert_equal [185, 155], [working['weight'], working['planned_weight']]
     assert_equal [true, false], [working['is_completed'], working['is_warmup']]
@@ -54,7 +53,6 @@ describe 'get_workout in the text a client renders' do
     @token = mint(scopes: ['read'])
     @exercise = account_lift(@token.account_id)
     @workout = planned_session(@token.account_id, Date.new(2027, 2, 1), @exercise, lifted: 185)
-    @workout.update(rpe: 9)
   end
 
   def text
@@ -85,17 +83,16 @@ describe 'get_workout on the flags a prose summary drops' do
   before do
     @token = mint(scopes: ['read'])
     @workout = planned_session(@token.account_id, Date.new(2027, 2, 1), account_lift(@token.account_id), lifted: 185)
-    @workout.update(rpe: 9)
     call_tool('get_workout', raw: @token.raw, arguments: { workout_id: @workout.id })
   end
 
-  it 'marks the warmup, the completion and both ratings' do
+  it 'marks the warmup, the completion and the set rating' do
     text = tool_result['content'].first['text']
 
     assert_includes text, 'warmup'
     assert_includes text, 'not done'
     assert_includes text, 'RPE 8'
-    assert_includes text, 'session RPE 9'
+    refute_includes text, 'session RPE'
   end
 end
 

@@ -135,11 +135,18 @@ describe 'swiping from one lift to the next' do
 
   # A lift with a ramp and working sets is taller than a phone, so the panels may not eat
   # the vertical scroll on their way to owning the horizontal one.
+  #
+  # Scrolled to the foot of the page rather than to a fixed 300px. What is under test is
+  # that the page scrolls vertically at all; how far is a property of how tall a session
+  # happens to be, and pinning it made this spec fail for a reason that had nothing to do
+  # with swiping -- #209 took the session rating form off the bottom, the page lost about
+  # 150px, and a scroll to 300 clamped at 286.
   it 'leaves the page scrolling up and down as it did' do
     swipe_to(1)
-    page.execute_script('window.scrollTo(0, 300)')
+    page.execute_script('window.scrollTo(0, document.body.scrollHeight)')
 
-    assert_equal 300, page.evaluate_script('window.scrollY')
+    assert_operator page.evaluate_script('window.scrollY'), :>, 0,
+                    'the panels must not eat the page vertical scroll'
     assert_equal 1, settled_on(1), 'and scrolling down should not slide the panels sideways'
   end
 end
@@ -207,9 +214,11 @@ describe 'where the rating scale sits' do
     @body = last_response.body
   end
 
-  # Two lifts with working sets on them, and no third copy under the session rating: that
-  # form sits directly below the last panel, so its own copy would be the same disclosure
-  # twice with only the rating buttons in between, which is #175.
+  # Two lifts with working sets on them, and no third copy below them. The third used to
+  # sit under the session rating form, which was directly below the last panel, so it was
+  # the same disclosure twice with only the rating buttons in between -- #175. #209 has
+  # since taken that form away entirely, so what is left below the last panel is nothing,
+  # and two copies is still the answer.
   it 'is under every panel that asks for a rating, and nowhere twice over' do
     assert_equal 2, @body.scan('How do I rate this?').length
   end
@@ -222,11 +231,16 @@ describe 'where the rating scale sits' do
   # #175 is a picture of the foot of this page: the scale, the session rating buttons, and
   # the scale again. What went wrong is visible only below the last panel, so that is where
   # this looks -- the copies inside panels are the ones that are supposed to be there.
+  #
+  # The session rating buttons that sat between the two copies are gone with #209, so the
+  # foot of the page is asserted to hold neither. The rating scale is the thing this
+  # describe is about; the session RPE heading is named as well because its absence is now
+  # a rule rather than an accident, and a form put back here would go unnoticed otherwise.
   it 'puts none of them below the last panel, where the duplicate showed' do
     tail = @body.split('</section>').last
 
-    assert_includes tail, 'Session RPE'
     refute_includes tail, 'How do I rate this?'
+    refute_includes tail, 'Session RPE'
   end
 
   it 'stays closed, because five open tables is worse than one far away' do

@@ -580,12 +580,6 @@ class Tectonic < Roda
         # The gym floor view of a workout, as distinct from workouts/show, which
         # stays the record of one. Ownership is already guaranteed by the gate above.
         r.on 'session' do
-          r.post do
-            check_csrf!
-            Workout.where(id: workout_id).update(rpe: r.params['rpe'])
-            @workout = Workout[workout_id]
-            r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
-          end
           r.get do
             # Insertion order is program order: warmups then working sets, lift by
             # lift in the position the program gave them.
