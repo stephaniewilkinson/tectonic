@@ -883,12 +883,20 @@ class Tectonic < Roda
     'border-sky-800 bg-sky-800 text-white hover:bg-sky-900'
   end
 
-  # Border and fill for a set row: still to do, done as written, or done
-  # differently, which has to read differently from done as planned.
+  # Border and fill for a set row: done, or still to do. Two states and no third.
+  #
+  # There used to be an amber one for a set lifted differently from the way it was
+  # written, on the reasoning that done-but-changed had to read differently from
+  # done-as-planned. #214 settled that it does not. Amber is the colour this app uses
+  # for a warning, and lifting 145 when the sheet said 150 is not one -- it is a set
+  # that got done. Reading a session is counting what is finished, and a colour that
+  # means "done, but" makes that count take two passes instead of one.
+  #
+  # What was changed is still said, by the "planned 150 x 5" line under the row. That
+  # is the honest place for it: a fact in words, under the row it belongs to, rather
+  # than a tint over the whole row that has to be learnt before it says anything.
   def row_style(set)
-    return 'border-gray-200 bg-white' unless set[:is_completed]
-
-    changed_from_plan?(set) ? 'border-amber-300 bg-amber-50' : 'border-lime-300 bg-lime-50'
+    set[:is_completed] ? 'border-lime-300 bg-lime-50' : 'border-gray-200 bg-white'
   end
 
   # A set lifted differently from the way it was written. Sets entered by hand
