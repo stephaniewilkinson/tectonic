@@ -501,17 +501,35 @@ class Tectonic < Roda
 
               revised = { weight: r.params['weight'], reps: r.params['reps'], rpe: r.params['rpe'] }
               revised = revised.reject { |_, value| value.to_s.empty? }
-              # No revision means the primary tap, which toggles so a mis-tap is
-              # undone by tapping again. A revision always completes the set, and a
-              # rating counts as one: rating a set is saying you lifted it.
+              # Three ways in, and they do not all mean the same thing.
+              #
+              # No parameters is the primary tap, which toggles, so a mis-tap is undone by
+              # tapping again. A rating completes: choosing an RPE is saying you lifted it,
+              # and there is nothing else an RPE could be about.
+              #
+              # A corrected weight or rep count does neither. It used to complete the set,
+              # which is what #215 is about: "the bar actually had 145 on it" and "I have
+              # finished this set" are different statements, and the form that makes the
+              # first was making the second on your behalf. That cost you the ability to fix
+              # a number part-way through a lift -- correcting the load between the second
+              # and third rep marked the set done and put Undo where Done had been -- and it
+              # meant a mis-typed weight could only be corrected by completing the set and
+              # then un-completing it. Saving a correction now leaves is_completed exactly
+              # as it was, done or not, and Done stays the only thing that says done.
               #
               # Nothing here asks whether the set is a warmup, and that stays deliberate now
               # that the session screen lets a warmup be revised too. A ramp step lifted
               # differently is the same fact as a working set lifted differently -- the
-              # generator writes planned_weight and planned_reps for both, so row_style and
-              # changed_from_plan? already read an edited warmup correctly -- and a second
+              # generator writes planned_weight and planned_reps for both -- and a second
               # branch here would be two ways of recording one thing.
-              set.update(**revised, is_completed: revised.empty? ? !set.is_completed : true)
+              completion = if revised.empty?
+                             { is_completed: !set.is_completed }
+                           elsif revised.key?(:rpe)
+                             { is_completed: true }
+                           else
+                             {}
+                           end
+              set.update(**revised, **completion)
               r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
             end
             # Every route below resolves the set through own_set, which scopes it to
