@@ -3,7 +3,10 @@
     <h1 class="text-3xl font-semibold text-gray-900">
       <%= @workout[:date].strftime('%A %b %-d') %>
     </h1>
-    <a href="/workouts/<%= @workout[:id] %>" class="text-sm text-gray-500 underline hover:text-lime-500">record</a>
+    <%# "record" was the noun -- the page that records this session -- and read as the verb,
+        which on a gym screen is an instruction to start recording. It is also where you go
+        when you have stopped lifting, so it says that instead. %>
+    <a href="/workouts/<%= @workout[:id] %>" class="text-sm text-gray-500 underline hover:text-lime-500">finish workout</a>
   </div>
 
   <div id="session-body">

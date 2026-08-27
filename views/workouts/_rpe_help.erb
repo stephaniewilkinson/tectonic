@@ -8,12 +8,17 @@
     is two of these one form apart (#175). It no longer renders any: the panels are the
     only thing that asks for it, and a session with no working set in it asks nothing.
 
+    The chevron is not decoration. A summary is display:list-item and draws a triangle by
+    default, but this one is a flex row so the marker never rendered -- "How do I rate this?"
+    was a line of bold text with nothing to say it opened. It rotates on open through
+    group-open, which is CSS, so it works with JavaScript off like the disclosure itself.
+
     Closed by default, and it has to stay that way -- five open tables is a worse page
     than one distant one. The cost of repeating it is about 2 KB of markup a copy, which
     is repeated text and so is close to free once gzipped; the alternative, one copy with
     a link or a script to reach it, buys nothing back and needs JS to work. %>
-<details class="mt-6 border-t border-gray-300 pt-3">
-  <summary class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-700">How do I rate this?</summary>
+<details class="group mt-6 border-t border-gray-300 pt-3">
+  <summary class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-700"><svg class="mr-1.5 h-4 w-4 shrink-0 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>How do I rate this?</summary>
   <div class="mt-3 space-y-4 text-sm text-gray-600">
     <p>The most reliable observable is bar speed, because it degrades before your perception of effort does.</p>
     <table class="w-full border-collapse text-left align-top">
@@ -56,8 +61,8 @@
       <p class="font-medium text-gray-700">Four checks that beat guessing</p>
       <ul class="mt-1 list-disc space-y-1 pl-5">
         <li><span class="font-medium text-gray-700">Rate it before you rack it.</span> The number degrades within seconds of setting the bar down &mdash; relief rewrites the memory of effort.</li>
-        <li><span class="font-medium text-gray-700">Ask the money question.</span> &ldquo;Would I bet $100 I could do two more?&rdquo; Confident yes = 8 or lower. Hesitation = 9.</li>
-        <li><span class="font-medium text-gray-700">Watch the film.</span> You&rsquo;re already filming bench from the ref&rsquo;s angle. Watching rep 1 against the last rep makes speed loss obvious in a way it isn&rsquo;t from under the bar.</li>
+        <li><span class="font-medium text-gray-700">Ask it as a bet.</span> &ldquo;Would I put money on two more?&rdquo; A confident yes is 8 or lower. Hesitating is a 9.</li>
+        <li><span class="font-medium text-gray-700">Film a set.</span> A phone propped against your bag is enough. Watching the first rep against the last makes speed loss obvious in a way it never is from under the bar.</li>
         <li><span class="font-medium text-gray-700">Form drift counts.</span> Hips shooting on a squat, elbows flaring on a bench &mdash; that&rsquo;s the body borrowing leverage, and it means 9+ regardless of how it felt.</li>
       </ul>
     </div>
