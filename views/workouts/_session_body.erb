@@ -96,16 +96,24 @@
     <%- unless lift.select { |set| set[:is_warmup] }.empty? %>
       <p class="mt-2 text-xs uppercase tracking-wide text-gray-500">Warmup</p>
     <%- end %>
-    <%# A warmup is played down by being smaller, not by being faded. The list carried
-        opacity-75, which would take the Done button on it to 4.24:1 against 7.56:1 at
-        full strength -- a washed-out control, which is what a disabled one looks like,
-        on the button that is the first thing anybody taps in a session. %>
+    <%# A warmup row and a working-set row are the same row. #207: they were text-lg in a
+        rounded-lg with py-2 against text-2xl font-semibold in a rounded-xl with py-3, which
+        made a ramp step and a working set read as two different kinds of object when they
+        are one kind -- a set, with a load, a rep count and a Done button. Both are now
+        text-xl font-medium in the same box, and what says which is which is the "Warmup"
+        label above this list, in words, where it was already being said.
+
+        This does not put back the fade #133 removed, and must not: the list carried
+        opacity-75, which took the Done button on a warmup to 4.24:1 against 7.56:1 at full
+        strength -- a washed-out control, which is what a disabled one looks like, on the
+        button that is the first thing anybody taps in a session. Size was what replaced
+        that fade; the label is what replaces the size. %>
     <ul>
       <%- lift.select { |set| set[:is_warmup] }.each do |set| %>
-        <li class="mt-1 rounded-lg border px-3 py-2 <%= row_style(set) %>">
+        <li class="mt-2 rounded-xl border px-3 py-3 <%= row_style(set) %>">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <span class="text-lg text-gray-900">
+              <span class="text-xl font-medium text-gray-900">
                 <%= load_label(set) %>
               </span>
               <%- if set[:is_barbell] %>
@@ -137,7 +145,8 @@
                   hx-target="#session-body" hx-swap="innerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <button type="submit"
-                      class="<%= button_style %> min-h-11 border px-4 text-sm font-semibold <%= complete_style(set) %>">
+                      class="<%= button_style %> min-h-11 border px-5 py-3 text-base font-semibold
+                             <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
               </button>
             </form>
@@ -190,7 +199,7 @@
         <li class="mt-2 rounded-xl border px-3 py-3 <%= row_style(set) %>">
           <div class="flex items-center justify-between gap-3">
             <div>
-              <span class="text-2xl font-semibold text-gray-900">
+              <span class="text-xl font-medium text-gray-900">
                 <%= load_label(set) %>
               </span>
               <%# Same words and same treatment as the warmup rows above: a warmup and a
@@ -225,7 +234,8 @@
                   hx-target="#session-body" hx-swap="innerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <button type="submit"
-                      class="<%= button_style %> border px-5 py-3 text-base font-semibold <%= complete_style(set) %>">
+                      class="<%= button_style %> min-h-11 border px-5 py-3 text-base font-semibold
+                             <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
               </button>
             </form>
