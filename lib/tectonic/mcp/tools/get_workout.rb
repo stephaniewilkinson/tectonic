@@ -38,8 +38,7 @@ class Tectonic < Roda
         # then printing a summary, which reads as the tool being broken rather than as the
         # client showing one field of the two it was sent.
         def self.headline(detail)
-          "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
-            "#{detail[:status]}#{", session RPE #{detail[:rpe]}" if detail[:rpe]}."
+          "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, #{detail[:status]}."
         end
 
         # One set: what was on the bar, what was asked for when that differs, and how it

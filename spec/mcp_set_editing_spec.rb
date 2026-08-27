@@ -110,25 +110,6 @@ describe 'delete_set' do
   end
 end
 
-describe 'rate_workout' do
-  include Rack::Test::Methods
-
-  it 'records how hard the session was' do
-    token = mint(scopes: %w[read write])
-    set = written_set(token.account_id)
-    call_tool('rate_workout', raw: token.raw, arguments: { rpe: 9, workout_id: set.workout_id })
-    assert_equal 9, Tectonic::Workout[set.workout_id].rpe
-    assert_equal({ 'from' => nil, 'to' => 9 }, tool_result['structuredContent']['changed']['rpe'])
-  end
-
-  it 'refuses to rate a day that was never trained rather than opening one' do
-    token = mint(scopes: %w[read write])
-    call_tool('rate_workout', raw: token.raw, arguments: { rpe: 8, date: '2027-09-09' })
-    assert tool_result['isError']
-    assert_equal 0, Tectonic::Workout.where(account_id: token.account_id).count
-  end
-end
-
 describe 'set editing isolation between accounts' do
   include Rack::Test::Methods
 
@@ -146,12 +127,6 @@ describe 'set editing isolation between accounts' do
     assert tool_result['isError']
 
     assert_equal [155, false], @set.refresh.values.values_at(:weight, :is_completed)
-  end
-
-  it "never rates another account's session" do
-    call_tool('rate_workout', raw: @stranger, arguments: { rpe: 10, workout_id: @set.workout_id })
-    assert tool_result['isError']
-    assert_nil Tectonic::Workout[@set.workout_id].rpe
   end
 end
 
