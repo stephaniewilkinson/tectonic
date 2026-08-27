@@ -68,25 +68,18 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 @font-face {
     font-family: "Blonde Serif";
-    src: url("/fonts/blonde_serif-webfont.eot");
     src:
-        url("/fonts/blonde_serif-webfont.eot?#iefix")
-            format("embedded-opentype"),
         url("/fonts/blonde_serif-webfont.woff2") format("woff2"),
-        url("/fonts/blonde_serif-webfont.woff") format("woff"),
-        url("/fonts/blonde_serif-webfont.svg#blonde_serifblonde") format("svg");
+        url("/fonts/blonde_serif-webfont.woff") format("woff");
     font-weight: normal;
     font-style: normal;
 }
 
 @font-face {
     font-family: "Blonde Sans";
-    src: url("/fonts/blonde_sans-webfont.eot");
     src:
-        url("/fonts/blonde_sans-webfont.eot?#iefix") format("embedded-opentype"),
         url("/fonts/blonde_sans-webfont.woff2") format("woff2"),
-        url("/fonts/blonde_sans-webfont.woff") format("woff"),
-        url("/fonts/blonde_sans-webfont.svg#blondeblonde") format("svg");
+        url("/fonts/blonde_sans-webfont.woff") format("woff");
     font-weight: normal;
     font-style: normal;
 }
