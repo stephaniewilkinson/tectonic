@@ -471,6 +471,11 @@ class Tectonic < Roda
             check_csrf!
             exercise = visible_exercise(r.params['exercise_id'])
             r.redirect "/workouts/#{workout_id}/sets/new" unless exercise
+            # required on the input is the browser's rule and stops at the browser. A post
+            # with no rep count in it reaches here, and sets_measures_one_way refuses a row
+            # measured in reps that has none -- unrescued, so a 500 rather than a refusal.
+            # Every set this form makes is measured in reps, which is the column default.
+            r.redirect "/workouts/#{workout_id}/sets/new" if r.params['reps'].to_s.strip.empty?
 
             set_id = WorkoutSet.insert(weight: r.params['weight'], reps: r.params['reps'],
                                        exercise_id: exercise.id, is_warmup: r.params['is_warmup'] || false,
@@ -521,9 +526,24 @@ class Tectonic < Roda
               set = own_set(set_id, workout_id)
               r.redirect "/workouts/#{workout_id}" unless set
 
-              set.update(weight: r.params['weight'], reps: r.params['reps'],
+              # A set counts in reps or in seconds, never in both, and the database says so
+              # outright: sets_measures_one_way refuses a row that has a rep count under
+              # measure 'time' or none under measure 'reps'. This form used to post reps
+              # whatever the set was measured in, so both halves of that constraint were
+              # reachable from it and neither was handled -- the violation came back as an
+              # unrescued exception, which is a 500 page and a lost edit. That is #213.
+              #
+              # A blank quantity is refused here rather than written, because a set that
+              # counts nothing is not a set. It returns to the form rather than to the
+              # record: the edit failed, and the place to say so is the page holding what
+              # was typed.
+              quantity = quantity_from(set, r.params)
+              r.redirect "/workouts/#{workout_id}/sets/#{set_id}/edit" unless quantity
+
+              set.update(weight: r.params['weight'],
                          is_warmup: r.params['is_warmup'] || false,
                          is_completed: r.params['is_completed'] || false,
+                         **quantity,
                          **substitution(set, r.params['exercise_id']))
               r.redirect "/workouts/#{workout_id}"
             end
@@ -670,6 +690,22 @@ class Tectonic < Roda
     return {} if exercise.nil? || exercise.id == set.exercise_id
 
     { exercise_id: exercise.id, is_barbell: exercise.barbell? }
+  end
+
+  # What a set counts, as the pair of columns it is stored in, or nil when the form left it
+  # blank. A set measured in seconds writes duration_seconds and a null reps; one measured
+  # in reps writes reps and a null duration_seconds. Both columns are always named, so
+  # neither can keep a stale value from the measure the set used to be in.
+  #
+  # The measure is the set's own rather than anything the form sends. It is a property of
+  # the movement -- a plank is held and a squat is repped -- so it is not a thing an edit to
+  # the weight is allowed to change, and taking it from the row means a posted field cannot
+  # push a set into a state its exercise disagrees with.
+  def quantity_from(set, params)
+    typed = set.timed? ? params['duration_seconds'] : params['reps']
+    return nil if typed.to_s.strip.empty?
+
+    set.timed? ? { duration_seconds: typed, reps: nil } : { reps: typed, duration_seconds: nil }
   end
 
   # The fields a lift edit may set. Named rather than taken wholesale so a form cannot
