@@ -115,11 +115,13 @@ class Tectonic < Roda
     end
 
     # What to draw beside this movement: a src, and the alt that goes with it. An icon_url
-    # of the account's own wins, which is the whole of what that column on the exercise
-    # form has ever been for -- it has been collected and stored since the beginning and
-    # read by nothing. The form posts an empty string when the field is left alone, so
-    # blank has to count as unset here or every movement added through the UI would draw a
-    # broken image.
+    # of the account's own wins. Nothing in the UI sets one any more -- #199 took the field
+    # off the form, because #171 gave every movement a shipped icon and so turned the field
+    # into a way to override a working default with a fetch from somebody else's server.
+    # The MCP tools still write the column, and rows written before that still carry values,
+    # so this override is live and is read here. Blank counts as unset: rows added through
+    # the old form carry an empty string rather than a null, and an empty src is a broken
+    # image on every card.
     #
     # What somebody else's picture shows is not knowable from here, so its alt names the
     # movement it was chosen for and claims nothing about what is in it. A value that could

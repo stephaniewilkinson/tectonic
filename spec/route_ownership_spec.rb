@@ -172,7 +172,7 @@ describe 'state-changing posts require a CSRF token' do
   # row some earlier run left behind.
   it 'refuses an exercise post with no token' do
     name = "Forged #{SecureRandom.hex(4)}"
-    post '/exercises', { id: '', name:, icon_url: '' }
+    post '/exercises', { id: '', name: }
 
     assert_equal 403, last_response.status
     assert_equal 0, DB[:exercises].where(name:).count

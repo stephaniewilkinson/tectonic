@@ -19,13 +19,13 @@ describe 'creating a movement through the form' do
   before { @account_id = login }
 
   it 'takes the barbell answer from the person filling it in' do
-    post '/exercises', { 'name' => invented_name, 'icon_url' => '', 'id' => '',
+    post '/exercises', { 'name' => invented_name, 'id' => '',
                          'is_barbell' => '1', '_csrf' => token_for('/exercises/new') }
     assert Tectonic::Exercise.where(account_id: @account_id).order(:id).last.barbell?
   end
 
   it 'leaves it off when the box is not ticked' do
-    post '/exercises', { 'name' => invented_name, 'icon_url' => '', 'id' => '',
+    post '/exercises', { 'name' => invented_name, 'id' => '',
                          '_csrf' => token_for('/exercises/new') }
     refute Tectonic::Exercise.where(account_id: @account_id).order(:id).last.barbell?
   end
@@ -42,7 +42,7 @@ describe 'a movement the library cannot name' do
   # separate elements -- and the heading is "Plate math" now, not "per side", which is a
   # phrase this app spends on a rep count taken per side.
   it 'gives its sets the plate breakdown a set of a library movement gets' do
-    post '/exercises', { 'name' => invented_name, 'icon_url' => '', 'id' => '',
+    post '/exercises', { 'name' => invented_name, 'id' => '',
                          'is_barbell' => '1', '_csrf' => token_for('/exercises/new') }
     exercise = Tectonic::Exercise.where(account_id: @account_id).order(:id).last
     workout_id = own_workout(@account_id)

@@ -177,7 +177,7 @@ describe 'who may write a note' do
 
   it 'refuses to note a library movement, which every account reads' do
     library = Tectonic::Exercise.where(account_id: nil).order(:id).first
-    post '/exercises', { id: library.id.to_s, name: library.name, icon_url: '',
+    post '/exercises', { id: library.id.to_s, name: library.name,
                          note: 'mine alone', '_csrf' => token_for('/exercises/new') }
 
     assert_nil Tectonic::Exercise.where(id: library.id).get(:note)
@@ -185,7 +185,7 @@ describe 'who may write a note' do
 
   it "refuses to note another account's private movement" do
     hidden = another_accounts_exercise
-    post '/exercises', { id: hidden.to_s, name: 'Renamed', icon_url: '',
+    post '/exercises', { id: hidden.to_s, name: 'Renamed',
                          note: 'mine alone', '_csrf' => token_for('/exercises/new') }
 
     assert_nil DB[:exercises].where(id: hidden).get(:note)
