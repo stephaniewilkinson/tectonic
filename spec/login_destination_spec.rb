@@ -29,8 +29,8 @@ module LandingAfterLogin
   # the evening.
   def finish(workout)
     exercise_id = Tectonic::Exercise.insert(account_id: workout.account_id, name: "L#{SecureRandom.hex(4)}")
-    Tectonic::Set.insert(workout_id: workout.id, exercise_id:, weight: 225, reps: 5,
-                         is_warmup: false, is_completed: true)
+    Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id:, weight: 225, reps: 5,
+                                is_warmup: false, is_completed: true)
     workout
   end
 end

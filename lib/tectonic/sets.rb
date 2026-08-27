@@ -5,7 +5,15 @@ require_relative 'measured'
 require_relative 'oauth_application'
 
 class Tectonic < Roda
-  class Set < Sequel::Model
+  # Named WorkoutSet rather than Set because Ruby 4.0 promoted Set to a core class, and a
+  # model called Set shadowed it in every file that reopens `class Tectonic` -- which is
+  # all of lib/ and app.rb. `Set.new` there returned an empty row of this table rather than
+  # a core Set, and did not raise while doing it, so the mistake surfaced somewhere else.
+  #
+  # The table is named explicitly because Sequel infers one from the class name, and this
+  # class is no longer named after its table. The table stays `sets`: it is the right name
+  # for what it holds, and it is the class name that had to move.
+  class WorkoutSet < Sequel::Model(:sets)
     many_to_one :exercise
     many_to_one :workout
     # The OAuth client (LLM) that created this row, or nil for a human-made one.

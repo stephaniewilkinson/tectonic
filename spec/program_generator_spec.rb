@@ -28,7 +28,7 @@ describe 'ProgramGenerator' do
   it 'writes a dated workout of warmups and working sets, planned and incomplete' do
     program = build_program
     workout = Tectonic::ProgramGenerator.new(program).generate(1).first
-    sets = Tectonic::Set.where(workout_id: workout.id).all
+    sets = Tectonic::WorkoutSet.where(workout_id: workout.id).all
     assert_equal Date.new(2026, 8, 17), workout.date.to_date # weekday 1 lands on the Monday
     assert_equal [4, 4], [sets.count(&:is_warmup), sets.reject(&:is_warmup).count]
     assert(sets.none?(&:is_completed))
@@ -38,9 +38,9 @@ describe 'ProgramGenerator' do
   it 'is idempotent: regenerating the week reuses the workout and adds no sets' do
     generator = Tectonic::ProgramGenerator.new(build_program)
     first = generator.generate(1).first
-    before = Tectonic::Set.where(workout_id: first.id).count
+    before = Tectonic::WorkoutSet.where(workout_id: first.id).count
     assert_equal first.id, generator.generate(1).first.id
-    assert_equal before, Tectonic::Set.where(workout_id: first.id).count
+    assert_equal before, Tectonic::WorkoutSet.where(workout_id: first.id).count
   end
 end
 

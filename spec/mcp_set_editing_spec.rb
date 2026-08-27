@@ -10,8 +10,8 @@ require 'date'
 def written_set(account_id, weight: 155, is_completed: false)
   exercise = Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}", is_barbell: true)
   workout = Tectonic::Workout.create(account_id:, date: Date.today)
-  Tectonic::Set.create(workout_id: workout.id, exercise_id: exercise.id, weight:, reps: 5,
-                       planned_weight: weight, planned_reps: 5, is_warmup: false, is_completed:)
+  Tectonic::WorkoutSet.create(workout_id: workout.id, exercise_id: exercise.id, weight:, reps: 5,
+                              planned_weight: weight, planned_reps: 5, is_warmup: false, is_completed:)
 end
 
 describe 'complete_set' do
@@ -94,7 +94,7 @@ describe 'delete_set' do
     set = written_set(@token.account_id)
     call_tool('delete_set', raw: @token.raw, arguments: { set_id: set.id })
     assert_equal 155, tool_result['structuredContent']['removed']['weight']
-    assert_nil Tectonic::Set[set.id]
+    assert_nil Tectonic::WorkoutSet[set.id]
   end
 
   # Training that happened is not an assistant's to tidy away on its own initiative.
@@ -103,10 +103,10 @@ describe 'delete_set' do
     call_tool('delete_set', raw: @token.raw, arguments: { set_id: set.id })
     assert tool_result['isError']
     assert_includes tool_result.dig('content', 0, 'text'), 'confirm true'
-    refute_nil Tectonic::Set[set.id]
+    refute_nil Tectonic::WorkoutSet[set.id]
 
     call_tool('delete_set', raw: @token.raw, arguments: { set_id: set.id, confirm: true })
-    assert_nil Tectonic::Set[set.id]
+    assert_nil Tectonic::WorkoutSet[set.id]
   end
 end
 

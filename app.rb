@@ -423,7 +423,7 @@ class Tectonic < Roda
           # Only the viewer's own sets for this movement, so a shared library
           # exercise never surfaces another account's logged sets.
           my_workouts = Workout.where(account_id: @account_id).select(:id)
-          mine = Set.where(exercise_id: @exercise.id, workout_id: my_workouts)
+          mine = WorkoutSet.where(exercise_id: @exercise.id, workout_id: my_workouts)
           @sets = mine.all
           @heaviest_by_day = heaviest_by_day(mine)
           view('exercises/show')
@@ -453,7 +453,7 @@ class Tectonic < Roda
         r.post 'delete' do
           check_csrf!
           Workout.db.transaction do
-            Set.where(workout_id:).delete
+            WorkoutSet.where(workout_id:).delete
             @workout.delete
           end
           r.env['HTTP_HX_REQUEST'] ? '' : r.redirect('/workouts')
@@ -472,10 +472,10 @@ class Tectonic < Roda
             exercise = visible_exercise(r.params['exercise_id'])
             r.redirect "/workouts/#{workout_id}/sets/new" unless exercise
 
-            set_id = Set.insert(weight: r.params['weight'], reps: r.params['reps'],
-                                exercise_id: exercise.id, is_warmup: r.params['is_warmup'] || false,
-                                is_completed: r.params['is_completed'] || false, workout_id:,
-                                is_barbell: exercise.barbell?)
+            set_id = WorkoutSet.insert(weight: r.params['weight'], reps: r.params['reps'],
+                                       exercise_id: exercise.id, is_warmup: r.params['is_warmup'] || false,
+                                       is_completed: r.params['is_completed'] || false, workout_id:,
+                                       is_barbell: exercise.barbell?)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
           end
 
@@ -504,7 +504,7 @@ class Tectonic < Roda
             end
             # Every route below resolves the set through own_set, which scopes it to
             # this workout -- and the workout is already gated to the account above. A
-            # bare `Set[id]` would match any set in the database, so a set id from
+            # bare `WorkoutSet[id]` would match any set in the database, so a set id from
             # another account's workout would load and save here despite that gate.
             r.get 'edit' do
               @set = own_set(set_id, workout_id)
@@ -544,14 +544,14 @@ class Tectonic < Roda
           r.get do
             # Insertion order is program order: warmups then working sets, lift by
             # lift in the position the program gave them.
-            @sets = Set.where(workout_id:).order(:id).all
+            @sets = WorkoutSet.where(workout_id:).order(:id).all
             @exercises = Exercise.visible_to(@account_id).as_hash(:id)
             view 'workouts/session'
           end
         end
         r.get('edit') { view('workouts/edit') }
         r.is do
-          @sets = Set.where(workout_id:).order(:exercise_id)
+          @sets = WorkoutSet.where(workout_id:).order(:exercise_id)
           @array_of_exercise_ids = @sets.map(:exercise_id).uniq
           view 'workouts/show'
         end
@@ -624,7 +624,7 @@ class Tectonic < Roda
   # buttons -- rendered without the layout so htmx can drop it into #session-body
   # after each tap. Without JS the routes redirect and the full page reloads.
   def session_body(workout_id)
-    @sets = Set.where(workout_id:).order(:id).all
+    @sets = WorkoutSet.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)
     render('workouts/_session_body')
   end
@@ -646,7 +646,7 @@ class Tectonic < Roda
   def own_set(set_id, workout_id)
     return nil unless @workout && @workout.account_id == @account_id
 
-    Set.where(id: set_id, workout_id:).first
+    WorkoutSet.where(id: set_id, workout_id:).first
   end
 
   # The movement a form asked for, looked up only among the ones this account may

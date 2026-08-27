@@ -33,8 +33,8 @@ module ExerciseTypes
   end
 
   def sets_for(account_id, exercise)
-    Tectonic::Set.where(exercise_id: exercise.id,
-                        workout_id: Tectonic::Workout.where(account_id:).select(:id)).order(:id).all
+    Tectonic::WorkoutSet.where(exercise_id: exercise.id,
+                               workout_id: Tectonic::Workout.where(account_id:).select(:id)).order(:id).all
   end
 
   def write(account_id, day, exercise, **attributes)

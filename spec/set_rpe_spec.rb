@@ -14,7 +14,7 @@ end
 # from is completed work.
 def log_lifted_set(workout_id, exercise, attributes)
   written = { reps: 5, rpe: nil, is_completed: true, is_warmup: false }.merge(attributes)
-  Tectonic::Set.insert(workout_id:, exercise_id: exercise.id, **written)
+  Tectonic::WorkoutSet.insert(workout_id:, exercise_id: exercise.id, **written)
 end
 
 describe 'rating a set in the session view' do
@@ -32,7 +32,7 @@ describe 'rating a set in the session view' do
     post "/workouts/#{workout_id}/sets/#{set_id}/complete",
          { 'rpe' => '9', '_csrf' => token_from(last_response.body) }
 
-    assert_equal [9, true], Tectonic::Set[set_id].values.values_at(:rpe, :is_completed)
+    assert_equal [9, true], Tectonic::WorkoutSet[set_id].values.values_at(:rpe, :is_completed)
   end
 end
 
@@ -97,7 +97,7 @@ describe 'a lift written as a percentage' do
     workout_id = Tectonic::Workout.insert(account_id: @account_id, date: Date.today)
     log_lifted_set(workout_id, @exercise, weight: 155, reps: 5, rpe: 8) # a max of 191
     generated = Tectonic::ProgramGenerator.new(@program).generate(1).first
-    top = Tectonic::Set.where(workout_id: generated.id).max(:weight)
+    top = Tectonic::WorkoutSet.where(workout_id: generated.id).max(:weight)
     assert_equal 155, top # 80% of 191, rounded to what a bar can hold
   end
 

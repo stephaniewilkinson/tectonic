@@ -30,7 +30,7 @@ describe 'a weight with a half pound in it' do
   it 'survives the round trip to the column and back' do
     _, _, set_id = a_set(@account_id, weight: 137.5)
 
-    assert_in_delta 137.5, Tectonic::Set[set_id].weight.to_f
+    assert_in_delta 137.5, Tectonic::WorkoutSet[set_id].weight.to_f
   end
 
   # The point of numeric over float: these are compared against a prescription and summed
@@ -39,8 +39,8 @@ describe 'a weight with a half pound in it' do
   it 'is exact rather than approximately itself' do
     _, _, set_id = a_set(@account_id, weight: 137.5)
 
-    assert_equal BigDecimal('137.5'), Tectonic::Set[set_id].weight
-    assert_equal BigDecimal('140'), Tectonic::Set[set_id].weight + BigDecimal('2.5')
+    assert_equal BigDecimal('137.5'), Tectonic::WorkoutSet[set_id].weight
+    assert_equal BigDecimal('140'), Tectonic::WorkoutSet[set_id].weight + BigDecimal('2.5')
   end
 end
 

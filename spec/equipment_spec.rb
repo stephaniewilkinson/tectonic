@@ -146,8 +146,8 @@ def week_for(plates)
   account = account_with(plates:)
   program = one_lift_block(account)
   Tectonic::ProgramGenerator.new(program).generate(1)
-  Tectonic::Set.where(workout_id: Tectonic::Workout.where(account_id: account).select(:id))
-               .exclude(is_warmup: true).order(:id).select_map(:weight)
+  Tectonic::WorkoutSet.where(workout_id: Tectonic::Workout.where(account_id: account).select(:id))
+                      .exclude(is_warmup: true).order(:id).select_map(:weight)
 end
 
 # One block, one week, one day, one lift: the smallest thing that generates a session.
@@ -168,8 +168,8 @@ end
 def generated_week_on(plates, top: 155, barbell: true)
   account = account_with(plates:)
   Tectonic::ProgramGenerator.new(one_lift_block(account, top:, barbell:)).generate(1)
-  weights = Tectonic::Set.where(workout_id: Tectonic::Workout.where(account_id: account).select(:id))
-                         .order(:id).select_map(:weight).compact
+  weights = Tectonic::WorkoutSet.where(workout_id: Tectonic::Workout.where(account_id: account).select(:id))
+                                .order(:id).select_map(:weight).compact
   [weights, Gear.for_account(account)]
 end
 
