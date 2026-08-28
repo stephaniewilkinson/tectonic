@@ -123,10 +123,12 @@ describe 'the weight of the bar itself' do
 
   before { @account_id = login }
 
+  # token_for_form rather than the page's first token: since #189 the settings page carries
+  # the week-start form above this one, and that token is bound to /settings/week, so the
+  # first one on the page is the wrong one and the post comes back 403.
   it 'takes a decimal through the equipment form' do
-    get '/equipment'
-    token = last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1]
-    post '/equipment', { bar_weight: '33.07', plates: { '45' => '2' }, '_csrf' => token }
+    post '/settings', { bar_weight: '33.07', plates: { '45' => '2' },
+                        '_csrf' => token_for_form('/settings', '/settings') }
 
     assert_equal BigDecimal('33.07'), DB[:accounts].where(id: @account_id).get(:bar_weight)
   end
@@ -141,7 +143,7 @@ describe 'the weight of the bar itself' do
   end
 
   it 'is offered as a field that will accept one' do
-    get '/equipment'
+    get '/settings'
 
     assert_match(/name="bar_weight"[^>]*step="any"/, last_response.body)
   end

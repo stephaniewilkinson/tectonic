@@ -1,0 +1,94 @@
+<div class="mx-auto max-w-md">
+  <h1 class="text-3xl font-semibold text-gray-900">Settings</h1>
+
+  <%# Two forms, not one. A week start and a plate inventory are unrelated answers, and a
+      single Save across both would mean changing either required re-submitting the other.
+      They share a page because they are the same kind of thing -- a per-account preference
+      about how the app should behave -- and splitting them put settings in two places
+      (#189).
+
+      No units here. That was the largest part of #189 and it was dropped outright: pounds
+      everywhere, no kg, so there is nothing to choose. %>
+  <h2 class="mt-8 text-xl font-semibold text-gray-900">Week</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    Which day the calendar grid begins on. It has always begun on Sunday, and not by
+    decision &mdash; that is simply the day <code>Date#wday</code> counts from.
+  </p>
+
+  <form method="post" action="/settings/week" class="mt-4">
+    <%== csrf_tag('/settings/week') %>
+    <fieldset>
+      <legend class="sr-only">Week starts on</legend>
+      <div class="flex gap-2">
+        <%- { 0 => 'Sunday', 1 => 'Monday' }.each do |wday, name| %>
+          <%# A radio rather than a select, because two options in a menu is a menu that
+              hides one of them behind a tap. Labels wrap the input so the whole 44px of it
+              is the target. %>
+          <%# An instance variable rather than a local, as views/workouts/show.erb does and
+              for the reason its comment gives: erb_lint hands each tag to rubocop as a
+              snippet of its own, so a local assigned in one tag and read in the next is a
+              useless assignment to every cop that sees it. %>
+          <%- @chosen = @week_starts_on == wday %>
+          <label class="<%= button_style %> flex min-h-11 flex-1 cursor-pointer items-center justify-center
+                        border px-4 text-sm font-semibold
+                        <%= @chosen ? 'border-sky-800 bg-sky-800 text-white' : 'border-gray-300 bg-white text-gray-700' %>
+                        <%= 'hover:bg-gray-50' unless @chosen %>">
+            <input type="radio" name="week_starts_on" value="<%= wday %>" class="sr-only" <%= 'checked' if @chosen %>>
+            <%= name %>
+          </label>
+        <%- end %>
+      </div>
+    </fieldset>
+    <button type="submit" class="<%= button_style %> mt-3 bg-lime-500 px-3 py-2 text-sm font-semibold text-white hover:bg-lime-600">Save</button>
+  </form>
+
+  <h2 class="mt-10 text-xl font-semibold text-gray-900">Equipment</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    What you lift with. Every weight the app works out &mdash; warmups, working sets, the
+    plate breakdown, and how much a programme adds after a good week &mdash; is rounded to
+    something this rack can actually load.
+  </p>
+
+  <form method="post" action="/settings" class="mt-6 space-y-6">
+    <%== csrf_tag('/settings') %>
+
+    <div>
+      <label for="bar_weight" class="block text-sm font-medium text-gray-900">Bar</label>
+      <div class="mt-1 flex items-center gap-2">
+        <input type="number" id="bar_weight" name="bar_weight" min="1" step="any" autocomplete="off"
+               value="<%= weight_label(@equipment.bar_weight) %>"
+               class="w-28 rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm
+                      ring-1 ring-inset ring-gray-300">
+        <span class="text-sm text-gray-500">lb</span>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend class="text-sm font-medium text-gray-900">Plates</legend>
+      <p class="mt-1 text-sm text-gray-500">
+        Pairs, not single plates &mdash; a bar is loaded on both sides. Set a count to zero
+        to say you no longer own it. Your smallest plate decides the smallest jump you can
+        make: <span class="font-semibold text-gray-900"><%= @equipment.increment %> lb</span>.
+      </p>
+      <div class="mt-3 space-y-2">
+        <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
+          <div class="flex items-center gap-3">
+            <span class="w-16 text-right font-mono text-sm text-gray-900">
+              <%= denomination %> lb
+            </span>
+            <input type="number" min="0" step="1" autocomplete="off"
+                   name="plates[<%= denomination %>]"
+                   value="<%= @equipment.pairs.fetch(denomination, 0) %>"
+                   class="w-20 rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm
+                          ring-1 ring-inset ring-gray-300">
+            <span class="text-sm text-gray-500">pairs</span>
+          </div>
+        <%- end %>
+      </div>
+    </fieldset>
+
+    <button type="submit"
+            class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5
+                   text-sm font-semibold leading-6 text-white hover:bg-lime-600">Save</button>
+  </form>
+</div>
