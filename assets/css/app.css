@@ -138,6 +138,49 @@ h6 {
     box-shadow: 0 0 0 2px #f3f4f6, 0 0 0 3px #6b7280;
 }
 
+/* That a tap landed. #236.
+ *
+ * htmx puts `htmx-request` on the element making the request for as long as it is in
+ * flight, and has done all along -- there was simply no rule for it, so nothing on screen
+ * changed between tapping Done and the answer coming back. On a session screen that swaps
+ * the whole body on every tap, over gym wifi, that gap is long enough to read as "the
+ * button did nothing", and the tap that follows lands as an undo.
+ *
+ * A ring rather than a fade, and that is the whole of the design. #133 took opacity-75 off
+ * the warmup rows because it dropped the Done button to 4.24:1 against 7.56:1 at full
+ * strength -- a washed-out control is what a disabled one looks like, on the button
+ * everybody taps first. This has to say "working", not "unavailable", so the button keeps
+ * its colour exactly and the movement happens outside it. Contrast is untouched.
+ *
+ * Both selectors because which element htmx marks depends on what carried the attribute:
+ * the form here, the button if one ever takes its own hx-post. Covering both costs one
+ * selector and stops this silently doing nothing later.
+ *
+ * The colour comes from the palette variables (#238) rather than a literal, so the ring is
+ * the session screen's own blue and follows it if that ever changes. */
+@keyframes tectonic-working {
+    0% {
+        box-shadow: 0 0 0 0 rgb(var(--color-session) / 0.55);
+    }
+    100% {
+        box-shadow: 0 0 0 6px rgb(var(--color-session) / 0);
+    }
+}
+.htmx-request button,
+button.htmx-request {
+    animation: tectonic-working 0.9s ease-out infinite;
+}
+
+/* A pulse is motion, and motion is a thing some people have asked their browser not to
+   show them. The state still has to be visible, so it becomes a ring that simply stays. */
+@media (prefers-reduced-motion: reduce) {
+    .htmx-request button,
+    button.htmx-request {
+        animation: none;
+        box-shadow: 0 0 0 3px rgb(var(--color-session) / 0.55);
+    }
+}
+
 /* Weight and reps are typed on a touch keypad, so the native number spinners
    just clutter the inputs. Tailwind has no utility for the spin-button
    pseudo-elements, so hide them here for every number field. */
