@@ -37,7 +37,7 @@
   <%- end %>
 
   <div class="mt-4 grid grid-cols-7 gap-px rounded-t-lg bg-gray-200 text-center text-xs font-semibold leading-6 text-gray-500">
-    <%- Tectonic::Calendar::DAY_NAMES.each do |name| %>
+    <%- Tectonic::Calendar.day_names(@week_starts_on).each do |name| %>
       <div class="bg-gray-50 py-2"><%= name %></div>
     <%- end %>
   </div>

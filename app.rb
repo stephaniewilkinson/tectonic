@@ -267,7 +267,8 @@ class Tectonic < Roda
       @month = Calendar.month_of(r.params['month'])
       @previous = @month << 1
       @following = @month >> 1
-      @weeks = Calendar.weeks(@account_id, @month)
+      @week_starts_on = week_starts_on(@account_id)
+      @weeks = Calendar.weeks(@account_id, @month, Date.today, @week_starts_on)
       @tally = Calendar.tally(@weeks)
       view('home')
     end
@@ -315,20 +316,54 @@ class Tectonic < Roda
 
     # The bar and plates this account lifts on. Everything the app calculates rounds to
     # what this rack can load, so it is the one setting that changes the numbers.
+    # Where /equipment used to be. Every link in the app points at /settings now, and this
+    # is here for a bookmark or a browser that remembers the old one. #189.
     r.on 'equipment' do
       rodauth.require_login
+      r.redirect '/settings'
+    end
+    # What this account has asked the app to do differently: which day a week starts on,
+    # and what is on the rack. Two forms rather than one, because they are two unrelated
+    # answers and a single Save would make changing either mean re-submitting both.
+    #
+    # The plate inventory moved here from a page of its own, which is the scope #189 added:
+    # it is the same kind of thing as the week start -- a per-account preference about how
+    # the app should behave -- and splitting "what I lift with" from "how I read a week"
+    # across two pages put settings in two places.
+    #
+    # Units are deliberately not here. That was the largest part of the issue and it was
+    # dropped: pounds everywhere, no kg, so there is nothing to choose.
+    r.on 'settings' do
+      rodauth.require_login
       @account_id = rodauth.account_from_session[:id]
+
+      r.post 'week' do
+        check_csrf!
+        # Checked here as well as in the database, and not for belt and braces: a check
+        # constraint refuses the write by raising, and an unrescued Sequel exception reaches
+        # a person as a 500 rather than as a refusal. That is #213's bug in a new place, so
+        # this is #211's answer to it -- the route refuses by name and the constraint stays
+        # as the backstop for anything that never comes through here.
+        #
+        # The two are the only days a calendar grid can honestly begin on. A week starting
+        # on Wednesday is not a preference anybody has, and accepting one would mean every
+        # reader handling a value nobody will ever choose.
+        chosen = r.params['week_starts_on'].to_i
+        DB[:accounts].where(id: @account_id).update(week_starts_on: chosen) if Calendar::WEEK_STARTS.include?(chosen)
+        r.redirect '/settings'
+      end
 
       r.post do
         check_csrf!
         Equipment.replace(@account_id, bar_weight: r.params['bar_weight'],
                                        plates: r.params['plates'])
-        r.redirect '/equipment'
+        r.redirect '/settings'
       end
 
       r.get do
+        @week_starts_on = week_starts_on(@account_id)
         @equipment = Equipment.for_account(@account_id)
-        view('equipment')
+        view('settings')
       end
     end
 
@@ -709,6 +744,17 @@ class Tectonic < Roda
     return '/workouts/new' unless mine.empty?
 
     '/start'
+  end
+
+  # Which day this account's week begins on, as a Date#wday number. #189.
+  #
+  # Read straight off the table rather than through a model, because there is no Account
+  # model in this app -- Rodauth owns that table and works it as a dataset -- and inventing
+  # one for a single integer would be a larger thing than the integer. The fallback is
+  # belt and braces: the column is NOT NULL with a default, so a row without one cannot
+  # exist, and a reader that assumes so anyway costs nothing.
+  def week_starts_on(account_id)
+    DB[:accounts].where(id: account_id).get(:week_starts_on) || 0
   end
 
   # What comes back from a tap: the panel of the lift that was tapped, and the progress

@@ -17,10 +17,17 @@ class Tectonic < Roda
     # Weeks begin on Sunday here and on Monday everywhere that buckets training -- the
     # volume chart, and the Monday a seeded block opens on. They are not the same week. A
     # training week is a unit of work and starts where the block starts; a month grid is
-    # read against the calendar already on the wall or the phone, and that one starts on
-    # Sunday. The columns therefore run in Date#wday order, which is why both ends of
-    # `bounds` are a plain subtraction.
+    # read against the calendar already on the wall or the phone.
+    #
+    # Which day that grid begins on is the account's, since #189 -- most of the world reads
+    # a week as starting on Monday and this app had no way to say so. The names are held in
+    # Date#wday order and rotated on the way out, because wday is what every date arithmetic
+    # here counts in and rewriting the list would mean rewriting that too.
     DAY_NAMES = %w[Sun Mon Tue Wed Thu Fri Sat].freeze
+    # The days a grid may begin on, as Date#wday numbers: Sunday and Monday. Named here
+    # because the route and the database constraint have to agree about it, and two places
+    # holding the same pair of numbers is one place too many.
+    WEEK_STARTS = [0, 1].freeze
     MONTH = /\A(?<year>\d{4})-(?<month>\d{2})\z/
     # A calendar is a way of reading training, not an archive to wander: far enough back
     # to cover any real history, and far enough forward for a written block.
@@ -53,8 +60,13 @@ class Tectonic < Roda
     # The month as whole weeks, so the grid is rectangular and every row has seven days.
     # The first and last rows spill into the neighbouring months, which is what makes a
     # week that straddles a month boundary readable at all.
-    def weeks(account_id, month, today = Date.today)
-      from, to = bounds(month)
+    # The column headings, beginning on the account's chosen day.
+    def day_names(starts_on = 0)
+      DAY_NAMES.rotate(starts_on)
+    end
+
+    def weeks(account_id, month, today = Date.today, starts_on = 0)
+      from, to = bounds(month, starts_on)
       trained = by_day(account_id, from, to)
       (from..to).each_slice(7).map do |week|
         week.map { |date| cell(date, month, today, trained.fetch(date, [])) }
@@ -64,9 +76,18 @@ class Tectonic < Roda
     # Back to the Sunday on or before the first, forward to the Saturday on or after the
     # last, so the grid is rectangular. Date#wday counts from Sunday, so each end is one
     # subtraction; a Monday-first grid had to shift the origin by a modulo at both.
-    def bounds(month)
+    # Back far enough to reach the account's start-of-week on or before the first, and
+    # forward to the day before the next one after the last, so the grid is whole weeks.
+    #
+    # Both ends were a plain subtraction while the week always began on Sunday, because
+    # Date#wday counts from Sunday and the arithmetic came out for free. The modulo is what
+    # that subtraction becomes once the starting day is a choice: `(wday - starts_on) % 7`
+    # is how far into the week a date sits, whichever day the week opens on, and Ruby's %
+    # returns a non-negative result for a positive divisor, so the wrap needs no special
+    # case for a Sunday in a week that begins on Monday.
+    def bounds(month, starts_on = 0)
       last = Date.new(month.year, month.month, -1)
-      [month - month.wday, last + (6 - last.wday)]
+      [month - ((month.wday - starts_on) % 7), last + ((starts_on + 6 - last.wday) % 7)]
     end
 
     def cell(date, month, today, workouts)
