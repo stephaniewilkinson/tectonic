@@ -78,8 +78,13 @@ class Tectonic < Roda
           exercise.estimated_max(account_id: context.account_id, on:)
         end
 
+        # `compact` before `max`, which is a second bug found while fixing the first. The
+        # column is nullable and unweighted work stores nothing in it, so a movement with
+        # both weighted and bodyweight sets in its history -- a pull-up, say -- reached
+        # `max` with a nil among BigDecimals and raised ArgumentError rather than answering.
+        # A history question about a mixed movement failed outright.
         def self.summary(exercise, rows, context, arguments)
-          heaviest = rows.map(&:weight).max
+          heaviest = Presenter.weight(rows.map(&:weight).compact.max)
           "#{exercise.name}: #{rows.length} set(s), heaviest #{heaviest || 'none'}, " \
             "estimated max #{estimated(context, exercise, arguments) || 'not yet readable'}."
         end

@@ -32,7 +32,7 @@ class Tectonic < Roda
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           workout = Resolver.workout(context, date: arguments[:date])
           set = WorkoutSet.create(attributes(arguments, exercise, workout, context))
-          ok("Logged #{set.weight}x#{set.reps} of #{exercise.name} (id #{set.id}).",
+          ok("Logged #{Presenter.load_phrase(set)} of #{exercise.name} (id #{set.id}).",
              structured: Presenter.view_set(set))
         end
 
