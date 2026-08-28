@@ -32,7 +32,9 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
-            <%- @workout.sets.each do |set| %>
+            <%# @sets rather than @workout.sets: the association is eager-loaded in the route,
+                so set.exercise below is a hash lookup rather than a query per row (#234). %>
+            <%- @sets.each do |set| %>
               <tr>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                   <%= set.exercise[:name] %>

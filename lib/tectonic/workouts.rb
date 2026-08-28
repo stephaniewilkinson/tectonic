@@ -35,6 +35,20 @@ class Tectonic < Roda
         lifted = db[:sets].where(workout_id: Sequel[:workouts][:id], is_completed: true)
         select_all(:workouts).select_append(lifted.exists.as(:is_performed))
       end
+
+      # How many sets are on each row, answered the same way and for the same reason. The
+      # workouts list printed workout.sets.count per row, which is a query per session on
+      # the page -- fourteen for a page of twelve, and a year of training is a year of
+      # queries. #234.
+      #
+      # A correlated subquery rather than a join with a group by: a join would multiply the
+      # workout rows before collapsing them again, and this page also wants the EXISTS
+      # above, which does not group. Both are index-backed since #233, so each is a lookup
+      # rather than a scan.
+      def with_set_count
+        counted = db[:sets].where(workout_id: Sequel[:workouts][:id])
+        select_append(counted.select { count.function.* }.as(:set_count))
+      end
     end
 
     # What a name is once a form has been through it. A text input posts an empty string
@@ -68,6 +82,14 @@ class Tectonic < Roda
     # (with_performance), and otherwise one EXISTS of its own.
     def performed?
       values.fetch(:is_performed) { sets_dataset.where(is_completed: true).limit(1).any? }
+    end
+
+    # How many sets are on this workout. Taken from the row when the list already asked
+    # (with_set_count), and otherwise one count of its own -- the same shape as performed?
+    # above, so a caller that has not opted into the wider select still gets an answer
+    # rather than an error.
+    def set_count
+      values.fetch(:set_count) { sets_dataset.count }
     end
 
     # Planned, performed or skipped, decided without inspecting the sets one at a time.
