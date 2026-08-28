@@ -574,6 +574,11 @@ class Tectonic < Roda
             end
           end
           r.get do
+            # eager rather than letting the view walk set.exercise per row, which was a
+            # query a set -- twenty-three for a page of twenty. Sequel fetches the sets and
+            # then every movement they point at in one further query, so the page is two
+            # regardless of how long the session was. #234.
+            @sets = @workout.sets_dataset.eager(:exercise).all
             view 'sets/index'
           end
         end
@@ -621,8 +626,20 @@ class Tectonic < Roda
           # and working sets interleaved however Postgres felt, and free to change after
           # any UPDATE. uniq below keeps first-occurrence order, so the cards now come
           # out in the order the lifts were first performed.
-          @sets = WorkoutSet.where(workout_id:).order(:id)
-          @array_of_exercise_ids = @sets.map(:exercise_id).uniq
+          # Loaded once and grouped in Ruby, rather than fetched once and then re-queried
+          # per card. The view used to call @sets.where(exercise_id:) inside the card loop,
+          # which re-issues the query for every movement in the session, and Exercise[] for
+          # the movement's own row on top of that -- thirteen queries for a session of five
+          # lifts. #234.
+          #
+          # group_by keeps first-occurrence order, which is the same guarantee uniq gave
+          # @array_of_exercise_ids, so the cards still come out in the order the lifts were
+          # first performed and the rows inside each card still come out in the order #217
+          # settled. The movements come as a hash, which is what the session screen has
+          # always done for the same reason.
+          @sets = WorkoutSet.where(workout_id:).order(:id).all
+          @lifts = @sets.group_by { |set| set[:exercise_id] }
+          @exercises = Exercise.visible_to(@account_id).as_hash(:id)
           view 'workouts/show'
         end
       end
@@ -631,7 +648,7 @@ class Tectonic < Roda
         # backwards, so both lists open on the workout nearest today. with_performance
         # answers "has anything been lifted here" for the whole page in the query that
         # fetches it, which is what keeps the split off the sets table.
-        planned, history = Workout.where(account_id: @account_id).with_performance
+        planned, history = Workout.where(account_id: @account_id).with_performance.with_set_count
                                   .reverse(:date).all.partition { |workout| workout.status == :planned }
         @upcoming = planned.reverse
         @workouts = history

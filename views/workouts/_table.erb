@@ -63,7 +63,10 @@
                   <div class="text-xs text-gray-400"><%= provenance(workout) %></div>
                 <%- end %>
               </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout.sets.count %></td>
+              <%# set_count, not sets.count: the second walks the association and is a query per row,
+                  which on this page is a query per session and grew with the history. It comes off
+                  the row now, counted in the query that fetched the page (#234). %>
+              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout.set_count %></td>
               <%# These two carried no class at all, so Tailwind's preflight left them the
                   cell's text-gray-500 and they read as two more facts about the row, next
                   to the set count, rather than as the two ways into a workout. lime-700 is

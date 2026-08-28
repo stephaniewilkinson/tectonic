@@ -33,13 +33,14 @@
     put a 392px table inside a 161px card -- and the card's overflow-hidden ate the rest
     silently, with no page-level scrollbar to show anything was missing. %>
 <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-  <%- @array_of_exercise_ids.each do | exercise_id | %>
+  <%- @lifts.each do |exercise_id, sets| %>
     <%# The row itself, rather than the id twice over: the card names the movement and now
-        draws it too, and Exercise[] is a query each time it is written. An instance
+        draws it too. It comes out of the hash the route loaded rather than from Exercise[],
+        which was a query per card -- see #234. An instance
         variable rather than a local, as in views/sets/_exercise_options.erb, because
         erb_lint hands each tag to rubocop as a snippet of its own and a local assigned in
         one tag and read in the next is a useless assignment to every cop that sees it. %>
-    <%- @exercise = Exercise[exercise_id] %>
+    <%- @exercise = @exercises[exercise_id] %>
     <div class="relative overflow-hidden rounded-xl bg-white px-4 pt-5 shadow sm:px-6 sm:pt-6">
       <dt class="inline-flex">
         <div class="absolute rounded-md bg-lime-500 p-2">
@@ -74,7 +75,7 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-          <%- @sets.where(exercise_id:).each do | set | %>
+          <%- sets.each do | set | %>
               <tr>
                 <td class="whitespace-nowrap px-3 py-4">
                   <a href="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>">
