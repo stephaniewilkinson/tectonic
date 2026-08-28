@@ -158,8 +158,16 @@
                 </div>
               <%- end %>
             </div>
+            <%# hx-disabled-elt is on this form and not on the others, because this is the only
+                one whose repeat is destructive. A bare tap toggles -- deliberately, so a
+                mis-tap is undone by tapping again -- so a second tap while the first is
+                still in flight lands as an undo, and the set you did reads as not done.
+                #236. The revision forms write the weight you typed and the RPE buttons
+                write the rating you chose; sending either twice is the same as sending it
+                once. %>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-disabled-elt="find button"
                   hx-target="#session-body" hx-swap="innerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <button type="submit"
@@ -247,8 +255,16 @@
                 </div>
               <%- end %>
             </div>
+            <%# hx-disabled-elt is on this form and not on the others, because this is the only
+                one whose repeat is destructive. A bare tap toggles -- deliberately, so a
+                mis-tap is undone by tapping again -- so a second tap while the first is
+                still in flight lands as an undo, and the set you did reads as not done.
+                #236. The revision forms write the weight you typed and the RPE buttons
+                write the rating you chose; sending either twice is the same as sending it
+                once. %>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                  hx-disabled-elt="find button"
                   hx-target="#session-body" hx-swap="innerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <button type="submit"
