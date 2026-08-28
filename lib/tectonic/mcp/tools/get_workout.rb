@@ -37,8 +37,13 @@ class Tectonic < Roda
         # "how did Monday go" with a count -- promising the sets in its own description and
         # then printing a summary, which reads as the tool being broken rather than as the
         # client showing one field of the two it was sent.
+        # "finished" is said in the prose and not only in the structured payload, because
+        # many clients render only the text -- and this is the sentence that was misread.
+        # A session sitting at "3 completed, performed" reads as one still under way, which
+        # is the whole of #218; the word is what closes it.
         def self.headline(detail)
-          "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, #{detail[:status]}."
+          "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
+            "#{detail[:status]}#{', finished' if detail[:finished]}."
         end
 
         # One set: what was on the bar, what was asked for when that differs, and how it

@@ -46,9 +46,19 @@ module SetOrder
 
   # The bit that used to shake the order loose. Completing a set rewrites the row, and an
   # unordered SELECT is free to hand back a rewritten row somewhere else entirely.
+  #
+  # The token has to come off the session screen rather than off the path being posted to:
+  # a GET of the complete path returns the set's show page, so token_for hands back a token
+  # bound to somewhere else and the post is refused 403 -- silently, which is why the status
+  # is checked here rather than assumed. This spec was written believing it trained first
+  # and, until now, was not.
   def train(workout_id, set_id)
-    post "/workouts/#{workout_id}/sets/#{set_id}/complete",
-         { '_csrf' => token_for("/workouts/#{workout_id}/sets/#{set_id}/complete") }
+    action = "/workouts/#{workout_id}/sets/#{set_id}/complete"
+    post action, { '_csrf' => token_for_form("/workouts/#{workout_id}/session", action) }
+    # 302 because this is not an htmx request: the route redirects back to the session
+    # rather than returning the swapped partial. A 403 here is the refusal this used to
+    # take silently.
+    raise "completing set #{set_id} was refused: #{last_response.status}" unless last_response.status == 302
   end
 
   # The sets down the page, in document order. Read off the links rather than off the

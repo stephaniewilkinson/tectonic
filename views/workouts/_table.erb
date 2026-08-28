@@ -31,6 +31,20 @@
                 <%- if workout.status == :skipped %>
                   <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">skipped</span>
                 <%- end %>
+                <%# The one thing this list could not say. Every session with a single set
+                    ticked read the same as one taken to the last rep, because status is
+                    derived and :performed means "something was lifted" -- so a day you
+                    finished early and one you are still in the middle of were one row
+                    apart and identical. #218.
+
+                    Only on a session that says so, and quiet when it does not: an absent
+                    badge means "not said", not "abandoned", and the app has no business
+                    claiming the second. Grey rather than lime because lime already means a
+                    completed set here and on the session screen, and this is a statement
+                    about the session rather than a count of its rows. %>
+                <%- if workout.finished? %>
+                  <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">finished</span>
+                <%- end %>
                 <%# Under the date rather than in a column of its own: most days have one
                     session and would leave that column empty, and the name is a caption on
                     the date rather than a fact standing beside it. Two sessions on one day

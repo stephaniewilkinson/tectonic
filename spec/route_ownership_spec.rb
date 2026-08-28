@@ -62,6 +62,26 @@ module RouteOwnership
     get path
     token_from(last_response.body)
   end
+
+  # The token belonging to one particular form, found by the action it posts to.
+  #
+  # token_for above works only where the page a form sits on is the page it posts to, which
+  # is true of the plain forms and false of every form on the session screen: those post to
+  # /workouts/:id/sets/:set_id/complete, and Roda's csrf_tag binds a token to the path it is
+  # given. GETting the complete path returns 200 -- the set's own show page -- so a token
+  # comes back and it looks like it worked, but it is a token for a different path and the
+  # post is refused 403.
+  #
+  # That is a silent failure in a spec, which is the worst kind: the request goes through,
+  # nothing raises, and an assertion about what the page did next goes on passing because
+  # nothing was done at all.
+  def token_for_form(page_path, action)
+    get page_path
+    form = last_response.body[%r{<form[^>]*action="#{Regexp.escape(action)}"[^>]*>.*?</form>}m]
+    raise "no form posting to #{action} on #{page_path}" unless form
+
+    form[/name="_csrf"[^>]*value="([^"]*)"/, 1]
+  end
 end
 
 describe 'workout rescheduling is owner-only' do

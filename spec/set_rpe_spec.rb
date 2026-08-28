@@ -21,16 +21,22 @@ describe 'rating a set in the session view' do
   include Rack::Test::Methods
   include RouteOwnership
 
-  # The session page renders one form per set, each carrying a token for its own path,
-  # and this workout holds exactly one set -- so the page's first token is that set's.
+  # The session page renders one form per set, each carrying a token for its own path.
+  # This used to take the page's first token, on the reasoning that a workout of one set
+  # has only one form -- which stopped being true when #218 put the finish button above
+  # the panels, and the first token became that button's. The post was then refused 403
+  # and the set went unrated, which is a failure this spec would have reported as "the
+  # rating was not recorded" without a hint as to why.
+  #
+  # token_for_form asks for the token of the form that posts where this is posting, which
+  # is true however the page is later rearranged.
   it 'records the rating on the set and counts as having lifted it' do
     account_id = login
     workout_id = own_workout(account_id)
     set_id = log_lifted_set(workout_id, own_lift(account_id), weight: 155, reps: 5, is_completed: false)
-    get "/workouts/#{workout_id}/session"
+    action = "/workouts/#{workout_id}/sets/#{set_id}/complete"
 
-    post "/workouts/#{workout_id}/sets/#{set_id}/complete",
-         { 'rpe' => '9', '_csrf' => token_from(last_response.body) }
+    post action, { 'rpe' => '9', '_csrf' => token_for_form("/workouts/#{workout_id}/session", action) }
 
     assert_equal [9, true], Tectonic::WorkoutSet[set_id].values.values_at(:rpe, :is_completed)
   end
