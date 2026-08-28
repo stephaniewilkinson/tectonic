@@ -530,7 +530,11 @@ class Tectonic < Roda
                              {}
                            end
               set.update(**revised, **completion)
-              r.env['HTTP_HX_REQUEST'] ? session_body(workout_id) : r.redirect("/workouts/#{workout_id}/session")
+              if r.env['HTTP_HX_REQUEST']
+                session_body(workout_id, set_id)
+              else
+                r.redirect("/workouts/#{workout_id}/session")
+              end
             end
             # Every route below resolves the set through own_set, which scopes it to
             # this workout -- and the workout is already gated to the account above. A
@@ -707,13 +711,31 @@ class Tectonic < Roda
     '/start'
   end
 
-  # The swappable core of the session view -- progress, every lift, and the RPE
-  # buttons -- rendered without the layout so htmx can drop it into #session-body
-  # after each tap. Without JS the routes redirect and the full page reloads.
-  def session_body(workout_id)
+  # What comes back from a tap: the panel of the lift that was tapped, and the progress
+  # header beside it, out of band.
+  #
+  # This used to be the whole of #session-body -- every panel, every row, every form --
+  # which on a five-lift session was 127KB, 96% of the page, to tint one row and fill one
+  # slice of the bar. #235.
+  #
+  # Two fragments rather than one because a tap changes exactly two things, and they are
+  # not adjacent: the row is inside a panel and the bar is in the sticky header above the
+  # scroller. hx-swap-oob is what lets one response carry both -- htmx puts the panel where
+  # the form aimed it and finds the header by its id. Sending only the panel would leave the
+  # bar disagreeing with the rows underneath it, which is worse than sending too much.
+  #
+  # The panel is the unit rather than the row, and that is a deliberate stopping point. It
+  # is already a thing in the markup with an id and a partial; the row is not, and the
+  # warmup and working-set rows are still two templates that differ in more than the RPE
+  # form. Splitting those is a design change about what a row is, and folding it into a
+  # payload fix would be smuggling one thing inside another. This is where the structural
+  # win is anyway: the scroller survives the swap, so the offset restore in session.erb goes.
+  def session_body(workout_id, set_id)
     @sets = WorkoutSet.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)
-    render('workouts/_session_body')
+    position = session_lifts.index { |lift| lift.any? { |set| set[:id] == set_id.to_i } } || 0
+    render('workouts/_lift_panel', locals: { lift: session_lifts[position], position: }) +
+      render('workouts/_progress', locals: { oob: true })
   end
 
   # The session's sets grouped into the lifts they belong to. Insertion order is program
