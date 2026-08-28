@@ -64,9 +64,14 @@
     working. markCurrentLift marks the segment belonging to the lift you are looking at, so
     the one bar says both how much of the session is done and where in it you are.
 
-    Which panel that is comes from the scroll offset over the panel width, both read off the
-    scroller itself rather than from a stored index, so it stays right when the width changes
-    under it -- a rotation, or the 640px breakpoint where the panels become a stack. It is
+    Which panel that is comes from the scroll offset over the panel width, both measured off
+    the DOM rather than from a stored index, so it stays right when the width changes under
+    it -- a rotation, or the 640px breakpoint where the panels become a stack.
+
+    The panel's width and not the scroller's, which are no longer the same number. #206 made
+    a panel 88% of the scroller so an edge of the next lift always shows, and dividing by the
+    scroller's width then drifts by 12% a lift: right for the first four and wrong from the
+    fifth on, which is a session nobody had in a spec. It is
     called on scroll, after every swap, and once on load, which is every way the answer can
     change.
 
@@ -79,9 +84,12 @@
 
     function markCurrentLift() {
       var panels = document.getElementById('lift-panels');
+      var sections = panels ? panels.querySelectorAll('section') : [];
       var segments = document.querySelectorAll('[data-lift-segment]');
-      if (!panels || !panels.clientWidth || !segments.length) { return; }
-      var current = Math.round(panels.scrollLeft / panels.clientWidth);
+      if (!panels || !sections.length || !segments.length) { return; }
+      var width = sections[0].getBoundingClientRect().width;
+      if (!width) { return; }
+      var current = Math.round(panels.scrollLeft / width);
       for (var i = 0; i < segments.length; i++) {
         segments[i].setAttribute('data-current', i === current ? 'true' : 'false');
       }

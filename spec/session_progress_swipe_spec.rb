@@ -75,3 +75,23 @@ describe 'the session progress bar while swiping' do
   end
 end
 
+# Six lifts, because the arithmetic this catches is right for the first few and wrong after.
+# The script divided the scroll offset by the *scroller's* width, which was the panel's
+# width until #206 made a panel 88% of it so the next lift peeks. Dividing by the wrong one
+# drifts 12% a lift: correct through the fourth, and from the fifth on it marks the lift
+# behind the one you are looking at. Three panels could never show it, which is why the
+# session here is longer than any other spec's.
+describe 'the progress bar on a session long enough for the drift to show' do
+  include Capybara::DSL
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include SwipeMarks
+
+  before { open_session(500, 800, lifts: 6) }
+  after { page.current_window.resize_to(*@restore) }
+
+  it 'marks the lift you are on, all the way to the last' do
+    (0..5).each { |lift| assert_equal [lift], marked_after(lift), "lift #{lift}" }
+  end
+end
+

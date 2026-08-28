@@ -72,9 +72,18 @@ module SwipedPanels
     visit "/workouts/#{swipeable_session(account_id, lifts:)}/session"
   end
 
+  # Scrolled to the panel's own left edge rather than to clientWidth * index. Those were
+  # the same number while a panel was exactly one screen wide; #206 made them 88% of one so
+  # that an edge of the next lift always shows, and the old arithmetic then landed between
+  # two panels and let the snap decide which.
   def swipe_to(index)
-    page.execute_script("var row = document.getElementById('lift-panels');" \
-                        "row.scrollLeft = row.clientWidth * #{index};")
+    page.execute_script(<<~JS)
+      (function () {
+        var row = document.getElementById('lift-panels');
+        var panel = row.querySelectorAll('section')[#{index}];
+        row.scrollLeft = panel.offsetLeft - row.offsetLeft;
+      })()
+    JS
   end
 
   # Capybara waits on the DOM, and a snap scroller settles a frame or two after scrollLeft
@@ -101,12 +110,23 @@ describe 'the lifts of a session on a phone' do
   before { open_session(500, 800) }
   after { page.current_window.resize_to(*@restore) }
 
-  it 'gives each lift a panel exactly one screen wide' do
+  # A panel was exactly one screen wide until #206, which is what left nothing at the edge
+  # to say there was anything past it. It is 88% of one now, so a slice of the next lift is
+  # always in view -- the cue both Nielsen Norman and Smashing name as the strong one, where
+  # the dots this screen was relying on are the weak one.
+  #
+  # Asserted as a band rather than as a number: what matters is that a panel is most of the
+  # screen and not all of it, and pinning 88% here would make this spec fail for a tweak to
+  # the peek rather than for a panel that stopped peeking.
+  it 'leaves an edge of the next lift showing' do
     row = page.evaluate_script("document.getElementById('lift-panels').clientWidth")
     boxes = page.evaluate_script(SwipedPanels::BOXES)
 
     assert_equal 3, boxes.length
-    assert_equal [row] * 3, boxes.map(&:last)
+    assert_equal 1, boxes.map(&:last).uniq.length, 'every panel should be the same width'
+    width = boxes.first.last
+    assert_operator width, :<, row, 'a panel that fills the screen hides the next one'
+    assert_operator width, :>, row * 0.75, 'and one much narrower stops being a screen of lift'
   end
 
   # The trap nav.erb already documents: a flex child will not shrink below its content, so
