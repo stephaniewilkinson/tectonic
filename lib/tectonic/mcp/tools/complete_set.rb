@@ -31,7 +31,7 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           set = Resolver.find_set(context, arguments[:set_id])
           changed = Changes.apply(set, attributes(set, arguments))
-          ok("#{set.exercise.name} #{set.weight}x#{set.reps}: #{Changes.describe(changed)}.",
+          ok("#{set.exercise.name} #{Presenter.load_phrase(set)}: #{Changes.describe(changed)}.",
              structured: Presenter.view_set(set.refresh).merge(changed:))
         end
 

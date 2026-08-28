@@ -178,8 +178,13 @@ class Tectonic < Roda
         # No extra query for either. `sets` was already being counted through the
         # association, which loads the rows, so the completed ones are counted from what is
         # in hand.
-        def view_workout(workout)
-          sets = workout.sets
+        #
+        # The rows are a parameter since #258, so a caller that has already loaded them
+        # says so rather than reaching for the association again. view_workout_detail is
+        # that caller, and it was the bug: it counted through the cached association and
+        # listed through a fresh query, so one response could say "2 completed" over three
+        # completed sets. A list still passes nothing and still costs no extra query.
+        def view_workout(workout, sets = workout.sets)
           { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), name: workout.name,
             label: workout.label, sets: sets.count, completed: sets.count(&:is_completed),
             finished: workout.finished? }
@@ -204,6 +209,17 @@ class Tectonic < Roda
           value && Plates.numeric(value)
         end
 
+        # A set as the phrase the write tools confirm it with. Three of them built this
+        # themselves and all three interpolated the column straight, so "Logged 155x3"
+        # reached a person as "Logged 0.155e3x3": weight is numeric(7,2), Sequel hands back
+        # a BigDecimal, and BigDecimal#to_s is scientific notation. The structured payload
+        # was always right -- view_set has run weights through `weight` for as long as it
+        # has existed -- and plenty of MCP clients render only the text, so the half that
+        # was wrong is the half most people saw. #256.
+        def load_phrase(set)
+          "#{weight(set.weight)}x#{set.reps}"
+        end
+
         # A workout with its sets in the order they are meant to be lifted, and where it
         # stands. `status` and the program day behind it are what separate a session that
         # was written from one that was trained, which is the question every "how did last
@@ -212,10 +228,14 @@ class Tectonic < Roda
         # No session rating: #209 removed it. A rating per set survives and is on view_set,
         # which is the finer-grained answer to the same question and the one the session
         # screen actually collects.
+        # One query, read once. Both halves used to load the sets separately -- the counts
+        # off the cached association and the list off a fresh query -- which is #258 seen
+        # from inside a single hash.
         def view_workout_detail(workout)
-          view_workout(workout).merge(
+          sets = workout.sets_dataset.order(:id).all
+          view_workout(workout, sets).merge(
             status: workout.status.to_s, program_day_id: workout.program_day_id,
-            sets: workout.sets_dataset.order(:id).all.map { |set| view_set(set) }
+            sets: sets.map { |set| view_set(set) }
           )
         end
 
@@ -303,11 +323,21 @@ class Tectonic < Roda
         # the prose flattens away -- warmup against working set, planned against lifted,
         # completion, the session rating -- rides in the metadata, which is the only
         # place a model can read them back as data rather than parse them out of English.
+        # The prose is built from the same list the metadata carries, which is #258. It read
+        # `workout.sets` -- the association, which Sequel caches on the instance and does
+        # not invalidate when a set is written through some other object -- while the
+        # metadata read a fresh query, so a client that edited a set and then asked for the
+        # workout got a `text` listing the values from before its own edit, beside a
+        # `metadata` listing the values after it. Two answers, one response, and the wrong
+        # one is the one most clients display.
+        #
+        # Reading detail[:sets] settles it and fixes #256 here for free: those weights have
+        # already been through Presenter.weight, so no BigDecimal reaches the sentence.
         def workout_document(workout)
           return unless workout
 
           detail = Presenter.view_workout_detail(workout)
-          lines = workout.sets.map { |s| "#{s.exercise.name} #{s.weight}x#{s.reps}" }.join(', ')
+          lines = detail[:sets].map { |set| "#{set[:exercise]} #{set[:weight]}x#{set[:reps]}" }.join(', ')
           workout_result(workout).merge(text: "Workout on #{workout.date.strftime('%Y-%m-%d')}: #{lines}.",
                                         metadata: detail)
         end
