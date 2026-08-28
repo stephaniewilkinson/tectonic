@@ -98,15 +98,76 @@ describe 'the stats on /volume' do
     assert_equal 4, tags_matching(/<dd\b[^>]*>/).length
   end
 
-  # A figure and the word for it are one reading, and the page is nothing but four of
-  # them. The display face is drawn for a headline; asked for digits at 24px it was the
-  # least legible thing on the page whose whole job those four numbers are.
-  it 'sets every figure in the same face as its label' do
+  # This asserted the opposite until #200: that a figure and its label read in one face,
+  # because the display face was on these by accident of text-2xl and #128 took it off.
+  #
+  # It is on them deliberately now. They are the only numbers in the app that are a result
+  # rather than an instruction -- read to feel something about a season, not to load a bar
+  # -- which is the line app.css now draws. The labels stay in the system face: a label is
+  # read at a glance and is not the thing on display.
+  it 'sets every figure in the display face and every label in the system one' do
     labels = tags_matching(/<dt\b[^>]*>/)
     figures = tags_matching(/<dd\b[^>]*>/)
 
-    labels.zip(figures).each do |label, figure|
-      assert_equal face_of(label), face_of(figure)
+    assert_equal 4, figures.length
+    figures.each { |figure| assert_equal ['serif'], face_of(figure) }
+    labels.each { |label| assert_empty face_of(label) }
+  end
+end
+
+# The rule #200 asked for, asserted where it can be: a display surface is read rather than
+# used. These are the four the issue named, and the last of them is the line -- a screen you
+# act on is not a display surface however large its title is.
+describe 'the surfaces that take the display face' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include DisplayFace
+
+  def heading_face(path)
+    get path
+    face_of(last_response.body[/<h1\b[^>]*>/].to_s)
+  end
+
+  # /welcome rather than /, which redirects to it when signed out.
+  it 'gives the marketing page its whole voice, not only its headline' do
+    get '/welcome'
+    copy = tags_matching(/<p class="[^"]*text-lg[^"]*">/)
+
+    refute_empty copy
+    copy.each { |line| assert_equal ['serif'], face_of(line) }
+  end
+
+  it 'titles /about, which had no heading at all' do
+    assert_equal ['serif'], heading_face('/about')
+  end
+
+  it 'sets the date on a workout record, which titles a thing that happened' do
+    account_id = login
+    workout_id = own_workout(account_id)
+
+    assert_equal ['serif'], heading_face("/workouts/#{workout_id}")
+  end
+end
+
+# The line the rule draws, and the half of it that is easy to lose: a screen you act on is
+# not a display surface however large its title is. /volume is the one worth naming --
+# its four figures take the face and its own heading does not, because the figures are the
+# result and the heading is a label on a screen you came to use.
+describe 'the surfaces that do not' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include DisplayFace
+
+  def heading_face(path)
+    get path
+    face_of(last_response.body[/<h1\b[^>]*>/].to_s)
+  end
+
+  it 'leaves the titles of the screens you use in the heading face' do
+    login
+
+    ['/workouts', '/exercises', '/volume'].each do |path|
+      assert_empty heading_face(path), "#{path} is a screen you use, not one you read"
     end
   end
 end

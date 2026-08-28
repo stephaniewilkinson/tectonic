@@ -36,9 +36,28 @@ h6 {
     font-family: Blonde Sans;
 }
 
-/* Outranks the heading rule on specificity, a class against an element, so the front
-   page's h1 is Blonde Serif wherever it sits in the file. It used to depend on coming
-   after the size rules at equal weight. */
+/* The third answer, and the rule for it, which #200 asked for. #128 settled that a face
+   follows what a thing *is*: a heading takes Blonde Sans off h1-h6, and anything that is
+   not a heading but wants that face says `brand`. There was no way to say "this is a
+   display moment" as distinct from "this is a heading", so `serif` existed as a class,
+   was used on exactly one headline, and was documented nowhere as anything.
+
+   A display surface is a thing that is READ RATHER THAN USED. The marketing page and
+   /about are read: their whole job is tone, and nobody loads a bar off them. The four
+   figures on /volume are read: they are the only numbers in the app that are a result
+   rather than an instruction, and you look at them to feel something about a season. The
+   date on a workout record is read: it titles a thing that happened rather than labelling
+   a screen you are about to act on.
+
+   What is NOT a display surface, and the line that matters: anything you act on. Every
+   weight, rep count and plate breakdown on the session screen is an instruction to be
+   followed with a bar in your hands, and #128 took this face off those for exactly that
+   reason. A page title on a screen you use is a heading and takes the heading rule; it can
+   be both, as /about is -- an h1 that also says `serif`.
+
+   Outranks the heading rule on specificity, a class against an element, so a display
+   heading is Blonde Serif wherever it sits in the file. It used to depend on coming after
+   the size rules at equal weight. */
 .serif {
     font-family: Blonde Serif;
 }
