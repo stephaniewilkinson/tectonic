@@ -57,7 +57,19 @@
       <script src="/js/chart.umd.js"></script>
       <script src="/js/chartkick.js"></script>
     <%- end %>
-    <script src="/js/htmx.min.js"></script>
+    <%# And the same for htmx, which is 50KB and was loaded on every page in the app while
+        being used on three. /exercises, /volume, /programs and /about each parsed and ran
+        it to do nothing at all -- and the front page and /about are the two most likely
+        first visits, neither of which uses it.
+
+        A partial that carries hx- attributes sets @htmx, so the answer is written where
+        the attributes are rather than in a route that has to remember. The risk of getting
+        this wrong is quiet -- buttons that stop swapping and fall back to full page posts,
+        which still work -- so spec/htmx_loading_spec.rb walks the app and holds the two
+        together instead of leaving it to be noticed. %>
+    <%- if @htmx %>
+      <script src="/js/htmx.min.js"></script>
+    <%- end %>
   </head>
   <body>
   <%== render('nav') %>
