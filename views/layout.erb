@@ -17,32 +17,64 @@
         would be refused there outright; separate layouts mean leaving it out is the whole
         of it, and analytics_spec keeps it that way.
 
-        This is now the only third-party script the site loads: the Tailwind CDN that used
-        to sit above it went with #142. %>
+        It is the only third-party script the site loads, which is what this comment
+        claimed while a tinyanalytics pixel sat twenty-two lines below it. Two vendors
+        counting the same visits with different ideas of a session, different bot filtering
+        and different sampling do not agree, so there was no answer to "how many people
+        came this week" -- there were two, with no reason to prefer either. Fathom is the
+        one #185 chose and said why: cookieless, no profile, no consent banner. The pixel
+        was never part of that decision. analytics_spec now holds both halves, because the
+        wrong half of this to get wrong is the comment: it is what somebody reads when
+        deciding whether the CSP can be tightened. %>
     <script src="https://cdn.usefathom.com/script.js" data-site="VXQDPBHH" defer></script>
 
     <!-- HTML Meta Tags -->
     <title>tectonic plates, a lifting app</title>
     <meta name="description" content="Lift heavier with tectonic plates. Track your workouts and progress.">
+    <%# One domain. render.yaml serves this app at tectonicplates.app and still allows
+        tectonic.onrender.com, so without this the same page is two pages. %>
+    <link rel="canonical" href="<%= canonical_url %>">
+    <%# The tab, the bookmark, and the iOS home screen -- which matters more here than on
+        most sites, because a gym app that gets added to a home screen is a gym app that
+        gets opened, and it was a blank document glyph until #254.
 
+        Three files because browsers still disagree. icon.svg is the real one and scales to
+        anything; favicon.ico carries 16, 32 and 48 for what cannot read it; and
+        apple-touch-icon.png is opaque at 180x180 because iOS composites a transparent icon
+        onto black. All three are the plates from _logo.erb with the wordmark dropped,
+        since eleven characters cannot be read at sixteen pixels.
+
+        theme-color paints the phone browser's own chrome, so the bar above the page is the
+        app's blue instead of white. %>
+    <link rel="icon" href="/favicon.ico" sizes="32x32">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <meta name="theme-color" content="#075985">
+
+    <%# Both cards fetch their image from this origin. They asked tectonic.onrender.com for
+        it until #251, which is the sort of thing that keeps working until the day the old
+        subdomain is retired and then breaks everywhere at once, silently, in somebody
+        else's cache. The alt text is here because a card announced nothing at all to a
+        screen reader, and og:site_name because it was attributed to nobody. %>
     <!-- Facebook Meta Tags -->
-    <meta property="og:url" content="https://tectonicplates.app">
+    <meta property="og:url" content="<%= canonical_url %>">
     <meta property="og:type" content="website">
+    <meta property="og:site_name" content="tectonic plates">
     <meta property="og:title" content="tectonic plates, a lifting app">
     <meta property="og:description" content="Lift heavier with tectonic plates. Track your workouts and progress.">
-    <meta property="og:image" content="https://tectonic.onrender.com/img/screenshot.jpeg">
+    <meta property="og:image" content="<%= Tectonic::CANONICAL_ORIGIN %>/img/screenshot.jpeg">
+    <meta property="og:image:alt" content="A tectonic plates workout, with each set's weight and the plates that make it.">
 
     <!-- Twitter Meta Tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta property="twitter:domain" content="tectonicplates.app">
-    <meta property="twitter:url" content="https://tectonicplates.app">
+    <meta property="twitter:url" content="<%= canonical_url %>">
+    <%# There is no separate product account, so the site and its author are one handle. %>
+    <meta name="twitter:site" content="@stephanieblack">
     <meta name="twitter:title" content="tectonic plates, a lifting app">
     <meta name="twitter:description" content="Lift heavier with tectonic plates. Track your workouts and progress.">
-    <meta name="twitter:image" content="https://tectonic.onrender.com/img/screenshot.jpeg">
-
-    <!-- Pixel Code for https://app.tinyanalytics.io/ -->
-    <script defer src="https://app.tinyanalytics.io/pixel/KyJ6JipBW9No4r00"></script>
-    <!-- END Pixel Code -->
+    <meta name="twitter:image" content="<%= Tectonic::CANONICAL_ORIGIN %>/img/screenshot.jpeg">
+    <meta name="twitter:image:alt" content="A tectonic plates workout, with each set's weight and the plates that make it.">
 
     <%# Charting costs a quarter of a megabyte, and on a page that draws no chart it is a
         quarter of a megabyte of nothing -- the login form, the sign-up form and every

@@ -1,0 +1,41 @@
+# Almost all of this app is behind a login, so nothing below is secret -- a crawler
+# that ignores this file gets a 302 to the login form and learns nothing. What it costs
+# without this file is the request, the redirect, and a line in the log, on every page
+# of an account's history, for every crawler, forever. This is the cheapest way to say
+# "there is nothing here for you".
+
+User-agent: *
+
+# The public surface, and all of it. Four pages and the root, which redirects to the
+# first of them.
+Allow: /$
+Allow: /welcome
+Allow: /about
+Allow: /login
+Allow: /create-account
+
+# An account's own pages. /start is the empty-state guide and is behind a login too.
+Disallow: /start
+Disallow: /workouts
+Disallow: /exercises
+Disallow: /volume
+Disallow: /programs
+Disallow: /settings
+Disallow: /equipment
+
+# The OAuth endpoints, and the consent screen most of all: it is the one page in this
+# app where a single tap hands an API client the account, so it is the last page that
+# should ever be arrived at from a search result.
+Disallow: /connections
+Disallow: /authorize
+Disallow: /token
+Disallow: /oauth-
+
+# Discovery metadata. Public by design and fetched by OAuth clients, which do not read
+# this file; it is listed because a search index is not what it is public for.
+Disallow: /.well-known/
+
+# No Sitemap line, deliberately. The public surface is the four pages above, they link
+# to each other, and a sitemap listing them would tell a crawler only what it already
+# has from following those links. Worth adding the day there is a public page nothing
+# links to -- documentation for the connector is the likely first one.
