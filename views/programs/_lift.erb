@@ -12,16 +12,16 @@
   <%== csrf_tag("/programs/#{@program.id}/lifts/#{lift.id}") %>
   <span class="w-36 truncate text-sm font-medium text-gray-900"><%= lift.exercise.name %></span>
   <input type="number" name="sets" value="<%= lift.sets %>" min="1" autocomplete="off"
-         aria-label="sets" class="min-h-11 w-14 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+         aria-label="sets" class="<%= field_style %> min-h-11 w-14 px-2 text-base">
   <span class="text-sm text-gray-400">&times;</span>
   <input type="number" name="reps" value="<%= lift.reps %>" min="1" autocomplete="off"
-         aria-label="reps" class="min-h-11 w-14 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+         aria-label="reps" class="<%= field_style %> min-h-11 w-14 px-2 text-base">
   <input type="number" name="top_weight" value="<%= weight_label(lift.top_weight) %>" step="any" autocomplete="off"
          aria-label="pounds" placeholder="lb"
-         class="min-h-11 w-20 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+         class="<%= field_style %> min-h-11 w-20 px-2 text-base">
   <input type="number" name="percent_of_max" value="<%= lift.percent_of_max %>" step="any" autocomplete="off"
          aria-label="percent of max" placeholder="%"
-         class="min-h-11 w-16 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+         class="<%= field_style %> min-h-11 w-16 px-2 text-base">
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Save</button>
 </form>

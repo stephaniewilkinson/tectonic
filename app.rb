@@ -948,6 +948,35 @@ class Tectonic < Roda
   # purpose and folding them in here would quietly undo that. The white secondary button
   # is left alone: it is already the same at all seven of its sites, which is what this
   # is trying to make the primary one.
+  # The shape of a text input, on the same terms button_style settles a button: one radius,
+  # one border treatment, one ring, one focus ring, and nothing about size or colour. #239.
+  #
+  # Fifteen distinct input class strings were written out across views/, and two of them
+  # were the same control at two radii -- rounded-md on four fields and rounded-lg on three
+  # more that differ from those four in nothing else. Nobody chose that. It is the drift
+  # button_style was introduced to stop, whose own note records "the rounded-lg both copies
+  # carried was one of the three radii that helper exists to settle".
+  #
+  # rounded-md rather than rounded-lg, and that is a real decision rather than a coin toss:
+  # button_style is rounded-md, so a field and the button under it now share one radius
+  # instead of disagreeing by two pixels. Eleven call sites move, which is visible if you
+  # look for it and is the point.
+  #
+  # Size and padding stay at the call site, exactly as they do for buttons. Several of these
+  # inputs are 44px tall for a thumb and several are w-14 because a rep count is two digits
+  # wide, and folding either in here would quietly undo a decision somebody made on purpose.
+  def field_style
+    'rounded-md border-0 shadow-sm ring-1 ring-inset ring-gray-300 ' \
+      'focus:ring-2 focus:ring-inset focus:ring-lime-500'
+  end
+
+  # A nav link, which appeared ten times written out in full. What differs between them is
+  # only whether the link is the one you are on -- colour, hover, and a transparent bottom
+  # border -- so that stays at the call site and the rest is here.
+  def nav_link_style
+    'brand inline-flex min-h-11 shrink-0 items-center border-b-2 px-1 text-base font-medium sm:text-xl'
+  end
+
   def button_style
     'rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 ' \
       'focus-visible:outline-offset-2 focus-visible:outline-lime-500'

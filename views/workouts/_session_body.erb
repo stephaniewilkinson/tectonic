@@ -204,18 +204,20 @@
               definition, so its rating is a number nobody will read back, and five buttons at
               48px would cost each of these rows more height than the whole row costs now. %>
           <details class="group mt-1">
-            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><svg class="mr-1.5 h-4 w-4 shrink-0 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>Lifted something else</summary>
+            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><%== render('_chevron') %>Lifted something else</summary>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML" class="mt-1 flex items-end gap-2">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
               <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                 Weight
-                <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off"
+                       class="<%= field_style %> mt-1 block w-24 py-2 text-center text-lg text-gray-900">
               </label>
               <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
                 Reps
-                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off"
+                       class="<%= field_style %> mt-1 block w-20 py-2 text-center text-lg text-gray-900">
               </label>
               <button type="submit"
                       class="<%= button_style %> border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">
@@ -311,7 +313,7 @@
           <%- end %>
 
           <details class="group mt-2">
-            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><svg class="mr-1.5 h-4 w-4 shrink-0 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>Lifted something else</summary>
+            <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><%== render('_chevron') %>Lifted something else</summary>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
@@ -342,11 +344,13 @@
                   different question, asked at generation, and #140 is where it is answered. %>
               <label class="text-xs text-gray-500" for="weight-<%= set[:id] %>">
                 Weight
-                <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off" class="mt-1 block w-24 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off"
+                       class="<%= field_style %> mt-1 block w-24 py-2 text-center text-lg text-gray-900">
               </label>
               <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
                 Reps
-                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off" class="mt-1 block w-20 rounded-lg border-0 py-2 text-center text-lg text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-lime-500">
+                <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off"
+                       class="<%= field_style %> mt-1 block w-20 py-2 text-center text-lg text-gray-900">
               </label>
               <%# Saving an edit is the same kind of thing as tapping Done -- an action,
                   not a state -- so it wears the same fill. Its hover used to jump to

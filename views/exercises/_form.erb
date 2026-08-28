@@ -3,7 +3,8 @@
   <div>
     <label for="name" class="block text-sm font-medium leading-6 text-gray-900">Name</label>
     <div class="mt-2">
-      <input value="<%= @exercise&.name || nil %>" name="name" id="name" class="block w-full rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+      <input value="<%= @exercise&.name || nil %>" name="name" id="name"
+             class="<%= field_style %> block w-full py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
     </div>
     <%# Coaching intent for the movement itself: why it is in the program, what to
         watch for, the cue that makes it work. It belongs here rather than on a set
@@ -20,7 +21,7 @@
     <label for="note" class="mt-4 block text-sm font-medium leading-6 text-gray-900">Note</label>
     <div class="mt-2">
       <textarea name="note" id="note" rows="3"
-                class="block min-h-11 w-full rounded-lg border-0 py-1.5 text-base text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6"
+                       class="<%= field_style %> block min-h-11 w-full py-1.5 text-base text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6"
                 placeholder="Why it is in the program, and what to watch for."><%= @exercise&.note %></textarea>
     </div>
     <%# The one thing about a movement the app cannot work out from its name once the

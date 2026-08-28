@@ -19,7 +19,8 @@
               saved credential back here, that is the first thing to try again. It has to
               match the token on the sign-up form either way, which is asserted rather than
               left to whoever edits one of the two files. %>
-          <input id="email" name="login" type="email" autocomplete="email" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+          <input id="email" name="login" type="email" autocomplete="email" required
+                        class="<%= field_style %> block w-full px-3 py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
         </div>
       </div>
 
@@ -34,7 +35,8 @@
             provider is wired up, and not before. %>
         <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
         <div class="mt-2">
-          <input id="password" name="password" type="password" autocomplete="current-password" required class="block w-full rounded-md border-0 px-3 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+          <input id="password" name="password" type="password" autocomplete="current-password" required
+                        class="<%= field_style %> block w-full px-3 py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
         </div>
       </div>
 
