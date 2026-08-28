@@ -9,40 +9,130 @@
   </svg>
   <div class="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8 lg:py-40">
     <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl lg:flex-shrink-0 lg:pt-8">
-      <div class="hidden mt-24 sm:mt-32 lg:mt-16">
-        <a href="#" class="inline-flex space-x-6">
-          <span class="rounded-full bg-lime-600/10 px-3 py-1 text-sm font-semibold leading-6 text-lime-600 ring-1 ring-inset ring-lime-600/10">What's new</span>
-          <span class="inline-flex items-center space-x-2 text-sm font-medium leading-6 text-gray-600">
-            <span>Just shipped v1.0</span>
-            <svg class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-            </svg>
-          </span>
-        </a>
-      </div>
-      <h1 class="serif mt-10 text-7xl font-bold text-sky-800 sm:text-8xl md:text-9xl">Lift heavier</h1>
+      <%# The connector leads, which is #255 answered with option 1: this page used to
+          open "Lift heavier" and describe a workout logger, which is what Hevy, Strong
+          and Boostcamp all say, most of them with more polish and all of them with more
+          reviews. On that ground this app is one of many. The connector is the one thing
+          none of them has, and it was the third sentence, in the same size and weight as
+          the two above it, written as a feature ("connect X to do Y") rather than as
+          something a person would want, and using two words -- "MCP" and "your LLM" --
+          that ask the reader to already be in this industry.
+
+          Naming Claude in the headline rather than "your AI" because a reader either
+          talks to one of these or does not, and the ones who do think of it by name.
+          ChatGPT is named a line later so the headline does not read as a Claude-only
+          product, which it is not.
+
+          The audience this narrows to is smaller than "people who lift" and that is
+          deliberate rather than accidental. Hedging cost both: the broad claim loses on
+          its own terms against apps with a decade of reviews, and the narrow one was
+          buried under it.
+
+          Five words rather than two, so the size steps down a notch at every breakpoint
+          from what "Lift heavier" could carry. %>
+      <h1 class="serif mt-10 text-5xl font-bold text-sky-800 sm:text-6xl md:text-7xl">Ask Claude what to lift</h1>
       <%# The serif carries on past the headline, which is #200. This is the one page whose
           job is tone rather than use -- nobody loads a bar off it -- so the face belongs to
           the whole of its voice rather than to its first line, which is where it stopped
           and looked like an accident. The buttons below are controls and stay in the
           system face; the rule is the page, not everything on it. %>
-      <p class="serif mt-6 text-lg leading-8 text-gray-600">The training tool built for lifting heavy. Track your plates and chart your heaviest lifts, day by day.</p>
-      <p class="serif mt-4 text-lg leading-8 text-gray-600">Connect your LLM over MCP to plan and edit your workouts.</p>
+      <p class="serif mt-6 text-lg leading-8 text-gray-600">Connect tectonic plates to Claude or ChatGPT and it writes your next block, changes it when the week does, and reads back what you actually lifted.</p>
+      <p class="serif mt-4 text-lg leading-8 text-gray-600">Underneath it is a lifting log: your bar, your plates, and your heaviest lifts charted day by day.</p>
       <div class="mt-10 flex items-center gap-x-6">
         <%# Log in rests a step darker than the primary button everywhere else, so its hover is
             lime-700 rather than the usual lime-600. It hovered to lime-500 before, which made it
             the one button in the app that got lighter when you pointed at it. %>
         <a href="/login" class="<%= button_style %> bg-lime-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-lime-700">Log in</a>
         <a href="/create-account" class="<%= button_style %> bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">Sign up</a>
-        <a href="/about" class="text-sm font-semibold leading-6 text-sky-800">Learn more <span aria-hidden="true">→</span></a>
+        <%# This said "Learn more" and went to /about, which is a colophon: a name, a
+            twitter handle and the Noun Project icon credits. The reader most likely to
+            sign up is the one who clicks it, and they were sent to attribution for the
+            squat icon. It now goes to the thing they were asking for, which is on this
+            page. /about keeps its link at the foot, because the icon licence turns on
+            that credit being reachable. %>
+        <a href="#how-it-works" class="text-sm font-semibold leading-6 text-sky-800">See how it works <span aria-hidden="true">&rarr;</span></a>
       </div>
     </div>
-    <div class="mx-auto mt-16 invisible lg:visible flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
+    <%# Shown at every width, which is #253. It was `invisible lg:visible` on the container
+        and `w-[0rem] lg:w-[16rem]` on the image -- two mechanisms saying the same thing,
+        neither removed, and `invisible` reserves the layout box that `hidden` does not, so
+        the page also carried an empty column on a phone. Below 1024px the marketing page
+        for a gym app showed no picture of the app, on the device the app is used on and
+        the device a link between two lifters is most likely opened on.
+
+        The reason to hide it was that the shot was unreadable small. It is not: the file
+        is a 500px-wide portrait screenshot of the session screen, which is the most
+        legible surface this app has -- a weight, a rep count, the plates that make it and
+        a Done button. It reads at 320px in a way the workout table never would.
+
+        The width and height attributes said 2432x1442 while the file was 591x1280. That
+        is not cosmetic: the browser reserves a box of that shape before the image arrives,
+        so the page laid out landscape and then jumped when a portrait image landed in it.
+        They are the file's own numbers now, and welcome_spec reads the file to keep them
+        that way. %>
+    <div class="mx-auto mt-16 flex max-w-2xl justify-center sm:mt-20 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
       <div class="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
         <div class="-m-2 rounded-xl bg-gray-900/5 p-2 ring-1 ring-inset ring-gray-900/10 lg:-m-4 lg:rounded-2xl lg:p-4">
-          <img src="/img/screenshot.jpeg" alt="App screenshot" width="2432" height="1442" class="w-[0rem] lg:w-[16rem] xl:w-[22rem] rounded-md shadow-2xl ring-1 ring-gray-900/10">
+          <img src="/img/screenshot.jpeg" alt="A session in progress: Back Squat at 225 for 5, the plates that make it, and a Done button." width="500" height="992" class="w-56 sm:w-64 lg:w-[16rem] xl:w-[22rem] rounded-md shadow-2xl ring-1 ring-gray-900/10">
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<%# The section the headline promises, and the one #255 asked for: "a real exchange -- ask
+    for next week, get a programme". It is here rather than on /about because the reader
+    who wants it is the reader deciding whether to sign up, and sending them to another
+    page to find out what the product does loses most of them.
+
+    Every step below is a thing the connector actually does today, which is the whole
+    point of showing it: create_program writes a block in one call, generate_program_week
+    turns a week of it into sessions on the calendar, update_program_lift changes a lift
+    and rewrites the sessions already generated from it, and exercise_history is where the
+    numbers come from. Nothing here is a mockup of something planned. %>
+<section id="how-it-works" class="mx-auto max-w-2xl px-6 pb-24 lg:px-8">
+  <h2 class="serif text-3xl font-semibold text-sky-800">Ask for next week. Get next week.</h2>
+  <p class="serif mt-4 text-lg leading-8 text-gray-600">A real exchange, and every step in it is something the connector does today.</p>
+
+  <div class="mt-8 space-y-4">
+    <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-gray-900/10">
+      <%# Small caps in gray-500 is this app's label register: the session screen wears it
+          on Warmup, RPE and Plate math, so a label always reads as a label and never as a
+          value. The same rule here means the speaker never reads as part of the sentence. %>
+      <p class="text-xs uppercase tracking-wide text-gray-500">You</p>
+      <p class="mt-2 text-gray-900">I&rsquo;m coming back after six weeks off. Write me a four-week squat block, three days a week.</p>
+    </div>
+
+    <div class="rounded-2xl bg-sky-800 p-5 text-white">
+      <p class="text-xs uppercase tracking-wide text-sky-200">Claude</p>
+      <p class="mt-2">Four weeks from Monday. Monday opens at 150 and steps to 165 &mdash; every weight loadable on the plates you own.</p>
+      <p class="mt-3 text-xs uppercase tracking-wide text-sky-200">read your history &middot; wrote the block &middot; generated week one</p>
+    </div>
+
+    <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-inset ring-gray-900/10">
+      <p class="text-xs uppercase tracking-wide text-gray-500">You</p>
+      <p class="mt-2 text-gray-900">Make Wednesday&rsquo;s squats flat sets rather than ascending.</p>
+    </div>
+
+    <div class="rounded-2xl bg-sky-800 p-5 text-white">
+      <p class="text-xs uppercase tracking-wide text-sky-200">Claude</p>
+      <p class="mt-2">Done &mdash; Wednesday is four sets of five at 155, and the sessions already on your calendar have been rewritten to match.</p>
+      <p class="mt-3 text-xs uppercase tracking-wide text-sky-200">edited the lift &middot; rewrote three sessions</p>
+    </div>
+  </div>
+
+  <%# "MCP" appeared on this page with nothing explaining it, which asks the reader to
+      already know an acronym that is about two years old outside this industry. It is
+      still named, because somebody who does know it is looking for exactly that word --
+      but it is named after the thing it does rather than before it. %>
+  <p class="serif mt-8 text-lg leading-8 text-gray-600">It works over MCP, the connector standard Claude and ChatGPT both speak. You authorise it once, and you can take the authorisation back whenever you like.</p>
+
+  <%# "Create an account" rather than a second "Sign up". The words are the same offer, but
+      four specs reach the sign-up form by asking Capybara for the button called Sign up on
+      this page, and two of them is ambiguous -- a marketing choice should not make the
+      suite less specific about what it is clicking. %>
+  <div class="mt-10 flex items-center gap-x-6">
+    <a href="/create-account" class="<%= button_style %> bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">Create an account</a>
+    <a href="/about" class="text-sm font-semibold leading-6 text-sky-800">About this app <span aria-hidden="true">&rarr;</span></a>
+  </div>
+</section>

@@ -203,7 +203,11 @@ describe 'the surfaces that do want the display face' do
     headline = tags_matching(/<h1[^>]*>/).first
 
     assert_equal ['serif'], face_of(headline)
-    assert_includes classes_of(headline), 'md:text-9xl'
+    # A display size rather than one particular display size. #255 rewrote this headline
+    # from two words to five and stepped every breakpoint down a notch to fit them, which
+    # failed here on a number this spec has no opinion about: what it is for is the face,
+    # and the size is only here to say the headline is still a display surface.
+    assert_match(/\bmd:text-[789]xl\b/, classes_of(headline).join(' '))
   end
 end
 

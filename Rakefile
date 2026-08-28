@@ -201,6 +201,113 @@ def missing_week_message(program, number)
     "Name a week: rake 'program:generate[1]'."
 end
 
+# The picture on the front page, taken from the app rather than from a phone.
+#
+# The one this replaced was three years old and it showed: a workout record that has since
+# become the session screen, a bare "Squat" from before the exercise library existed, a
+# date in July 2023, an iOS status bar and tab count, and -- on the page selling the app --
+# a URL bar reading tectonic.onrender.com, which is the retired domain #251 is about.
+#
+# None of that was anyone's fault. Retaking it was a manual job nobody had written down,
+# so it was never retaken. This is that job written down. It is not run by CI and does not
+# need to be: nothing breaks when it rots, which is exactly how the last one rotted, so
+# welcome_spec asserts the committed file against the markup that sizes it instead.
+SCREENSHOT_DATABASE = 'tectonic_screenshot'
+SCREENSHOT_PATH = 'assets/img/screenshot.jpeg'
+# Firefox will not open a viewport narrower than 500 CSS px, and does not need to:
+# Tailwind's `sm` breakpoint is 640, so at 500 every phone rule is in force and no `sm:`
+# override is. The height is the window's rather than the page's -- Firefox keeps about
+# 85px of it for its own chrome -- so the shot comes back shorter than asked and is
+# cropped to a fixed size afterwards, which is what stops the committed file changing
+# shape with a browser release.
+SCREENSHOT_WINDOW = [500, 1100].freeze
+SCREENSHOT_CROP = '500x992+0+0'
+# Selenium writes a PNG whatever the filename says, so it gets a PNG name and the crop
+# below is also the conversion. Shooting straight at the .jpeg produced a PNG called
+# screenshot.jpeg, which every tool downstream read correctly and every human would not.
+SCREENSHOT_RAW = 'tmp-screenshot.png'
+
+namespace :assets do
+  desc 'Retake the front page screenshot from the app itself, on a scratch database'
+  task :screenshot do
+    retake_screenshot
+  end
+end
+
+# Builds a throwaway database, drives a headless Firefox through sign-up and into a
+# seeded session, and crops what comes back.
+def retake_screenshot
+  abort 'Needs ImageMagick to crop: brew install imagemagick' unless system('command -v magick > /dev/null')
+
+  reset_database(SCREENSHOT_DATABASE)
+  sh({ 'DATABASE_URL' => "postgres:///#{SCREENSHOT_DATABASE}" }, 'bundle', 'exec', 'rake', 'library:exercises')
+  # Assigned rather than defaulted, because the Rakefile resolved a URL from .env as it
+  # loaded and app.rb below is what finally opens the connection. A task that has already
+  # opened one -- `rake db:migrate assets:screenshot` -- would screenshot that database
+  # instead, which is worth refusing rather than discovering in the committed file.
+  abort 'Run this on its own: something in this process is already connected.' if defined?(DB)
+  ENV['DATABASE_URL'] = "postgres:///#{SCREENSHOT_DATABASE}"
+  shoot_session
+  sh "magick #{SCREENSHOT_RAW} -crop #{SCREENSHOT_CROP} +repage -quality 82 -strip #{SCREENSHOT_PATH}"
+  File.delete(SCREENSHOT_RAW)
+  puts "Retook #{SCREENSHOT_PATH}"
+end
+
+# Signs up through the form rather than inserting an account, because the session screen
+# is reached with a cookie and the sign-up is the shortest way to hold one.
+def shoot_session
+  require_relative 'app'
+  require 'capybara/dsl'
+  require 'securerandom'
+  browse_headless
+  session = Capybara::Session.new(:screenshot, Tectonic)
+  session.current_window.resize_to(*SCREENSHOT_WINDOW)
+  account_id = sign_up_in(session)
+  session.visit "/workouts/#{seed_shown_session(account_id)}/session"
+  session.assert_text 'Back Squat'
+  session.save_screenshot(SCREENSHOT_RAW)
+end
+
+def browse_headless
+  require 'selenium/webdriver'
+  Capybara.server = :puma
+  Capybara.register_driver :screenshot do |app|
+    options = Selenium::WebDriver::Firefox::Options.new
+    options.add_argument('-headless')
+    Capybara::Selenium::Driver.new(app, browser: :firefox, options:)
+  end
+end
+
+def sign_up_in(session)
+  email = "screenshot-#{SecureRandom.hex(4)}@example.com"
+  session.visit '/create-account'
+  session.fill_in 'email', with: email
+  session.fill_in 'password', with: SecureRandom.hex(8)
+  session.click_on 'Sign up'
+  DB[:accounts].where(email:).get(:id) or abort 'Sign-up did not take.'
+end
+
+# A squat day part way through: a ramp finished, one working set done and rated, two to
+# go, and a second lift behind it so the swipe strip has an edge showing. Everything the
+# session screen is for is in that -- a load, a rep count, the plates that make it, a
+# Done button, and the RPE scale on the sets that take one.
+def seed_shown_session(account_id)
+  workout_id = DB[:workouts].insert(account_id:, date: Time.now)
+  squat = { workout_id:, exercise_id: library_exercise('Back Squat'), is_barbell: true }
+  [[45, 5, true], [135, 5, true], [185, 3, true], [225, 5, false]].each do |load, reps, warmup|
+    DB[:sets].insert(**squat, weight: load, reps:, is_warmup: warmup, is_completed: true, rpe: (8 unless warmup))
+  end
+  2.times { DB[:sets].insert(**squat, weight: 225, reps: 5, is_warmup: false, is_completed: false) }
+  bench = { workout_id:, exercise_id: library_exercise('Bench Press'), is_barbell: true }
+  DB[:sets].insert(**bench, weight: 95, reps: 5, is_warmup: true, is_completed: false)
+  DB[:sets].insert(**bench, weight: 155, reps: 5, is_warmup: false, is_completed: false)
+  workout_id
+end
+
+def library_exercise(name)
+  DB[:exercises].where(name:, account_id: nil).get(:id) or abort "The library has no #{name}."
+end
+
 namespace :library do
   desc 'Load the built-in barbell exercise library (idempotent on name)'
   task :exercises do
