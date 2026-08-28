@@ -1,3 +1,10 @@
+<%# This screen drives htmx, so the layout loads it. Set here rather than in the routes
+    because here is where the hx- attributes are: a partial that stops using htmx, or one
+    that starts, changes its own answer in the same edit. A route flag would be a second
+    place to remember, and the failure it produces is silent -- buttons that quietly stop
+    swapping and fall back to full page posts. The same shape as @charts, which every view
+    that plots something sets for the same reason. %>
+<%- @htmx = true %>
 <%# One table of workouts, rendered once for the sessions still ahead and once for
     training already done, so the two lists cannot drift apart in how a row reads. %>
 <div class="mt-4 flow-root">
