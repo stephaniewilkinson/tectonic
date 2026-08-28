@@ -66,7 +66,25 @@
     scroll container whose contents are all focusable needs no tabindex of its own. %>
 <div id="lift-panels" class="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain sm:block sm:overflow-x-visible">
 <%- session_lifts.each_with_index do |lift, position| %>
-  <section class="mt-6 w-full shrink-0 snap-center px-1 sm:px-0" aria-labelledby="lift-<%= position + 1 %>">
+  <%# 88% rather than the full width, so an edge of the next lift is always showing. That
+      is #206, and it is the answer both bits of research give.
+
+      Nielsen Norman on mobile carousels: "The illusion of continuity, created by half
+      images or text that look like they are continued beyond the vertical edge of the
+      screen, is a strong carousel cue", and against what this screen was relying on --
+      "Dots are generally weak signifiers: because they are small, people often don't
+      notice them." Smashing Magazine puts the same thing as a rule: "Always indicate a
+      slice of the upcoming slide", and "Never use progress dots as the only way for users
+      to navigate the carousel."
+
+      The dots and the "3 of 5" stay. They say how many there are and where you sit, which
+      a cut edge cannot; what they were failing at was being the only thing saying a swipe
+      exists at all. Same for the progress bar #212 taught to move -- these are three cues
+      doing different jobs, and only this one is visible before you touch anything.
+
+      Restored to the full width from 640px up along with everything else: the lifts are a
+      stack there, and 88% of a column would just be a narrow column. %>
+  <section class="mt-6 w-[88%] shrink-0 snap-center px-1 sm:w-full sm:px-0" aria-labelledby="lift-<%= position + 1 %>">
     <h2 id="lift-<%= position + 1 %>" class="text-xl text-gray-900">
       <%= @exercises[lift.first[:exercise_id]]&.name %>
     </h2>
