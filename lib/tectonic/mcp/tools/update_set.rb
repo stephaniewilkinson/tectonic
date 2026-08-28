@@ -35,6 +35,11 @@ class Tectonic < Roda
         def self.attributes(context, set, arguments)
           fields = arguments.slice(:weight, :reps, :rpe, :is_warmup)
           check(fields)
+          # The shape the set will be left in, not the one it is in: this is the one tool
+          # that can set is_warmup and rpe in a single call, so asking the row as it stands
+          # would let a rating through onto a set about to become a warmup.
+          Bounds.rating_fits!(fields.fetch(:rpe, set.rpe),
+                              warmup: fields.fetch(:is_warmup, set.is_warmup), timed: set.timed?)
           return fields unless arguments[:exercise]
 
           exercise = Resolver.exercise(context, name: arguments[:exercise])

@@ -30,6 +30,24 @@ class Tectonic < Roda
       measure == Measured::TIME
     end
 
+    # Whether an RPE means anything for this set. #211.
+    #
+    # RPE is reps in reserve -- an 8 is "two more were there" -- so it needs reps for any
+    # to be in reserve of. A 60 second plank has none, and the scale in _rpe_help.erb is
+    # written entirely in rep counts ("4+", "3", "2", "1", "0"), so on a timed set it was
+    # explaining a measure that could not be applied to it.
+    #
+    # A warmup is submaximal by definition, so its rating is a number nobody reads back.
+    # The session screen already declined to ask for one; this is that rule said once,
+    # where the write paths can see it, rather than implied by which list a row is in.
+    #
+    # Deliberately not is_barbell. That flag decides plate math and a warmup ramp, and a
+    # dumbbell press has reps in reserve in exactly the sense a bench press does -- the
+    # question is whether the set is counted in reps, not what it is loaded with.
+    def ratable?
+      !is_warmup && !timed?
+    end
+
     # The work of one set, doubled where the count was per side. A Bulgarian split squat
     # written 3x8 per side is 48 reps of work, not 24, and counting it as 24 is what made
     # unilateral volume read as half of what was done.

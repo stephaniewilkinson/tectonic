@@ -262,7 +262,15 @@
           <%# Rated per set, not just per session: five lifts in a session are five
               different questions, and the answer decays within seconds of racking the
               bar. Submitting a rating completes the set, because rating one is saying
-              you lifted it. %>
+              you lifted it.
+
+              Only where a rating means something, which is #211. RPE is reps in reserve,
+              so a set counted in seconds has none to be in reserve of and is not asked --
+              a plank used to get the same five buttons as a squat, under a scale written
+              entirely in rep counts. ratable? is the rule, and it is on the model rather
+              than here because the MCP tools and the database constraint enforce the same
+              one. Warmups never reach this list at all. %>
+          <%- if set.ratable? %>
           <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 hx-target="#session-body" hx-swap="innerHTML" class="mt-2 flex items-center gap-2">
@@ -277,6 +285,7 @@
               </button>
             <%- end %>
           </form>
+          <%- end %>
 
           <details class="group mt-2">
             <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><svg class="mr-1.5 h-4 w-4 shrink-0 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>Lifted something else</summary>
@@ -332,8 +341,12 @@
 
     <%# The scale belongs under the buttons that ask for it, and only under those. A panel
         of nothing but warmups asks for no rating -- the ramp rows carry no RPE row -- so
-        it would be a table answering a question that panel never puts. %>
-    <%- unless lift.all? { |set| set[:is_warmup] } %>
+        it would be a table answering a question that panel never puts.
+
+        Asked of the same predicate the buttons use rather than of is_warmup, so the two
+        cannot drift: a lift of nothing but timed sets now also asks nothing, and until
+        #211 it drew the full scale under five buttons it had no business offering. %>
+    <%- if lift.any?(&:ratable?) %>
       <%== render('workouts/_rpe_help') %>
     <%- end %>
   </section>
