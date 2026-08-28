@@ -48,6 +48,19 @@ class Tectonic < Roda
   CONSENT_SECURITY_POLICY = "default-src 'none'; " \
                             "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; " \
                             "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+  # The one origin this app calls itself by, and the fix for two places disagreeing about
+  # it. Every share card told the platform to fetch its image from tectonic.onrender.com,
+  # the Render subdomain the app lived at before tectonicplates.app, while the canonical
+  # URL beside it named the new domain. A card is fetched once and cached for a long time,
+  # so that broke in the way that is hardest to notice: the person sharing sees the card
+  # the platform cached months ago and the recipient sees a blank one, and nobody ever
+  # sees both halves.
+  #
+  # render.yaml still allows the old host, so every page really is reachable at two
+  # domains. That is the duplicate-content split rel=canonical is for, and this is the
+  # value it names. Read from the environment so a preview deploy can say what it is,
+  # defaulted so a checkout and the suite have an answer without configuring anything.
+  CANONICAL_ORIGIN = ENV.fetch('CANONICAL_ORIGIN', 'https://tectonicplates.app')
 
   include Chartkick::Helper
 
@@ -77,8 +90,15 @@ class Tectonic < Roda
   # screen most of all: it is the one page where a click grants an API client access to
   # the account, so it is the one worth framing over a decoy. base-uri and object-src
   # close the two injection sinks that cost nothing to shut. Script and style sources are
-  # deliberately left open because the site loads a JIT stylesheet CDN and renders inline
-  # chart scripts, so naming them would be a policy this app does not yet satisfy.
+  # deliberately left open because the site renders chart scripts inline, so naming them
+  # would be a policy this app does not yet satisfy.
+  #
+  # This said "loads a JIT stylesheet CDN" until #252, which was two versions stale --
+  # #142 compiled the stylesheet and served it from this origin. Worth correcting rather
+  # than leaving, because a comment about the CSP is exactly what somebody reads when
+  # working out whether the CSP can be tightened, and this one named a reason that had
+  # stopped being true. The remaining one is real: inline scripts need 'unsafe-inline'
+  # or a nonce, and the third-party origin list is now one entry long (Fathom).
   plugin :default_headers,
          'Strict-Transport-Security' => 'max-age=31536000; includeSubDomains',
          'X-Content-Type-Options' => 'nosniff',
@@ -217,10 +237,10 @@ class Tectonic < Roda
     # name its grant for the resource server to check; this puts that name in the claims.
     auth_class_eval { prepend OAuth::GrantBoundTokens }
     # The consent screen renders through a layout of its own. The site layout carries an
-    # analytics pixel, two charting libraries, a date bundle, and htmx -- five third-party
-    # scripts, none of them subresource-pinned -- and any one of them could rewrite the
-    # form that grants an API client the account. None of them has anything to do with
-    # this page, so it loads none of them, and the policy above says so.
+    # analytics script, and conditionally two charting libraries and htmx, none of them
+    # subresource-pinned -- and any one of them could rewrite the form that grants an API
+    # client the account. None of them has anything to do with this page, so it loads none
+    # of them, and the policy above says so.
     authorize_view do
       scope.response['Content-Security-Policy'] = CONSENT_SECURITY_POLICY
       scope.view('authorize', layout: 'oauth_layout')
@@ -744,6 +764,20 @@ class Tectonic < Roda
     return '/workouts/new' unless mine.empty?
 
     '/start'
+  end
+
+  # This page's address on the canonical origin, which is what rel=canonical wants and
+  # what the share cards should have been naming all along.
+  #
+  # The path and not the query string. The four pages reachable without a login --
+  # /welcome, /about, /login, /create-account -- take no parameters, and every page that
+  # does take them is behind one, so a query string here could only ever be something a
+  # crawler appended. A trailing slash is dropped for the same reason the domain is
+  # settled: slash_path_empty means /welcome and /welcome/ are the same page, and a
+  # canonical that says otherwise is the split it exists to close.
+  def canonical_url
+    path = request.path.chomp('/')
+    "#{CANONICAL_ORIGIN}#{path.empty? ? '/' : path}"
   end
 
   # Which day this account's week begins on, as a Date#wday number. #189.

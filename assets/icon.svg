@@ -1,0 +1,22 @@
+<!-- The tab-sized mark: the two plates from views/_logo.erb and none of the wordmark,
+     which is eleven characters and cannot be read at sixteen pixels.
+
+     Squared and enlarged rather than cropped out of the logo. The logo's viewBox is
+     310x72 because most of it is type; lifting the plates into a 64x64 box and growing
+     them to fill it is what makes the mark survive being drawn at the size of a full
+     stop. The plates are thicker here than they are there (ry 11 against ry 10, in a box
+     a fifth the width) because an ellipse that reads as a plate seen edge-on at 224px
+     reads as a hairline at 16px, and a hairline is what a favicon cannot afford.
+
+     Everything else is the logo's: the same two fills, the same evenodd holes so the
+     mark works on any tab colour a browser decides on, and the same idea, which is the
+     bottom plate lying where it was put and the top one tilted off it. The tilt is a
+     degree steeper (-10 against -8) for the same reason the plates are thicker. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img"
+     aria-labelledby="tectonic-icon-title">
+  <title id="tectonic-icon-title">tectonic plates</title>
+  <path fill-rule="evenodd" fill="#075985"
+        d="M5 45a27 11 0 1 0 54 0a27 11 0 1 0 -54 0ZM25 45a7 2.9 0 1 0 14 0a7 2.9 0 1 0 -14 0Z" />
+  <path fill-rule="evenodd" fill="#84cc16" transform="rotate(-10 32 24)"
+        d="M6 24a26 11 0 1 0 52 0a26 11 0 1 0 -52 0ZM25 24a6.8 2.9 0 1 0 13.6 0a6.8 2.9 0 1 0 -13.6 0Z" />
+</svg>
