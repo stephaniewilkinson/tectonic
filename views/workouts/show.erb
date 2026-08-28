@@ -1,5 +1,10 @@
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-  <h1 class="text-3xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h1>
+  <%# The one heading in the app that titles a thing that happened rather than labelling a
+      screen you are about to act on, which is what makes it a display surface under #200's
+      rule. It is still a page title and still obeys #128's shape -- an h1 at text-3xl,
+      semibold, in the title colour -- so this is both, and `serif` outranks the heading
+      rule on specificity to decide which face wins. %>
+  <h1 class="serif text-3xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h1>
   <div class="flex flex-col gap-2">
     <%# Both of these used to hover to gray-500, which on a control means disabled. It kept
         surviving review because white on gray-500 is 4.83:1 and white on lime-500 is 1.98:1,

@@ -39,22 +39,34 @@
       Warmups and sets still waiting to be marked done are not counted.
     </p>
   <%- else %>
+    <%# The four figures take the display face, which is #200. They are the only numbers in
+        the app that are a result rather than an instruction -- you read them to feel
+        something about a season, not to load a bar -- and that is the line the rule in
+        app.css draws.
+
+        Worth knowing that #128 took this face off these very numbers, and not by accident:
+        they had it because they happen to be text-2xl, and its note says the display face
+        asked for digits at 24px was the least legible thing on the page whose whole job
+        those four numbers are. Putting it back is a deliberate choice where that was an
+        accidental one, but the legibility observation stands, so this is the surface to
+        look at first if the face turns out to be wrong anywhere. The labels stay in the
+        system face: a label is read at a glance and is not the thing on display. %>
     <dl class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
       <div class="rounded-lg bg-gray-50 px-4 py-3">
         <dt class="text-sm text-gray-500">Tonnage</dt>
-        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:tonnage].to_i %></dd>
+        <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:tonnage].to_i %></dd>
       </div>
       <div class="rounded-lg bg-gray-50 px-4 py-3">
         <dt class="text-sm text-gray-500">Working sets</dt>
-        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:sets] %></dd>
+        <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:sets] %></dd>
       </div>
       <div class="rounded-lg bg-gray-50 px-4 py-3">
         <dt class="text-sm text-gray-500">Reps</dt>
-        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:reps].to_i %></dd>
+        <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:reps].to_i %></dd>
       </div>
       <div class="rounded-lg bg-gray-50 px-4 py-3">
         <dt class="text-sm text-gray-500">Weeks trained</dt>
-        <dd class="text-2xl font-semibold text-gray-900"><%= @summary[:weeks] %> / <%= @rows.length %></dd>
+        <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:weeks] %> / <%= @rows.length %></dd>
       </div>
     </dl>
 

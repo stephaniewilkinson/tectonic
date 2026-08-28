@@ -1,4 +1,15 @@
 <div class="mx-auto max-w-2xl space-y-4 text-sm text-gray-700">
+  <%# This page had no heading at all, which #128's rule could not fix on its own -- there
+      was nothing for it to apply to, and a page with no title is a skipped level for
+      anybody moving through by heading. It gets one here, and the one it gets is a display
+      surface: /about is read rather than used, like the marketing page, so it takes the
+      serif under #200's rule.
+
+      It obeys the page-title rule at the same time -- an h1 at text-3xl, semibold, in the
+      title colour -- which is the point of `serif` being a class rather than a size: a
+      thing can be a page title and a display surface at once, and the class decides only
+      which face wins. %>
+  <h1 class="serif text-3xl font-semibold text-gray-900">About</h1>
   <p>Hi! I made an app. If you have questions, find me on twitter <a href="https://twitter.com/stephanieblack" class="font-medium text-lime-700 hover:text-lime-800">@stephanieblack</a>. I'm happy to help.</p>
   <div>
     <p class="font-medium text-gray-900">Acknowledgements</p>
