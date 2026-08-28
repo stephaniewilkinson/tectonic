@@ -31,57 +31,29 @@
   </div>
 </div>
 
-<%# The lifts are a horizontal scroller now, and htmx replaces the whole of #session-body
-    after every tap. An innerHTML swap destroys the scroller along with everything else in
-    there, so its scrollLeft goes with it: without this, finishing a set on lift three
-    drops the lifter back on lift one, every set, all session. That is the one thing that
-    would have made the panels unusable.
+<%# One thing left in here, and it is not the one that used to be.
+    A tap used to replace the whole of #session-body, which destroyed the scroller along
+    with everything in it and took its scrollLeft with it -- so finishing a set on lift
+    three dropped the lifter back on lift one, every set, all session. This script existed
+    to save that number across the swap and put it back, and its note explained at length
+    why hx-preserve was the wrong answer.
 
-    hx-preserve is the obvious answer and it is the wrong one: it keeps the old element,
-    which means it keeps the old element's children, so the set that was just completed
-    would never redraw. Re-rendering the panels is the entire point of the swap. What has
-    to survive is one number, and only that.
+    #235 made the swap a single lift panel instead. The scroller is no longer replaced, so
+    its scroll position is never lost, and the whole save-and-restore went with the problem
+    rather than being carried alongside it.
 
-    It is a listener on document.body rather than on the scroller because htmx events
-    bubble, so this binds once when the page loads and keeps working across every swap.
-    Binding to the scroller itself -- or writing the gesture in JS at all -- would mean
-    re-binding after each swap to an element that no longer exists, which is the class of
-    bug that only shows up mid-session with a bar in your hands.
+    What remains is marking which lift you are on in the progress bar, which is #212 and is
+    a different job: the bar is re-rendered out of band on every tap, so the marks come back
+    unset and have to be recomputed. Bound to document.body because htmx events bubble, so
+    it binds once and survives every swap; and to document in the capture phase for scroll,
+    because scroll events do not bubble at all.
 
-    The offset is put back raw rather than recomputed from a lift index. Every panel is
-    exactly the scroller's own width, so the offset before the swap already names a snap
-    point, and the browser re-snaps to it anyway if a swipe was in flight.
-
-    None of this runs without JavaScript and none of it needs to. The stylesheet is a
-    stylesheet since #188 -- it was the Tailwind play CDN, a script, when this was written,
-    so the claim used to be that JS off meant no flex row and no snapping at all. It is
-    compiled now, so with JS off the panels are still a real horizontal snap scroller; what
-    is lost is the offset restore below, and the forms post normally and the route
-    redirects, which is the page this screen has always degraded to. %>
-<%# The second thing in here is #212: the progress bar did not move when you swiped. It
-    could not -- it is rendered from what is completed, and swiping completes nothing -- so
-    a bar sitting still above a screen that had just changed read as a bar that had stopped
-    working. markCurrentLift marks the segment belonging to the lift you are looking at, so
-    the one bar says both how much of the session is done and where in it you are.
-
-    Which panel that is comes from the scroll offset over the panel width, both measured off
-    the DOM rather than from a stored index, so it stays right when the width changes under
-    it -- a rotation, or the 640px breakpoint where the panels become a stack.
-
-    The panel's width and not the scroller's, which are no longer the same number. #206 made
-    a panel 88% of the scroller so an edge of the next lift always shows, and dividing by the
-    scroller's width then drifts by 12% a lift: right for the first four and wrong from the
-    fifth on, which is a session nobody had in a spec. It is
-    called on scroll, after every swap, and once on load, which is every way the answer can
-    change.
-
-    The scroll listener is on document in the capture phase because scroll events do not
-    bubble: a listener on the scroller itself would have to be re-bound after every htmx
-    swap destroys it, which is the same trap the offset restore above avoids. %>
+    Which panel is centred is a scroll position, and CSS cannot see one, so this is set from
+    JS. It degrades to the bar exactly as it was: without the script every segment is
+    unmarked, which is what it looked like before, and the per-panel dots and "3 of 5" are
+    rendered server-side and go on saying where you are regardless. %>
 <script>
   (function () {
-    var offset = 0;
-
     function markCurrentLift() {
       var panels = document.getElementById('lift-panels');
       var sections = panels ? panels.querySelectorAll('section') : [];
@@ -99,15 +71,7 @@
       if (event.target && event.target.id === 'lift-panels') { markCurrentLift(); }
     }, true);
 
-    document.body.addEventListener('htmx:beforeSwap', function () {
-      var panels = document.getElementById('lift-panels');
-      if (panels) { offset = panels.scrollLeft; }
-    });
-    document.body.addEventListener('htmx:afterSwap', function () {
-      var panels = document.getElementById('lift-panels');
-      if (panels) { panels.scrollLeft = offset; }
-      markCurrentLift();
-    });
+    document.body.addEventListener('htmx:afterSwap', markCurrentLift);
 
     markCurrentLift();
   })();

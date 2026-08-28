@@ -1,0 +1,57 @@
+<%# This screen drives htmx, so the layout loads it. Set here rather than in the routes
+    because here is where the hx- attributes are: a partial that stops using htmx, or one
+    that starts, changes its own answer in the same edit. A route flag would be a second
+    place to remember, and the failure it produces is silent -- buttons that quietly stop
+    swapping and fall back to full page posts. The same shape as @charts, which every view
+    that plots something sets for the same reason. %>
+<%- @htmx = true %>
+<%# The swappable core of the session view. Every form posts with htmx targeting
+    #session-body, so a tap re-renders progress, the set row, and the RPE state
+    together; without JS the same forms post normally and the route redirects. %>
+<%# One segment per lift, not per set. A set is the wrong unit for a bar: five movements
+    of six sets drew thirty dashes twelve pixels wide on a phone, which is a barcode, and
+    it disagreed with the panel directly beneath it saying "1 of 5" over five dots. The
+    bar now counts what the session is made of, which is what #176 asks for.
+
+    A segment fills with its own sets rather than flipping whole, so a lift four sets into
+    six is two thirds lime and reads as underway -- the distinction an all-or-nothing
+    segment throws away, and the one that matters most while you are in the middle of a
+    lift. The slices are the sets themselves, laid out with no gap inside a rounded,
+    clipped track, so they read as one bar filling rather than as six dashes. That keeps
+    every set the old bar showed and needs no width computed into a style attribute or an
+    arbitrary class -- either of which would have to survive htmx swapping this partial
+    out from under the CDN's JIT on every tap. %>
+<%# data-lift-segment marks each segment with the lift it belongs to, so the script at the
+    foot of session.erb can say which one you are looking at. The bar answers "how much of
+    this session is done"; on its own it could not answer "and where am I in it", which is
+    the question a swipe asks -- the bar sat perfectly still while the screen moved, which
+    is #212. Marking the current segment makes one bar answer both.
+
+    Which panel is centred is a scroll position, and CSS cannot see one, so this is set from
+    JS. It degrades to the bar exactly as it was: without the script every segment is
+    unmarked, which is what it looked like before, and the per-panel dots and "3 of 5" are
+    rendered server-side and go on saying where you are regardless. %>
+<%# Rendered on its own as well as inside the body, because completing a set changes the
+    bar and the count without changing anything else on the page. When it comes back on its
+    own it carries hx-swap-oob, which tells htmx to find the element with this id and
+    replace it wherever it is, rather than putting it where the response was aimed. That is
+    what lets a tap send back one lift panel and still have the bar agree with it (#235).
+
+    `oob` is a local with a default so the two callers read the same: the body renders it
+    plainly, the complete route renders it with oob: true. %>
+<div id="session-progress"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %> class="sticky top-0 bg-gray-100 py-2">
+  <div class="flex gap-0.5" aria-label="Session progress">
+    <%- session_lifts.each_with_index do |lift, position| %>
+      <div data-lift-segment="<%= position %>" class="flex h-2 flex-1 overflow-hidden rounded-sm bg-gray-300">
+        <%- lift.each do |set| %>
+          <div class="flex-1 <%= set[:is_completed] ? 'bg-lime-500' : '' %>"></div>
+        <%- end %>
+      </div>
+    <%- end %>
+  </div>
+  <%# Sets rather than lifts, and deliberately: the bar is now the answer to "how many
+      movements", so the line under it is where the exact set count still has to live. %>
+  <p class="mt-1 text-xs text-gray-500">
+    <%= @sets.count { |set| set[:is_completed] } %> of <%= @sets.length %> sets
+  </p>
+</div>
