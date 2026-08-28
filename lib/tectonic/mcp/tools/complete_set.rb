@@ -30,14 +30,15 @@ class Tectonic < Roda
 
         def self.perform(context:, arguments:)
           set = Resolver.find_set(context, arguments[:set_id])
-          changed = Changes.apply(set, attributes(arguments))
+          changed = Changes.apply(set, attributes(set, arguments))
           ok("#{set.exercise.name} #{set.weight}x#{set.reps}: #{Changes.describe(changed)}.",
              structured: Presenter.view_set(set.refresh).merge(changed:))
         end
 
-        def self.attributes(arguments)
+        def self.attributes(set, arguments)
           lifted = arguments.slice(:weight, :reps, :rpe)
           check(lifted)
+          Bounds.rating_fits!(lifted[:rpe], warmup: set.is_warmup, timed: set.timed?)
           lifted.merge(is_completed: arguments.fetch(:completed, true))
         end
 

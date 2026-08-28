@@ -36,6 +36,26 @@ class Tectonic < Roda
 
           raise Tool::Refusal, "#{name} #{value} is out of range; use #{range.first}-#{range.last}#{unit}."
         end
+
+        # Where a rating may sit at all, as against how large it may be. #211: RPE is reps
+        # in reserve, so it applies only to a working set counted in reps -- a warmup is
+        # submaximal by definition and a held position has no reps for any to be spare of.
+        #
+        # Refused here by name rather than left to sets_rpe_only_on_working_reps, which
+        # enforces the same rule. A constraint violation reaches a client as a database
+        # error and reads as the tool being broken; this says which set and why, which is
+        # something a model can act on.
+        #
+        # Takes the shape the set will have *after* the write rather than the shape it has
+        # now, because update_set can move a set onto is_warmup in the same call that
+        # carries a rating.
+        def rating_fits!(rpe, warmup:, timed:)
+          return if rpe.nil? || !(warmup || timed)
+
+          kind = warmup ? 'a warmup' : 'a set counted in seconds'
+          raise Tool::Refusal, "RPE is reps in reserve, so it does not apply to #{kind}. " \
+                               'Leave rpe out, or clear is_warmup first.'
+        end
       end
 
       # What a write actually changed, as field => from/to. An edit tool hands this back

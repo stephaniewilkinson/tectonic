@@ -43,6 +43,9 @@ class Tectonic < Roda
           Bounds.check(Bounds::WEIGHT, arguments[:weight], 'Weight', unit: ' lb')
           Bounds.check(Bounds::REPS, arguments[:reps], 'Reps')
           Bounds.check(Bounds::RPE, arguments[:rpe], 'RPE')
+          # This tool takes no measure, so every set it writes is counted in reps and only
+          # is_warmup can put a rating somewhere it does not belong.
+          Bounds.rating_fits!(arguments[:rpe], warmup: arguments.fetch(:is_warmup, false), timed: false)
         end
 
         # is_barbell comes off the movement rather than the arguments: whether a lift is
