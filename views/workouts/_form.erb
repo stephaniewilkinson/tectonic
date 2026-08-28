@@ -32,7 +32,7 @@
     <div class="mt-2">
       <input type="text" name="name" id="name" autocomplete="off" maxlength="120"
              value="<%= @workout&.name %>" placeholder="Morning lift"
-             class="block w-full max-w-sm rounded-lg border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-lime-500 sm:text-sm sm:leading-6">
+                    class="<%= field_style %> block w-full max-w-sm py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
     </div>
   </div>
   <input type="submit" value="Save" class="<%= button_style %> mt-4 block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-lime-600">

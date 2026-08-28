@@ -92,6 +92,18 @@ class Tectonic < Roda
       values.fetch(:set_count) { sets_dataset.count }
     end
 
+    # Whether the lifter said they were done, which is not a thing any amount of looking
+    # at the sets can answer: three of ten completed is "I stopped early" and "I am between
+    # sets" written identically. #218.
+    #
+    # Deliberately not a fourth value of `status`. That enum answers where a session stands
+    # in the plan -- written, missed, or trained -- and is what the calendar colours a cell
+    # by. A finished session and one still under way are both trained, and a diary cell has
+    # no reason to tell them apart, so folding this in would have made every reader of
+    # `status` grow a case for a distinction most of them do not care about. Two questions,
+    # two fields.
+    def finished? = !finished_at.nil?
+
     # Planned, performed or skipped, decided without inspecting the sets one at a time.
     # A session that has been lifted at all is performed; a generated one still on or
     # ahead of its date is planned, and one whose date has passed with nothing lifted
@@ -106,18 +118,6 @@ class Tectonic < Roda
     # -- the row a lifter opened the page to start. A generated session dated today was
     # never affected either way: program_day_id makes it a plan before any date is
     # compared.
-    # Whether the lifter said they were done, which is not a thing any amount of looking
-    # at the sets can answer: three of ten completed is "I stopped early" and "I am between
-    # sets" written identically. #218.
-    #
-    # Deliberately not a fourth value of `status`. That enum answers where a session stands
-    # in the plan -- written, missed, or trained -- and is what the calendar colours a cell
-    # by. A finished session and one still under way are both trained, and a diary cell has
-    # no reason to tell them apart, so folding this in would have made every reader of
-    # `status` grow a case for a distinction most of them do not care about. Two questions,
-    # two fields.
-    def finished? = !finished_at.nil?
-
     def status(today = Date.today)
       return :performed if performed?
       return :skipped if program_day_id && date.to_date < today

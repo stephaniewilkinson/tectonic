@@ -22,7 +22,7 @@
             the front page, and at the 16px this row runs at on a phone it would be harder
             to read, not more distinguished. What sets the wordmark apart is what already
             did -- darker text and a border that is not transparent. %>
-        <a href="/" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 px-1 text-base font-medium text-gray-900 sm:text-xl">tectonic plates</a>
+        <a href="/" class="<%= nav_link_style %> text-gray-900">tectonic plates</a>
           <%# The links below are gray-900 at 70%, not the gray-500 they arrived in. That
               grey came from a stock nav that sits on a white bar, where it is 4.83:1 and
               passes AA; this bar is lime-500 and the grey came along unchanged, so it read
@@ -36,16 +36,16 @@
               measured against this bar, so a nav that stops being lime-500 is a nav whose
               links have to be measured again. %>
           <%- if rodauth.logged_in? %>
-            <a href="/workouts" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">workouts</a>
-            <a href="/exercises" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">exercises</a>
-            <a href="/programs" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">programs</a>
-            <a href="/volume" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">volume</a>
-            <a href="/equipment" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">equipment</a>
-            <a href="/connections" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">assistants</a>
-            <a href="<%= rodauth.logout_path %>" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">exit</a>
+            <a href="/workouts" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">workouts</a>
+            <a href="/exercises" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">exercises</a>
+            <a href="/programs" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">programs</a>
+            <a href="/volume" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">volume</a>
+            <a href="/equipment" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">equipment</a>
+            <a href="/connections" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">assistants</a>
+            <a href="<%= rodauth.logout_path %>" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">exit</a>
           <%- else %>
-            <a href="<%= rodauth.login_path %>" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">log in</a>
-            <a href="<%= rodauth.create_account_path %>" class="brand inline-flex min-h-11 shrink-0 items-center border-b-2 border-transparent px-1 text-base font-medium text-gray-900/70 sm:text-xl hover:border-gray-300 hover:text-gray-900">sign up</a>
+            <a href="<%= rodauth.login_path %>" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">log in</a>
+            <a href="<%= rodauth.create_account_path %>" class="<%= nav_link_style %> border-transparent text-gray-900/70 hover:border-gray-300 hover:text-gray-900">sign up</a>
           <%- end %>
         </div>
       </div>

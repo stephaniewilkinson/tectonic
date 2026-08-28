@@ -5,13 +5,13 @@
       one control here a phone answers with its own picker, and a picker that needs a
       25px strip hit first is the same problem as any other small target. %>
   <select name="weekday" aria-label="weekday"
-          class="min-h-11 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+          class="<%= field_style %> min-h-11 px-2 text-base">
     <%- Date::DAYNAMES.each_with_index do |name, index| %>
       <option value="<%= index %>"><%= name %></option>
     <%- end %>
   </select>
   <input type="text" name="focus" autocomplete="off" aria-label="focus" placeholder="focus (optional)"
-         class="min-h-11 w-40 rounded-md border-0 px-2 text-base shadow-sm ring-1 ring-inset ring-gray-300">
+         class="<%= field_style %> min-h-11 w-40 px-2 text-base">
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Add day</button>
 </form>

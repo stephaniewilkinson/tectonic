@@ -92,7 +92,12 @@ describe 'revising a set in the session' do
     a_session_with_one_set_at 135
     correct_the_weight_to 145
 
-    assert_includes page.body, '145'
+    # has_text? rather than assert_includes page.body: the first waits for the swap and the
+    # second reads whatever is on screen at that instant. This was written the second way
+    # and passed for weeks, then failed on CI -- which is slower, so the request was still
+    # in flight when the assertion ran and the row still said 135. A race, not a bug in the
+    # app, and one that would have gone on failing at random.
+    assert page.has_text?('145'), 'the row should take the corrected weight'
     assert page.has_button?('Done'), 'a correction is not a claim that the set is finished'
     refute page.has_button?('Undo')
   end
@@ -105,7 +110,7 @@ describe 'revising a set in the session' do
     click_button 'Done'
     correct_the_weight_to 145
 
-    assert_includes page.body, '145'
+    assert page.has_text?('145'), 'the row should take the corrected weight'
     assert page.has_button?('Undo'), 'correcting a finished set should not un-finish it'
   end
 end

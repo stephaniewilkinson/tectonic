@@ -14,7 +14,7 @@
       <%# Only lifts with work in the window: the library ships movements this account
           has never trained, and offering them means most of the menu draws a blank page. %>
       <select id="exercise_id" name="exercise_id" onchange="this.form.submit()"
-              class="mt-1 rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300">
+              class="<%= field_style %> mt-1 py-1.5 pl-3 pr-8 text-gray-900">
         <option value="">Everything</option>
         <%- @lifts.each do |id, name| %>
           <option value="<%= id %>" <%= 'selected' if @lift&.first == id %>><%= name %></option>
@@ -24,7 +24,7 @@
     <div>
       <label for="weeks" class="block text-sm font-medium text-gray-900">Window</label>
       <select id="weeks" name="weeks" onchange="this.form.submit()"
-              class="mt-1 rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300">
+              class="<%= field_style %> mt-1 py-1.5 pl-3 pr-8 text-gray-900">
         <%- Tectonic::Volume::WINDOWS.each do |window| %>
           <option value="<%= window %>" <%= 'selected' if @weeks == window %>><%= window %> weeks</option>
         <%- end %>

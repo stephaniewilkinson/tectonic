@@ -1,0 +1,13 @@
+<%# The disclosure marker on a <summary>, which is not decoration and is easy to think is.
+    A summary is display:list-item and draws a triangle by default -- but every one of these
+    is a flex row, and flex overrides list-item, so no marker ever rendered and "How do I
+    rate this?" was a line of bold text with nothing to say it opened (#208).
+
+    It rotates through group-open, which is CSS, so it works with JavaScript off exactly as
+    the <details> element does.
+
+    A partial rather than a third copy of the path data: this was written out in full three
+    times, so a change to the shape meant finding all three (#239). aria-hidden because the
+    summary beside it already says what it does; a screen reader announcing "chevron" adds
+    nothing to a control that reports its own expanded state. %>
+<svg class="mr-1.5 h-4 w-4 shrink-0 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z" clip-rule="evenodd" /></svg>
