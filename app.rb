@@ -580,6 +580,24 @@ class Tectonic < Roda
         # The gym floor view of a workout, as distinct from workouts/show, which
         # stays the record of one. Ownership is already guaranteed by the gate above.
         r.on 'session' do
+          # Saying the session is over. The link at the top of the session screen has read
+          # "finish workout" since #216 and until now only navigated to the record, which is
+          # a control whose words promised the one thing this app could not do -- #218.
+          #
+          # Stamped rather than toggled, and it does not lock anything. Finishing is a
+          # statement about the session, not a gate on editing it: a set corrected
+          # afterwards is a correction to a finished session, which is ordinary. Posting
+          # twice re-stamps, which is the honest answer to "I meant that time, not this one"
+          # and cheaper than a confirmation nobody wants mid-gym.
+          #
+          # Sets left undone stay undone. That is the whole point: deciding to stop with
+          # three of ten done is a thing that happens, and the record should say so rather
+          # than ask whether you are sure.
+          r.post 'finish' do
+            check_csrf!
+            Workout.where(id: workout_id).update(finished_at: Time.now)
+            r.redirect "/workouts/#{workout_id}"
+          end
           r.get do
             # Insertion order is program order: warmups then working sets, lift by
             # lift in the position the program gave them.

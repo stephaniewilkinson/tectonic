@@ -5,8 +5,25 @@
     </h1>
     <%# "record" was the noun -- the page that records this session -- and read as the verb,
         which on a gym screen is an instruction to start recording. It is also where you go
-        when you have stopped lifting, so it says that instead. %>
-    <a href="/workouts/<%= @workout[:id] %>" class="text-sm text-gray-500 underline hover:text-lime-500">finish workout</a>
+        when you have stopped lifting, so it says that instead (#216).
+
+        It only navigated, though, and #218 is what that cost: nothing in the app could say
+        a session was over, so a day finished with three of ten sets done looked exactly
+        like one still under way -- to the workouts list, and to an assistant reading the
+        history through MCP, which called it in progress. The words were already right. Now
+        the control does what they say, and lands on the record either way, which is where
+        the link went before.
+
+        A button rather than a link because it writes, and a form rather than htmx because
+        this is the one control on the screen whose whole job is to leave it. Styled as the
+        link it replaces: it sits beside an h1 as a quiet way out, not as the thing the
+        page is for -- that is Done, five times over, below. %>
+    <form action="/workouts/<%= @workout[:id] %>/session/finish" method="post">
+      <%== csrf_tag("/workouts/#{@workout[:id]}/session/finish") %>
+      <button type="submit" class="min-h-11 text-sm text-gray-500 underline hover:text-lime-500">
+        <%= @workout[:finished_at] ? 'finished' : 'finish workout' %>
+      </button>
+    </form>
   </div>
 
   <div id="session-body">

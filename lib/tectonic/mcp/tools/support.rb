@@ -144,9 +144,25 @@ class Tectonic < Roda
         # has no name of its own. An assistant asked to "add a set to the evening walk"
         # needs the second to match on, and an assistant asked to rename one needs the
         # first to know whether there is anything there to replace.
+        # `completed` and `finished` are both here because neither answers for the other,
+        # and a list that carries only `status` answers neither. #218: an assistant reading
+        # a history saw `performed` -- which is true of a session with one warmup ticked --
+        # over sets that were not all done, and called a finished day one still in progress.
+        #
+        # `completed` is the count, so a list says three-of-ten without a second call per
+        # session; it used to take a get_workout each, and nothing told a reader it needed
+        # one. `finished` is the lifter's own word for it, and is the only one of the two
+        # that settles the question: three of ten is "I stopped early" and "I am between
+        # sets" written the same way, so the count narrows it and the flag closes it.
+        #
+        # No extra query for either. `sets` was already being counted through the
+        # association, which loads the rows, so the completed ones are counted from what is
+        # in hand.
         def view_workout(workout)
+          sets = workout.sets
           { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), name: workout.name,
-            label: workout.label, sets: workout.sets.count }
+            label: workout.label, sets: sets.count, completed: sets.count(&:is_completed),
+            finished: workout.finished? }
             .merge(provenance(workout))
         end
 
