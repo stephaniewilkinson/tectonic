@@ -16,6 +16,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* The palette, by what each colour means rather than by where it sits on a scale.
+ *
+ * These are plain CSS custom properties, which is the whole point of them: they are not
+ * Tailwind, they survive Tailwind, and a future stylesheet built with anything at all can
+ * read them. tailwind.config.js consumes them, so `bg-action` works today and resolves to
+ * exactly what `bg-lime-500` resolves to -- there is a spec holding those two together.
+ *
+ * Renaming the utilities was the other way to do this and it buys nothing here:
+ * `bg-action-500` is as Tailwind-shaped as `bg-lime-500`, so it would have moved 150 class
+ * names across 28 files, rewritten the ten specs that exist to catch colour mistakes, and
+ * left the app exactly as coupled as it was. Colour is a fifth of the utilities in views/;
+ * the other four fifths are layout and type, and no amount of renaming colours touches
+ * them. What a framework swap actually needs is the values in a portable place, which is
+ * this, and fewer utility runs in the markup, which is #239.
+ *
+ * Channels rather than hex, because Tailwind injects the alpha itself: written as
+ * `rgb(var(--color-action) / <alpha-value>)` in the config, `bg-action/70` goes on working
+ * the way `text-gray-900/70` does in the nav today. A hex value here would break the
+ * opacity modifier and nothing would say so until somebody used one.
+ *
+ * Every existing utility is untouched. This adds names; it takes none away. */
+:root {
+    /* The primary action, everywhere but the session screen. lime-500, its hover step, and
+       the one step of the scale that clears AA for body text -- 4.99:1 on white, which is
+       why links are lime-700 and not lime-500. */
+    --color-action: 132 204 22;
+    --color-action-strong: 101 163 13;
+    --color-action-text: 77 124 15;
+
+    /* The session screen's own action: Done, and Run session on the record. Sky rather than
+       lime so that the control never wears the colour of the state it sits on -- lime means
+       "completed" there, and a lime Done button meant the opposite of what it did. */
+    --color-session: 7 89 133;
+    --color-session-strong: 12 74 110;
+
+    /* A set that is done. Two states only, since #214 -- there is no third colour for a set
+       finished differently from the plan, and the row says that in words instead. */
+    --color-done-surface: 247 254 231;
+    --color-done-edge: 190 242 100;
+
+    /* A warning, and only a warning. #214 took amber off the set row for exactly this
+       reason: it is the colour this app warns in, and a set lifted at 145 against a written
+       150 is not a warning. The two callouts on /connections and the program page are. */
+    --color-warning-surface: 255 251 235;
+    --color-warning-edge: 253 230 138;
+    --color-warning-text: 146 64 14;
+}
+
 /* A heading, and nothing else that is merely large. The size utilities from 20px up used
    to sit in this selector list too, which made the typeface a property of how big a thing
    happens to be and settled questions nobody asked. The session screen printed a working
