@@ -7,6 +7,7 @@ require_relative '../../exercises'
 require_relative '../../exercise_library'
 require_relative '../../workouts'
 require_relative '../../sets'
+require_relative '../../measured'
 
 class Tectonic < Roda
   module MCP
@@ -55,6 +56,32 @@ class Tectonic < Roda
           kind = warmup ? 'a warmup' : 'a set counted in seconds'
           raise Tool::Refusal, "RPE is reps in reserve, so it does not apply to #{kind}. " \
                                'Leave rpe out, or clear is_warmup first.'
+        end
+
+        # The same question asked of a prescription rather than of a set. #265.
+        #
+        # Beside rating_fits! rather than in ProgramWriter because it is the same rule about
+        # the same scale, and the two would otherwise be a pair of RPE placement rules in
+        # different files, free to drift. The prescription side has one clause the set side
+        # does not: #278 decided the screen does not ask for a rating on work carrying no
+        # external load, so a target there would print an instruction with no buttons under
+        # it to answer -- a prescription the app accepted and then silently swallowed.
+        #
+        # There is no warmup clause, because a lift prescribes its working sets and the ramp
+        # above them is computed by Warmup rather than written. The generator declines to
+        # copy a target onto a ramp row, and sets_planned_rpe_only_on_working_reps holds it
+        # to that.
+        #
+        # It answers both halves of "is this target acceptable" -- how large it may be as
+        # well as where it may sit -- because no caller wants one without the other, and a
+        # range checked at one call site with the placement checked at another is how the two
+        # come to be applied to different arguments.
+        def target_fits!(target, measure:, weighted:)
+          check(RPE, target, 'Target RPE')
+          return if target.nil? || (measure == Measured::REPS && weighted)
+
+          raise Tool::Refusal, 'A target RPE is reps in reserve, so it belongs only on a loaded lift ' \
+                               'counted in reps. Drop target_rpe, or prescribe this lift in reps with a load.'
         end
       end
 
@@ -201,7 +228,8 @@ class Tectonic < Roda
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
             rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps }
+            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps,
+            planned_rpe: set.planned_rpe }
             .merge(provenance(set))
         end
 

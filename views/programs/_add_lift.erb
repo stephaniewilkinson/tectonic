@@ -17,6 +17,15 @@
   <input type="number" name="top_weight" step="any" autocomplete="off"
          aria-label="pounds" placeholder="lb"
          class="<%= field_style %> min-h-11 w-20 px-2 text-base">
+  <%# The effort a lift is written at, available from the moment it is written (#265) --
+      "top set at RPE 8" is how an autoregulated lift is prescribed, and having to add the
+      lift and then edit it to say so would make the target feel like an afterthought.
+
+      This form still offers no percent_of_max box, unlike the edit row beside it. That
+      omission is this form's existing shape and is not #265's to change. %>
+  <input type="number" name="target_rpe" min="1" max="10" step="1" autocomplete="off"
+         aria-label="target RPE" placeholder="RPE"
+         class="<%= field_style %> min-h-11 w-16 px-2 text-base">
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Add lift</button>
 </form>

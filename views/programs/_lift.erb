@@ -22,6 +22,21 @@
   <input type="number" name="percent_of_max" value="<%= lift.percent_of_max %>" step="any" autocomplete="off"
          aria-label="percent of max" placeholder="%"
          class="<%= field_style %> min-h-11 w-16 px-2 text-base">
+  <%# The effort the working sets are meant to be taken at (#265), after the two prices and
+      before Save: the row reads volume, then price, then effort, then the button, which is
+      the order a prescription is spoken in.
+
+      Narrower than the percentage box because the value is one or two characters against
+      three. Same 44px height and 16px type as every other control in this row, for the
+      reasons its opening comment gives -- a tablet in landscape is all thumb, and iOS
+      Safari zooms a field under 16px and leaves the page zoomed.
+
+      Blank is the common case and has to stay cheap to leave: most lifts are prescribed by
+      load alone, and ProgramEditor#symbolize reads an empty box as nil rather than as zero,
+      which is what makes clearing a target the same gesture as never setting one. %>
+  <input type="number" name="target_rpe" value="<%= lift.target_rpe %>" min="1" max="10" step="1" autocomplete="off"
+         aria-label="target RPE" placeholder="RPE"
+         class="<%= field_style %> min-h-11 w-16 px-2 text-base">
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Save</button>
 </form>

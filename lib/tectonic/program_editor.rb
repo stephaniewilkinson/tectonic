@@ -106,11 +106,17 @@ class Tectonic < Roda
     end
 
     # Everything about a lift except which day it belongs to.
+    #
+    # target_rpe is here because week two is week one again, a little heavier, and an effort
+    # the block asks for is part of what it asks. Left out, "top set at RPE 8" would hold
+    # for the first week of a block and quietly stop applying to every week copied from it
+    # -- which is the shape of the bug this method is most prone to, since a column added to
+    # program_lifts and not added here is silently dropped by the copy rather than refused.
     def copied(lift)
       { exercise_id: lift.exercise_id, position: lift.position, sets: lift.sets, reps: lift.reps,
         top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
         progression: lift.progression, is_barbell: lift.is_barbell, is_main: lift.is_main,
-        note: lift.note }
+        target_rpe: lift.target_rpe, note: lift.note }
     end
 
     def add_day(week, weekday:, focus: nil)
@@ -128,7 +134,8 @@ class Tectonic < Roda
       whole = merged(lift, written)
       shape = MCP::Tools::ProgramWriter.shape_of(whole, lift.exercise)
       MCP::Tools::ProgramWriter.check_load(whole, shape)
-      lift.update(**rounded_load(written.slice(:sets, :reps, :top_weight, :percent_of_max, :note), lift, shape),
+      lift.update(**rounded_load(written.slice(:sets, :reps, :top_weight, :percent_of_max, :target_rpe, :note),
+                                 lift, shape),
                   progression: MCP::Tools::ProgramWriter.progression_for(whole, shape))
       refresh_session(lift.program_day)
     end
@@ -165,7 +172,7 @@ class Tectonic < Roda
     def merged(lift, attributes)
       { sets: lift.sets, reps: lift.reps, duration_seconds: lift.duration_seconds,
         top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
-        is_weighted: lift.is_weighted, measure: lift.measure,
+        is_weighted: lift.is_weighted, measure: lift.measure, target_rpe: lift.target_rpe,
         is_per_side: lift.is_per_side }.merge(attributes)
     end
 

@@ -67,7 +67,7 @@ class Tectonic < Roda
           { sets: attributes[:sets], top_weight: attributes[:top_weight],
             percent_of_max: attributes[:percent_of_max], note: attributes[:note],
             progression: progression_for(attributes, shape),
-            is_main: attributes.fetch(:is_main, false),
+            is_main: attributes.fetch(:is_main, false), target_rpe: attributes[:target_rpe],
             is_barbell: barbell?(attributes, exercise, shape) }.merge(shape)
         end
 
@@ -125,6 +125,14 @@ class Tectonic < Roda
           Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
           Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
           check_measure(shape, attributes[:measure])
+          # How large a target may be and where it may sit are one question, asked in Bounds
+          # beside where a *rating* may sit -- the same rule about the same scale, put to the
+          # prescription and to the answer. Refused by name here rather than left to
+          # program_lifts_target_rpe_on_working_reps, which enforces it again: a constraint
+          # violation reaches a client as a database error and reads as the tool being
+          # broken, and the constraint stays as the backstop for anything that never comes
+          # through this writer.
+          Bounds.target_fits!(attributes[:target_rpe], measure: shape[:measure], weighted: shape[:is_weighted])
           check_priced(attributes, shape)
         end
 

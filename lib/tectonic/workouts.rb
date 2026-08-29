@@ -120,8 +120,14 @@ class Tectonic < Roda
     # `select_all`. created_at and created_by_oauth_application_id are on these rows and
     # are not drawn on this screen, and including them would make a set rewritten to the
     # same values look like news.
+    # planned_rpe joins the list with #265 because the session row draws it: a target the
+    # block asks for is printed beside the prescribed load. The rule this list follows is
+    # "what the screen renders", so a column the screen renders and the digest ignores is a
+    # change an assistant could make -- retargeting a lift and regenerating the day -- that
+    # the poll would answer 204 to, leaving the screen showing the old instruction.
     SESSION_COLUMNS = %i[id exercise_id weight reps rpe is_warmup is_completed
-                         measure duration_seconds is_per_side planned_weight planned_reps].freeze
+                         measure duration_seconds is_per_side
+                         planned_weight planned_reps planned_rpe].freeze
 
     def session_fingerprint
       rows = WorkoutSet.where(workout_id: id).order(:id).select(*SESSION_COLUMNS).all
