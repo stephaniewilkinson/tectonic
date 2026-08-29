@@ -122,6 +122,34 @@ class Tectonic < Roda
       sorted.length.odd? ? sorted[middle] : ((sorted[middle - 1] + sorted[middle]) / 2.0).round
     end
 
+    # What one set of a movement costs this lifter, across every session it appears in. #263.
+    #
+    # The turnaround between consecutive sets of the same movement, which is the number that
+    # prices a prescription: a day of five squat sets costs roughly five of these, and an
+    # assistant asked "will this fit in an hour" can answer it in the lifter's own numbers
+    # rather than in a constant somebody chose.
+    #
+    # That is the whole of why #263 stopped being an estimator. The issue asked for a model --
+    # main lifts around 3 minutes, accessories 1.5, warmups 1 -- and the owner's answer was
+    # that the app should represent what a lifter actually takes and let the assistant judge.
+    # A median off this lifter's own sets is that representation; the constants were a guess
+    # that would have been wrong for everybody in a different direction.
+    #
+    # Grouped by session before the subtraction, and that grouping is the point. Two sets of
+    # the same movement in sessions a week apart are not a turnaround, and subtracting across
+    # that boundary would report a week as a rest. Within a session, consecutive sets of the
+    # movement are what a lifter experiences as "the next set" -- so a squat followed by a
+    # bench and then a squat again measures the whole superset cycle, which is honest: that
+    # is what the next squat set actually cost.
+    #
+    # Nil rather than zero where there is nothing to measure. A movement lifted once, or one
+    # whose sets predate #281, has no turnaround, and a zero would be read as instantaneous.
+    def between_sets_of(sets)
+      gaps = sets.group_by { |set| set[:workout_id] }
+                 .flat_map { |_workout_id, rows| turnarounds(stamps_of(rows)) }
+      median(gaps)
+    end
+
     # A duration as a person reads it on a gym floor: "1h 12m", "48m", "90s". Seconds only
     # under two minutes, where a turnaround is the thing being read and "2m" would round away
     # the difference between 61 and 119 seconds; minutes above that, where nobody cares about
