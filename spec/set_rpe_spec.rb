@@ -107,9 +107,16 @@ describe 'a lift written as a percentage' do
     assert_equal 155, top # 80% of 191, rounded to what a bar can hold
   end
 
+  # Still a refusal after #264, and still for the same reason: with neither a stated max nor
+  # lifting to derive one from there is nothing to take a percentage of, and a guess would
+  # be a whole week of loads nobody chose. The message changed because the way out did --
+  # stating a max is now a second remedy beside logging a set.
+  # The other way out of this refusal -- stating a max, so a movement with nothing logged
+  # can still be generated against -- is #264's own, and is tested in training_max_spec.rb
+  # beside the rest of that rule rather than repeated here.
   it 'refuses to invent a max when nothing has been lifted yet' do
     error = assert_raises(ArgumentError) { Tectonic::ProgramGenerator.new(@program).generate(1) }
-    assert_includes error.message, 'No estimated max'
+    assert_includes error.message, 'No training max'
   end
 end
 

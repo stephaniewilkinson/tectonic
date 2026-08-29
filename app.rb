@@ -20,6 +20,7 @@ require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/program_editor'
 require_relative 'lib/tectonic/program_generator'
+require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
@@ -437,7 +438,14 @@ class Tectonic < Roda
       rodauth.require_login
       @account_id = rodauth.account_from_session[:id]
       r.get('new') { view('exercises/new') }
-      r.post do
+      # `r.post(true)` rather than a bare `r.post`, which matches a POST to anything under
+      # /exercises and so is terminal for every one of them. That was harmless while this
+      # was the only POST here -- views/exercises/_form.erb posts to /exercises exactly, and
+      # nothing else did -- and it stops being harmless the moment a second one exists:
+      # #264 adds POST /exercises/:id/training-max below, and a bare matcher here would
+      # swallow it and run the create-or-update branch against a form that sent no name.
+      # The terminal matcher says what this route always meant, which is /exercises itself.
+      r.post(true) do
         check_csrf!
         # Whether the movement is loaded on a bar is asked outright here and the answer
         # is taken as given, ticked or not: a person looking at the checkbox knows their
@@ -485,6 +493,22 @@ class Tectonic < Roda
           r.redirect "/exercises/#{@exercise.id}/" unless @exercise.account_id == @account_id
           view('exercises/edit')
         end
+        # The max this account takes percentages of, stated rather than derived. #264.
+        #
+        # Deliberately not behind the owner-only gate the edit above sits behind, and this
+        # is the point of keying it on the pair rather than putting a column on exercises:
+        # a training max is not a property of the movement, it is a property of this account
+        # *on* the movement. A shared Back Squat is on everybody's page, and everybody has a
+        # different one -- so the row is private by construction and there is nothing here
+        # for the library rule to protect.
+        #
+        # Blank clears, which is how somebody hands the question back to the estimate. See
+        # TrainingMax.replace, which is where that decision is made for every write path.
+        r.post 'training-max' do
+          check_csrf!
+          TrainingMax.replace(@account_id, @exercise.id, r.params['pounds'])
+          r.redirect "/exercises/#{@exercise.id}/"
+        end
         r.get do
           # Only the viewer's own sets for this movement, so a shared library
           # exercise never surfaces another account's logged sets.
@@ -492,6 +516,11 @@ class Tectonic < Roda
           mine = WorkoutSet.where(exercise_id: @exercise.id, workout_id: my_workouts)
           @sets = mine.all
           @heaviest_by_day = heaviest_by_day(mine)
+          # Whatever a percentage of this movement would resolve against today, and which
+          # of the two answers that is. Nil when there is neither, which is the state the
+          # page has to say something about: it is the one that makes a percentage lift
+          # refuse to generate.
+          @training_max = TrainingMax.for(account_id: @account_id, exercise: @exercise)
           view('exercises/show')
         end
       end

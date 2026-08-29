@@ -12,6 +12,7 @@ require_relative 'equipment'
 require_relative 'measured'
 require_relative 'set_scheme'
 require_relative 'sets'
+require_relative 'training_max'
 require_relative 'warmup'
 require_relative 'workouts'
 
@@ -175,18 +176,29 @@ class Tectonic < Roda
                            'with no top_weight to start from.'
     end
 
-    # With no completed set the chart can read there is no max to take a percentage of, and
-    # inventing one would write a whole week of loads off a guess, so the week refuses to
-    # generate and says which movement is missing.
+    # The max this account lifts this movement off, which since #264 is the one it has
+    # stated if it has stated one and the derived reading of its completed sets otherwise.
+    # TrainingMax holds that fallback so this does not: a generator that asked for the
+    # stored number and then reached for the estimate itself would be the second place the
+    # rule lives, and the second place is the one that goes out of date.
+    #
+    # With neither -- nothing stated and nothing lifted the chart can read -- there is still
+    # no max to take a percentage of, and inventing one would write a whole week of loads
+    # off a guess. So the week still refuses and still names the movement. What changed is
+    # the remedy: logging a set was the only way out of this, which is a strange thing to
+    # require of somebody who already knows what they can lift, and the message now offers
+    # both doors.
     def percent_of_max_weight(lift)
       exercise = Exercise[lift.exercise_id]
-      max = exercise.estimated_max(account_id: @program.account_id)
-      unless max
-        raise ArgumentError, "No estimated max for #{exercise.name} yet, so #{lift.percent_of_max}% of it " \
-                             'cannot be worked out. Log a completed set of it first.'
-      end
+      max = TrainingMax.for(account_id: @program.account_id, exercise:)
+      raise ArgumentError, no_max_message(exercise, lift) unless max
 
-      @equipment.loadable(max * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell)
+      @equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell)
+    end
+
+    def no_max_message(exercise, lift)
+      "No training max for #{exercise.name} yet, so #{lift.percent_of_max}% of it cannot be " \
+        'worked out. Set one on the movement, or log a completed set of it and let the app estimate it.'
     end
 
     # The written top_weight is where a lift starts and nothing more: once the movement has
