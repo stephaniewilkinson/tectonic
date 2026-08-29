@@ -39,7 +39,21 @@ class Tectonic < Roda
         def lift(context, day_row, attributes, position = nil)
           exercise = Resolver.exercise(context, name: attributes[:exercise])
           ProgramLift.create(program_day_id: day_row.id, exercise_id: exercise.id,
-                             position: position || next_position(day_row), **load(attributes, exercise))
+                             position: position || next_position(day_row),
+                             **rounded(load(attributes, exercise), context))
+        end
+
+        # The prescription lands on a weight the rack can build (#259). The sets were never
+        # the problem -- every weight ProgramGenerator writes goes through Equipment#loading,
+        # on generation and on the rewrite after an edit alike, since the editor delegates
+        # to the generator's own refresh. What was unrounded was the prescription above
+        # them, so a block asking for 152 on a rack whose smallest jump is 5 generated
+        # 135/140/145/150, all loadable and all correct, and went on displaying 152.
+        def rounded(attributes, context)
+          return attributes unless attributes[:top_weight] && attributes[:is_weighted]
+
+          attributes.merge(top_weight: Equipment.loadable_for(context.account_id, attributes[:top_weight],
+                                                              is_barbell: attributes[:is_barbell]))
         end
 
         # The columns a lift carries, checked here rather than in the schema so an
