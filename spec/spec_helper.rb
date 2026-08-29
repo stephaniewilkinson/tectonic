@@ -16,6 +16,27 @@ ENV['DATABASE_URL'] = ENV.fetch('TEST_DATABASE_URL', 'postgres:///tectonic_test'
 # in its discovery document; tests sign and expect tokens for this audience.
 ENV['MCP_PUBLIC_BASE_URL'] ||= 'https://example.org'
 
+# bcrypt is deliberately slow, and in a test suite that is the whole cost of the run.
+#
+# The default cost is 12, which is about 200ms a hash on this machine -- the point of the
+# algorithm, and right in production, where it happens once when somebody logs in. Here it
+# happened roughly four times per test: the helpers that seed an account hash a password,
+# and every login then *verifies* against that hash, which costs the same again because
+# verification cost is carried by the stored hash rather than chosen by the verifier.
+#
+# Rodauth already knew this -- it uses BCrypt::Engine::MIN_COST when RACK_ENV is test -- so
+# the accounts it creates through the sign-up form were always cheap. What was not cheap
+# was every account a spec inserted with BCrypt::Password.create directly, and every login
+# against one of those. Fourteen spec files do that.
+#
+# Setting the engine's cost here covers both halves: those hashes are created at cost 4 and
+# therefore verified at cost 4 too. It is scoped to the suite -- production reads
+# BCrypt::Engine::DEFAULT_COST through Rodauth and never loads this file -- and it is the
+# same trade Rails makes in its own test environment. It took `rake test:rack` from about
+# five minutes to under thirty seconds.
+require 'bcrypt'
+BCrypt::Engine.cost = BCrypt::Engine::MIN_COST
+
 # require 'dotenv/load' #keeping this here until i need it later
 require 'minitest/autorun'
 require 'minitest/capybara'
