@@ -99,8 +99,12 @@ describe 'a lift written as a percentage' do
                                          progression: 'percent')
   end
 
-  it 'takes its load from the estimated max at generation time' do
-    workout_id = Tectonic::Workout.insert(account_id: @account_id, date: Date.today)
+  # "at generation time" until #291, which is the rule this now states the other way: the
+  # max is read as of the block's start date, so every week of a wave is a percentage of
+  # one number. The set therefore has to be dated on or before the day the block opened --
+  # lifting done *after* it opened belongs to the block that comes next.
+  it 'takes its load from the max as of the day the block opened' do
+    workout_id = Tectonic::Workout.insert(account_id: @account_id, date: @program.start_date)
     log_lifted_set(workout_id, @exercise, weight: 155, reps: 5, rpe: 8) # a max of 191
     generated = Tectonic::ProgramGenerator.new(@program).generate(1).first
     top = Tectonic::WorkoutSet.where(workout_id: generated.id).max(:weight)

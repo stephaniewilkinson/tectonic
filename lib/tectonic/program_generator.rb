@@ -152,11 +152,31 @@ class Tectonic < Roda
       week.is_deload ? Progression.deloaded(planned, increment: @equipment.increment) : planned
     end
 
-    # fixed keeps the number it was written with. percent takes one of the account's
-    # estimated max, resolved at generation rather than stored, so a week written months ago
-    # is generated against the strength that exists when it is trained -- and it needs no
-    # step rule, because a max read fresh has already moved by however much the lifting
-    # moved it. linear is the one that steps, off the last session of the movement.
+    # fixed keeps the number it was written with. percent takes one of the account's training
+    # max, read as of the block's start date. linear is the one that steps, off the last
+    # session of the movement.
+    #
+    # That "as of the block's start" is #291, and it replaces the opposite rule -- the max
+    # used to be resolved at generation, so a week written months ago was generated against
+    # the strength that existed when it was trained. That reads well for a lift standing on
+    # its own and is wrong for a block, because a percentage wave only means anything if all
+    # of its percentages are of the same number.
+    #
+    # What it did: a four-week block at 70/80/90/deload against a max of 300 generates week
+    # one at 210. A PR in week two raises the derived max to 333, so week three's 90% comes
+    # out at 300 -- a week-four load -- and week four's deload at 233, which is heavier than
+    # week one's working weight. The deload stops being a deload. It compounds, too: the
+    # heavier week raises the max again.
+    #
+    # Fixing it at the start is what 5/3/1, Juggernaut, Sheiko and block periodization all
+    # do -- the reference is constant for the cycle and moves at a control point, which is a
+    # re-test or a new block rather than a good Tuesday. A block that wants a new denominator
+    # is a new block, or a training max stated outright, which #264 made possible.
+    #
+    # A *stated* max was never affected by any of this, because it does not move -- see
+    # TrainingMax.for, which passes `on` to the derivation and not to the lookup. That is an
+    # argument that a stated max was always the right way to run a percentage block, and the
+    # derived one the anomaly.
     def prescribed_weight(week, lift)
       case lift.progression
       when 'percent' then percent_of_max_weight(lift)
@@ -188,9 +208,16 @@ class Tectonic < Roda
     # the remedy: logging a set was the only way out of this, which is a strange thing to
     # require of somebody who already knows what they can lift, and the message now offers
     # both doors.
+    # `on:` is the block's start date and not today, which is #291. A derived max read fresh
+    # at every generation moves under a block that is halfway through; read as of the start
+    # it is the same number for every week of it, which is what a percentage wave means.
+    #
+    # It also settles `refresh`. That rewrites an untrained day from the plan as it now
+    # stands, so an edit to week one in March used to rewrite it against a max earned in
+    # April -- a load nobody prescribed appearing in a week nobody touched.
     def percent_of_max_weight(lift)
       exercise = Exercise[lift.exercise_id]
-      max = TrainingMax.for(account_id: @program.account_id, exercise:)
+      max = TrainingMax.for(account_id: @program.account_id, exercise:, on: @program.start_date)
       raise ArgumentError, no_max_message(exercise, lift) unless max
 
       @equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell)
