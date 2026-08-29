@@ -146,6 +146,19 @@ class Tectonic < Roda
     def on_date
       as_of&.to_date
     end
+
+    # The date as a clause, with its own leading space and its own preposition -- " on Aug 29,
+    # 2026", or nothing at all where there is no date.
+    #
+    # Here rather than in the view because a view interpolating a strftime behind a guard is a
+    # long line doing two jobs, and both places that show this had grown one. Returning the
+    # empty string rather than nil is what lets a template interpolate it with no conditional
+    # around the punctuation that follows.
+    def since(preposition = 'on')
+      return '' unless on_date
+
+      " #{preposition} #{on_date.strftime('%b %-d, %Y')}"
+    end
   end
 end
 
