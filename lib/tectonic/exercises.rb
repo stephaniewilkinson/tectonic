@@ -64,17 +64,36 @@ class Tectonic < Roda
       OneRepMax.best_of(lifted_sets(account_id, on))
     end
 
+    # The same estimate with the day the set behind it was lifted, for the callers that
+    # report it rather than only calculate with it. #293.
+    #
+    # A separate method rather than a wider return from estimated_max, because three callers
+    # want the number alone and changing what they get would be churn for nothing. Both read
+    # the same rows through the same scope, so the two cannot disagree.
+    def estimated_reading(account_id:, on: Date.today)
+      OneRepMax.best_reading(lifted_sets(account_id, on))
+    end
+
     # An account's own completed sets of this movement, up to and including a date. Scoped
     # through the workouts rather than the sets alone, because a library movement is
     # shared and the work done on it is not: another account's lifting must never reach
     # this number.
     # planned_rpe joins the select with #294: it is what the chart reads a set at when the
-    # lifter did not rate it, and it was sitting on the row unread since #265.
+    # lifter did not rate it, and it was sitting on the row unread since #265. The session's
+    # date joins it with #293, which is what lets a reader say when a max was earned -- from
+    # a join rather than a second query, so the number and its date cannot disagree.
     def lifted_sets(account_id, on)
       mine = Workout.where(account_id:).where { date < (on + 1) }.select(:id)
       WorkoutSet.where(exercise_id: id, workout_id: mine, is_completed: true)
-                .select(:weight, :reps, :rpe, :planned_rpe).all
+                .join(:workouts, id: :workout_id).select(*READ_COLUMNS).all
     end
+
+    # Qualified because `date` is on workouts while the rest are on sets, and unqualified it
+    # is ambiguous the moment the two tables meet.
+    READ_COLUMNS = [
+      Sequel[:sets][:weight], Sequel[:sets][:reps], Sequel[:sets][:rpe],
+      Sequel[:sets][:planned_rpe], Sequel[:workouts][:date]
+    ].freeze
   end
 end
 
