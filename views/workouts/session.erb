@@ -76,3 +76,56 @@
     markCurrentLift();
   })();
 </script>
+
+<%# The session clock, ticking. #281.
+    The number in the header is true when the server sends it and stale a second later, so
+    this counts on from it. It does not fetch anything and does not know what time it is on
+    the server: the element carries how many seconds had already elapsed, and this adds the
+    seconds since the page was painted. A phone whose clock is wrong is therefore still
+    right, which asking the browser for a wall-clock start time would not be.
+
+    Re-baselined on every htmx swap rather than left running, because the header comes back
+    out of band on every tap and on every poll -- with a fresh figure from the server, which
+    is the authoritative one. Reading the element again after each swap is what keeps the
+    script agreeing with the page rather than drifting away from it over a long session.
+
+    Bound to document.body because htmx events bubble, so it binds once and survives every
+    swap. The same reasoning as the script above it, and the reason both live out here.
+
+    Degrades to exactly what the server sent: with JavaScript off the header shows the
+    session length as at page load, which is a true statement about a real session rather
+    than a blank. That is why the figure is rendered server-side at all.
+
+    The format is deliberately the same shape as Timing.phrase, and deliberately not shared
+    with it -- one is Ruby on the server and one is JavaScript in the browser, and the only
+    way to have one copy would be to ship a number and a formatter over the wire. The two
+    can drift; spec/timing_spec.rb pins the Ruby half, and the server re-renders on every
+    tap, so a drift shows up on screen rather than hiding. %>
+<script>
+  (function () {
+    var clock = null, base = 0, painted = 0;
+
+    function spell(total) {
+      if (total < 120) { return total + 's'; }
+      var minutes = Math.floor(total / 60);
+      if (minutes < 60) { return minutes + 'm'; }
+      return Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm';
+    }
+
+    function rebase() {
+      clock = document.getElementById('session-clock');
+      if (!clock) { return; }
+      base = parseInt(clock.getAttribute('data-elapsed'), 10) || 0;
+      painted = Date.now();
+    }
+
+    function tick() {
+      if (!clock || !clock.isConnected) { return; }
+      clock.textContent = spell(base + Math.floor((Date.now() - painted) / 1000));
+    }
+
+    document.body.addEventListener('htmx:afterSwap', rebase);
+    rebase();
+    setInterval(tick, 1000);
+  })();
+</script>

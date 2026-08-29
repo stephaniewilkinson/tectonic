@@ -51,7 +51,33 @@
   </div>
   <%# Sets rather than lifts, and deliberately: the bar is now the answer to "how many
       movements", so the line under it is where the exact set count still has to live. %>
+  <%# The clock joins it rather than taking a line of its own (#281). This paragraph is the
+      session's status line and two short facts fit on it; a second line would push the
+      first Done button further down every screen for a number nobody reads mid-set.
+
+      Inside this <p> and not in a flex row around it, because spec/session_progress_spec.rb
+      anchors its reader on the literal `<p class="mt-1` that closes the bar -- markup that
+      moved the tag would make that spec read an empty string and pass for the wrong reason.
+      A middot between the two, the same separator views/programs/show.erb already uses.
+
+      Server-rendered first and ticked by script afterwards. The numbers are true as sent,
+      so a browser with JavaScript off shows the session length as it was at page load
+      rather than nothing at all -- and this element comes back on every tap and every poll,
+      which re-baselines it without the script having to.
+
+      data-since is epoch seconds for the script to count from, and it is the *server's*
+      idea of now subtracted out: the attribute carries how many seconds have already
+      elapsed, so a phone whose clock is wrong still counts correctly from what it was
+      told. aria-hidden on the ticking part, because a screen reader announcing a number
+      that changes every second is a screen reader nobody can use. %>
   <p class="mt-1 text-xs text-gray-500">
     <%= @sets.count { |set| set[:is_completed] } %> of <%= @sets.length %> sets
+    <%- if @timing && @timing[:overall] %>
+      <span aria-hidden="true">&middot;</span>
+      <span id="session-clock" data-elapsed="<%= @timing[:overall] %>"><%= Timing.phrase(@timing[:overall]) %></span>
+      <%- if @timing[:overall_basis] == :in_progress %>
+        <span>so far</span>
+      <%- end %>
+    <%- end %>
   </p>
 </div>

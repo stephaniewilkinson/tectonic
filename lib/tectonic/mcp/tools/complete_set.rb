@@ -39,7 +39,10 @@ class Tectonic < Roda
           lifted = arguments.slice(:weight, :reps, :rpe)
           check(lifted)
           Bounds.rating_fits!(lifted[:rpe], warmup: set.is_warmup, timed: set.timed?)
-          lifted.merge(is_completed: arguments.fetch(:completed, true))
+          # Through WorkoutSet.completion so the stamp travels with the flag (#281). This
+          # is the other path that can un-complete a set, and the one most easily forgotten
+          # -- the session screen's Done is the obvious one and this is the quiet one.
+          lifted.merge(WorkoutSet.completion(arguments.fetch(:completed, true)))
         end
 
         def self.check(lifted)

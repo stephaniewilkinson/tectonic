@@ -7,6 +7,7 @@ require_relative '../../exercises'
 require_relative '../../exercise_library'
 require_relative '../../workouts'
 require_relative '../../sets'
+require_relative '../../timing'
 
 class Tectonic < Roda
   module MCP
@@ -201,7 +202,11 @@ class Tectonic < Roda
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
             rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps }
+            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps,
+            # When it was done, iso8601 to match provenance's created_at below, so the two
+            # timestamps in one payload agree about shape. Nil on every set completed before
+            # #281 and on every one not yet done.
+            completed_at: set.completed_at&.iso8601 }
             .merge(provenance(set))
         end
 
@@ -231,10 +236,14 @@ class Tectonic < Roda
         # One query, read once. Both halves used to load the sets separately -- the counts
         # off the cached association and the list off a fresh query -- which is #258 seen
         # from inside a single hash.
+        # `timing` is #281's half: how long the session ran, what a normal turnaround
+        # between sets was, and how many gaps were too long to count as training. Off the
+        # rows already fetched, so it costs no query.
         def view_workout_detail(workout)
           sets = workout.sets_dataset.order(:id).all
           view_workout(workout, sets).merge(
             status: workout.status.to_s, program_day_id: workout.program_day_id,
+            timing: Timing.session(workout, sets.map(&:values)),
             sets: sets.map { |set| view_set(set) }
           )
         end

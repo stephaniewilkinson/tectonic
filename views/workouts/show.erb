@@ -29,6 +29,38 @@
   <p class="mt-2 text-xs text-gray-400"><%= provenance(@workout) %></p>
 <%- end %>
 
+<%# How long it took, once it is over. #281.
+    The record is where a measured session is read back, and it is the only place these
+    numbers are worth keeping still -- on the session screen they are a clock, here they are
+    a fact about a day that is finished.
+
+    Three things, and no more. How long from the first set to the last (or to the moment the
+    lifter said they were done); what a normal turnaround between sets was; and how many
+    turnarounds were thrown out for being too long to be training. That last one earns its
+    place: "typical 2m" over a session with four discarded gaps is a different session from
+    one with none, and without the count nobody can tell which they are reading.
+
+    "Turnaround" and not "rest", throughout. One tap per set measures the gap between two
+    taps, which is the rest plus the working time of the set that ended it -- see
+    lib/tectonic/timing.rb. Calling it rest would be naming a number the app cannot see.
+
+    Nothing at all on a session with no stamps, which is every session logged before #281
+    and every one written but not yet trained. An empty line saying "0m" would be a claim
+    about training that never happened. %>
+<%- if @timing[:overall] %>
+  <p class="mt-2 text-sm text-gray-500">
+    <%= Timing.phrase(@timing[:overall]) %><%= ' so far' if @timing[:overall_basis] == :in_progress %>
+    <%- if @timing[:typical_turnaround] %>
+      <span aria-hidden="true">&middot;</span>
+      typically <%= Timing.phrase(@timing[:typical_turnaround]) %> between sets
+    <%- end %>
+    <%- if @timing[:discarded].positive? %>
+      <span aria-hidden="true">&middot;</span>
+      <%= @timing[:discarded] %> long <%= @timing[:discarded] == 1 ? 'gap' : 'gaps' %> not counted
+    <%- end %>
+  </p>
+<%- end %>
+
 <%# One column on a phone. grid-cols-2 was unprefixed, so it applied at every width and
     put a 392px table inside a 161px card -- and the card's overflow-hidden ate the rest
     silently, with no page-level scrollbar to show anything was missing. %>
