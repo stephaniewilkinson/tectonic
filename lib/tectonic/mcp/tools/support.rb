@@ -8,6 +8,7 @@ require_relative '../../exercise_library'
 require_relative '../../workouts'
 require_relative '../../sets'
 require_relative '../../measured'
+require_relative '../../timing'
 
 class Tectonic < Roda
   module MCP
@@ -225,12 +226,24 @@ class Tectonic < Roda
         # column hands back, which would serialise as "0.1375e3" and reach an assistant as a
         # string it has to parse. Plates.numeric gives 225 back as an Integer and 137.5 as a
         # Float, which is what JSON wants of each.
+        # completed_at is iso8601 to match provenance's created_at below, so the two
+        # timestamps in one payload agree about shape. Nil on every set completed before
+        # #281 and on every one not yet done.
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
             rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps,
+            completed_at: set.completed_at&.iso8601 }
+            .merge(prescribed(set)).merge(provenance(set))
+        end
+
+        # The three columns saying what was asked for, split out from what was done. They
+        # travel together because they are one fact -- the prescription -- and they were
+        # extracted here when planned_rpe made the third: a hash literal naming both halves
+        # of every dimension is a method doing two jobs, and rubocop counted it before a
+        # reader would have.
+        def prescribed(set)
+          { planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps,
             planned_rpe: set.planned_rpe }
-            .merge(provenance(set))
         end
 
         def weight(value)
@@ -259,10 +272,14 @@ class Tectonic < Roda
         # One query, read once. Both halves used to load the sets separately -- the counts
         # off the cached association and the list off a fresh query -- which is #258 seen
         # from inside a single hash.
+        # `timing` is #281's half: how long the session ran, what a normal turnaround
+        # between sets was, and how many gaps were too long to count as training. Off the
+        # rows already fetched, so it costs no query.
         def view_workout_detail(workout)
           sets = workout.sets_dataset.order(:id).all
           view_workout(workout, sets).merge(
             status: workout.status.to_s, program_day_id: workout.program_day_id,
+            timing: Timing.session(workout, sets.map(&:values)),
             sets: sets.map { |set| view_set(set) }
           )
         end

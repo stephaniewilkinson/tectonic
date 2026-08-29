@@ -125,9 +125,16 @@ class Tectonic < Roda
     # "what the screen renders", so a column the screen renders and the digest ignores is a
     # change an assistant could make -- retargeting a lift and regenerating the day -- that
     # the poll would answer 204 to, leaving the screen showing the old instruction.
+    #
+    # completed_at joins it with #281, because the session header draws off that: how long
+    # the session has been going. It is the weaker of the two cases and worth saying so --
+    # completed_at moves only when is_completed moves, which the digest already watches, so
+    # it notices nothing new today. It is here to keep the list's stated rule true rather
+    # than true by accident, which is what a column drawn on the screen and missing from
+    # here would leave it.
     SESSION_COLUMNS = %i[id exercise_id weight reps rpe is_warmup is_completed
                          measure duration_seconds is_per_side
-                         planned_weight planned_reps planned_rpe].freeze
+                         planned_weight planned_reps planned_rpe completed_at].freeze
 
     def session_fingerprint
       rows = WorkoutSet.where(workout_id: id).order(:id).select(*SESSION_COLUMNS).all

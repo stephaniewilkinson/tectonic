@@ -17,8 +17,9 @@ class Tectonic < Roda
         tool_name 'get_workout'
         description 'Read one session in full: its sets in order with weight, reps, RPE, ' \
                     'whether each was a warmup and whether it was completed, what the ' \
-                    "program prescribed, and the session rating. Give a date ('today' or " \
-                    'YYYY-MM-DD) or a workout_id, which list_workouts and search return.'
+                    'program prescribed, the session rating, and how long it took. Give a ' \
+                    "date ('today' or YYYY-MM-DD) or a workout_id, which list_workouts and " \
+                    'search return.'
         scope :read
         input_schema(
           type: 'object',
@@ -43,7 +44,29 @@ class Tectonic < Roda
         # is the whole of #218; the word is what closes it.
         def self.headline(detail)
           "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
-            "#{detail[:status]}#{', finished' if detail[:finished]}."
+            "#{detail[:status]}#{', finished' if detail[:finished]}#{timing(detail)}."
+        end
+
+        # How long it ran and what a normal turnaround was, in the sentence rather than only
+        # in the structured payload -- many clients render only the text, which is #262's
+        # lesson and the reason this tool prints its sets at all.
+        #
+        # "Turnaround" and never "rest". One tap per set measures the gap between two taps,
+        # which is the rest plus the working time of the set that ended it; naming it rest
+        # would tell an assistant the app knows something it does not. See
+        # lib/tectonic/timing.rb.
+        #
+        # Silent on a session with no stamps, which is every session trained before #281 and
+        # every one not yet trained. "0m" would be a claim about training that never
+        # happened, and a model reading it would repeat the claim.
+        def self.timing(detail)
+          measured = detail[:timing]
+          return '' unless measured && measured[:overall]
+
+          phrase = ", #{Timing.phrase(measured[:overall])}#{' so far' if measured[:overall_basis] == :in_progress}"
+          return phrase unless measured[:typical_turnaround]
+
+          "#{phrase}, typically #{Timing.phrase(measured[:typical_turnaround])} between sets"
         end
 
         # One set: what was on the bar, what was asked for when that differs, and how it

@@ -17,6 +17,7 @@ require_relative 'lib/tectonic/workouts'
 require_relative 'lib/tectonic/connection'
 require_relative 'lib/tectonic/equipment'
 require_relative 'lib/tectonic/volume'
+require_relative 'lib/tectonic/timing'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/program_editor'
 require_relative 'lib/tectonic/program_generator'
@@ -610,10 +611,15 @@ class Tectonic < Roda
               # differently is the same fact as a working set lifted differently -- the
               # generator writes planned_weight and planned_reps for both -- and a second
               # branch here would be two ways of recording one thing.
+              # Through WorkoutSet.completion so the stamp and the flag are written together
+              # (#281). The empty branch is the one that matters: a correction changes
+              # neither, so it must not touch the stamp either -- fixing a weight two reps
+              # into a set is not doing the set, and re-stamping it would move a turnaround
+              # the lifter never took.
               completion = if revised.empty?
-                             { is_completed: !set.is_completed }
+                             WorkoutSet.completion(!set.is_completed)
                            elsif revised.key?(:rpe)
-                             { is_completed: true }
+                             WorkoutSet.completion(true)
                            else
                              {}
                            end
@@ -657,9 +663,14 @@ class Tectonic < Roda
               quantity = quantity_from(set, r.params)
               r.redirect "/workouts/#{workout_id}/sets/#{set_id}/edit" unless quantity
 
+              # The completion goes through the helper here too (#281). This form is the one
+              # place a set can be un-completed by a checkbox rather than by a tap, and a
+              # cleared box that left completed_at behind would violate
+              # sets_completed_at_needs_a_completion -- which reaches a person as a 500 and
+              # a lost edit, which is the failure #213 was about.
               set.update(weight: r.params['weight'],
                          is_warmup: r.params['is_warmup'] || false,
-                         is_completed: r.params['is_completed'] || false,
+                         **WorkoutSet.completion(!r.params['is_completed'].nil?),
                          **quantity,
                          **substitution(set, r.params['exercise_id']))
               r.redirect "/workouts/#{workout_id}"
@@ -753,6 +764,10 @@ class Tectonic < Roda
           @sets = WorkoutSet.where(workout_id:).order(:id).all
           @lifts = @sets.group_by { |set| set[:exercise_id] }
           @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+          # How long it took, off the rows already loaded (#281). No query of its own: the
+          # stamps are columns on the sets this page has just fetched, which is the whole
+          # reason the timing lives on the set rather than in a table beside it.
+          @timing = Timing.session(@workout, @sets.map(&:values))
           view 'workouts/show'
         end
       end
@@ -909,6 +924,12 @@ class Tectonic < Roda
   def load_session(workout_id)
     @sets = WorkoutSet.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+    # How long this has been going, worked out from rows already in hand (#281). Set here
+    # rather than in the session route because all three render paths go through this one --
+    # the first paint, the panel a tap sends back, and the poll -- and the progress header
+    # is rendered by every one of them. Set in the route instead, a tap would render a
+    # header with no clock on it and the number would vanish on the first Done.
+    @timing = Timing.session(@workout, @sets.map(&:values))
   end
 
   # The session's sets grouped into the lifts they belong to. Insertion order is program

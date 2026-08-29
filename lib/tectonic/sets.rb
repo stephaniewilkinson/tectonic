@@ -67,6 +67,31 @@ class Tectonic < Roda
 
       is_per_side ? reps * 2 : reps
     end
+
+    # The two columns that say a set was done, always written together. #281.
+    #
+    # completed_at is the instant it happened and is_completed is whether it did, and the
+    # database refuses a row holding one without the other -- sets_completed_at_needs_a_
+    # completion, because a set that was never done carrying the moment it was done is not
+    # a state any reader could make sense of.
+    #
+    # Here rather than at the call sites, and for the same reason ratable? is on the model:
+    # four write paths flip is_completed -- the session screen's Done, the set edit form,
+    # complete_set and create_set -- and a rule remembered at four places is a rule forgotten
+    # at one. The one that would forget it is undo, which is the path that clears the flag,
+    # and the failure would be a check violation surfacing as a 500 on a Done button. That
+    # is #213's shape, and this is the answer #211 gave to it: enforce it where it cannot be
+    # routed around, and give every caller one way to say the thing.
+    #
+    # An undo clears the stamp rather than keeping it. A set un-completed was not done, so
+    # the instant it was done is not a fact any more -- and keeping it would leave a
+    # turnaround measured against a set that the lifter has said did not happen.
+    #
+    # `at` is a parameter with a default rather than a Time.now inside, so a caller with a
+    # better answer -- a backdated import, a test pinning a clock -- can give one.
+    def self.completion(done, at: Time.now)
+      { is_completed: done, completed_at: done ? at : nil }
+    end
   end
 end
 

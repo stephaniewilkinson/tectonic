@@ -55,8 +55,13 @@ class Tectonic < Roda
         def self.attributes(arguments, exercise, workout, context)
           { exercise_id: exercise.id, workout_id: workout.id,
             weight: arguments[:weight], reps: arguments[:reps], rpe: arguments[:rpe],
-            is_warmup: arguments.fetch(:is_warmup, false),
-            is_completed: arguments.fetch(:is_completed, false), is_barbell: exercise.barbell?,
+            is_warmup: arguments.fetch(:is_warmup, false), is_barbell: exercise.barbell?,
+            # A set logged as already done is stamped with when it was logged, which is the
+            # best this path can say (#281). It is not when it was lifted -- a session typed
+            # up in the evening stamps the evening -- so the turnarounds such a session
+            # produces describe the typing rather than the training. That is honest about
+            # what the column holds and is why Timing never claims a turnaround is a rest.
+            **WorkoutSet.completion(arguments.fetch(:is_completed, false)),
             created_by_oauth_application_id: context.application_id, created_at: Time.now }
         end
       end
