@@ -18,7 +18,7 @@ class Tectonic < Roda
         description 'Read one session in full: its sets in order with weight, reps, RPE, ' \
                     'whether each was a warmup and whether it was completed, what the ' \
                     "program prescribed, and the session rating. Give a date ('today' or " \
-                    'YYYY-MM-DD) or a workout_id.'
+                    'YYYY-MM-DD) or a workout_id, which list_workouts and search return.'
         scope :read
         input_schema(
           type: 'object',

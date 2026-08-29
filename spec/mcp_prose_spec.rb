@@ -2,6 +2,7 @@
 
 require_relative 'spec_helper'
 require_relative 'mcp_spec' # reuses its helpers (mint, call_tool, tool_result); idempotent require
+require_relative 'mcp_program_tools_spec' # and its write_block; idempotent
 require_relative '../lib/tectonic/mcp'
 require 'securerandom'
 require 'date'
@@ -196,6 +197,26 @@ end
 # The guard the next prose site needs, since the five that were wrong were wrong the same
 # way and a sixth would be too. Source rather than behaviour: a spec cannot call a tool
 # that does not exist yet, and this catches it the moment it is written.
+# The half #256 reported as already correct, and where that turned out not to hold. A
+# set's weight goes through Presenter.weight in view_set; a program lift's did not, and
+# migration 012 made program_lifts.top_weight numeric(7,2) too. So a prescribed load
+# reached structuredContent as the JSON string "0.155e3" where a client had every reason
+# to expect the number 155 -- the same bug, in the payload rather than the prose, found by
+# printing that payload in #262.
+describe 'the load a program lift carries in the structured payload' do
+  include Rack::Test::Methods
+  include McpProse
+
+  it 'is a number rather than a string spelling one' do
+    token = mint(scopes: %w[read write])
+    program = write_block(token.raw)
+    load = program['weeks'].first['days'].first['lifts'].first['top_weight']
+
+    assert_kind_of Numeric, load, "top_weight came back as #{load.inspect}"
+    assert_equal 155, load
+  end
+end
+
 describe 'every tool that puts a weight in a sentence' do
   it 'runs it through the presenter first' do
     Dir[McpProse::TOOL_SOURCES].each do |tool|

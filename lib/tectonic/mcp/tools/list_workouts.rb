@@ -52,13 +52,32 @@ class Tectonic < Roda
             shown: workouts.length, total:, withheld: total - workouts.length, limit: limit_for(arguments) }
         end
 
-        # The withheld count is the point of the sentence: a model told "20 workouts" and
+        # The withheld count is the point of the first line: a model told "20 workouts" and
         # not told there are 63 will answer a question about the year from a fortnight.
+        #
+        # The rows below it are #262. The description promises set counts and a status per
+        # workout; the text was a single sentence carrying a total and nothing else, so a
+        # client rendering only the text -- which many are -- got a number where it had been
+        # told to expect a list, and no id to follow up with.
         def self.summary(workouts, total)
+          [count_line(workouts, total), *workouts.map { |workout| row(workout) }].join("\n")
+        end
+
+        def self.count_line(workouts, total)
           return "You have #{total} workout(s) in this range." if workouts.length == total
 
           "Showing #{workouts.length} of #{total} workout(s), most recent first; " \
             "#{total - workouts.length} not shown. Narrow with from/to or raise limit."
+        end
+
+        # One workout: when, what it is called, how much of it is done, and where it sits
+        # in the plan. `label` rather than `name` because a generated session has no name
+        # of its own and is known by its program day's focus.
+        def self.row(workout)
+          view = Presenter.view_workout(workout)
+          done = "#{view[:completed]} of #{view[:sets]} set(s) done"
+          "  [workout #{view[:id]}] #{view[:date]}#{" #{view[:label]}" if view[:label]}: " \
+            "#{done}, #{workout.status}#{', finished' if view[:finished]}"
         end
       end
     end
