@@ -4,6 +4,7 @@ require 'date'
 require_relative '../tool'
 require_relative 'support'
 require_relative '../../one_rep_max'
+require_relative '../../training_max'
 
 class Tectonic < Roda
   module MCP
@@ -64,9 +65,21 @@ class Tectonic < Roda
           (arguments[:limit] || DEFAULT_LIMIT).clamp(1, MAX_LIMIT)
         end
 
+        # estimated_1rm keeps its name and its meaning: the max the chart reads out of the
+        # sets, which is what it has always been. training_max beside it is what a
+        # percentage actually resolves against, which since #264 is the stated one where
+        # there is one -- so the two disagree exactly when somebody has overridden the
+        # estimate, and an assistant reading this can tell that they have.
+        #
+        # Reporting only the resolved number would have been smaller and wrong. "Your max
+        # is 315" and "you told us your max is 315" are different claims, and an assistant
+        # advising on a block needs the second: a stated max is a standing instruction, and
+        # a derived one is a reading that a layoff quietly invalidates.
         def self.payload(context, exercise, rows, arguments)
+          resolved = resolved_max(context, exercise, arguments)
           { exercise: exercise.name, exercise_id: exercise.id, shown: rows.length,
             limit: limit_for(arguments), estimated_1rm: estimated(context, exercise, arguments),
+            training_max: resolved&.pounds, training_max_source: resolved&.source,
             sets: rows.map { |set| Presenter.view_set(set).merge(date: set.workout.date.strftime('%Y-%m-%d')) } }
         end
 
@@ -74,8 +87,20 @@ class Tectonic < Roda
         # block that finished in March is answered with what was true in March. Without a
         # window it means now, which is what "what can I lift" asks.
         def self.estimated(context, exercise, arguments)
-          on = arguments[:to] ? Resolver.parse_date(arguments[:to]) : Date.today
-          exercise.estimated_max(account_id: context.account_id, on:)
+          exercise.estimated_max(account_id: context.account_id, on: as_of(arguments))
+        end
+
+        # What a percentage lift would generate against: the stated max if there is one and
+        # the derived reading otherwise. Through TrainingMax rather than repeating the
+        # fallback, so this and ProgramGenerator cannot come to different conclusions about
+        # the same movement -- which would make this tool describe a block it is not
+        # generating.
+        def self.resolved_max(context, exercise, arguments)
+          TrainingMax.for(account_id: context.account_id, exercise:, on: as_of(arguments))
+        end
+
+        def self.as_of(arguments)
+          arguments[:to] ? Resolver.parse_date(arguments[:to]) : Date.today
         end
 
         # `compact` before `max`, which is a second bug found while fixing the first. The
@@ -83,10 +108,21 @@ class Tectonic < Roda
         # both weighted and bodyweight sets in its history -- a pull-up, say -- reached
         # `max` with a nil among BigDecimals and raised ArgumentError rather than answering.
         # A history question about a mixed movement failed outright.
+        #
+        # The prose says the resolved max rather than the estimate, because it is the number
+        # the next block will be built on, and it says which kind it is -- many clients show
+        # only this text, and "max 315" that turns out to be a guess off a set from before a
+        # layoff is the misreading #264 is about.
         def self.summary(exercise, rows, context, arguments)
           heaviest = Presenter.weight(rows.map(&:weight).compact.max)
           "#{exercise.name}: #{rows.length} set(s), heaviest #{heaviest || 'none'}, " \
-            "estimated max #{estimated(context, exercise, arguments) || 'not yet readable'}."
+            "#{max_phrase(resolved_max(context, exercise, arguments))}."
+        end
+
+        def self.max_phrase(resolved)
+          return 'no training max yet and nothing lifted to estimate one from' unless resolved
+
+          "training max #{Presenter.weight(resolved.pounds)} (#{resolved.explanation})"
         end
       end
     end

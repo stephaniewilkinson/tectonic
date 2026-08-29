@@ -105,18 +105,35 @@ class Tectonic < Roda
       day
     end
 
-    # Everything about a lift except which day it belongs to.
+    # What a copied lift must not take with it: its own identity, and the day it belonged to.
+    # Everything else about a lift is part of the prescription and travels.
+    NOT_COPIED = %i[id program_day_id].freeze
+
+    # Everything about a lift except which day it belongs to and which row it is.
     #
-    # target_rpe is here because week two is week one again, a little heavier, and an effort
-    # the block asks for is part of what it asks. Left out, "top set at RPE 8" would hold
-    # for the first week of a block and quietly stop applying to every week copied from it
-    # -- which is the shape of the bug this method is most prone to, since a column added to
-    # program_lifts and not added here is silently dropped by the copy rather than refused.
+    # Read off the row rather than named, and that is #289. This method used to list its
+    # columns by hand, and a list of names is a list somebody has to remember to add to --
+    # so 009's four columns never reached it. `measure`, `is_weighted`, `is_per_side` and
+    # `duration_seconds` were all dropped by the copy, silently, because a column missing
+    # from a create is defaulted rather than refused.
+    #
+    # Two failure modes came out of that, and the quiet one was worse. A timed lift raised
+    # outright -- measure defaulted to 'reps' with no reps, which violates
+    # program_lifts_measures_one_way -- so "add a week like the last" was a 500 on any block
+    # containing a plank. An unweighted or per-side lift copied without complaint and came
+    # out wrong: a bodyweight lift became a weighted one, and a split squat written per side
+    # silently began counting half the volume it should, which is #279's bug in a new place.
+    #
+    # Deriving the list inverts the default. A column added to program_lifts is now carried
+    # unless somebody says otherwise, so the next one is right without anybody remembering
+    # this method exists -- which is the property a hand-written list could not have, and the
+    # note that used to sit here predicted the failure without preventing it.
+    #
+    # `values` rather than the reader methods, deliberately: it is the row as the database
+    # holds it, so `measure` comes back as the text the column stores rather than as the
+    # symbol ProgramLift#measure casts it to, and that is what an insert wants.
     def copied(lift)
-      { exercise_id: lift.exercise_id, position: lift.position, sets: lift.sets, reps: lift.reps,
-        top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
-        progression: lift.progression, is_barbell: lift.is_barbell, is_main: lift.is_main,
-        target_rpe: lift.target_rpe, note: lift.note }
+      lift.values.except(*NOT_COPIED)
     end
 
     def add_day(week, weekday:, focus: nil)
