@@ -308,6 +308,79 @@ def library_exercise(name)
   DB[:exercises].where(name:, account_id: nil).get(:id) or abort "The library has no #{name}."
 end
 
+# Folding one movement into another: everything logged against it and everything
+# prescribed with it move across, and the empty row goes.
+#
+# Written for #267, which is one row of production data: `exercise:1` is a bare "Squat"
+# predating the exercise library, sitting alongside Back Squat, High-Bar Squat and
+# Low-Bar Squat. Over MCP that is a real ambiguity rather than an untidy list, because
+# Resolver.exercise matches on the trimmed name and creates a private row when nothing
+# matches -- so "squat" is a coin toss between a legacy row and whichever variation was
+# meant, and a history question answered from the wrong one is answered wrongly and
+# silently.
+#
+# A task rather than a migration, because it is one account's history rather than a
+# schema change, and because whether those sets were back squats is a judgement only the
+# person who lifted them can make. Written generally rather than hard-coded to that row:
+# the same ambiguity turns up whenever somebody logs "Bench" for a year and then adds
+# "Bench Press", and a one-off script for a recurring shape is a script somebody rewrites
+# from memory the second time.
+#
+# DRY_RUN=1 says what it would do and writes nothing, which is the way to answer "how many
+# sets does it have" -- the question #267 says to ask first.
+namespace :exercises do
+  desc "Fold one movement into another and delete it: rake 'exercises:merge[Squat,Back Squat]'"
+  task :merge, %i[from to] do |_task, args|
+    merge_exercises(args[:from], args[:to])
+  end
+end
+
+def merge_exercises(from_name, to_name)
+  # The two tables that point at exercises, and the movement itself. Required here rather
+  # than at the top of the file so a task that never touches a movement never opens a
+  # connection by being loaded.
+  require_relative 'lib/tectonic/exercises'
+  require_relative 'lib/tectonic/sets'
+  require_relative 'lib/tectonic/program_lifts'
+  abort "Name both: rake 'exercises:merge[Squat,Back Squat]'" if from_name.nil? || to_name.nil?
+
+  from = sole_exercise(from_name)
+  to = sole_exercise(to_name)
+  abort 'A movement cannot be folded into itself.' if from.id == to.id
+
+  announce_merge(from, to)
+  return puts 'DRY_RUN: nothing written.' if ENV['DRY_RUN']
+
+  perform_merge(from, to)
+end
+
+# Exact name, and exactly one of it. A partial match would be convenient and is how the
+# wrong movement's history gets moved: "Squat" is a prefix of four rows here, and the
+# whole point of this task is that those four are worth telling apart.
+def sole_exercise(name)
+  found = Tectonic::Exercise.where(name: name.to_s.strip).all
+  abort "No movement named #{name.to_s.strip.inspect}." if found.empty?
+  abort "#{found.length} movements are named #{name.inspect} (ids #{found.map(&:id).join(', ')})." if found.length > 1
+
+  found.first
+end
+
+def announce_merge(from, to)
+  sets = Tectonic::WorkoutSet.where(exercise_id: from.id).count
+  lifts = Tectonic::ProgramLift.where(exercise_id: from.id).count
+  puts "#{from.name} (id #{from.id}#{', library row' if from.library?}) -> #{to.name} (id #{to.id})"
+  puts "  #{sets} set(s) and #{lifts} prescribed lift(s) would move."
+end
+
+def perform_merge(from, to)
+  DB.transaction do
+    Tectonic::WorkoutSet.where(exercise_id: from.id).update(exercise_id: to.id)
+    Tectonic::ProgramLift.where(exercise_id: from.id).update(exercise_id: to.id)
+    from.delete
+  end
+  puts "Folded #{from.name} into #{to.name}."
+end
+
 namespace :library do
   desc 'Load the built-in barbell exercise library (idempotent on name)'
   task :exercises do
