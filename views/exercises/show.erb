@@ -27,6 +27,57 @@
     <p class="mt-4 whitespace-pre-line text-sm text-gray-700"><%= @exercise.note %></p>
   <%- end %>
 
+  <%# The number a percentage of this movement resolves against, and a box to state it.
+      #264.
+
+      Above the history rather than below it, because it is a setting and the rest of this
+      page is a record -- and because the case it exists for is the one where there is no
+      history to sit under. Coming off a layoff, or on a movement never logged, everything
+      below here is empty and this is the only thing on the page worth reading.
+
+      On a library movement as well as an account's own, unlike the Edit button at the top.
+      That is the whole reason #264 is a table keyed on (account, movement) rather than a
+      column on the movement: a shared Back Squat carries a different max for every account
+      that lifts it, so there is nothing here for the library rule to protect.
+
+      Three states, and the page says which one it is in rather than showing a number and
+      leaving its provenance to be guessed. A stated max is a fact about the lifter. A
+      derived one is an inference the app is making, and should be seen to be making, since
+      it is the one that goes stale over a layoff -- which is the case this feature is for.
+      Neither is worth saying plainly too: it is the state in which a percentage lift
+      refuses to generate, and the refusal names this page. %>
+  <h2 class="mt-8 text-xl font-semibold text-gray-900">Training max</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    <%- if @training_max&.stated? %>
+      Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
+      which you set. Clear the box to go back to estimating it from your lifting.
+    <%- elsif @training_max %>
+      Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
+      estimated from your completed sets. Set one below to override it &mdash; worth doing coming
+      back from a layoff, when the estimate reads off work you did before the break.
+    <%- else %>
+      Nothing has been lifted here that the chart can read, so a lift written as a percentage
+      of this movement cannot be generated yet. Set a max, or log a completed set.
+    <%- end %>
+  </p>
+
+  <%# min-h-11 is 44px and text-base is 16px, which is the threshold below which iOS Safari
+      zooms the page when a field takes focus and leaves it zoomed. Both match the block
+      editor's row; see views/programs/_lift.erb. step="any" because this is a number the
+      lifter knows rather than one the rack has to build -- what a bar can be loaded to is a
+      different question, asked at generation. %>
+  <form method="post" action="/exercises/<%= @exercise[:id] %>/training-max" class="mt-3 flex items-end gap-2">
+    <%== csrf_tag("/exercises/#{@exercise[:id]}/training-max") %>
+    <label class="text-xs text-gray-500" for="training-max">
+      Pounds
+      <input type="number" name="pounds" id="training-max" min="0" step="any" autocomplete="off"
+             value="<%= weight_label(@training_max.pounds) if @training_max&.stated? %>" placeholder="lb"
+             class="<%= field_style %> mt-1 block min-h-11 w-28 px-2 text-base text-gray-900">
+    </label>
+    <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                  text-white hover:bg-lime-600">Save</button>
+  </form>
+
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>

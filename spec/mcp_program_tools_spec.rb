@@ -272,7 +272,12 @@ describe 'refusing to generate a week' do
                                                   top_weight: nil })
     call_tool('generate_program_week', raw: @token.raw, arguments: { program_id: @program['id'], week: 1 })
     assert tool_result['isError']
-    assert_includes tool_result.dig('content', 0, 'text'), 'No estimated max'
+    # "No estimated max" until #264, which is the refusal itself unchanged -- a week with
+    # no max to take a percentage of still will not generate, because inventing one would
+    # write every load in it off a guess. What moved is the remedy the message offers: a
+    # max can now be stated as well as derived, so "log a set first" is no longer the only
+    # way out and the sentence says both.
+    assert_includes tool_result.dig('content', 0, 'text'), 'No training max'
   end
 end
 

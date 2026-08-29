@@ -13,6 +13,7 @@ require_relative 'tools/delete_set'
 require_relative 'tools/delete_workout'
 require_relative 'tools/get_workout'
 require_relative 'tools/exercise_history'
+require_relative 'tools/set_training_max'
 require_relative 'tools/list_exercises'
 require_relative 'tools/list_workouts'
 require_relative 'tools/list_programs'
@@ -46,6 +47,7 @@ class Tectonic < Roda
         Tools::CreateExercise, Tools::UpdateExercise, Tools::CreateWorkout, Tools::CreateSet,
         Tools::CompleteSet, Tools::UpdateSet, Tools::DeleteSet, Tools::DeleteWorkout,
         Tools::ListExercises, Tools::ListWorkouts, Tools::GetWorkout, Tools::ExerciseHistory,
+        Tools::SetTrainingMax,
         Tools::ListPrograms, Tools::GetProgram, Tools::CreateProgram,
         Tools::UpdateProgram, Tools::DeleteProgram,
         Tools::AddProgramWeek, Tools::AddProgramDay, Tools::UpdateProgramDay,
