@@ -591,3 +591,96 @@ describe 'how old a max is, where it is read' do
   end
 end
 
+# Saying a training max as two numbers rather than one. #292.
+#
+# 020 stored one figure and multiplied it by percent_of_max directly, which works for a
+# lifter who does the arithmetic themselves and cannot express what 5/3/1 asks you to say:
+# my squat is 500, and I train off 90% of it. Collapsed to one number the 500 is nowhere,
+# so the page cannot show its working and a re-test means retyping a derived figure.
+describe 'a training max stated as a percentage of a max' do
+  include TrainingMaxes
+
+  before do
+    @account_id = scratch_account
+    @exercise = movement(@account_id)
+  end
+
+  it 'generates against the product rather than the number typed' do
+    Tectonic::TrainingMax.replace(@account_id, @exercise.id, 500, train_at: 90)
+
+    assert_equal 450, resolve(@account_id, @exercise).pounds
+  end
+
+  # Both halves survive, which is what lets the page show "500 lb x 90%" and catch a lifter
+  # who typed a tested single into a box meaning a training max.
+  it 'keeps both halves so the arithmetic can be shown' do
+    Tectonic::TrainingMax.replace(@account_id, @exercise.id, 500, train_at: 90)
+    resolved = resolve(@account_id, @exercise)
+
+    assert_equal 500, resolved.stated_pounds
+    assert_equal 90, resolved.train_at_percent
+    assert_equal '500 lb × 90%', resolved.working
+  end
+
+  # The default is what makes this safe to ship: it reproduces the old arithmetic exactly,
+  # so no existing account's loads move.
+  it 'is a no-op for a max stated without one' do
+    Tectonic::TrainingMax.replace(@account_id, @exercise.id, 450)
+    resolved = resolve(@account_id, @exercise)
+
+    assert_equal 450, resolved.pounds
+    refute_predicate resolved, :discounted?
+    assert_nil resolved.working
+  end
+end
+
+describe 'a percentage outside what anybody trains at' do
+  include TrainingMaxes
+
+  before do
+    @account_id = scratch_account
+    @exercise = movement(@account_id)
+  end
+
+  # Blank means "off the number I typed" rather than a refusal to save, which is what a
+  # lifter clearing the box is saying.
+  it 'falls back to the whole number when nothing usable was given' do
+    Tectonic::TrainingMax.replace(@account_id, @exercise.id, 500, train_at: '')
+
+    assert_equal 500, resolve(@account_id, @exercise).pounds
+  end
+
+  # A training max above the max it is a percentage of is not a thing, and neither is one at
+  # twenty percent. Both are typos, and the column refuses them either way.
+  it 'ignores one out of range rather than storing it' do
+    Tectonic::TrainingMax.replace(@account_id, @exercise.id, 500, train_at: 150)
+
+    assert_equal 500, resolve(@account_id, @exercise).pounds
+  end
+end
+
+describe 'stating a training max as two numbers over MCP' do
+  include Rack::Test::Methods
+  include TrainingMaxes
+
+  it 'takes both and reports the product' do
+    minted, exercise = minted_movement
+
+    call_tool('set_training_max', raw: minted.raw,
+                                  arguments: { exercise: exercise.name, pounds: 500, train_at_percent: 90 })
+
+    assert_equal 450, resolve(minted.account_id, exercise).pounds
+    assert_equal 450, tool_result.dig('structuredContent', 'training_max')
+  end
+
+  it 'refuses a percentage outside the range by naming the bound' do
+    minted, exercise = minted_movement
+
+    call_tool('set_training_max', raw: minted.raw,
+                                  arguments: { exercise: exercise.name, pounds: 500, train_at_percent: 20 })
+
+    assert tool_result.fetch('isError')
+    assert_includes tool_result.dig('content', 0, 'text'), 'Train at 20 is out of range'
+  end
+end
+

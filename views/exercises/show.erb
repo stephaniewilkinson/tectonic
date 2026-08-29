@@ -50,7 +50,7 @@
   <p class="mt-2 text-sm text-gray-600">
     <%- if @training_max&.stated? %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
-      which you set<%= @training_max.since %>.
+      <%= @training_max.stated_phrase %>.
       Clear the box to go back to estimating it from your lifting.
     <%- elsif @training_max %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
@@ -79,7 +79,9 @@
       would silently move the loads of everybody who has been typing an undiscounted number. %>
   <p class="mt-2 text-sm text-gray-600">
     This is the number percentages are taken of. A 5/3/1-style block wants roughly 90% of a
-    one-rep max here; if you program off a competition max, put the competition max in.
+    one-rep max, which you can say as two numbers &mdash; your max, and the percentage of it
+    you train off. If you program off a competition max, put it in and leave the percentage
+    blank.
   </p>
 
   <%# min-h-11 is 44px and text-base is 16px, which is the threshold below which iOS Safari
@@ -92,8 +94,24 @@
     <label class="text-xs text-gray-500" for="training-max">
       Pounds
       <input type="number" name="pounds" id="training-max" min="0" max="2000" step="any" autocomplete="off"
-             value="<%= weight_label(@training_max.pounds) if @training_max&.stated? %>" placeholder="lb"
+             value="<%= weight_label(@training_max.stated_pounds) if @training_max&.stated? %>" placeholder="lb"
              class="<%= field_style %> mt-1 block min-h-11 w-28 px-2 text-base text-gray-900">
+    </label>
+    <%# The second half of the prescription, and the reason both boxes exist rather than one.
+        A 5/3/1 lifter says 500 and 90 and the page shows "500 lb x 90%" back; a lifter
+        programming off a competition max says 500 and leaves this alone. Typing the
+        discounted number straight into the box above still works and always did -- 100 is
+        the default and multiplies out to itself -- so this adds a way to say it rather than
+        a way it must be said.
+
+        Blank means the whole number, which is what TrainingMax.fraction decides for every
+        write path: a lifter who clears this box is saying "off the number I typed", not
+        refusing to answer. %>
+    <label class="text-xs text-gray-500" for="train-at">
+      Train at
+      <input type="number" name="train_at_percent" id="train-at" min="50" max="100" step="1" autocomplete="off"
+             value="<%= @training_max.train_at_percent if @training_max&.discounted? %>" placeholder="%"
+             class="<%= field_style %> mt-1 block min-h-11 w-20 px-2 text-base text-gray-900">
     </label>
     <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
                                   text-white hover:bg-lime-600">Save</button>
