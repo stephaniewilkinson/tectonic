@@ -121,13 +121,24 @@ describe 'a poll that finds a set has moved under it' do
 
   # The middle failure of the three, and the worst: silently wrong rather than visibly
   # broken, because the plate math under it is for a load nobody is being asked to lift.
+  # The loads are matched with their unit rather than as bare numbers, and that is not
+  # tidiness. `refute_includes body, '155'` matched any occurrence of those three digits
+  # anywhere in the markup -- and every set on this screen writes its own id into a form
+  # action, a label `for`, and an input id. So the assertion failed whenever the sets
+  # sequence happened to hand this fixture id 155, which depends on how many rows the run
+  # created before it, which depends on the seed and on what the database was left at by the
+  # run before. Green on almost every seed and red on a few, for a reason that has nothing
+  # to do with the app.
+  #
+  # `load_label` renders "185 lb × 5" since #280, so the unit is what tells a weight apart
+  # from an id -- no id is ever followed by " lb".
   it 'sends the panels back when an assistant corrects a weight' do
     DB[:sets].where(id: @set_id).update(weight: 185)
     poll(@workout_id, @stale)
 
     assert_equal 200, last_response.status
-    assert_includes last_response.body, '185'
-    refute_includes last_response.body, '155'
+    assert_includes last_response.body, '185 lb'
+    refute_includes last_response.body, '155 lb'
   end
 
   it 'sends them back when an assistant completes a set' do
