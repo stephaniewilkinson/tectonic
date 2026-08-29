@@ -87,7 +87,7 @@
                     anyway -- the generator writes weight equal to planned_weight, so
                     changed_from_plan? is false until something changes it. %>
                 <div class="text-xs text-gray-500">
-                  planned <%= weight_label(set[:planned_weight]) %> &times; <%= set[:planned_reps] %>
+                  planned <%= planned_label(set) %>
                 </div>
               <%- end %>
             </div>
@@ -186,7 +186,7 @@
                     anyway -- the generator writes weight equal to planned_weight, so
                     changed_from_plan? is false until something changes it. %>
                 <div class="text-xs text-gray-500">
-                  planned <%= weight_label(set[:planned_weight]) %> &times; <%= set[:planned_reps] %>
+                  planned <%= planned_label(set) %>
                 </div>
               <%- end %>
             </div>

@@ -44,8 +44,19 @@ class Tectonic < Roda
     # Deliberately not is_barbell. That flag decides plate math and a warmup ramp, and a
     # dumbbell press has reps in reserve in exactly the sense a bench press does -- the
     # question is whether the set is counted in reps, not what it is loaded with.
+    # Nor unweighted work, which is #278. RPE on a set carrying no external load is a
+    # question about a movement rather than about a load: press-ups are as hard as your
+    # last set of press-ups made them, and the answer moves nothing the app can act on --
+    # there is no weight for Progression to step, and the rating would sit beside a blank
+    # where every other rated set has a number. Five 48px buttons is also the tallest thing
+    # on a row, and a session of banded and bodyweight accessories was mostly rating scale.
+    #
+    # This is the screen declining to ask. The database constraint from #211 still permits
+    # a rating here, and deliberately: it enforces the two rules that are about meaning --
+    # warmups and timed work -- and narrowing it to weight as well would be a migration
+    # that clears ratings somebody did record.
     def ratable?
-      !is_warmup && !timed?
+      !is_warmup && !timed? && !weight.nil?
     end
 
     # The work of one set, doubled where the count was per side. A Bulgarian split squat

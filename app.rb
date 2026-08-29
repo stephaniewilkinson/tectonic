@@ -444,6 +444,10 @@ class Tectonic < Roda
         # own variation better than a name ever says. The paths with nobody to ask fall
         # back to the library name instead.
         is_barbell = !r.params['is_barbell'].nil?
+        # And whether it is counted one limb at a time, on the same terms (#279). Every
+        # other write path could set this and the form could not, so a split squat added
+        # in the browser counted half the volume it should have and nothing said so.
+        default_is_per_side = !r.params['default_is_per_side'].nil?
         # The textarea is posted whether or not anyone typed in it, so a blank one has to
         # become a null rather than an empty string; clean_note is where that is decided
         # for every write path, this one and the MCP tools alike.
@@ -456,8 +460,8 @@ class Tectonic < Roda
         # and quietly erase an icon an assistant had chosen every time somebody used the
         # browser to fix a typo in the name.
         if r.params['id'].empty?
-          exercise_id = Exercise.insert(name: r.params['name'],
-                                        account_id: @account_id, is_barbell:, note:)
+          exercise_id = Exercise.insert(name: r.params['name'], account_id: @account_id,
+                                        is_barbell:, default_is_per_side:, note:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
@@ -467,7 +471,7 @@ class Tectonic < Roda
           # everybody else reads.
           @exercise = Exercise.owned_by(@account_id).where(id: r.params['id']).first
           r.redirect '/exercises' unless @exercise
-          @exercise.update(name: r.params['name'], is_barbell:, note:)
+          @exercise.update(name: r.params['name'], is_barbell:, default_is_per_side:, note:)
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end
@@ -1043,8 +1047,26 @@ class Tectonic < Roda
   # The times sign is the character and not `&times;`, because this phrase is a value that
   # a template escapes rather than markup a template trusts. An entity written here would
   # arrive on the page spelled out rather than drawn.
+  # The unit is said out loud, which is #280. This read "20 × 8", and in a gym "20 x 8" is
+  # a notation people already use for something else: twenty sets of eight is nonsense, but
+  # "3 x 8" means three sets of eight everywhere lifting is written down, so a reader
+  # arriving at a two-number phrase reaches for sets-and-reps first. On a heavy barbell
+  # lift the size of the number settles it -- nobody does 225 sets -- and on the accessory
+  # work where the first number is small, nothing did.
+  #
+  # "lb" on the load rather than "reps" on the count, because it disambiguates with three
+  # characters on the number that is already the largest thing on the row, and because it
+  # is the half a lifter is reading at arm's length. Unweighted work still says "8 reps" in
+  # full, since there is no load in front of it to make the count obvious.
   def load_label(set)
-    "#{"#{weight_label(set[:weight])} × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+    "#{"#{weight_label(set[:weight])} lb × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+  end
+
+  # What the sheet said, in the same words as what was lifted. The two sit one line apart
+  # on a changed set -- "75 lb × 5" over "planned 95 × 5" -- and a unit on only one of them
+  # reads as two different kinds of number rather than as the same number twice. #280.
+  def planned_label(set)
+    "#{"#{weight_label(set[:planned_weight])} lb × " if set[:planned_weight]}#{set[:planned_reps]}"
   end
 
   # A weight as somebody would write it on a sheet: 225 rather than 225.0, and 137.5 as

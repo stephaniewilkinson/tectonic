@@ -31,6 +31,26 @@
       <input type="checkbox" name="is_barbell" id="is_barbell" value="1" <%= 'checked' if @exercise&.is_barbell %> class="h-4 w-4 rounded border-gray-300 text-lime-500 accent-lime-500 focus:ring-lime-500">
       <label for="is_barbell" class="text-sm font-medium leading-6 text-gray-900">Loaded on a barbell</label>
     </div>
+    <%# The second thing the app cannot work out from a name, and the one that changes the
+        arithmetic rather than the drawing: a movement done one limb at a time is written
+        3x8 and lifted sixteen times, so counted_reps doubles it and every volume figure
+        downstream depends on the answer. #279.
+
+        The column has existed since the per-side work and every write path could set it --
+        create_program, add_program_lift, the MCP exercise tools -- except the one a person
+        actually uses. So a Bulgarian split squat added in the browser was half the volume
+        it should have been, silently, and the only way to correct it was to ask an
+        assistant to do it.
+
+        A default rather than a fact about one set: a prescription may override it for a
+        block that wants the dumbbell press done one arm at a time, which is what
+        shape_of already reads. This is what that override falls back to. %>
+    <div class="mt-4 flex items-center gap-2">
+      <input type="checkbox" name="default_is_per_side" id="default_is_per_side" value="1"
+             <%= 'checked' if @exercise&.default_is_per_side %>
+             class="h-4 w-4 rounded border-gray-300 text-lime-500 accent-lime-500 focus:ring-lime-500">
+      <label for="default_is_per_side" class="text-sm font-medium leading-6 text-gray-900">Counted per side</label>
+    </div>
   </div>
   <input type="hidden" name="id" id="id" value="<%= @exercise&.id || nil %>">
   <input type="submit" value="Save" class="<%= button_style %> mt-4 block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-lime-600">
