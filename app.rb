@@ -507,7 +507,8 @@ class Tectonic < Roda
         # TrainingMax.replace, which is where that decision is made for every write path.
         r.post 'training-max' do
           check_csrf!
-          TrainingMax.replace(@account_id, @exercise.id, r.params['pounds'])
+          TrainingMax.replace(@account_id, @exercise.id, r.params['pounds'],
+                              train_at: r.params['train_at_percent'])
           r.redirect "/exercises/#{@exercise.id}/"
         end
         r.get do

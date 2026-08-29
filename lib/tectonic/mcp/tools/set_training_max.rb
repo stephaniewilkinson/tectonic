@@ -35,18 +35,25 @@ class Tectonic < Roda
                     'break, and a movement never logged, where there is nothing to read. ' \
                     'Omit pounds, or send 0, to clear it and go back to the estimate. Works ' \
                     'on shared library movements too: the value belongs to this account, ' \
-                    'not to the movement.'
+                    'not to the movement. train_at_percent, 50 to 100, is the fraction of ' \
+                    'that number percentages are actually taken of -- send pounds 500 and ' \
+                    'train_at_percent 90 for a 5/3/1 lifter with a tested 500 single, or ' \
+                    'leave it out to train off the whole number, which is what a ' \
+                    'competition-max convention means.'
         scope :write
         input_schema(
           type: 'object',
-          properties: { exercise: { type: 'string' }, pounds: { type: 'number' } },
+          properties: { exercise: { type: 'string' }, pounds: { type: 'number' },
+                        train_at_percent: { type: 'integer' } },
           required: ['exercise'], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           Bounds.check(Bounds::WEIGHT, arguments[:pounds], 'Training max', unit: ' lb')
-          TrainingMax.replace(context.account_id, exercise.id, arguments[:pounds])
+          Bounds.check(TrainingMax::TRAIN_AT, arguments[:train_at_percent], 'Train at', unit: '%')
+          TrainingMax.replace(context.account_id, exercise.id, arguments[:pounds],
+                              train_at: arguments.fetch(:train_at_percent, TrainingMax::WHOLE))
           answer(context, exercise)
         end
 

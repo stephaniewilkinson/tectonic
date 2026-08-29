@@ -53,18 +53,32 @@ class Tectonic < Roda
     # lands rather than on the one path that remembered it.
     PLAUSIBLE = (0..2000)
 
+    # What fraction of a stated number a lifter actually trains off, bounded the way the
+    # column is (#292). A training max above the max it is a percentage of is not a thing,
+    # and neither is one at twenty percent; both are typos.
+    TRAIN_AT = (50..100)
+    # Training off the whole number, which is what a competition-max convention says and
+    # what every row written before #292 means.
+    WHOLE = 100
+
     # The day this number is as of, and both kinds have one (#293). For a stated max it is
     # when it was said; for a derived one it is when the set behind it was lifted.
     #
     # One accessor rather than two, because every reader asks the same question -- "how old
     # is this" -- and a caller that had to pick between stated_at and something else would be
     # re-deriving `source` to do it. `explanation` is where the two readings are told apart.
-    attr_reader :pounds, :source, :as_of
+    # `pounds` is what percentages are taken of, which since #292 is not always what the
+    # lifter typed: `stated_pounds` is the number they entered and `train_at_percent` is the
+    # fraction of it they train off, and `pounds` is those two multiplied out. Every caller
+    # doing arithmetic wants the product; the two parts are for showing the working.
+    attr_reader :pounds, :source, :as_of, :stated_pounds, :train_at_percent
 
-    def initialize(pounds:, source:, as_of: nil)
+    def initialize(pounds:, source:, as_of: nil, stated_pounds: nil, train_at_percent: WHOLE)
       @pounds = pounds
       @source = source
       @as_of = as_of
+      @stated_pounds = stated_pounds || pounds
+      @train_at_percent = train_at_percent
     end
 
     # The max to generate against, or nil when there is neither a stated one nor enough
@@ -88,8 +102,15 @@ class Tectonic < Roda
     # the rack -- Plates.numeric is the same conversion Equipment does on plate denominations,
     # and for the same reason: 315 should come back as 315 rather than as a decimal that
     # prints with a trailing zero everywhere it is displayed.
+    # `pounds` is the product rather than the column, which is the whole of #292: a lifter
+    # who says "my squat is 500 and I train off 90%" is generated against 450, and both
+    # halves survive so the page can show the arithmetic that produced it. A row written
+    # before #292 carries 100 and multiplies out to itself.
     def self.from_row(row)
-      new(pounds: Plates.numeric(row[:pounds].to_r), source: STATED, as_of: row[:stated_at])
+      stated = Plates.numeric(row[:pounds].to_r)
+      percent = row[:train_at_percent] || WHOLE
+      new(pounds: Plates.numeric((stated * percent / 100.0).to_r), source: STATED,
+          as_of: row[:stated_at], stated_pounds: stated, train_at_percent: percent)
     end
 
     # Saves what a lifter typed, or clears it when they typed nothing.
@@ -110,15 +131,28 @@ class Tectonic < Roda
     # stored value is the only outcome that loses nothing. The form carries min and max so a
     # browser refuses it first, and set_training_max refuses it by name; this is what holds
     # if anything reaches here without either.
-    def self.replace(account_id, exercise_id, pounds)
+    #
+    # `train_at` is the fraction of that number the lifter trains off (#292), defaulting to
+    # the whole of it. Out of range is ignored the same way an implausible weight is, and for
+    # the same reason: the stored value is the only outcome that loses nothing.
+    def self.replace(account_id, exercise_id, pounds, train_at: WHOLE)
       number = Float(pounds.to_s, exception: false)
       return clear(account_id, exercise_id) unless number&.positive?
       return unless PLAUSIBLE.cover?(number)
 
+      percent = fraction(train_at)
       DB[:account_training_maxes]
         .insert_conflict(target: %i[account_id exercise_id],
-                         update: { pounds: number, stated_at: Sequel::CURRENT_TIMESTAMP })
-        .insert(account_id:, exercise_id:, pounds: number)
+                         update: { pounds: number, train_at_percent: percent,
+                                   stated_at: Sequel::CURRENT_TIMESTAMP })
+        .insert(account_id:, exercise_id:, pounds: number, train_at_percent: percent)
+    end
+
+    # A percentage as it should be stored: the whole number where nothing usable was given,
+    # so a blank box means "off the number I typed" rather than refusing the save.
+    def self.fraction(train_at)
+      number = Integer(train_at.to_s, 10, exception: false)
+      number && TRAIN_AT.cover?(number) ? number : WHOLE
     end
 
     def self.clear(account_id, exercise_id)
@@ -134,7 +168,31 @@ class Tectonic < Roda
     # is a fact about the lifter, and a derived one is an inference the app is making and
     # should be seen to be making -- and, since it is an estimated *single* standing in for a
     # training max, an inference on a different scale from the one the box asks for.
+    # Whether the stated number and the number trained off are different, which is when the
+    # arithmetic is worth showing. False for a competition-max convention, and for every row
+    # written before #292.
+    def discounted?
+      stated? && train_at_percent != WHOLE
+    end
+
+    # "500 lb x 90%", for a page that wants to show its working. Nil where there is none to
+    # show, so a caller guards on the value rather than on the convention.
+    def working
+      return nil unless discounted?
+
+      "#{Plates.numeric(stated_pounds)} lb \u00d7 #{train_at_percent}%"
+    end
+
+    # How a stated max introduces itself on its own page: what it is, and when it was said.
+    # One method rather than a conditional in the template, which erb_lint is right to
+    # dislike -- a view choosing between two phrasings and then appending a third is three
+    # decisions in a tag, and the tag has to be split across lines to fit.
+    def stated_phrase
+      "#{discounted? ? "which is #{working}" : 'which you set'}#{since}"
+    end
+
     def explanation
+      return "#{train_at_percent}% of the #{Plates.numeric(stated_pounds)} lb max you set" if discounted?
       return 'the max you set' if stated?
 
       'an estimated one-rep max from your completed sets, since you have not set one'
