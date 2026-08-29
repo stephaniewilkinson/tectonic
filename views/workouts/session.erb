@@ -1,4 +1,12 @@
-<div class="mx-auto max-w-md pb-12">
+<%# pb-24 rather than pb-12, and the number is the footer's. #277 pinned the rating scale to
+    the bottom of the screen, and a fixed element is out of the flow -- so without padding
+    the same height beneath it, it would sit on top of the last set row of every session.
+    The one control it would cover is Done, which is the whole point of the screen.
+
+    24 is 96px against a collapsed footer of 44px plus its safe-area inset, which is more
+    than the arithmetic needs. That slack is deliberate: it is the gap between the last Done
+    button and the footer, and a thumb aiming at the first needs to not find the second. %>
+<div class="mx-auto max-w-md pb-24">
   <div class="flex items-baseline justify-between">
     <h1 class="text-3xl font-semibold text-gray-900">
       <%= @workout[:date].strftime('%A %b %-d') %>
@@ -30,6 +38,30 @@
     <%== render('workouts/_session_body') %>
   </div>
 </div>
+
+<%# The rating scale, once, pinned to the foot of the screen. #277.
+
+    Here rather than inside #session-body, and that is the placement the whole thing rests
+    on: a Done tap sends back one lift panel and the progress bar, and the poll sends back
+    every panel, so anything inside that region is replaced several times a session. A
+    <details> is stateful -- it is open or it is not -- and state inside a swapped element
+    is state that resets. Out here it is rendered once per page load and htmx never touches
+    it, so a scale the lifter opened stays open through a set, a tap, and a poll.
+
+    Asked of the whole session rather than of one lift, which is the guard that used to live
+    at the foot of _lift_panel.erb. Same predicate -- ratable? on the model, so the table and
+    the five buttons that fill it in can never disagree about who is being asked -- but read
+    across every set on the page, because a footer belongs to the page.
+
+    A session with nothing ratable in it therefore has no footer at all: all warmups, or all
+    timed work, and the table would be explaining a scale nothing on screen offers. That
+    session also keeps the shorter bottom padding it needs, which is the one thing the wrapper
+    above cannot know -- and is why pb-24 is unconditional there rather than clever here. A
+    little dead space at the foot of a warmup-only session is worth less than a rule that
+    reads two ways. %>
+<%- if @sets.any?(&:ratable?) %>
+  <%== render('workouts/_rpe_help') %>
+<%- end %>
 
 <%# One thing left in here, and it is not the one that used to be.
     A tap used to replace the whole of #session-body, which destroyed the scroller along

@@ -292,14 +292,13 @@
       <%- end %>
     </ul>
 
-    <%# The scale belongs under the buttons that ask for it, and only under those. A panel
-        of nothing but warmups asks for no rating -- the ramp rows carry no RPE row -- so
-        it would be a table answering a question that panel never puts.
+    <%# No copy of the rating scale here since #277. It was the footer of every panel that
+        asked for a rating, which is how it stayed near the buttons it explains; it is now
+        one copy pinned to the foot of the screen, rendered from views/workouts/session.erb,
+        which is nearer to every panel than a copy inside one panel ever was.
 
-        Asked of the same predicate the buttons use rather than of is_warmup, so the two
-        cannot drift: a lift of nothing but timed sets now also asks nothing, and until
-        #211 it drew the full scale under five buttons it had no business offering. %>
-    <%- if lift.any?(&:ratable?) %>
-      <%== render('workouts/_rpe_help') %>
-    <%- end %>
+        The guard went with it and had to. "Does this panel ask for a rating" is the wrong
+        question for page furniture -- a footer that appeared and vanished as you swiped
+        between a squat and a plank would be a control moving under the thumb -- so the page
+        asks whether any set in the session can be rated. Same predicate, one level up. %>
   </section>
