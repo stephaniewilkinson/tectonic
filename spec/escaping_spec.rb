@@ -160,7 +160,7 @@ describe 'an entity that passes through an expression' do
     visit "/workouts/#{workout.id}/session"
 
     refute_includes page.body, '&amp;times;'
-    assert_includes page.text, '225 × 5'
+    assert_includes page.text, '225 lb × 5'
   end
 end
 

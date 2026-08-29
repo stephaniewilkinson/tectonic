@@ -142,7 +142,7 @@ describe 'a weight that is not on the five pound grid' do
     fill_in 'Weight', with: '135'
     click_button 'Save'
 
-    assert page.has_text?('135 × 5'), 'the revised weight should be on the row'
+    assert page.has_text?('135 lb × 5'), 'the revised weight should be on the row'
   end
 end
 
@@ -167,8 +167,8 @@ describe 'a warmup taken differently from the ramp' do
     fill_in "weight-#{warmup_id}", with: '75'
     click_button 'Save'
 
-    assert page.has_text?('75 × 5'), 'the warmup row should carry what was lifted'
-    assert page.has_text?('planned 95 × 5'), 'and should say what it was changed from'
+    assert page.has_text?('75 lb × 5'), 'the warmup row should carry what was lifted'
+    assert page.has_text?('planned 95 lb × 5'), 'and should say what it was changed from'
     refute page.has_css?('li.bg-amber-50'), 'and should not wear a third state'
   end
 
