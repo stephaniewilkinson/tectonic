@@ -68,9 +68,12 @@ class Tectonic < Roda
     # through the workouts rather than the sets alone, because a library movement is
     # shared and the work done on it is not: another account's lifting must never reach
     # this number.
+    # planned_rpe joins the select with #294: it is what the chart reads a set at when the
+    # lifter did not rate it, and it was sitting on the row unread since #265.
     def lifted_sets(account_id, on)
       mine = Workout.where(account_id:).where { date < (on + 1) }.select(:id)
-      WorkoutSet.where(exercise_id: id, workout_id: mine, is_completed: true).select(:weight, :reps, :rpe).all
+      WorkoutSet.where(exercise_id: id, workout_id: mine, is_completed: true)
+                .select(:weight, :reps, :rpe, :planned_rpe).all
     end
   end
 end
