@@ -85,12 +85,18 @@ class Tectonic < Roda
         ENV.fetch('MCP_SERVER_VERSION', '1.0.0')
       end
 
-      # High-level orientation for a model, per spec §6: what Tectonic is and the one
-      # unit fact that trips up every numeric tool. Tool-specific guidance stays on tools.
+      # High-level orientation for a model, per spec §6: what Tectonic is, the one unit
+      # fact that trips up every numeric tool, and where ids come from. Tool-specific
+      # guidance stays on tools.
+      #
+      # The last sentence is #262. Every edit tool takes an id and nothing said how to get
+      # one; the answer is list_* or search, and an MCP audit found it by trial instead.
       def instructions
         'Tectonic is a barbell strength-training tracker: accounts log workouts, each ' \
           'containing sets of an exercise with a weight and rep count. All weights are ' \
-          'integer pounds. Every tool acts only on the authenticated account.'
+          'integer pounds. Every tool acts only on the authenticated account. ' \
+          'The edit tools take ids: get them from list_workouts, list_programs and ' \
+          'list_exercises, or from search, whose results fetch resolves.'
       end
 
       def on?(key, default:)
