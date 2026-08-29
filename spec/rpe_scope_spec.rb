@@ -78,7 +78,7 @@ describe 'which sets the session screen asks to rate' do
   end
 
   it 'still shows the scale, because one set on the panel can be rated' do
-    assert_includes @body, 'How do I rate this?'
+    assert_includes @body, 'RPE Advice'
   end
 end
 
@@ -99,7 +99,7 @@ describe 'the rating scale on a lift measured in seconds' do
     end
     get "/workouts/#{workout_id}/session"
 
-    refute_includes last_response.body, 'How do I rate this?'
+    refute_includes last_response.body, 'RPE Advice'
     refute_includes last_response.body, 'name="rpe"'
   end
 end

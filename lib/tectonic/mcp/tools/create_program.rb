@@ -28,7 +28,8 @@ class Tectonic < Roda
             top_weight: { type: 'number' }, percent_of_max: { type: 'integer' },
             is_weighted: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
             is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
-            is_main: { type: 'boolean' }, is_barbell: { type: 'boolean' }, note: { type: 'string' }
+            is_main: { type: 'boolean' }, is_barbell: { type: 'boolean' },
+            target_rpe: { type: 'integer' }, note: { type: 'string' }
           },
           required: %w[exercise sets], additionalProperties: false
         }.freeze

@@ -7,6 +7,7 @@ require_relative '../../exercises'
 require_relative '../../exercise_library'
 require_relative '../../workouts'
 require_relative '../../sets'
+require_relative '../../measured'
 require_relative '../../timing'
 
 class Tectonic < Roda
@@ -56,6 +57,32 @@ class Tectonic < Roda
           kind = warmup ? 'a warmup' : 'a set counted in seconds'
           raise Tool::Refusal, "RPE is reps in reserve, so it does not apply to #{kind}. " \
                                'Leave rpe out, or clear is_warmup first.'
+        end
+
+        # The same question asked of a prescription rather than of a set. #265.
+        #
+        # Beside rating_fits! rather than in ProgramWriter because it is the same rule about
+        # the same scale, and the two would otherwise be a pair of RPE placement rules in
+        # different files, free to drift. The prescription side has one clause the set side
+        # does not: #278 decided the screen does not ask for a rating on work carrying no
+        # external load, so a target there would print an instruction with no buttons under
+        # it to answer -- a prescription the app accepted and then silently swallowed.
+        #
+        # There is no warmup clause, because a lift prescribes its working sets and the ramp
+        # above them is computed by Warmup rather than written. The generator declines to
+        # copy a target onto a ramp row, and sets_planned_rpe_only_on_working_reps holds it
+        # to that.
+        #
+        # It answers both halves of "is this target acceptable" -- how large it may be as
+        # well as where it may sit -- because no caller wants one without the other, and a
+        # range checked at one call site with the placement checked at another is how the two
+        # come to be applied to different arguments.
+        def target_fits!(target, measure:, weighted:)
+          check(RPE, target, 'Target RPE')
+          return if target.nil? || (measure == Measured::REPS && weighted)
+
+          raise Tool::Refusal, 'A target RPE is reps in reserve, so it belongs only on a loaded lift ' \
+                               'counted in reps. Drop target_rpe, or prescribe this lift in reps with a load.'
         end
       end
 
@@ -199,15 +226,24 @@ class Tectonic < Roda
         # column hands back, which would serialise as "0.1375e3" and reach an assistant as a
         # string it has to parse. Plates.numeric gives 225 back as an Integer and 137.5 as a
         # Float, which is what JSON wants of each.
+        # completed_at is iso8601 to match provenance's created_at below, so the two
+        # timestamps in one payload agree about shape. Nil on every set completed before
+        # #281 and on every one not yet done.
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
             rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps,
-            # When it was done, iso8601 to match provenance's created_at below, so the two
-            # timestamps in one payload agree about shape. Nil on every set completed before
-            # #281 and on every one not yet done.
             completed_at: set.completed_at&.iso8601 }
-            .merge(provenance(set))
+            .merge(prescribed(set)).merge(provenance(set))
+        end
+
+        # The three columns saying what was asked for, split out from what was done. They
+        # travel together because they are one fact -- the prescription -- and they were
+        # extracted here when planned_rpe made the third: a hash literal naming both halves
+        # of every dimension is a method doing two jobs, and rubocop counted it before a
+        # reader would have.
+        def prescribed(set)
+          { planned_weight: weight(set.planned_weight), planned_reps: set.planned_reps,
+            planned_rpe: set.planned_rpe }
         end
 
         def weight(value)

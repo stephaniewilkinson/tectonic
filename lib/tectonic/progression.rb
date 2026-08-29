@@ -92,6 +92,29 @@ class Tectonic < Roda
 
       set[:weight] >= set[:planned_weight] && set[:reps] >= set[:planned_reps]
     end
+
+    # How far the effort landed from the effort that was asked for, in reps in reserve.
+    # #265, and it is the reason that issue is worth doing rather than a display of it.
+    #
+    # Positive means harder than prescribed -- a set asked for at 8 and rated 9 is one rep
+    # further into the tank than the block intended, and a block full of those is a block
+    # running ahead of the lifter. Negative means easier, which over a week is the signal
+    # that the loads are behind where the lifter now is. Zero is the prescription answered.
+    #
+    # nil where the question was not put or not answered: a set carrying no target was not
+    # asked, and one carrying no rating did not say. Those are different from a gap of zero
+    # and must not be flattened into it -- an unrated set is not a set taken exactly as
+    # written, and counting it as one is how an average comes out reassuring.
+    #
+    # Nothing calls this from the rules above yet, and that is deliberate. Autoregulating on
+    # the gap is a real change to how loads move and wants its own issue and its own
+    # argument; this is the number that argument would have to be made with, exposed where
+    # the rest of "asked for versus happened" already lives.
+    def rpe_gap(set)
+      return nil unless set[:planned_rpe] && set[:rpe]
+
+      set[:rpe] - set[:planned_rpe]
+    end
   end
 end
 

@@ -77,8 +77,25 @@ class Tectonic < Roda
           parts << "(planned #{set[:planned_weight]}x#{set[:planned_reps]})" if revised?(set)
           parts << 'warmup' if set[:is_warmup]
           parts << (set[:is_completed] ? 'done' : 'not done')
-          parts << "RPE #{set[:rpe]}" if set[:rpe]
+          parts << rating(set) if set[:rpe] || set[:planned_rpe]
           parts.join(' ')
+        end
+
+        # The effort, as asked for and as answered. #265, and this is the read-back that
+        # issue is really for: the app already stores both halves of "what was prescribed
+        # versus what happened" for weight and for reps, and printing only the answer threw
+        # away the half that makes the other one mean anything.
+        #
+        # Both numbers only where they differ, on the same rule the planned weight above
+        # follows -- on a set taken exactly as asked it is the same figure twice. A target
+        # with no answer is a set not yet rated, and says so rather than printing a bare
+        # number an assistant would read as the rating.
+        def self.rating(set)
+          return "RPE #{set[:rpe]}" unless set[:planned_rpe]
+          return "RPE target #{set[:planned_rpe]}, not yet rated" unless set[:rpe]
+          return "RPE #{set[:rpe]}" if set[:rpe] == set[:planned_rpe]
+
+          "RPE #{set[:rpe]} (target #{set[:planned_rpe]})"
         end
 
         # Only worth printing where the prescription and the performance disagree; on a
