@@ -221,9 +221,14 @@ describe 'the same session on a desktop' do
   end
 end
 
-# The rating scale used to sit once at the bottom of the page. With the lifts as panels
-# that is a swipe and a scroll away from the buttons it explains, so it is the footer of
-# every panel that asks a rating question -- and of no panel that does not.
+# The rating scale sat once at the bottom of the page, then once per panel, and is now a
+# fixed footer. #277.
+#
+# The middle arrangement was the answer to panels: one copy at the foot of a long page was
+# a swipe and a scroll away from the buttons it explains, so every panel that asked a
+# rating question carried its own. Pinning it to the screen answers the same question
+# better -- the foot of the viewport is nearer to every panel than the foot of one panel is
+# to the others -- and the duplication has nothing left to buy.
 describe 'where the rating scale sits' do
   include Rack::Test::Methods
   include RouteOwnership
@@ -234,37 +239,63 @@ describe 'where the rating scale sits' do
     @body = last_response.body
   end
 
-  # Two lifts with working sets on them, and no third copy below them. The third used to
-  # sit under the session rating form, which was directly below the last panel, so it was
-  # the same disclosure twice with only the rating buttons in between -- #175. #209 has
-  # since taken that form away entirely, so what is left below the last panel is nothing,
-  # and two copies is still the answer.
-  it 'is under every panel that asks for a rating, and nowhere twice over' do
-    assert_equal 2, @body.scan('How do I rate this?').length
+  # Two lifts with working sets on them, and one scale. This counted two before #277, and
+  # the number going down is the change: the copies were per panel, and there is now one
+  # copy per page however many panels the session has.
+  it 'is on the page exactly once, however many panels ask for a rating' do
+    assert_equal 1, @body.scan('RPE Advice').length
   end
 
-  it 'is not on a lift of nothing but warmups' do
-    assert_includes panels(@body).first, 'How do I rate this?'
-    refute_includes panels(@body).last, 'How do I rate this?'
+  # The old name, gone. Asserted rather than assumed, because a rename that leaves the old
+  # string somewhere is a page with both on it, and the count above would not notice.
+  it 'is not still asking the question it used to ask' do
+    refute_includes @body, 'How do I rate this?'
+  end
+
+  # It used to be *inside* a panel, which is the arrangement this replaces. A copy left
+  # behind in one would ride the swipe strip sideways and take its own guard with it.
+  it 'is no longer inside any panel' do
+    panels(@body).each { |panel| refute_includes panel, 'RPE Advice' }
   end
 
   # #175 is a picture of the foot of this page: the scale, the session rating buttons, and
-  # the scale again. What went wrong is visible only below the last panel, so that is where
-  # this looks -- the copies inside panels are the ones that are supposed to be there.
-  #
-  # The session rating buttons that sat between the two copies are gone with #209, so the
-  # foot of the page is asserted to hold neither. The rating scale is the thing this
-  # describe is about; the session RPE heading is named as well because its absence is now
-  # a rule rather than an accident, and a form put back here would go unnoticed otherwise.
-  it 'puts none of them below the last panel, where the duplicate showed' do
+  # the scale again. The scale belongs below the last panel now -- that is what a footer
+  # is -- so what this holds is the half of #175 that is still a rule: the session rating
+  # form is gone with #209, and one put back here would go unnoticed otherwise.
+  it 'is below the last panel, and is the only thing there' do
     tail = @body.split('</section>').last
 
-    refute_includes tail, 'How do I rate this?'
+    assert_includes tail, 'RPE Advice'
     refute_includes tail, 'Session RPE'
   end
+end
 
-  it 'stays closed, because five open tables is worse than one far away' do
+# What makes it a footer rather than simply the last thing on the page. #277 asks for the
+# content to scroll *behind* it, which is a positioning claim and not a placement one.
+describe 'the rating scale as page furniture' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SwipeableSession
+
+  before do
+    get "/workouts/#{swipeable_session(login)}/session"
+    @body = last_response.body
+  end
+
+  # Fixed, so the session scrolls behind it rather than ending above it.
+  it 'is pinned to the foot of the screen rather than to the end of the content' do
+    assert_includes @body, 'fixed inset-x-0 bottom-0'
+  end
+
+  it 'stays closed, because an open table would cover the session it explains' do
     refute_includes @body, '<details open'
+  end
+
+  # The footer is out of the flow, so nothing in the flow reserves space for it. Without
+  # padding the last set row sits underneath it, and the control that ends up covered is
+  # Done -- the one thing the screen is for.
+  it 'leaves room beneath the last set row for itself' do
+    assert_includes @body, 'mx-auto max-w-md pb-24'
   end
 end
 
@@ -285,7 +316,7 @@ describe 'the rating scale on a session of nothing but warmups' do
   end
 
   it 'is not on the page at all' do
-    assert_equal 0, @body.scan('How do I rate this?').length
+    assert_equal 0, @body.scan('RPE Advice').length
   end
 
   # The page still renders, and still renders as a session rather than as an error, which

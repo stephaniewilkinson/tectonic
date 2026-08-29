@@ -1,25 +1,57 @@
-<%# The rating scale, rendered as the footer of every lift panel with a working set in it.
-    It used to sit once at the bottom of the page, which was a scroll away from the buttons
-    it explains even when the lifts were stacked, and is a swipe and a scroll away now that
-    they are panels. Warmup-only panels do not carry it, because they ask nothing.
+<%# The rating scale, as a fixed footer the session scrolls behind. #277, and it is called
+    "RPE Advice" because that is what the issue asks it be called -- "How do I rate this?"
+    was a question, and a question sitting permanently on screen reads as one being put to
+    you rather than as a reference you may open.
 
-    A panel is the unit, so there is one copy per screenful and never two. The session
-    rating at the foot of the page used to render its own on top of the last panel's, which
-    is two of these one form apart (#175). It no longer renders any: the panels are the
-    only thing that asks for it, and a session with no working set in it asks nothing.
+    It was rendered once per lift panel until now, which is the arrangement this replaces
+    and which was not wrong when it was written: the scale belongs near the buttons it
+    explains, and one copy at the foot of a long page was a scroll away from all of them.
+    Panels made that worse rather than better -- the copy was then a swipe *and* a scroll
+    away -- so a copy per panel was how it stayed close.
+
+    Pinning it removes the reason for the duplication entirely. A footer is never further
+    away than the bottom of the screen, from any panel, at any scroll position, so one copy
+    is now closer than five were. That is the trade #277 is asking for, and it also ends
+    two small costs the repetition carried: five open tables were reachable at once, and
+    five copies of a table meant the same 2 KB of markup five times over.
+
+    Fixed rather than sticky. Sticky positions inside the flow, so it would have to sit at
+    the foot of a scroller -- and the one on this screen is horizontal, scroll-snapped, and
+    swapped out by htmx on every tap. Fixed takes it out of the flow entirely, which is
+    what lets the content scroll behind it and what keeps it out of the panels' way.
+
+    Rendered from views/workouts/session.erb rather than from the body, and that placement
+    is load-bearing: #session-body and the panels inside it are replaced by htmx on every
+    Done tap and every fifteen-second poll, and a <details> the lifter had opened would
+    snap shut each time. Outside the swapped region it holds its own open state with no
+    JavaScript and nothing to re-bind.
+
+    bg-gray-100 is the page's own background rather than transparency, so the rows passing
+    underneath are covered rather than showing through the table. The border is what says
+    the footer is a different surface from the session above it.
+
+    max-h and overflow-y-auto because this table is taller than a phone: opened without
+    them it would cover the whole screen, including the Done buttons it exists to explain.
+    svh rather than vh is the unit that accounts for iOS Safari's URL bar -- vh is the
+    *large* viewport, measured as though the bar were collapsed, so 70vh of an expanded
+    viewport is taller than what is actually visible.
+
+    env(safe-area-inset-bottom) keeps the summary above the home indicator on a notched
+    phone. Zero everywhere else, so it costs nothing on a device without one.
 
     The chevron is not decoration. A summary is display:list-item and draws a triangle by
-    default, but this one is a flex row so the marker never rendered -- "How do I rate this?"
-    was a line of bold text with nothing to say it opened. It rotates on open through
-    group-open, which is CSS, so it works with JavaScript off like the disclosure itself.
+    default, but this one is a flex row so the marker never rendered -- the label was a line
+    of bold text with nothing to say it opened. It rotates on open through group-open, which
+    is CSS, so it works with JavaScript off like the disclosure itself.
 
-    Closed by default, and it has to stay that way -- five open tables is a worse page
-    than one distant one. The cost of repeating it is about 2 KB of markup a copy, which
-    is repeated text and so is close to free once gzipped; the alternative, one copy with
-    a link or a script to reach it, buys nothing back and needs JS to work. %>
-<details class="group mt-6 border-t border-gray-300 pt-3">
-  <summary class="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-700"><%== render('_chevron') %>How do I rate this?</summary>
-  <div class="mt-3 space-y-4 text-sm text-gray-600">
+    Closed by default, which matters more now than it did: this one is on screen at all
+    times, and a table that opens itself would be covering the session every time the page
+    loads. %>
+<details class="group fixed inset-x-0 bottom-0 z-20 border-t border-gray-300 bg-gray-100
+                pb-[env(safe-area-inset-bottom)]">
+  <summary class="mx-auto flex min-h-11 max-w-md cursor-pointer items-center px-4 text-sm
+                  font-medium text-gray-700"><%== render('_chevron') %>RPE Advice</summary>
+  <div class="mx-auto max-h-[70svh] max-w-md space-y-4 overflow-y-auto px-4 pb-4 text-sm text-gray-600">
     <p>The most reliable observable is bar speed, because it degrades before your perception of effort does.</p>
     <table class="w-full border-collapse text-left align-top">
       <thead>

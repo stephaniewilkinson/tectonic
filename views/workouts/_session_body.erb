@@ -47,11 +47,13 @@
 <%- end %>
 </div>
 
-<%# No copy of the rating scale here. The last lift panel's is immediately above this form,
-    so a second one put two identical disclosures on screen with nothing between them but
-    the five rating buttons, which is what #175 is a picture of.
+<%# No copy of the rating scale here, and now for a second reason on top of the first.
 
-    Nor is one rendered when no panel carried it, which is a session of nothing but
-    warmups. A warmup is submaximal by definition and asks for no rating -- that is why the
-    ramp rows have no RPE row and warmup-only panels have no scale -- so a session that is
-    all ramp has nothing on it the scale would be explaining. %>
+    The first is #175: the panels used to carry a copy each, so one rendered here sat
+    directly beneath the last panel's with nothing between them but the rating buttons --
+    the same disclosure twice, which is what that issue is a picture of.
+
+    The second is #277, which moved the scale out of the panels entirely and pinned it to
+    the foot of the screen. It is rendered from views/workouts/session.erb, outside this
+    partial on purpose: everything in here is replaced by htmx on a tap and on the poll, and
+    a disclosure that is swapped is a disclosure that closes itself under the lifter. %>
