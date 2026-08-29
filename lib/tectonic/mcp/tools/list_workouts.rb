@@ -2,6 +2,7 @@
 
 require_relative '../tool'
 require_relative 'support'
+require_relative '../../timing'
 
 class Tectonic < Roda
   module MCP
@@ -18,9 +19,10 @@ class Tectonic < Roda
         MAX_LIMIT = 200
 
         tool_name 'list_workouts'
-        description "List the account's workouts, most recent first, with set counts and " \
-                    'whether each is planned, performed or skipped. Narrow with from/to ' \
-                    "(YYYY-MM-DD) and limit; the default is the #{DEFAULT_LIMIT} most recent."
+        description "List the account's workouts, most recent first, with set counts, " \
+                    'whether each is planned, performed or skipped, and how long each one ' \
+                    'took. Narrow with from/to (YYYY-MM-DD) and limit; the default is the ' \
+                    "#{DEFAULT_LIMIT} most recent."
         scope :read
         input_schema(
           type: 'object',
@@ -31,8 +33,12 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           matching = window(context, arguments)
           total = matching.count
+          # eager(:sets) because every row below reads them: Presenter.view_workout counts
+          # them and the timing subtracts their stamps. Without it that is a query a workout
+          # -- twenty for a default page -- which is #234's shape in the one list that had
+          # escaped it. Two queries now, however long the page.
           workouts = matching.with_performance.order(Sequel.desc(:date), Sequel.desc(:id))
-                             .limit(limit_for(arguments)).all
+                             .limit(limit_for(arguments)).eager(:sets).all
           ok(summary(workouts, total), structured: payload(workouts, total, arguments))
         end
 
@@ -47,8 +53,17 @@ class Tectonic < Roda
           (arguments[:limit] || DEFAULT_LIMIT).clamp(1, MAX_LIMIT)
         end
 
+        # How long each one took rides along with the counts (#263). A question about pace
+        # over a month -- "are my sessions getting longer" -- was otherwise a call per
+        # session, and the numbers are already in the rows this loads.
+        def self.timing_of(workout)
+          measured = Timing.session(workout, workout.sets.map(&:values))
+          { seconds: measured[:overall], typical_turnaround_seconds: measured[:typical_turnaround] }
+        end
+
         def self.payload(workouts, total, arguments)
-          { workouts: workouts.map { |w| Presenter.view_workout(w).merge(status: w.status.to_s) },
+          rows = workouts.map { |w| Presenter.view_workout(w).merge(status: w.status.to_s, timing: timing_of(w)) }
+          { workouts: rows,
             shown: workouts.length, total:, withheld: total - workouts.length, limit: limit_for(arguments) }
         end
 
@@ -77,7 +92,14 @@ class Tectonic < Roda
           view = Presenter.view_workout(workout)
           done = "#{view[:completed]} of #{view[:sets]} set(s) done"
           "  [workout #{view[:id]}] #{view[:date]}#{" #{view[:label]}" if view[:label]}: " \
-            "#{done}, #{workout.status}#{', finished' if view[:finished]}"
+            "#{done}, #{workout.status}#{', finished' if view[:finished]}#{took(workout)}"
+        end
+
+        # Silent on a session with no stamps, which is every one trained before #281. A "0m"
+        # in a list of twenty would read as a real session that took no time.
+        def self.took(workout)
+          seconds = timing_of(workout)[:seconds]
+          seconds && ", #{Timing.phrase(seconds)}"
         end
       end
     end

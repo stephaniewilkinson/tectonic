@@ -4,6 +4,7 @@ require 'date'
 require_relative '../tool'
 require_relative 'support'
 require_relative '../../one_rep_max'
+require_relative '../../timing'
 
 class Tectonic < Roda
   module MCP
@@ -21,7 +22,9 @@ class Tectonic < Roda
                     'the dates they were lifted and the estimated one-rep max they support. ' \
                     'Narrow with from/to (YYYY-MM-DD). Completed sets only by default, which ' \
                     'is what training history means; pass include_planned for written but ' \
-                    'unlifted sets too.'
+                    'unlifted sets too. Also reports how long this lifter typically takes ' \
+                    'between sets of this movement, measured from their own sessions, which ' \
+                    'is what to price a prescribed day with.'
         scope :read
         input_schema(
           type: 'object',
@@ -64,10 +67,25 @@ class Tectonic < Roda
           (arguments[:limit] || DEFAULT_LIMIT).clamp(1, MAX_LIMIT)
         end
 
+        # typical_turnaround_seconds is #263's half: what one set of this movement actually
+        # costs this lifter, measured rather than modelled. It is what lets an assistant
+        # price a prescribed day -- five squat sets is roughly five of these -- in the
+        # lifter's own numbers instead of in a constant somebody chose.
+        #
+        # Off the rows already fetched, so it costs no query. Nil where nothing can be
+        # measured, which is a movement lifted once and every movement whose sets predate
+        # #281; a zero there would read as instantaneous.
         def self.payload(context, exercise, rows, arguments)
           { exercise: exercise.name, exercise_id: exercise.id, shown: rows.length,
             limit: limit_for(arguments), estimated_1rm: estimated(context, exercise, arguments),
+            typical_turnaround_seconds: turnaround(rows),
             sets: rows.map { |set| Presenter.view_set(set).merge(date: set.workout.date.strftime('%Y-%m-%d')) } }
+        end
+
+        # Grouped by session inside Timing, so two sets a week apart are never subtracted
+        # from one another. The rows carry workout_id already.
+        def self.turnaround(rows)
+          Timing.between_sets_of(rows.map(&:values))
         end
 
         # The max as of the end of the window rather than as of today, so asking about a
@@ -86,7 +104,15 @@ class Tectonic < Roda
         def self.summary(exercise, rows, context, arguments)
           heaviest = Presenter.weight(rows.map(&:weight).compact.max)
           "#{exercise.name}: #{rows.length} set(s), heaviest #{heaviest || 'none'}, " \
-            "estimated max #{estimated(context, exercise, arguments) || 'not yet readable'}."
+            "estimated max #{estimated(context, exercise, arguments) || 'not yet readable'}#{pace(rows)}."
+        end
+
+        # How long a set of this costs, in the sentence as well as the payload -- many
+        # clients render only the text, which is #262's lesson. Silent where there is nothing
+        # measured, rather than printing a zero that reads as instantaneous.
+        def self.pace(rows)
+          seconds = turnaround(rows)
+          seconds && ", about #{Timing.phrase(seconds)} between sets of it"
         end
       end
     end
