@@ -111,7 +111,8 @@ class Tectonic < Roda
           { id: row.id, position: row.position, exercise: row.exercise&.name,
             exercise_id: row.exercise_id, sets: row.sets, reps: row.reps,
             top_weight: Presenter.weight(row.top_weight), percent_of_max: row.percent_of_max,
-            is_barbell: row.is_barbell, is_main: row.is_main, note: row.note }
+            is_barbell: row.is_barbell, is_main: row.is_main,
+            target_rpe: row.target_rpe, note: row.note }
         end
       end
     end

@@ -18,7 +18,9 @@ class Tectonic < Roda
         tool_name 'update_program_lift'
         description 'Change a prescribed lift: sets, reps, top_weight or percent_of_max, ' \
                     'the exercise it is, whether it is the main work, or its position in ' \
-                    'the day (0 is first). Send only what changes. To swap how the load is ' \
+                    'the day (0 is first). target_rpe, 1 to 10, is the effort its working ' \
+                    'sets are meant to be taken at, on a loaded lift counted in reps; send ' \
+                    'null to clear it. Send only what changes. To swap how the load is ' \
                     'written, set one of top_weight/percent_of_max and null the other. ' \
                     'Returns what actually moved.'
         scope :write
@@ -29,7 +31,8 @@ class Tectonic < Roda
             sets: { type: 'integer' }, reps: { type: 'integer' },
             top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
             position: { type: 'integer' }, is_main: { type: 'boolean' },
-            is_barbell: { type: 'boolean' }, note: { type: 'string' }
+            is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
+            note: { type: 'string' }
           },
           required: ['program_lift_id'], additionalProperties: false
         )
@@ -55,7 +58,7 @@ class Tectonic < Roda
         # lift that was swapped out is worse than none -- the same rule the web UI follows.
         def self.fields(context, lift, arguments)
           attributes = repriced(lift, arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
-                                                      :is_main, :is_barbell, :note))
+                                                      :is_main, :is_barbell, :target_rpe, :note))
           attributes = round_load(context, lift, attributes)
           return attributes unless arguments[:exercise]
 
