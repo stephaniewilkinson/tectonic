@@ -18,8 +18,11 @@ class Tectonic < Roda
                     'percent_of_max, or is_weighted false for work carrying no external ' \
                     'load. measure is reps or time; a timed lift gives duration_seconds ' \
                     'instead of reps. is_per_side says the count is per side. Each defaults ' \
-                    'to how the movement is usually done. It goes last in the day unless ' \
-                    'position says otherwise.'
+                    'to how the movement is usually done. target_rpe, 1 to 10, is the ' \
+                    'effort the working sets are meant to be taken at -- how autoregulated ' \
+                    'programming is written, and the better instruction than a percentage ' \
+                    'coming off a layoff. It belongs only on a loaded lift counted in reps. ' \
+                    'It goes last in the day unless position says otherwise.'
         scope :write
         input_schema(
           type: 'object',
@@ -30,7 +33,8 @@ class Tectonic < Roda
             is_weighted: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
             is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             position: { type: 'integer' }, is_main: { type: 'boolean' },
-            is_barbell: { type: 'boolean' }, note: { type: 'string' }
+            is_barbell: { type: 'boolean' }, target_rpe: { type: 'integer' },
+            note: { type: 'string' }
           },
           required: %w[program_day_id exercise sets], additionalProperties: false
         )

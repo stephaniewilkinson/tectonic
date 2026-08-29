@@ -973,7 +973,7 @@ class Tectonic < Roda
   # The fields a lift edit may set. Named rather than taken wholesale so a form cannot
   # reach a column it has no business in, and so the pricing rule sees both prices when
   # one is being swapped for the other.
-  LIFT_FIELDS = %w[sets reps top_weight percent_of_max note].freeze
+  LIFT_FIELDS = %w[sets reps top_weight percent_of_max target_rpe note].freeze
 
   # Every programme write is the same shape: check the token, try it, and come back to the
   # block with either nothing to say or the writer's own refusal to show. The refusal is

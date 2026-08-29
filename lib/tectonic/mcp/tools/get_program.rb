@@ -61,12 +61,18 @@ class Tectonic < Roda
         # priced as a percentage says so rather than showing a blank where pounds would be,
         # and one carrying no load at all -- bodyweight, banded -- says nothing rather than
         # implying zero.
+        #
+        # The target effort follows the load rather than preceding it (#265), because the
+        # load is what identifies the lift when this is skimmed and because a prescription
+        # reads as a weight first and a difficulty second. Only where there is one: most
+        # lifts carry none, and ", target RPE" on every line would be noise on all of them.
         def self.lift_line(lift)
           load = if lift[:top_weight] then " @ #{lift[:top_weight]}"
                  elsif lift[:percent_of_max] then " @ #{lift[:percent_of_max]}% of max"
                  else ''
                  end
-          "#{lift[:exercise]} #{lift[:sets]}x#{lift[:reps]}#{load}#{" (#{lift[:note]})" if lift[:note]}"
+          target = lift[:target_rpe] ? ", target RPE #{lift[:target_rpe]}" : ''
+          "#{lift[:exercise]} #{lift[:sets]}x#{lift[:reps]}#{load}#{target}#{" (#{lift[:note]})" if lift[:note]}"
         end
       end
     end
