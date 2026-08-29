@@ -172,6 +172,27 @@
                   <%= plate_label(set) %>
                 </div>
               <%- end %>
+              <%# What the block asked this set to feel like (#265), under the load and above
+                  the five buttons that answer it. Between the two on purpose: it is the
+                  other half of the prescription, so it belongs with the load rather than
+                  with the answer, and reading down the row goes asked-for, asked-for,
+                  answer.
+
+                  Small caps in gray-500 is this screen's label register -- Warmup, RPE and
+                  Plate math all wear it -- so "Target" is recognisable as a label and the
+                  number after it as a value. Without that the row would carry two bare RPE
+                  numbers a centimetre apart, one prescribed and one recorded, with nothing
+                  saying which was which.
+
+                  Only on a set the generator wrote a target onto, which is a working set of
+                  a loaded lift counted in reps. A warmup never carries one, and neither the
+                  editor nor the tools will write a target on timed or unweighted work, so
+                  this line cannot appear on a row with no rating buttons beneath it. %>
+              <%- if set[:planned_rpe] %>
+                <div class="text-xs text-gray-500">
+                  <span class="uppercase tracking-wide">Target</span> RPE <%= set[:planned_rpe] %>
+                </div>
+              <%- end %>
               <%- if changed_from_plan?(set) %>
                 <%# Grey, and not the amber it wore until #214. This line is the whole of how
                     a changed set is now marked -- the row tint went to two states, done and

@@ -298,7 +298,7 @@ class Tectonic < Roda
       WorkoutSet.insert(
         workout_id: workout.id, exercise_id: lift.exercise_id,
         weight: set[:weight], reps: set[:reps], duration_seconds: set[:duration_seconds],
-        planned_weight: set[:weight], planned_reps: set[:reps],
+        planned_weight: set[:weight], planned_reps: set[:reps], planned_rpe: target_rpe(lift, is_warmup:),
         # A set is done the way the lift that wrote it is done, so the two never disagree
         # about whether it was counted per side or held for time. Stored form rather than
         # the symbol: this is a dataset insert, which does not typecast, and Sequel reads a
@@ -307,6 +307,24 @@ class Tectonic < Roda
         is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
         created_by_oauth_application_id: @created_by
       )
+    end
+
+    # The effort this lift asks for, copied onto the working sets and onto nothing else.
+    # #265, and the third of the planned_ trio: the prescription travels with the row so
+    # that "what was asked for" and "what happened" sit side by side, which is the whole
+    # reason the other two are there.
+    #
+    # Not onto a warmup, and the rule is #211's. A ramp is submaximal by definition -- the
+    # rung is computed as a fraction of the top set, not chosen for how it should feel --
+    # so a target on one is an instruction nobody can follow and a number nobody reads
+    # back. sets_planned_rpe_only_on_working_reps refuses it outright, which is what makes
+    # this a guard rather than a preference.
+    #
+    # A timed lift cannot carry a target at all, so there is nothing to filter here for it:
+    # program_lifts_target_rpe_on_working_reps refuses one on the prescription side, one
+    # level earlier, where the tool can name the field it is refusing.
+    def target_rpe(lift, is_warmup:)
+      lift.target_rpe unless is_warmup
     end
   end
 end
