@@ -1,0 +1,38 @@
+<%# The one place in this app where something genuinely changes underneath a page that is
+    already open, and the thing that lets the page notice. #249.
+
+    Fifteen MCP tools carry `scope :write` and four of them write to a workout you may be
+    looking at right now -- create_set, complete_set, update_set, delete_set -- plus
+    create_workout and generate_program_week, which can write the session itself. So: the
+    phone is propped against your bag, an assistant logs the set you just told it about,
+    and the screen goes on showing what was true when it loaded. Nothing crashes, because
+    every route is account-scoped and every write goes through own_set; the screen is
+    simply behind, in a way that reads as the app being wrong rather than as the app being
+    late. The worst of the three is a corrected weight, because it is silently wrong rather
+    than visibly broken: the plate math under it is for a load that is no longer prescribed.
+
+    Polling rather than a channel, which is the answer #248 settled: websockets need Falcon
+    under the web server, and buying full duplex for a problem where the browser has nothing
+    to push is paying at the wrong end. The staleness window that matters here is "since I
+    last looked at the screen", not "since the last frame", and fifteen seconds closes it.
+
+    What makes this cheap enough to be obviously right is the fingerprint. The request
+    carries the digest of the sets as this page rendered them; unchanged, the route answers
+    204 and htmx does nothing at all, so the common case costs one small request and touches
+    no DOM. There is no re-render on a timer, no open <details> snapping shut mid-set, and
+    no swap landing between a thumb and a Done button.
+
+    hx-target is #lift-panels and the swap is innerHTML, which is load-bearing rather than
+    incidental: it replaces the panels and leaves the scroller itself alive, so scrollLeft
+    survives. Swapping #session-body instead would destroy the scroller and drop a lifter
+    back on lift one -- every fifteen seconds, which is the bug #235 removed, reintroduced
+    on a timer. The progress header and this element come back out of band beside them.
+
+    This element replaces itself because it carries state: the `since` it was rendered with
+    is stale the moment a swap lands, and a poller still asking about the old digest would
+    report the same news forever. %>
+<div id="session-poll"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %>
+     hx-get="/workouts/<%= workout_id %>/session/changes?since=<%= fingerprint %>"
+     hx-trigger="every 15s"
+     hx-target="#lift-panels"
+     hx-swap="innerHTML"></div>
