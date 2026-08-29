@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'date'
+require 'digest'
 require_relative 'db'
 require_relative 'oauth_application'
 require_relative 'program_days'
@@ -103,6 +104,29 @@ class Tectonic < Roda
     # `status` grow a case for a distinction most of them do not care about. Two questions,
     # two fields.
     def finished? = !finished_at.nil?
+
+    # Everything the session screen draws from this workout's sets, as one short string.
+    # #249: the screen has no way to notice that an assistant changed the session under it.
+    #
+    # A digest rather than a timestamp, because there is no timestamp to read. `sets` has
+    # created_at and no updated_at, so a weight corrected over MCP moves nothing a poller
+    # could compare -- and adding an updated_at means a column, a trigger or a touch on
+    # every write path, all to answer a question a digest of eleven columns answers exactly.
+    # Exactly, and not approximately: it changes when and only when something the screen
+    # renders changes, so a poll that finds it unchanged can be answered with a 204 and the
+    # page left alone entirely.
+    #
+    # The column list is the screen's, which is why it is written out rather than being
+    # `select_all`. created_at and created_by_oauth_application_id are on these rows and
+    # are not drawn on this screen, and including them would make a set rewritten to the
+    # same values look like news.
+    SESSION_COLUMNS = %i[id exercise_id weight reps rpe is_warmup is_completed
+                         measure duration_seconds is_per_side planned_weight planned_reps].freeze
+
+    def session_fingerprint
+      rows = WorkoutSet.where(workout_id: id).order(:id).select(*SESSION_COLUMNS).all
+      Digest::MD5.hexdigest(rows.map { |row| SESSION_COLUMNS.map { |column| row[column] }.join(',') }.join(';'))
+    end
 
     # Planned, performed or skipped, decided without inspecting the sets one at a time.
     # A session that has been lifted at all is performed; a generated one still on or

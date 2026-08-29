@@ -13,6 +13,10 @@
     panel as the response, the header out of band beside it. Held together here so the
     first render is still one page rather than three requests. %>
 <%== render('workouts/_progress') %>
+<%# Outside #lift-panels on purpose: it is the one element on this screen that must not be
+    swapped away by the poll it issues. %>
+<%== render('workouts/_session_poll',
+            locals: { workout_id: @workout[:id], fingerprint: @fingerprint }) %>
 
 <%# One lift a screen, swiped between, rather than five lifts down one scroll. Five lifts
     and twenty sets is a page nobody can find their place in: the lift you are on is

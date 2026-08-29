@@ -662,11 +662,32 @@ class Tectonic < Roda
             Workout.where(id: workout_id).update(finished_at: Time.now)
             r.redirect "/workouts/#{workout_id}"
           end
+          # What the screen asks every fifteen seconds: has anything changed under me.
+          # #249, and the answer is usually no.
+          #
+          # 204 for no, which htmx reads as "do not swap" -- so the ordinary case costs one
+          # small request and touches nothing on the page. That is what makes polling the
+          # right shape here rather than merely the cheap one: a re-render on a timer would
+          # close every open <details> and could land between a thumb and a Done button,
+          # fifteen seconds after the last one, forever.
+          #
+          # For yes, the panels come back for #lift-panels' innerHTML -- which keeps the
+          # scroller element itself, and therefore its scrollLeft -- with the progress
+          # header and the poller beside them out of band. The poller has to come back
+          # because it carries the digest it asked about, and one still asking about the
+          # old digest would go on reporting the same news every fifteen seconds.
+          r.get 'changes' do
+            fresh = @workout.session_fingerprint
+            if r.params['since'] == fresh
+              response.status = 204
+              ''
+            else
+              session_changes(workout_id, fresh)
+            end
+          end
           r.get do
-            # Insertion order is program order: warmups then working sets, lift by
-            # lift in the position the program gave them.
-            @sets = WorkoutSet.where(workout_id:).order(:id).all
-            @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+            load_session(workout_id)
+            @fingerprint = @workout.session_fingerprint
             view 'workouts/session'
           end
         end
@@ -810,12 +831,51 @@ class Tectonic < Roda
   # form. Splitting those is a design change about what a row is, and folding it into a
   # payload fix would be smuggling one thing inside another. This is where the structural
   # win is anyway: the scroller survives the swap, so the offset restore in session.erb goes.
+  # What comes back when the poll finds the session has moved: every lift panel, for
+  # #lift-panels' innerHTML, with the progress header and a re-armed poller beside them out
+  # of band. #249.
+  #
+  # Every panel rather than the one that changed, because unlike a tap this does not know
+  # which one did -- and a set an assistant deleted can take a whole lift off the screen,
+  # which no per-panel swap could express. Rendering the lot is what the first paint does
+  # anyway, and it happens only when something actually changed.
+  def session_changes(workout_id, fingerprint)
+    load_session(workout_id)
+    panels = session_lifts.each_with_index.map do |lift, position|
+      render('workouts/_lift_panel', locals: { lift:, position: })
+    end
+    panels.join + render('workouts/_progress', locals: { oob: true }) + session_poll(workout_id, fingerprint)
+  end
+
+  # The poller, re-armed with what the session now is. Every response that changes this
+  # screen ends with one, because the digest it was rendered with is stale the moment
+  # anything lands -- and a poller still asking about the old digest would find it changed
+  # on every poll from then on and swap the panels every fifteen seconds forever. #249.
+  #
+  # The fingerprint is a parameter because the changes route has already worked it out and
+  # a tap has not.
+  def session_poll(workout_id, fingerprint = @workout.session_fingerprint)
+    render('workouts/_session_poll', locals: { workout_id:, fingerprint:, oob: true })
+  end
+
   def session_body(workout_id, set_id)
-    @sets = WorkoutSet.where(workout_id:).order(:id).all
-    @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+    load_session(workout_id)
     position = session_lifts.index { |lift| lift.any? { |set| set[:id] == set_id.to_i } } || 0
     render('workouts/_lift_panel', locals: { lift: session_lifts[position], position: }) +
-      render('workouts/_progress', locals: { oob: true })
+      render('workouts/_progress', locals: { oob: true }) +
+      # Re-armed with what this tap just made true. Without it the poller would still be
+      # asking about the digest the page loaded with, find it changed -- by the lifter, a
+      # second ago -- and swap every panel back over the top of their own tap. #249.
+      session_poll(workout_id)
+  end
+
+  # Everything the session screen renders from, which is the same two reads whether the
+  # whole page is being drawn, one panel is coming back after a tap, or the poll has found
+  # something moved. Insertion order is program order: warmups then working sets, lift by
+  # lift in the position the program gave them.
+  def load_session(workout_id)
+    @sets = WorkoutSet.where(workout_id:).order(:id).all
+    @exercises = Exercise.visible_to(@account_id).as_hash(:id)
   end
 
   # The session's sets grouped into the lifts they belong to. Insertion order is program
