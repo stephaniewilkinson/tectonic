@@ -22,15 +22,20 @@ class Tectonic < Roda
       # zero: that hands the question back to the estimate, which is the only way back.
       class SetTrainingMax < Tool
         tool_name 'set_training_max'
-        description 'Set the training max this account takes percentages of for one ' \
-                    'movement (by name), in pounds. Percentage-priced program lifts ' \
-                    'resolve against it; without one the app estimates a max from ' \
-                    'completed sets instead, which is right most of the time and wrong ' \
-                    'in two cases -- coming off a layoff, where the estimate reads work ' \
-                    'done before the break, and a movement never logged, where there is ' \
-                    'nothing to estimate from. Omit pounds, or send 0, to clear it and go ' \
-                    'back to the estimate. Works on shared library movements too: the ' \
-                    'value belongs to this account, not to the movement.'
+        description 'Set the number percentages of one movement (by name) are taken of, ' \
+                    'in pounds. Which number that should be depends on the programme and ' \
+                    'the app does not guess: a 5/3/1-style block wants roughly 90% of a ' \
+                    'one-rep max, while percentage programming in the Sheiko tradition is ' \
+                    'written against a competition max directly -- so ask the lifter which ' \
+                    'convention they train on rather than sending a tested single by ' \
+                    'default. Without a stated max the app falls back to an estimated ' \
+                    'one-rep max off completed sets, which is a lifetime best with no lower ' \
+                    'bound -- right most of the time, and wrong in the two cases this ' \
+                    'exists for: coming off a layoff, where it reads work done before the ' \
+                    'break, and a movement never logged, where there is nothing to read. ' \
+                    'Omit pounds, or send 0, to clear it and go back to the estimate. Works ' \
+                    'on shared library movements too: the value belongs to this account, ' \
+                    'not to the movement.'
         scope :write
         input_schema(
           type: 'object',

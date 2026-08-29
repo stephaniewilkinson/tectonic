@@ -11,11 +11,19 @@
 # Two cases the derived one cannot answer, and they are the two where percentages are most
 # used:
 #
-# **Coming off a layoff.** A derived max reads the last completed work, so after time away
-# it is either stale-high, from before the break, or gone entirely once the window has
-# nothing in it. Somebody who knows their training max is 315 and wants to open a block at
-# 65% had no way to say so, and generating against a stale 315 is how a return to lifting
-# gets prescribed at the weight that ended the last block.
+# **Coming off a layoff.** The derived max is a lifetime best, and that is worth stating
+# exactly rather than loosely, because it is stronger than it sounds: `Exercise#lifted_sets`
+# bounds the window only at the top -- `date < (on + 1)` -- and `OneRepMax.best_of` takes the
+# maximum over everything it is handed. So there is no lower bound at all. A single lifted in
+# 2023 is still the number today's percentages are taken of, and it does not decay, expire or
+# get outvoted by a year of lighter work.
+#
+# That is the right default -- a max is the most that has been demonstrated, not the most
+# recent thing attempted, and inferring weakness from absence is what `Progression` already
+# refuses to do at session scale. It is also exactly wrong after a layoff, which is when
+# percentages get reached for. Somebody who knows their training max is 315 and wants to open
+# a block at 65% had no way to say so, and generating against a three-year-old best is how a
+# return to lifting gets prescribed at the weight that ended the last block.
 #
 # **A movement never logged.** There is nothing to derive from, so the week refuses to
 # generate and names the movement. That refusal is correct -- inventing a max would write a
@@ -61,6 +69,17 @@ Sequel.migration do
       # the number percentages are taken of, and a lift written at 65% of it may never put
       # it on a bar at all.
       BigDecimal :pounds, size: [7, 2], null: false
+      # When it was said. A stated max is a standing instruction and is resolved without
+      # reference to a date -- see TrainingMax.for -- but "how recent does this have to be to
+      # count" is a question a reader cannot even ask of a number with no date on it, and one
+      # typed fourteen months ago is otherwise indistinguishable from one typed yesterday.
+      #
+      # Recorded rather than acted on, deliberately. Nothing expires a stated max, nothing
+      # decays it, and nothing warns about it: the app reports when it was said and the
+      # reader judges, which is the same division of labour #263 settled for session length.
+      # Every other substantive table in 001 carries a timestamp; this is that, and it is
+      # here rather than in a later migration because adding a column later is a migration.
+      Time :stated_at, null: false, default: Sequel::CURRENT_TIMESTAMP
       # A max that is zero or negative is not a max, and one saved by accident would make
       # every percentage lift in a block generate at nothing. Refused here because this is
       # the one place that cannot be routed around -- the form, the MCP tool and any future

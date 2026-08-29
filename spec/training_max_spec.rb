@@ -181,6 +181,23 @@ describe 'stating and clearing a training max' do
   end
 end
 
+# An implausible number is left alone rather than stored or cleared: storing it writes a
+# block of nonsense loads, and clearing it would let a typo silently delete a max somebody had
+# set. Before this it went past numeric(7, 2) as an unhandled database error, which reaches a
+# person as a 500 on a form submission -- #213's shape.
+describe 'a training max outside what anybody lifts' do
+  include TrainingMaxes
+
+  it 'leaves the stored one alone rather than storing it or clearing it' do
+    account_id = scratch_account
+    exercise = movement(account_id)
+    stated(account_id, exercise, 315)
+    stated(account_id, exercise, 100_000)
+
+    assert_equal 315, resolve(account_id, exercise).pounds
+  end
+end
+
 # The reason #264 is a table keyed on the pair rather than a column on exercises. A library
 # movement has a null account_id and sits on every account's page, so a column there would
 # be one account's number generated against by everybody -- which is precisely what
@@ -323,11 +340,15 @@ describe 'what the movement page says about the max it is showing' do
     @exercise = movement(@account_id)
   end
 
-  it 'names the estimate as an estimate' do
+  # And names it as an estimated *one-rep max*, which is not the same kind of number as the
+  # training max the box asks for -- 5/3/1 puts a training max at about 90% of a single, so
+  # the two scales are roughly ten percent apart. The app applies no coefficient; what it
+  # does is say which number this is.
+  it 'names the estimate as an estimated one-rep max' do
     lifted(@account_id, @exercise)
     get "/exercises/#{@exercise.id}/"
 
-    assert_includes last_response.body, 'estimated from your completed sets'
+    assert_includes last_response.body, 'an estimated one-rep max from your completed sets'
   end
 
   it 'names a stated max as one you set' do
@@ -337,10 +358,68 @@ describe 'what the movement page says about the max it is showing' do
     assert_includes last_response.body, 'which you set'
   end
 
-  it 'says plainly when there is neither, since that is when generation refuses' do
+  # "How recent does a max have to be" cannot be asked at all of a number with no date on
+  # it. Recorded and shown; nothing expires it, and nothing warns about it.
+  it 'says when a stated max was said' do
+    stated(@account_id, @exercise, 315)
     get "/exercises/#{@exercise.id}/"
 
+    assert_includes last_response.body, "which you set on #{Date.today.strftime('%b %-d, %Y')}"
+  end
+end
+
+# The state a percentage lift refuses to generate in, and the refusal names this page.
+describe 'the movement page with no max of either kind' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include TrainingMaxes
+
+  it 'says so plainly' do
+    account_id = login
+    exercise = movement(account_id)
+    get "/exercises/#{exercise.id}/"
+
     assert_includes last_response.body, 'cannot be generated yet'
+  end
+end
+
+# The derived max is a lifetime best with no lower bound -- Exercise#lifted_sets bounds only
+# the top of its window and OneRepMax.best_of takes the maximum of everything -- so a single
+# lifted three years ago is still today's denominator. That is the right default, and it is
+# exactly wrong after a layoff, so the page says which it is rather than letting a reader
+# assume the number reflects recent training.
+describe 'what the page says about an estimate going stale' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include TrainingMaxes
+
+  it 'says the estimate does not fade with time off' do
+    account_id = login
+    exercise = movement(account_id)
+    lifted(account_id, exercise)
+    get "/exercises/#{exercise.id}/"
+
+    assert_includes last_response.body, 'does not fade with time off'
+  end
+end
+
+# The direct answer to "how would this handle competition maxes": the app does not guess. A
+# training max and a competition max are different numbers about ten percent apart, nothing
+# in a figure says which was meant, and applying a coefficient would be the app choosing a
+# convention for a lifter whose programme has already chosen one. So it says what the number
+# is used for and names both.
+describe 'what scale the box is on' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include TrainingMaxes
+
+  it 'is said on the page, without picking one for you' do
+    account_id = login
+    exercise = movement(account_id)
+    get "/exercises/#{exercise.id}/"
+
+    assert_includes last_response.body, 'roughly 90% of a'
+    assert_includes last_response.body, 'competition max'
   end
 end
 

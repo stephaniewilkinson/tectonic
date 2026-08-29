@@ -50,15 +50,35 @@
   <p class="mt-2 text-sm text-gray-600">
     <%- if @training_max&.stated? %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
-      which you set. Clear the box to go back to estimating it from your lifting.
+      which you set<%= " on #{@training_max.stated_at.strftime('%b %-d, %Y')}" if @training_max.stated_at %>.
+      Clear the box to go back to estimating it from your lifting.
     <%- elsif @training_max %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
-      estimated from your completed sets. Set one below to override it &mdash; worth doing coming
-      back from a layoff, when the estimate reads off work you did before the break.
+      an estimated one-rep max from your completed sets &mdash; your best ever, with no cutoff,
+      so it does not fade with time off. Set one below to override it, which is worth doing
+      coming back from a layoff, when that estimate reads work you did before the break.
     <%- else %>
       Nothing has been lifted here that the chart can read, so a lift written as a percentage
       of this movement cannot be generated yet. Set a max, or log a completed set.
     <%- end %>
+  </p>
+
+  <%# What scale the box is on, said plainly, because the app cannot know which convention
+      you train on and must not guess.
+
+      A training max and a one-rep max are different numbers -- 5/3/1 puts the training max at
+      about 90% of a tested single, and every percentage it writes is of that -- while Sheiko
+      and the percentage programming it comes out of are written against a competition max
+      directly. The same "80%" means two loads about ten percent apart depending which was
+      meant, and nothing in a number says which it is.
+
+      So this says what the number is used for and gives the two conventions, rather than
+      applying a coefficient. Discounting a stated max on the lifter's behalf would be the app
+      picking 0.85 or 0.90 for somebody whose programme may have already picked one -- and it
+      would silently move the loads of everybody who has been typing an undiscounted number. %>
+  <p class="mt-2 text-sm text-gray-600">
+    This is the number percentages are taken of. A 5/3/1-style block wants roughly 90% of a
+    one-rep max here; if you program off a competition max, put the competition max in.
   </p>
 
   <%# min-h-11 is 44px and text-base is 16px, which is the threshold below which iOS Safari
@@ -70,7 +90,7 @@
     <%== csrf_tag("/exercises/#{@exercise[:id]}/training-max") %>
     <label class="text-xs text-gray-500" for="training-max">
       Pounds
-      <input type="number" name="pounds" id="training-max" min="0" step="any" autocomplete="off"
+      <input type="number" name="pounds" id="training-max" min="0" max="2000" step="any" autocomplete="off"
              value="<%= weight_label(@training_max.pounds) if @training_max&.stated? %>" placeholder="lb"
              class="<%= field_style %> mt-1 block min-h-11 w-28 px-2 text-base text-gray-900">
     </label>
