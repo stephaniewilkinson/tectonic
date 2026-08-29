@@ -53,14 +53,18 @@ class Tectonic < Roda
     # lands rather than on the one path that remembered it.
     PLAUSIBLE = (0..2000)
 
-    # When a stated max was said, and nil for a derived one -- which has a date too, but it
-    # is the date of the set behind it and reporting that is its own change.
-    attr_reader :pounds, :source, :stated_at
+    # The day this number is as of, and both kinds have one (#293). For a stated max it is
+    # when it was said; for a derived one it is when the set behind it was lifted.
+    #
+    # One accessor rather than two, because every reader asks the same question -- "how old
+    # is this" -- and a caller that had to pick between stated_at and something else would be
+    # re-deriving `source` to do it. `explanation` is where the two readings are told apart.
+    attr_reader :pounds, :source, :as_of
 
-    def initialize(pounds:, source:, stated_at: nil)
+    def initialize(pounds:, source:, as_of: nil)
       @pounds = pounds
       @source = source
-      @stated_at = stated_at
+      @as_of = as_of
     end
 
     # The max to generate against, or nil when there is neither a stated one nor enough
@@ -75,8 +79,8 @@ class Tectonic < Roda
       stated = DB[:account_training_maxes].where(account_id:, exercise_id: exercise.id).first
       return from_row(stated) if stated
 
-      derived = exercise.estimated_max(account_id:, on:)
-      derived && new(pounds: derived, source: DERIVED)
+      derived = exercise.estimated_reading(account_id:, on:)
+      derived && new(pounds: derived[:pounds], source: DERIVED, as_of: derived[:on])
     end
 
     # The stored row as the object every caller reads. The column is numeric, so Sequel hands
@@ -85,7 +89,7 @@ class Tectonic < Roda
     # and for the same reason: 315 should come back as 315 rather than as a decimal that
     # prints with a trailing zero everywhere it is displayed.
     def self.from_row(row)
-      new(pounds: Plates.numeric(row[:pounds].to_r), source: STATED, stated_at: row[:stated_at])
+      new(pounds: Plates.numeric(row[:pounds].to_r), source: STATED, as_of: row[:stated_at])
     end
 
     # Saves what a lifter typed, or clears it when they typed nothing.
@@ -134,6 +138,26 @@ class Tectonic < Roda
       return 'the max you set' if stated?
 
       'an estimated one-rep max from your completed sets, since you have not set one'
+    end
+
+    # The date as a reader sees it, or nil where there is none to show. Nil is reachable on a
+    # derived max whose set predates the join that carries the date, and on any caller that
+    # built one by hand, so every display of this is guarded rather than assumed.
+    def on_date
+      as_of&.to_date
+    end
+
+    # The date as a clause, with its own leading space and its own preposition -- " on Aug 29,
+    # 2026", or nothing at all where there is no date.
+    #
+    # Here rather than in the view because a view interpolating a strftime behind a guard is a
+    # long line doing two jobs, and both places that show this had grown one. Returning the
+    # empty string rather than nil is what lets a template interpolate it with no conditional
+    # around the punctuation that follows.
+    def since(preposition = 'on')
+      return '' unless on_date
+
+      " #{preposition} #{on_date.strftime('%b %-d, %Y')}"
     end
   end
 end

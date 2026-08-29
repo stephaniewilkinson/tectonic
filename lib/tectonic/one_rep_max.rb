@@ -67,9 +67,29 @@ class Tectonic < Roda
     # nil when none of them can be read at all. The best rather than the latest, because a
     # max is the most that has been demonstrated, not the most recent thing attempted.
     def best_of(sets)
-      sets.filter_map do |set|
-        estimate(weight: set[:weight], reps: set[:reps], rpe: set[:rpe], planned_rpe: set[:planned_rpe])
-      end.max
+      best_reading(sets)&.fetch(:pounds)
+    end
+
+    # The same answer with the set that produced it, so a reader can say *when*. #293.
+    #
+    # "The best rather than the latest" is the right rule and it is also the one that makes
+    # a bare number misleading: there is no lower bound on the window, so the number can be
+    # a single lifted three years ago and nothing about it says so. The date is what turns
+    # that from a hidden property into a fact somebody can judge -- which is the whole of
+    # #293, and why nothing here expires or decays anything.
+    #
+    # Nil rather than a zero-ish reading when no set can be read, so every caller keeps the
+    # "nothing to go on" branch it already had.
+    def best_reading(sets)
+      sets.filter_map { |set| reading_of(set) }.max_by { |reading| reading[:pounds] }
+    end
+
+    # One set as an estimate and the day it was lifted, or nil where the chart declines.
+    # `date` rides along from the row; it is nil on any caller that did not select it, which
+    # reads as "no date" rather than raising.
+    def reading_of(set)
+      pounds = estimate(weight: set[:weight], reps: set[:reps], rpe: set[:rpe], planned_rpe: set[:planned_rpe])
+      pounds && { pounds:, on: set[:date] }
     end
   end
 end

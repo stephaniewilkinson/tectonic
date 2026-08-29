@@ -348,7 +348,7 @@ describe 'what the movement page says about the max it is showing' do
     lifted(@account_id, @exercise)
     get "/exercises/#{@exercise.id}/"
 
-    assert_includes last_response.body, 'an estimated one-rep max from your completed sets'
+    assert_includes last_response.body, 'an estimated one-rep max'
   end
 
   it 'names a stated max as one you set' do
@@ -509,7 +509,85 @@ describe 'exercise_history and the two kinds of max' do
 
     call_tool('exercise_history', raw: minted.raw, arguments: { exercise: exercise.name })
 
-    assert_match(/training max 315 \(the max you set\)/, tool_result.fetch('content').first.fetch('text'))
+    assert_match(/training max 315 \(the max you set/, tool_result.fetch('content').first.fetch('text'))
+  end
+end
+
+# When a max is as of, for both kinds. #293.
+#
+# A derived max is a lifetime best with no lower bound -- Exercise#lifted_sets bounds only
+# the top of its window and best_reading takes the largest estimate of everything -- so the
+# number a percentage block generates against may be a single lifted years ago, and a bare
+# figure says nothing about that. The date is what turns a hidden property into a fact
+# somebody can judge.
+#
+# Reported and never acted on: nothing expires a max, decays one, or warns about one. That
+# is the same division of labour #263 settled -- the app represents, the assistant judges.
+describe 'when a max is as of' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include TrainingMaxes
+
+  before do
+    @account_id = login
+    @exercise = movement(@account_id)
+  end
+
+  # The set behind the estimate, not today: an old best stays old, which is the whole point.
+  it 'is the day the set behind a derived max was lifted' do
+    workout_id = DB[:workouts].insert(account_id: @account_id, date: Date.today - 400)
+    DB[:sets].insert(workout_id:, exercise_id: @exercise.id, weight: 200, reps: 5,
+                     is_warmup: false, is_completed: true, is_barbell: true)
+
+    assert_equal Date.today - 400, resolve(@account_id, @exercise).on_date
+  end
+
+  # The best rather than the latest is the rule, so the date follows the winning set rather
+  # than the most recent one -- a heavier single last year outranks a lighter one yesterday,
+  # and the date has to say last year or it is describing a different set.
+  it 'follows the set that won rather than the most recent one' do
+    old = DB[:workouts].insert(account_id: @account_id, date: Date.today - 400)
+    DB[:sets].insert(workout_id: old, exercise_id: @exercise.id, weight: 300, reps: 5,
+                     is_warmup: false, is_completed: true, is_barbell: true)
+    recent = DB[:workouts].insert(account_id: @account_id, date: Date.today - 1)
+    DB[:sets].insert(workout_id: recent, exercise_id: @exercise.id, weight: 100, reps: 5,
+                     is_warmup: false, is_completed: true, is_barbell: true)
+
+    assert_equal Date.today - 400, resolve(@account_id, @exercise).on_date
+  end
+end
+
+# A stated max carries its own date, written when it was said. Same accessor, so no reader
+# has to work out which kind it is holding before it can ask how old the number is.
+describe 'when a stated max was said' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include TrainingMaxes
+
+  it 'is the day it was stated' do
+    account_id = login
+    exercise = movement(account_id)
+    stated(account_id, exercise, 315)
+
+    assert_equal Date.today, resolve(account_id, exercise).on_date
+  end
+end
+
+describe 'how old a max is, where it is read' do
+  include Rack::Test::Methods
+  include TrainingMaxes
+
+  it 'is in the exercise_history payload and its prose' do
+    minted, exercise = minted_movement
+    workout_id = DB[:workouts].insert(account_id: minted.account_id, date: Date.today - 400)
+    DB[:sets].insert(workout_id:, exercise_id: exercise.id, weight: 200, reps: 5,
+                     is_warmup: false, is_completed: true, is_barbell: true)
+
+    call_tool('exercise_history', raw: minted.raw, arguments: { exercise: exercise.name })
+
+    assert_equal (Date.today - 400).strftime('%Y-%m-%d'),
+                 tool_result.dig('structuredContent', 'training_max_as_of')
+    assert_includes tool_result.dig('content', 0, 'text'), (Date.today - 400).strftime('%-d %b %Y')
   end
 end
 

@@ -50,13 +50,14 @@
   <p class="mt-2 text-sm text-gray-600">
     <%- if @training_max&.stated? %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
-      which you set<%= " on #{@training_max.stated_at.strftime('%b %-d, %Y')}" if @training_max.stated_at %>.
+      which you set<%= @training_max.since %>.
       Clear the box to go back to estimating it from your lifting.
     <%- elsif @training_max %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
-      an estimated one-rep max from your completed sets &mdash; your best ever, with no cutoff,
-      so it does not fade with time off. Set one below to override it, which is worth doing
-      coming back from a layoff, when that estimate reads work you did before the break.
+      an estimated one-rep max<%= @training_max.since('from a set on') %>
+      &mdash; your best ever, with no cutoff, so it does not fade with time off. Set one below
+      to override it, which is worth doing coming back from a layoff, when that estimate reads
+      work you did before the break.
     <%- else %>
       Nothing has been lifted here that the chart can read, so a lift written as a percentage
       of this movement cannot be generated yet. Set a max, or log a completed set.

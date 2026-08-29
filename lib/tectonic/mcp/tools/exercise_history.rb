@@ -86,12 +86,21 @@ class Tectonic < Roda
         # it costs no query, and nil where nothing can be measured: a movement lifted once,
         # and every movement whose sets predate #281. A zero would read as instantaneous.
         def self.payload(context, exercise, rows, arguments)
-          resolved = resolved_max(context, exercise, arguments)
           { exercise: exercise.name, exercise_id: exercise.id, shown: rows.length,
             limit: limit_for(arguments), estimated_1rm: estimated(context, exercise, arguments),
-            training_max: resolved&.pounds, training_max_source: resolved&.source,
             typical_turnaround_seconds: turnaround(rows),
             sets: rows.map { |set| Presenter.view_set(set).merge(date: set.workout.date.strftime('%Y-%m-%d')) } }
+            .merge(max_fields(context, exercise, arguments))
+        end
+
+        # The resolved max as three keys: the number, which of the two kinds it is, and the
+        # day it is as of. Split out because they are one fact in three parts and because a
+        # payload naming every field of every fact in one literal is a method doing several
+        # jobs -- which rubocop counted before a reader would have.
+        def self.max_fields(context, exercise, arguments)
+          resolved = resolved_max(context, exercise, arguments)
+          { training_max: resolved&.pounds, training_max_source: resolved&.source,
+            training_max_as_of: resolved&.on_date&.strftime('%Y-%m-%d') }
         end
 
         # Grouped by session inside Timing, so two sets a week apart are never subtracted
@@ -139,7 +148,8 @@ class Tectonic < Roda
         def self.max_phrase(resolved)
           return 'no training max yet and nothing lifted to estimate one from' unless resolved
 
-          "training max #{Presenter.weight(resolved.pounds)} (#{resolved.explanation})"
+          dated = resolved.on_date ? ", from #{resolved.on_date.strftime('%-d %b %Y')}" : ''
+          "training max #{Presenter.weight(resolved.pounds)} (#{resolved.explanation}#{dated})"
         end
 
         # How long a set of this costs, in the sentence as well as the payload -- many
