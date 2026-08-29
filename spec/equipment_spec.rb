@@ -96,11 +96,19 @@ describe 'Equipment.loadable at the edges' do
 
   # A machine stack or a dumbbell is not loaded off this rack, so putting its weight
   # through barbell plate math would be a new wrong answer in place of the old one.
-  it 'leaves a lift that is not on a barbell to the increment' do
+  #
+  # It used to take the bar's own increment, and #259 is why it no longer does: the bar's
+  # increment is a fact about the plates an account owns, and buying a pair of 1 lb plates
+  # took it to 2 and started prescribing 26 lb dumbbells. The reasoning above is unchanged
+  # -- the plate enumeration is still not consulted -- but the number it falls back to is
+  # now the dumbbell's, not the bar's.
+  it 'holds a lift that is not on a barbell to its own increment rather than the bar' do
     rack = Gear.for_account(account_with(plates: { 45 => 2, 25 => 2, 1 => 2 }))
 
+    assert_equal 2, rack.increment
+    assert_equal 5, rack.increment_for(is_barbell: false)
     assert_equal 200, rack.loadable(200, is_barbell: false)
-    assert_equal 4, rack.loadable(4, is_barbell: false)
+    assert_equal 5, rack.loadable(4, is_barbell: false)
   end
 
   # write_flat passes the weight of an unweighted lift straight through, and that is nil.
@@ -224,20 +232,28 @@ describe 'every weight a generated week writes' do
     refute_includes weights, 124
     assert_empty(weights.uniq.reject { |weight| rack.per_side(weight) })
   end
+end
 
-  # The deliberate exception, pinned because it looks exactly like the bug it is not. A
-  # machine stack is not loaded off this rack, so its weight is not held to what the rack
-  # can build -- and the session view knows, because it draws no plate math for a set that
-  # is not on a barbell. A sweep that read every generated weight without asking this
-  # question would report the machine as a failure, which is what it did while this was
-  # being written.
-  it 'leaves a lift that is not on a barbell off the rack entirely' do
+# The deliberate exception, pinned because it looks exactly like the bug it is not. A
+# machine stack is not loaded off this rack, so its weight is not held to what the rack
+# can build -- and the session view knows, because it draws no plate math for a set that
+# is not on a barbell. A sweep that read every generated weight without asking this
+# question would report the machine as a failure, which is what it did while this was
+# being written.
+describe 'a generated weight that is not on the bar' do
+  # Asserted as "on its own grid" rather than as "off the barbell's", which is what it
+  # said before #259. That worked while the fallback was the bar's increment and a fine
+  # rack could produce an odd number the bar could not build; now the fallback is fives,
+  # and a multiple of five is usually loadable on a bar too, so the old assertion tested
+  # a coincidence. The claim worth making is the positive one.
+  it 'is held to the dumbbell grid rather than to the rack' do
     weights, rack = generated_week_on({ 45 => 2, 25 => 2, 10 => 2, 5 => 2, 2.5 => 2, 1 => 1 },
                                       top: 135, barbell: false)
+    step = rack.increment_for(is_barbell: false)
 
     refute_empty weights
-    assert weights.any? { |weight| rack.per_side(weight).nil? },
-           "a machine should not be held to the barbell's grid, got #{weights.inspect}"
+    assert weights.all? { |weight| (weight % step).zero? },
+           "a machine should step by #{step}, got #{weights.inspect}"
   end
 end
 

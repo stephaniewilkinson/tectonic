@@ -128,9 +128,18 @@ class Tectonic < Roda
       whole = merged(lift, written)
       shape = MCP::Tools::ProgramWriter.shape_of(whole, lift.exercise)
       MCP::Tools::ProgramWriter.check_load(whole, shape)
-      lift.update(**written.slice(:sets, :reps, :top_weight, :percent_of_max, :note),
+      lift.update(**rounded_load(written.slice(:sets, :reps, :top_weight, :percent_of_max, :note), lift, shape),
                   progression: MCP::Tools::ProgramWriter.progression_for(whole, shape))
       refresh_session(lift.program_day)
+    end
+
+    # A load typed into the block editor lands on a weight the rack can build, the same as
+    # one written over MCP (#259). The form is where an unloadable number is most likely to
+    # be typed, since nothing in it says what the rack can make.
+    def rounded_load(fields, lift, shape)
+      return fields unless fields[:top_weight] && shape[:is_weighted]
+
+      fields.merge(top_weight: Equipment.loadable_for(@account_id, fields[:top_weight], is_barbell: lift.is_barbell))
     end
 
     # Deletion closes the gap the lift leaves, so positions stay 0..n-1 and the session

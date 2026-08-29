@@ -56,12 +56,24 @@ class Tectonic < Roda
         def self.fields(context, lift, arguments)
           attributes = repriced(lift, arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
                                                       :is_main, :is_barbell, :note))
+          attributes = round_load(context, lift, attributes)
           return attributes unless arguments[:exercise]
 
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           return attributes if exercise.id == lift.exercise_id
 
           { exercise_id: exercise.id, is_barbell: exercise.barbell? }.merge(attributes)
+        end
+
+        # An edited load lands on a weight the rack can build, the same as one written with
+        # the block (#259). Reported honestly by the Changes line above, which describes
+        # what was stored rather than what was asked for, so an assistant that sent 152 and
+        # reads back "top_weight 155 to 150" can see the rack answered.
+        def self.round_load(context, lift, attributes)
+          return attributes unless attributes[:top_weight] && lift.is_weighted
+
+          is_barbell = attributes.fetch(:is_barbell, lift.is_barbell)
+          attributes.merge(top_weight: Equipment.loadable_for(context.account_id, attributes[:top_weight], is_barbell:))
         end
 
         # An edit that changes how a lift is priced changes how it progresses, because the

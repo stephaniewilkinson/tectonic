@@ -39,6 +39,17 @@ class Tectonic < Roda
       new(bar_weight: bar, pairs: owned.empty? ? DEFAULT_PLATES : numeric_keys(owned))
     end
 
+    # The nearest weight one account's rack can build, which is where a prescription should
+    # land (#259). Here rather than on the program writer because it is a question about a
+    # rack, and because three write paths ask it -- a lift inside a new block, a lift added
+    # to a day, and an edit to one. Rounding on two of those and not the third is the shape
+    # of the bug rather than a fix for it.
+    def self.loadable_for(account_id, weight, is_barbell:)
+      return weight if weight.nil?
+
+      for_account(account_id).loadable(weight.to_f, is_barbell:)
+    end
+
     # An account that has never said what it owns lifts on the default rack rather than on
     # an empty one, so nothing breaks for anyone who does not care.
     def self.default
@@ -59,6 +70,27 @@ class Tectonic < Roda
       return Rounding::INCREMENT unless lightest
 
       Plates.numeric(lightest.to_r * 2)
+    end
+
+    # The smallest step a dumbbell makes, which is not the smallest step this bar makes.
+    # A fixed dumbbell rack runs 5, 10, 15 and up in fives, and no plate an account owns
+    # for its barbell changes that: buying a pair of 1 lb plates takes `increment` to 2 and
+    # would otherwise start prescribing 26 and 28 lb dumbbells, which almost nobody has.
+    #
+    # An assumption rather than an inventory, and worth naming as one (#259). The app knows
+    # what plates an account owns and nothing at all about its dumbbells, so this is the
+    # common case stated plainly: fives, unless the bar itself cannot manage fives, in which
+    # case the coarser number is the honest one. An account with adjustable dumbbells that
+    # micro-load is not served by this, and is not served by anything else here either --
+    # that wants a second inventory, which is a bigger thing than a rounding rule.
+    DUMBBELL_INCREMENT = 5
+
+    # How far apart two loads of this kind sit. The bar answers from its plates; anything
+    # else answers from the rule above.
+    def increment_for(is_barbell:)
+      return increment if is_barbell
+
+      [increment, DUMBBELL_INCREMENT].max
     end
 
     # The nearest weight this rack can actually load.
@@ -84,9 +116,12 @@ class Tectonic < Roda
     # `is_barbell` is not decoration. A machine stack or a dumbbell is not loaded from this
     # rack at all, and putting its weight through barbell plate math would be a new wrong
     # answer in place of the old one, so those keep the increment rounding they had.
+    # Anything not on the bar rounds to its own increment rather than to the bar's, which
+    # is #259's dumbbell half: a rack that gains a pair of 1 lb plates takes `increment` to
+    # 2, and 26 lb dumbbells are not a thing most gyms have.
     def loadable(weight, is_barbell: true)
       return weight if weight.nil?
-      return Rounding.to_increment(weight, increment:) unless is_barbell
+      return Rounding.to_increment(weight, increment: increment_for(is_barbell:)) unless is_barbell
       return Rounding.to_increment(weight, increment:) if loadable_totals.empty?
 
       loadable_totals.min_by { |total| [(total - weight).abs, total] }
@@ -98,7 +133,8 @@ class Tectonic < Roda
     # know what this rack holds. The increment rides along because a ramp still has to know
     # how far apart to space its rungs, which is a question the increment answers correctly.
     def loading(is_barbell: true)
-      Rounding::Loading.new(increment:, round: ->(weight) { loadable(weight, is_barbell:) })
+      Rounding::Loading.new(increment: increment_for(is_barbell:),
+                            round: ->(weight) { loadable(weight, is_barbell:) })
     end
 
     # Every weight this rack can load, worked out once and kept. A week's generation asks
