@@ -105,9 +105,22 @@ describe 'revising a set in the session' do
   # And the other half of it: a set already done stays done when its weight is corrected.
   # The old rule forced is_completed true on any revision, which hid this case; the new one
   # leaves the flag alone, so it has to be said that "alone" means both ways.
+  # The wait after Done is not decoration, and this test flaked on CI without it. Done posts
+  # over htmx and the response replaces the whole lift panel, so the disclosure that
+  # correct_the_weight_to opens can be a disclosure on the outgoing DOM: it opens, the swap
+  # lands, and the replacement comes back closed with its Weight field hidden -- which
+  # surfaces as "Unable to find visible field" a long way from the cause.
+  #
+  # `has_button?('Undo')` is Capybara's waiting matcher, so it blocks until the swap has
+  # landed, and it is worth asserting in its own right: it is the fact that makes the rest of
+  # this test mean anything, since a set that never registered as done cannot demonstrate
+  # staying done.
   it 'leaves a finished set finished when its weight is corrected' do
     a_session_with_one_set_at 135
     click_button 'Done'
+
+    assert page.has_button?('Undo'), 'the set should be done before its weight is corrected'
+
     correct_the_weight_to 145
 
     assert page.has_text?('145'), 'the row should take the corrected weight'
