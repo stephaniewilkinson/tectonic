@@ -77,6 +77,18 @@ class Tectonic < Roda
         # well as where it may sit -- because no caller wants one without the other, and a
         # range checked at one call site with the placement checked at another is how the two
         # come to be applied to different arguments.
+        # A reference with nothing to reference. #295: percent_of names the movement a
+        # percentage is taken of, so without a percentage beside it there is nothing for it to
+        # qualify -- and a field that reads as doing something and does not is worse than one
+        # that is refused. Beside the two rules above because it is the same kind of rule: what
+        # a value needs next to it before it means anything.
+        def reference_fits!(percent_of, percent:)
+          return if percent_of.nil? || percent
+
+          raise Tool::Refusal, 'percent_of names the movement a percentage is taken of, so it needs ' \
+                               'percent_of_max beside it. Give a percentage, or drop percent_of.'
+        end
+
         def target_fits!(target, measure:, weighted:)
           check(RPE, target, 'Target RPE')
           return if target.nil? || (measure == Measured::REPS && weighted)

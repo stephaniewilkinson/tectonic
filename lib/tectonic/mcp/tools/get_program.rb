@@ -66,9 +66,17 @@ class Tectonic < Roda
         # load is what identifies the lift when this is skimmed and because a prescription
         # reads as a weight first and a difficulty second. Only where there is one: most
         # lifts carry none, and ", target RPE" on every line would be noise on all of them.
+        # Whose max a percentage is of. "max" unqualified where it is the lift's own, which
+        # is the ordinary case and reads the way it always did; named where it is another
+        # movement's, because "70% of max" on a deficit deadlift is the sentence #295 is
+        # about and it means two different loads depending on which max was meant.
+        def self.whose_max(lift)
+          lift[:percent_of] ? "#{lift[:percent_of]} max" : 'max'
+        end
+
         def self.lift_line(lift)
           load = if lift[:top_weight] then " @ #{lift[:top_weight]}"
-                 elsif lift[:percent_of_max] then " @ #{lift[:percent_of_max]}% of max"
+                 elsif lift[:percent_of_max] then " @ #{lift[:percent_of_max]}% of #{whose_max(lift)}"
                  else ''
                  end
           target = lift[:target_rpe] ? ", target RPE #{lift[:target_rpe]}" : ''

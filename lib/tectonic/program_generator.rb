@@ -216,16 +216,41 @@ class Tectonic < Roda
     # stands, so an edit to week one in March used to rewrite it against a max earned in
     # April -- a load nobody prescribed appearing in a week nobody touched.
     def percent_of_max_weight(lift)
-      exercise = Exercise[lift.exercise_id]
+      exercise = priced_off(lift)
       max = TrainingMax.for(account_id: @program.account_id, exercise:, on: @program.start_date)
       raise ArgumentError, no_max_message(exercise, lift) unless max
 
       @equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell)
     end
 
+    # Whose max this lift is a percentage of: another movement where the prescription names
+    # one, and its own otherwise. #295.
+    #
+    # Null means "its own", which is what every lift meant before this and what most go on
+    # meaning -- so the fallback is the column being absent rather than a value chosen for
+    # it. Naming one is how Sheiko prices a deficit pull off the competition deadlift and how
+    # 5/3/1 prices Boring But Big off the main lift's training max; without it a Paused Squat
+    # at 80% resolved against Paused Squat history, which is a different and much lower
+    # number, and came out light in a way that looks correct.
+    #
+    # The load still rounds to *this* lift's own rack rule -- is_barbell above is the lift's,
+    # not the reference's -- because what a percentage is taken of and what the bar can be
+    # loaded to are two different questions. A dumbbell variation priced off a barbell max is
+    # exactly the case that would go wrong if this borrowed both.
+    def priced_off(lift)
+      Exercise[lift.percent_of_exercise_id || lift.exercise_id]
+    end
+
+    # Names the movement the max is missing for, and -- where they differ -- the lift that
+    # was waiting on it (#295). "No training max for Back Squat" is a puzzling thing to be
+    # told about a day whose only lift is a Paused Squat, and the puzzle is the whole reason
+    # to say both.
     def no_max_message(exercise, lift)
-      "No training max for #{exercise.name} yet, so #{lift.percent_of_max}% of it cannot be " \
-        'worked out. Set one on the movement, or log a completed set of it and let the app estimate it.'
+      priced = Exercise[lift.exercise_id]
+      whose = exercise.id == priced.id ? '' : ", which #{priced.name} is priced off"
+      "No training max for #{exercise.name}#{whose} yet, so #{lift.percent_of_max}% of it " \
+        'cannot be worked out. Set one on the movement, or log a completed set of it and ' \
+        'let the app estimate it.'
     end
 
     # The written top_weight is where a lift starts and nothing more: once the movement has

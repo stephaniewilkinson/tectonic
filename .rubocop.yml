@@ -14,6 +14,17 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Enabled: false
 
+# ProgramWriter is the one module every program write path goes through, and that is the
+# point of it: the alternative is the same rules written twice -- once for the browser and
+# once for MCP -- drifting apart, with the browser's copy the one that drifts, because an
+# assistant's calls are specced in a way a form never quite is. It is long because the rules
+# about how a lift may be written are long, and splitting it to satisfy a line count would
+# put related rules in two files, which is the thing it exists to prevent. Same reasoning as
+# ClassLength above, applied to the one module it matters for.
+Metrics/ModuleLength:
+  Exclude:
+    - "lib/tectonic/mcp/tools/program_writer.rb"
+
 AllCops:
   NewCops: enable
 

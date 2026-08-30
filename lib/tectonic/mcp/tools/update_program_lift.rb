@@ -32,7 +32,7 @@ class Tectonic < Roda
             top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
-            note: { type: 'string' }
+            percent_of: { type: %w[string null] }, note: { type: 'string' }
           },
           required: ['program_lift_id'], additionalProperties: false
         )
@@ -59,13 +59,26 @@ class Tectonic < Roda
         def self.fields(context, lift, arguments)
           attributes = repriced(lift, arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
                                                       :is_main, :is_barbell, :target_rpe, :note))
-          attributes = round_load(context, lift, attributes)
+          attributes = round_load(context, lift, attributes).merge(reference(context, arguments))
           return attributes unless arguments[:exercise]
 
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           return attributes if exercise.id == lift.exercise_id
 
           { exercise_id: exercise.id, is_barbell: exercise.barbell? }.merge(attributes)
+        end
+
+        # Repointing the movement a percentage is taken of, or clearing it (#295). Null is how
+        # a lift goes back to being priced off its own max, which is what the column being
+        # absent has always meant -- so the two spellings of "its own" stay one value.
+        #
+        # A key that was not sent is left alone, the same rule the rest of this tool follows:
+        # renaming a lift must not silently repoint what it is priced off.
+        def self.reference(context, arguments)
+          return {} unless arguments.key?(:percent_of)
+          return { percent_of_exercise_id: nil } if arguments[:percent_of].nil?
+
+          { percent_of_exercise_id: Resolver.exercise(context, name: arguments[:percent_of]).id }
         end
 
         # An edited load lands on a weight the rack can build, the same as one written with
