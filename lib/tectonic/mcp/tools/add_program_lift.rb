@@ -22,6 +22,9 @@ class Tectonic < Roda
                     'effort the working sets are meant to be taken at -- how autoregulated ' \
                     'programming is written, and the better instruction than a percentage ' \
                     'coming off a layoff. It belongs only on a loaded lift counted in reps. ' \
+                    'percent_of names a different movement whose max the percentage is of: ' \
+                    'a deficit deadlift written at 70% of the competition deadlift, or ' \
+                    'supplemental work off the main lift. It defaults to the lift itself. ' \
                     'It goes last in the day unless position says otherwise.'
         scope :write
         input_schema(
@@ -34,7 +37,7 @@ class Tectonic < Roda
             is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: { type: 'integer' },
-            note: { type: 'string' }
+            percent_of: { type: 'string' }, note: { type: 'string' }
           },
           required: %w[program_day_id exercise sets], additionalProperties: false
         )

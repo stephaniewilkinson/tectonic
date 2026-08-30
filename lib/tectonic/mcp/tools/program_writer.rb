@@ -40,7 +40,22 @@ class Tectonic < Roda
           exercise = Resolver.exercise(context, name: attributes[:exercise])
           ProgramLift.create(program_day_id: day_row.id, exercise_id: exercise.id,
                              position: position || next_position(day_row),
+                             **reference(context, attributes),
                              **rounded(load(attributes, exercise), context))
+        end
+
+        # The movement whose max a percentage is taken of, when the prescription names one
+        # (#295). Resolved through the same account-scoped resolver every other movement goes
+        # through, so a block can never be priced off a stranger's private lift.
+        #
+        # Absent rather than defaulted: null means "its own max", which is what every lift
+        # meant before this, and writing the lift's own id here instead would make a fallback
+        # look like a decision somebody made. Whether it is allowed at all is Bounds', beside
+        # the other rules about what a field needs next to it to mean anything.
+        def reference(context, attributes)
+          return {} unless attributes[:percent_of]
+
+          { percent_of_exercise_id: Resolver.exercise(context, name: attributes[:percent_of]).id }
         end
 
         # The prescription lands on a weight the rack can build (#259). The sets were never
@@ -118,12 +133,13 @@ class Tectonic < Roda
           attributes[:percent_of_max] ? 'percent' : 'linear'
         end
 
+        # Two kinds of check, split because they answer different questions. check_numbers
+        # asks whether each figure is within its own bounds; everything below it asks whether
+        # the figures make sense *together* -- a measure with the quantity it needs, a target
+        # where a target can sit, a reference with something to reference, a price stated
+        # exactly one way.
         def check_load(attributes, shape)
-          Bounds.check(Bounds::SETS, attributes[:sets], 'Sets')
-          Bounds.check(Bounds::REPS, shape[:reps], 'Reps')
-          Bounds.check(Bounds::SECONDS, shape[:duration_seconds], 'Duration', unit: ' seconds')
-          Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
-          Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
+          check_numbers(attributes, shape)
           check_measure(shape, attributes[:measure])
           # How large a target may be and where it may sit are one question, asked in Bounds
           # beside where a *rating* may sit -- the same rule about the same scale, put to the
@@ -133,7 +149,16 @@ class Tectonic < Roda
           # broken, and the constraint stays as the backstop for anything that never comes
           # through this writer.
           Bounds.target_fits!(attributes[:target_rpe], measure: shape[:measure], weighted: shape[:is_weighted])
+          Bounds.reference_fits!(attributes[:percent_of], percent: attributes[:percent_of_max])
           check_priced(attributes, shape)
+        end
+
+        def check_numbers(attributes, shape)
+          Bounds.check(Bounds::SETS, attributes[:sets], 'Sets')
+          Bounds.check(Bounds::REPS, shape[:reps], 'Reps')
+          Bounds.check(Bounds::SECONDS, shape[:duration_seconds], 'Duration', unit: ' seconds')
+          Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
+          Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
         end
 
         # A lift is counted one way or the other, and the way it is counted decides which

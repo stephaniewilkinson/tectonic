@@ -107,12 +107,18 @@ class Tectonic < Roda
         # Presenter.weight in view_set, and not true here. Migration 012 made this column
         # numeric(7,2) as well, so a program lift's load reached structuredContent as the
         # JSON *string* "0.155e3" where a client had every reason to expect the number 155.
+        # The movement a percentage is taken of, by name, and absent where it is the lift's
+        # own -- which is the ordinary case and the one that should read as it always did.
+        def reference_of(row)
+          { percent_of: Exercise[row.percent_of_exercise_id]&.name }
+        end
+
         def lift(row)
           { id: row.id, position: row.position, exercise: row.exercise&.name,
             exercise_id: row.exercise_id, sets: row.sets, reps: row.reps,
             top_weight: Presenter.weight(row.top_weight), percent_of_max: row.percent_of_max,
             is_barbell: row.is_barbell, is_main: row.is_main,
-            target_rpe: row.target_rpe, note: row.note }
+            target_rpe: row.target_rpe, note: row.note }.merge(reference_of(row))
         end
       end
     end
