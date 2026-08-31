@@ -73,7 +73,7 @@ class Tectonic < Roda
         # went. A warmup says so, because a ramp counted as working sets inflates the
         # volume of every session read off this.
         def self.line(set)
-          parts = ["  #{set[:exercise]} #{set[:weight]}x#{set[:reps]}"]
+          parts = ["  #{set[:exercise]} #{quantity(set)}"]
           parts << "(planned #{set[:planned_weight]}x#{set[:planned_reps]})" if revised?(set)
           parts << 'warmup' if set[:is_warmup]
           parts << (set[:is_completed] ? 'done' : 'not done')
@@ -96,6 +96,19 @@ class Tectonic < Roda
           return "RPE #{set[:rpe]}" if set[:rpe] == set[:planned_rpe]
 
           "RPE #{set[:rpe]} (target #{set[:planned_rpe]})"
+        end
+
+        # What was on the bar and how many times it moved, in the session screen's own words.
+        #
+        # "per side" is #306, and it is a correction rather than an addition. A split squat
+        # written 3x8 per side printed here as `40x8`, so an assistant reading a session back
+        # reasoned about volume, fatigue and progression off half the work -- while this app's
+        # own Volume figures, which have doubled a per-side count since #279, said sixteen.
+        # Two numbers from one app differing by exactly 2x with nothing to say which was
+        # which, which is worse than either being wrong alone. `load_label` on the session
+        # screen has said it all along; only the read tools were silent.
+        def self.quantity(set)
+          "#{set[:weight]}x#{set[:reps]}#{' per side' if set[:is_per_side]}"
         end
 
         # Only worth printing where the prescription and the performance disagree; on a

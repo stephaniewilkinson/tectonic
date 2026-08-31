@@ -241,10 +241,15 @@ class Tectonic < Roda
         # completed_at is iso8601 to match provenance's created_at below, so the two
         # timestamps in one payload agree about shape. Nil on every set completed before
         # #281 and on every one not yet done.
+        # is_per_side joins the payload with #306, and it is a correction rather than an
+        # addition: the column has been on these rows since 009 and Volume has doubled a
+        # per-side count since #279, so the app's own volume figures were already right while
+        # this said `40x8` about sixteen reps of work. Two numbers from one app differing by
+        # exactly 2x, with nothing on the row to explain which was which.
         def view_set(set)
           { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
             rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            completed_at: set.completed_at&.iso8601 }
+            is_per_side: set.is_per_side, completed_at: set.completed_at&.iso8601 }
             .merge(prescribed(set)).merge(provenance(set))
         end
 
