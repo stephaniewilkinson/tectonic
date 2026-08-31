@@ -790,8 +790,11 @@ class Tectonic < Roda
         # also means clearing the field on an edit puts a generated session back to
         # reading its program day's focus rather than pinning it to an empty string.
         name = Workout.clean_name(r.params['name'])
+        # And how it went, on the same terms (#310). Blank clears, so a note written after a
+        # bad day can be taken back off without leaving an empty paragraph behind.
+        note = Workout.clean_note(r.params['note'])
         if id.empty?
-          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'], name:)
+          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'], name:, note:)
           r.redirect "/workouts/#{workout_id}/"
         else
           # Rescheduling is owner-only. This route sits outside the nested ownership
@@ -799,7 +802,7 @@ class Tectonic < Roda
           # account's workout could be moved to a new date.
           @workout = Workout.where(id:, account_id: @account_id).first
           r.redirect '/workouts' unless @workout
-          @workout.update(date: r.params['date'], name:)
+          @workout.update(date: r.params['date'], name:, note:)
           r.redirect "/workouts/#{@workout.id}/"
         end
       end

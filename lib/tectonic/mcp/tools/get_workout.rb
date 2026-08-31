@@ -30,7 +30,8 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           workout = find(context, arguments)
           detail = Presenter.view_workout_detail(workout)
-          ok([headline(detail), *detail[:sets].map { |set| line(set) }].join("\n"), structured: detail)
+          ok([headline(detail), *note_line(detail), *detail[:sets].map { |set| line(set) }].join("\n"),
+             structured: detail)
         end
 
         # The sets have always been in structuredContent, and a client that reads it needs
@@ -45,6 +46,17 @@ class Tectonic < Roda
         def self.headline(detail)
           "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
             "#{detail[:status]}#{', finished' if detail[:finished]}#{timing(detail)}."
+        end
+
+        # What the lifter said about the day, above the sets rather than after them (#310).
+        # It is the thing that explains them: an RPE of 9 and a fourteen minute turnaround
+        # both read differently once "slept badly" is on the page, and an assistant reading
+        # the sets first would have already drawn its conclusion by the time it got there.
+        #
+        # An array so the caller can splat it -- a session with no note contributes no line
+        # rather than a blank one.
+        def self.note_line(detail)
+          detail[:note] ? ["  note: #{detail[:note]}"] : []
         end
 
         # How long it ran and what a normal turnaround was, in the sentence rather than only

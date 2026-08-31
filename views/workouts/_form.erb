@@ -35,5 +35,22 @@
                     class="<%= field_style %> block w-full max-w-sm py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
     </div>
   </div>
+  <%# How the session went, as opposed to what it is called. #310.
+
+      A textarea rather than an input because the useful version is a sentence -- "bar felt
+      slow, slept badly" -- and a single-line box invites two words. whitespace-pre-line on
+      the record keeps the line breaks somebody puts between two thoughts.
+
+      Blank clears, the same as the name above it, so a note written after a bad day can be
+      taken back off rather than being permanent the moment it is typed. %>
+  <div class="mt-4">
+    <label for="note" class="block text-sm font-medium leading-6 text-gray-900">How it went</label>
+    <div class="mt-2">
+      <textarea name="note" id="note" rows="3" autocomplete="off"
+                placeholder="Bar felt slow today, slept badly"
+                class="<%= field_style %> block w-full max-w-sm py-1.5 text-gray-900
+                       placeholder:text-gray-400 sm:text-sm sm:leading-6"><%= @workout&.note %></textarea>
+    </div>
+  </div>
   <input type="submit" value="Save" class="<%= button_style %> mt-4 block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-lime-600">
 </form>
