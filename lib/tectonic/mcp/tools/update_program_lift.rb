@@ -14,11 +14,19 @@ class Tectonic < Roda
       # tools chooses wrong more often than it fills in one more field.
       class UpdateProgramLift < Tool
         NUMBER_OR_NULL = { type: %w[integer null] }.freeze
+        # The arguments that change how a lift is done rather than what it weighs. Any one of
+        # them re-derives the whole shape, since the measure decides which quantity column
+        # carries the number and the other has to be emptied.
+        SHAPE_FIELDS = %i[is_weighted is_per_side measure duration_seconds].freeze
 
         tool_name 'update_program_lift'
         description 'Change a prescribed lift: sets, reps, top_weight or percent_of_max, ' \
                     'the exercise it is, whether it is the main work, or its position in ' \
-                    'the day (0 is first). target_rpe, 1 to 10, is the effort its working ' \
+                    'the day (0 is first). is_weighted, is_per_side, measure and ' \
+                    'duration_seconds change how the lift is done -- loading a movement that ' \
+                    'was written unweighted, holding one that was counted in reps, or ' \
+                    'flagging a count as per side after the fact. target_rpe, 1 to 10, is ' \
+                    'the effort its working ' \
                     'sets are meant to be taken at, on a loaded lift counted in reps; send ' \
                     'null to clear it. Send only what changes. To swap how the load is ' \
                     'written, set one of top_weight/percent_of_max and null the other. ' \
@@ -32,7 +40,9 @@ class Tectonic < Roda
             top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
-            percent_of: { type: %w[string null] }, note: { type: 'string' }
+            percent_of: { type: %w[string null] }, is_weighted: { type: 'boolean' },
+            is_per_side: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
+            duration_seconds: { type: 'integer' }, note: { type: 'string' }
           },
           required: ['program_lift_id'], additionalProperties: false
         )
@@ -57,15 +67,46 @@ class Tectonic < Roda
         # flag with it unless the caller says otherwise, because plate math describing the
         # lift that was swapped out is worse than none -- the same rule the web UI follows.
         def self.fields(context, lift, arguments)
-          attributes = repriced(lift, arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
-                                                      :is_main, :is_barbell, :target_rpe, :note))
-          attributes = round_load(context, lift, attributes).merge(reference(context, arguments))
+          written = arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
+                                    :is_main, :is_barbell, :target_rpe, :note)
+          attributes = round_load(context, lift, written, arguments)
+                       .merge(reference(context, arguments))
+                       .merge(reshaped(lift, arguments))
+                       .merge(repriced(lift, arguments))
           return attributes unless arguments[:exercise]
 
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           return attributes if exercise.id == lift.exercise_id
 
           { exercise_id: exercise.id, is_barbell: exercise.barbell? }.merge(attributes)
+        end
+
+        # The four columns that say how a lift is done, and the quantity that follows from
+        # them. #305: create_program and add_program_lift have always accepted these and this
+        # tool did not, so a lift's shape was fixed at the moment it was written and the only
+        # way to change it was to delete the lift and add it back -- losing its position and
+        # its note.
+        #
+        # The concrete case, and the reason it was sharp: a split squat written unweighted
+        # and later loaded with dumbbells was refused with "Drop the load, or set
+        # is_weighted", naming a remedy the tool would not take. A refusal that tells a caller
+        # to do something the API cannot express is worse than a plain no, because a model
+        # will retry it.
+        #
+        # Taken from `shape` rather than passed through, because these four do not travel
+        # alone: switching to `time` has to null `reps` and set `duration_seconds`, which is
+        # sets_measures_one_way's rule one level up, and shape_of is where that already lives.
+        # Recomputing the whole shape when any one of them is sent means the quantity always
+        # agrees with the measure.
+        #
+        # `measure` back to its stored form, because Changes.apply compares against `row[]`,
+        # which reads the raw column -- a symbol there would differ from the text every time
+        # and report a change on every edit that touched anything else.
+        def self.reshaped(lift, arguments)
+          return {} unless SHAPE_FIELDS.any? { |field| arguments.key?(field) }
+
+          shaped = shape(lift, arguments)
+          shaped.merge(measure: Measured.stored(shaped[:measure]))
         end
 
         # Repointing the movement a percentage is taken of, or clearing it (#295). Null is how
@@ -85,23 +126,37 @@ class Tectonic < Roda
         # the block (#259). Reported honestly by the Changes line above, which describes
         # what was stored rather than what was asked for, so an assistant that sent 152 and
         # reads back "top_weight 155 to 150" can see the rack answered.
-        def self.round_load(context, lift, attributes)
-          return attributes unless attributes[:top_weight] && lift.is_weighted
+        # `arguments` rather than the written slice decides whether there is a load to round,
+        # because is_weighted may be arriving in the same call (#305): a lift being loaded for
+        # the first time has lift.is_weighted false on the row and true in the arguments, and
+        # asking the row would skip the rounding on exactly the edit that introduces a weight.
+        def self.round_load(context, lift, attributes, arguments)
+          return attributes unless attributes[:top_weight] && arguments.fetch(:is_weighted, lift.is_weighted)
 
           is_barbell = attributes.fetch(:is_barbell, lift.is_barbell)
           attributes.merge(top_weight: Equipment.loadable_for(context.account_id, attributes[:top_weight], is_barbell:))
         end
 
-        # An edit that changes how a lift is priced changes how it progresses, because the
-        # two are the same fact: a percentage is re-read from the estimated max each week,
+        # The arguments that change how a lift progresses. The first two are the price, and
+        # the two are the same fact: a percentage is re-read from the estimated max each week,
         # pounds are a starting point the rules step from. Swapping one for the other and
-        # leaving the old rule behind would write a row the generator cannot price -- a
-        # percentage lift it tries to step off a top_weight that is now null.
-        def self.repriced(lift, attributes)
-          return attributes unless attributes.key?(:top_weight) || attributes.key?(:percent_of_max)
+        # leaving the old rule behind writes a row the generator cannot price.
+        #
+        # is_weighted is the third, and it was the bug #305 found. It does not choose *which*
+        # rule applies but whether there is one at all -- unweighted work has no load to
+        # decide -- so loading a lift that was written unweighted has to recompute the rule
+        # even though neither price key moved on its own.
+        REPRICES = %i[top_weight percent_of_max is_weighted].freeze
 
-          attributes.merge(progression: ProgramWriter.progression_for(merged(lift, attributes),
-                                                                      shape(lift, attributes)))
+        # Read off `arguments` and not the written slice, which is what made the two disagree:
+        # the slice carries no is_weighted, so `merged` saw the old value and decided the lift
+        # was still unweighted -- progression nil -- while `reshaped` wrote is_weighted true
+        # beside it. That row fails program_lifts_weight_matches_progression, as a check
+        # violation rather than as a refusal anybody could read.
+        def self.repriced(lift, arguments)
+          return {} unless REPRICES.any? { |field| arguments.key?(field) }
+
+          { progression: ProgramWriter.progression_for(merged(lift, arguments), shape(lift, arguments)) }
         end
 
         # Position is applied by renumbering the whole day rather than written as a
