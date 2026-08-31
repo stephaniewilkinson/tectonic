@@ -62,6 +62,21 @@ class Tectonic < Roda
     # mean "the lifter may say something here, or not" should not disagree about what
     # saying nothing looks like.
     def self.clean_name(raw)
+      clean_text(raw)
+    end
+
+    # What the lifter said about how the session went, or nil where they said nothing. #310.
+    # An RPE and a turnaround are both recorded now and neither says why; this is where "slept
+    # badly" goes, which is the sentence that explains them three weeks later.
+    def self.clean_note(raw)
+      clean_text(raw)
+    end
+
+    # Blank as null, for both of the above. The comment on clean_name already said the two
+    # spellings must not disagree and pointed at Exercise.clean_note for the same rule in a
+    # third place -- so when the note arrived it went through the same helper rather than
+    # becoming a fourth copy of four lines.
+    def self.clean_text(raw)
       text = raw.to_s.strip
       text.empty? ? nil : text
     end

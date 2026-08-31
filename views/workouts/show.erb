@@ -29,6 +29,17 @@
   <p class="mt-2 text-xs text-gray-400"><%= provenance(@workout) %></p>
 <%- end %>
 
+<%# What the lifter said about the day. #310, and it sits above the numbers rather than under
+    them because it is the thing that explains them: an RPE of 9 and a long turnaround both
+    read differently once "slept badly" is on the page.
+
+    whitespace-pre-line keeps the line breaks somebody put between two thoughts while still
+    wrapping a long line on a phone, which is the one thing pre would not do -- the same
+    treatment views/exercises/show.erb gives a movement's note, and for the same reason. %>
+<%- if @workout.note %>
+  <p class="mt-3 whitespace-pre-line text-sm text-gray-700"><%= @workout.note %></p>
+<%- end %>
+
 <%# How long it took, once it is over. #281.
     The record is where a measured session is read back, and it is the only place these
     numbers are worth keeping still -- on the session screen they are a clock, here they are

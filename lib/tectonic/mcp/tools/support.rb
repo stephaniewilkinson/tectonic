@@ -226,8 +226,8 @@ class Tectonic < Roda
         # completed sets. A list still passes nothing and still costs no extra query.
         def view_workout(workout, sets = workout.sets)
           { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), name: workout.name,
-            label: workout.label, sets: sets.count, completed: sets.count(&:is_completed),
-            finished: workout.finished? }
+            label: workout.label, note: workout.note, sets: sets.count,
+            completed: sets.count(&:is_completed), finished: workout.finished? }
             .merge(provenance(workout))
         end
 
