@@ -1112,15 +1112,29 @@ class Tectonic < Roda
   # characters on the number that is already the largest thing on the row, and because it
   # is the half a lifter is reading at arm's length. Unweighted work still says "8 reps" in
   # full, since there is no load in front of it to make the count obvious.
+  #
+  # `positive?` rather than truthiness, which is #321: **zero is truthy in Ruby**, so a set
+  # whose weight was stored as 0 took the weighted branch and printed "0 lb × 10" -- a load
+  # nobody is being asked to lift, on the row a lifter reads at arm's length. 025 nulls the
+  # zeros and `create_set` no longer writes one, so this guard is the belt to that braces:
+  # a zero arriving from anywhere reads as the absence it means.
   def load_label(set)
-    "#{"#{weight_label(set[:weight])} lb × " if set[:weight]}#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+    "#{"#{weight_label(set[:weight])} lb × " if loaded?(set[:weight])}" \
+      "#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
   end
 
   # What the sheet said, in the same words as what was lifted. The two sit one line apart
   # on a changed set -- "75 lb × 5" over "planned 95 × 5" -- and a unit on only one of them
   # reads as two different kinds of number rather than as the same number twice. #280.
   def planned_label(set)
-    "#{"#{weight_label(set[:planned_weight])} lb × " if set[:planned_weight]}#{set[:planned_reps]}"
+    "#{"#{weight_label(set[:planned_weight])} lb × " if loaded?(set[:planned_weight])}#{set[:planned_reps]}"
+  end
+
+  # Whether there is a load to name. One predicate rather than the same guard spelled three
+  # times, because the three labels differing about what counts as a weight is exactly how
+  # "0 lb × 10" got onto a row whose own quantity method would have said "10 reps".
+  def loaded?(weight)
+    !weight.nil? && weight.positive?
   end
 
   # A weight as somebody would write it on a sheet: 225 rather than 225.0, and 137.5 as
@@ -1140,7 +1154,7 @@ class Tectonic < Roda
   def quantity_label(set)
     return "#{set[:duration_seconds]}s" if set[:duration_seconds]
 
-    set[:weight] ? set[:reps].to_s : "#{set[:reps]} reps"
+    loaded?(set[:weight]) ? set[:reps].to_s : "#{set[:reps]} reps"
   end
 
   # The heaviest a lift was taken on each day it was recorded, oldest day first, which
