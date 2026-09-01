@@ -56,9 +56,14 @@ class Tectonic < Roda
         # How long each one took rides along with the counts (#263). A question about pace
         # over a month -- "are my sessions getting longer" -- was otherwise a call per
         # session, and the numbers are already in the rows this loads.
+        # `active_seconds` and the gap count ride along since #318, because a month of
+        # sessions is exactly where a 24-hour figure does the most damage: one session
+        # spanning midnight makes "are my sessions getting longer" unanswerable, and nothing
+        # in this payload said which row to distrust.
         def self.timing_of(workout)
           measured = Timing.session(workout, workout.sets.map(&:values))
-          { seconds: measured[:overall], typical_turnaround_seconds: measured[:typical_turnaround] }
+          { seconds: measured[:overall], active_seconds: measured[:active],
+            long_gaps: measured[:discarded], typical_turnaround_seconds: measured[:typical_turnaround] }
         end
 
         def self.payload(workouts, total, arguments)
@@ -97,9 +102,16 @@ class Tectonic < Roda
 
         # Silent on a session with no stamps, which is every one trained before #281. A "0m"
         # in a list of twenty would read as a real session that took no time.
+        #
+        # A row is one line in a list, so the pair is spelled tightly -- "9m active of 24h" --
+        # rather than in get_workout's full sentence. It appears only where the two numbers
+        # differ, which keeps nineteen ordinary rows reading as they did.
         def self.took(workout)
-          seconds = timing_of(workout)[:seconds]
-          seconds && ", #{Timing.phrase(seconds)}"
+          measured = timing_of(workout)
+          return nil unless measured[:seconds]
+          return ", #{Timing.phrase(measured[:seconds])}" unless measured[:long_gaps].positive?
+
+          ", #{Timing.phrase(measured[:active_seconds])} active of #{Timing.phrase(measured[:seconds])}"
         end
       end
     end
