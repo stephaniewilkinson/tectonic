@@ -12,9 +12,10 @@ class Tectonic < Roda
   # codebase for the other meaning. Timer and Countdown were refused for the opposite reason:
   # they would name the gadget in the issue's screenshot, which this deliberately is not.
   #
-  # Everything here is arithmetic on sets.completed_at. Three answers come out of it:
+  # Everything here is arithmetic on sets.completed_at. Four answers come out of it:
   #
   #   overall     -- first stamp to last, or to finished_at where the lifter said so
+  #   active      -- that span with the gaps too long to be training taken out (#318)
   #   turnarounds -- the interval between consecutive stamps
   #   held        -- the seconds a timed set states in duration_seconds
   #
@@ -52,7 +53,8 @@ class Tectonic < Roda
     def session(workout, sets)
       stamps = stamps_of(sets)
       gaps = turnarounds(stamps)
-      { overall: overall(workout, stamps), overall_basis: basis(workout, stamps),
+      span = overall(workout, stamps)
+      { overall: span, active: active(span, stamps), overall_basis: basis(workout, stamps),
         turnarounds: gaps, discarded: discarded(stamps), held: held(sets),
         typical_turnaround: median(gaps), sets_done: stamps.length }
     end
@@ -75,6 +77,42 @@ class Tectonic < Roda
       seconds.positive? ? seconds : nil
     end
 
+    # The same span with the gaps too long to be training taken back out. #318.
+    #
+    # This reverses a decision made deliberately in #281, so the reversal is worth arguing
+    # rather than just making. The original note said the overall length is not trimmed
+    # because "the lifter was there; the session really did run that long". That holds for a
+    # twenty-five minute gap -- somebody took a phone call and the session really did take
+    # that much longer -- and it does not hold for a twenty-four hour one, which is what a
+    # session logged either side of midnight produces. There is no threshold at which "the
+    # lifter was there" stays true, so the line was drawn in the wrong place.
+    #
+    # **Both numbers are reported, and that is the whole of the fix.** This one leans on
+    # LONG_GAP_SECONDS, which the constant above admits is a defended guess and not a
+    # measurement -- so a version that replaced the span with this would make a guess the
+    # only number anyone could see, and a real nineteen-minute rest before a max attempt
+    # would silently vanish from how long the session took. Beside the raw span the guess can
+    # never destroy anything: a reader seeing "9m active, 24h elapsed, 1 long gap" knows
+    # exactly what happened and can judge whether that was one session or two, which is the
+    # split #263 settled.
+    #
+    # Only the gaps *between stamps* come out. A long tail from the last set to `finished_at`
+    # stays in, because finishing is a thing the lifter said rather than something inferred
+    # from silence, and the ten minutes spent putting plates away is time the session cost.
+    def active(span, stamps)
+      return nil if span.nil?
+
+      span - long_gaps(stamps).sum
+    end
+
+    # The gaps that were too long to be training, which two callers now want in two ways:
+    # `discarded` counts them and `active` subtracts them. One method so the rule cannot
+    # drift apart -- a session reporting "1 long gap" while its active time took two out
+    # would be arithmetic nobody could follow.
+    def long_gaps(stamps)
+      consecutive(stamps).select { |seconds| seconds > LONG_GAP_SECONDS }
+    end
+
     # Which of those two ends was used, so a reader can say "so far" about a session still
     # running rather than reporting it as a finished length.
     def basis(workout, stamps)
@@ -95,7 +133,7 @@ class Tectonic < Roda
     # turnaround 2m" with four discarded gaps is a different session from one with none, and
     # a reader who cannot see the count cannot tell them apart.
     def discarded(stamps)
-      consecutive(stamps).count { |seconds| seconds > LONG_GAP_SECONDS }
+      long_gaps(stamps).length
     end
 
     def consecutive(stamps)

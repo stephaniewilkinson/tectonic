@@ -45,11 +45,19 @@
     numbers are worth keeping still -- on the session screen they are a clock, here they are
     a fact about a day that is finished.
 
-    Three things, and no more. How long from the first set to the last (or to the moment the
-    lifter said they were done); what a normal turnaround between sets was; and how many
-    turnarounds were thrown out for being too long to be training. That last one earns its
-    place: "typical 2m" over a session with four discarded gaps is a different session from
-    one with none, and without the count nobody can tell which they are reading.
+    How long from the first set to the last (or to the moment the lifter said they were
+    done); what a normal turnaround between sets was; and how many turnarounds were thrown
+    out for being too long to be training. That last one earns its place: "typical 2m" over
+    a session with four discarded gaps is a different session from one with none, and
+    without the count nobody can tell which they are reading.
+
+    Since #318 there are two lengths rather than one, and the second only appears when it
+    differs. A session with no long gaps has an active time equal to its span, and printing
+    "48m active - 48m elapsed" would be saying the same thing twice on a line that is
+    already three clauses long. Where they do differ -- a session logged either side of
+    midnight -- both are shown, because the active figure rests on a guess about what counts
+    as training and the raw span beside it is what keeps that guess from destroying
+    anything.
 
     "Turnaround" and not "rest", throughout. One tap per set measures the gap between two
     taps, which is the rest plus the working time of the set that ended it -- see
@@ -60,7 +68,13 @@
     about training that never happened. %>
 <%- if @timing[:overall] %>
   <p class="mt-2 text-sm text-gray-500">
-    <%= Timing.phrase(@timing[:overall]) %><%= ' so far' if @timing[:overall_basis] == :in_progress %>
+    <%- if @timing[:discarded].positive? %>
+      <%= Timing.phrase(@timing[:active]) %> active
+      <span aria-hidden="true">&middot;</span>
+      <%= Timing.phrase(@timing[:overall]) %> elapsed<%= ' so far' if @timing[:overall_basis] == :in_progress %>
+    <%- else %>
+      <%= Timing.phrase(@timing[:overall]) %><%= ' so far' if @timing[:overall_basis] == :in_progress %>
+    <%- end %>
     <%- if @timing[:typical_turnaround] %>
       <span aria-hidden="true">&middot;</span>
       typically <%= Timing.phrase(@timing[:typical_turnaround]) %> between sets

@@ -71,14 +71,29 @@ class Tectonic < Roda
         # Silent on a session with no stamps, which is every session trained before #281 and
         # every one not yet trained. "0m" would be a claim about training that never
         # happened, and a model reading it would repeat the claim.
+        #
+        # Both lengths where they differ (#318), and this is the surface that needed it
+        # most: an assistant reading "24h 9m" in a sentence has no way to know that all but
+        # nine minutes of it was the lifter asleep, and the record page's discarded count --
+        # which has been there since #281 -- never reached the text at all.
         def self.timing(detail)
           measured = detail[:timing]
           return '' unless measured && measured[:overall]
 
-          phrase = ", #{Timing.phrase(measured[:overall])}#{' so far' if measured[:overall_basis] == :in_progress}"
+          phrase = ", #{length(measured)}#{' so far' if measured[:overall_basis] == :in_progress}"
           return phrase unless measured[:typical_turnaround]
 
           "#{phrase}, typically #{Timing.phrase(measured[:typical_turnaround])} between sets"
+        end
+
+        # One length, or two and the reason for the difference. The gap count is what makes
+        # the pair readable rather than puzzling: "9m active, 24h elapsed" invites the
+        # question that "1 long gap not counted" answers.
+        def self.length(measured)
+          return Timing.phrase(measured[:overall]) unless measured[:discarded].positive?
+
+          gaps = "#{measured[:discarded]} long #{measured[:discarded] == 1 ? 'gap' : 'gaps'} not counted"
+          "#{Timing.phrase(measured[:active])} active over #{Timing.phrase(measured[:overall])} elapsed, #{gaps}"
         end
 
         # One set: what was on the bar, what was asked for when that differs, and how it
