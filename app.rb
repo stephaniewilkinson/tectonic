@@ -182,6 +182,21 @@ class Tectonic < Roda
     login_redirect { scope.login_destination(account_id) }
     create_account_redirect { scope.login_destination(account_id) }
 
+    # A background request cannot be answered with a redirect to the login page: the
+    # browser follows it inside the fetch, so what htmx receives is the sign-in markup
+    # with a 200 on it, and it splices that into whatever target the request named --
+    # the middle of a workout, in #341's screenshot, via the session poll. htmx reads
+    # this header before it considers swapping, so a signed-out answer to any htmx
+    # request walks the whole tab to the login screen instead.
+    login_required do
+      if request.env['HTTP_HX_REQUEST']
+        response['HX-Redirect'] = login_path
+        response.status = 401
+        request.halt
+      end
+      super()
+    end
+
     # The scopes an LLM can be granted, and the RSA keypair that signs (private) and
     # verifies (public) the JWT access tokens the resource server checks locally.
     oauth_application_scopes %w[read write]
