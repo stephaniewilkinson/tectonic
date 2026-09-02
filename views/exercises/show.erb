@@ -117,6 +117,52 @@
                                   text-white hover:bg-lime-600">Save</button>
   </form>
 
+  <%# What you are aiming at, and when by. #308.
+
+      One paragraph below the training max, because the goal is a target for that number and
+      the two are read together: "worked out from 450 lb" and "aiming at 500 by March 14" is
+      the whole of "am I on pace" on one movement, and the block-by-block openers are the
+      rest of it.
+
+      How far there is to go is shown as a subtraction and nothing more. Nothing here divides
+      pounds by weeks to call a lifter behind: pace on a barbell is not linear, a peaking
+      block moves a max in a way a hypertrophy block deliberately does not, and an app that
+      did the arithmetic would call a correctly-run offseason a failure every time. The app
+      reports the gap and the days; the judgement is somebody else's, which is #263. %>
+  <h2 class="mt-8 text-xl font-semibold text-gray-900">Goal</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    <%- if @goal %>
+      Aiming at <strong><%= weight_label(@goal.pounds) %> lb</strong><%= @goal.deadline_phrase %>.
+      <%= @goal.gap_phrase(@training_max&.pounds) %>
+      <%= @goal.days_phrase %>
+      Clear the box to drop it.
+    <%- else %>
+      Nothing set. A number and a date here is what makes &ldquo;am I on pace&rdquo; a question
+      with an answer &mdash; without one the app can show what you have been training against
+      and cannot say whether it is enough.
+    <%- end %>
+  </p>
+
+  <form method="post" action="/exercises/<%= @exercise[:id] %>/goal" class="mt-3 flex items-end gap-2">
+    <%== csrf_tag("/exercises/#{@exercise[:id]}/goal") %>
+    <label class="text-xs text-gray-500" for="goal-pounds">
+      Pounds
+      <input type="number" name="pounds" id="goal-pounds" min="0" max="2000" step="any" autocomplete="off"
+             value="<%= weight_label(@goal.pounds) if @goal %>" placeholder="lb"
+             class="<%= field_style %> mt-1 block min-h-11 w-28 px-2 text-base text-gray-900">
+    </label>
+    <%# Optional, because a target with no deadline is still a target and insisting on one
+        would be the app requiring a plan the lifter has not made. %>
+    <label class="text-xs text-gray-500" for="goal-by">
+      By
+      <input type="date" name="by_date" id="goal-by" autocomplete="off"
+             value="<%= @goal&.by_date %>"
+             class="<%= field_style %> mt-1 block min-h-11 w-40 px-2 text-base text-gray-900">
+    </label>
+    <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                  text-white hover:bg-lime-600">Save</button>
+  </form>
+
   <%- if @sets.empty? %>
     <p class="mt-6 text-sm text-gray-500">No sets logged yet.</p>
   <%- else %>

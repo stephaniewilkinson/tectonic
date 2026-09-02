@@ -93,8 +93,50 @@ class Tectonic < Roda
       stated = DB[:account_training_maxes].where(account_id:, exercise_id: exercise.id).first
       return from_row(stated) if stated
 
-      derived = exercise.estimated_reading(account_id:, on:)
-      derived && new(pounds: derived[:pounds], source: DERIVED, as_of: derived[:on])
+      derived(account_id:, exercise:, on:)
+    end
+
+    # What this max was on a date that has passed, for reporting and for nothing else. #308.
+    #
+    # `for` answers "what is the max" -- a standing instruction with no history to be as-of,
+    # which is why it passes `on` to the derivation and not to the stated lookup. That is the
+    # right answer to that question and it is unchanged. But it makes a second question
+    # unanswerable: "what did the block I ran in March actually open at". Since #291 a block
+    # fixes its denominator at its start date, so that is a well-defined quantity, and for a
+    # stated max the current row could not produce it -- restating 315 as 325 left nothing
+    # behind saying it was ever 315.
+    #
+    # **This resolves and nothing generates off it.** One rule decides what to lift and it is
+    # `for`; this reads a log of what was said and when. Two rules for one question is what
+    # this class exists to prevent, and these are two questions -- keeping them in separate
+    # methods with the boundary named is the only way to have the second without losing the
+    # first. In particular #291's escape hatch survives: restating a max still moves the
+    # block you are in when you regenerate it, because regeneration goes through `for`.
+    #
+    # Falling through to the derived reading where no statement is old enough is not a gap,
+    # it is the truth: before a lifter stated anything, the app was generating against the
+    # estimate, so that is what that block opened at.
+    def self.as_of(account_id:, exercise:, on:)
+      said = statement(account_id, exercise.id, on)
+      return from_row(said) if said && said[:pounds]
+
+      derived(account_id:, exercise:, on:)
+    end
+
+    # The last thing said about this movement on or before a date, or nil if nothing had been
+    # said yet. A row whose pounds are null is a lifter who cleared their max, and it is a
+    # statement like any other -- it is what stops a block run after a clear from reporting
+    # the number that was stated before it.
+    def self.statement(account_id, exercise_id, on)
+      DB[:account_training_max_statements]
+        .where(account_id:, exercise_id:)
+        .where { stated_at < (on + 1) }
+        .order(Sequel.desc(:stated_at), Sequel.desc(:id)).first
+    end
+
+    def self.derived(account_id:, exercise:, on:)
+      reading = exercise.estimated_reading(account_id:, on:)
+      reading && new(pounds: reading[:pounds], source: DERIVED, as_of: reading[:on])
     end
 
     # The stored row as the object every caller reads. The column is numeric, so Sequel hands
@@ -140,12 +182,26 @@ class Tectonic < Roda
       return clear(account_id, exercise_id) unless number&.positive?
       return unless PLAUSIBLE.cover?(number)
 
-      percent = fraction(train_at)
-      DB[:account_training_maxes]
-        .insert_conflict(target: %i[account_id exercise_id],
-                         update: { pounds: number, train_at_percent: percent,
-                                   stated_at: Sequel::CURRENT_TIMESTAMP })
-        .insert(account_id:, exercise_id:, pounds: number, train_at_percent: percent)
+      store(account_id, exercise_id, number, fraction(train_at))
+    end
+
+    # The current answer and the record of having given it, written together (#308).
+    #
+    # The upsert is the answer to "what is my max" and there is one row of it per movement.
+    # The log below cannot be an upsert -- repetition is the whole point of it, since a lifter
+    # who restates 315 as 325 has said two things and a block ran against each. In one
+    # transaction because a current row with no statement behind it would make a block report
+    # whatever could still be derived for it, which is a quieter wrong answer than an error.
+    def self.store(account_id, exercise_id, pounds, percent)
+      DB.transaction do
+        DB[:account_training_maxes]
+          .insert_conflict(target: %i[account_id exercise_id],
+                           update: { pounds:, train_at_percent: percent,
+                                     stated_at: Sequel::CURRENT_TIMESTAMP })
+          .insert(account_id:, exercise_id:, pounds:, train_at_percent: percent)
+        DB[:account_training_max_statements]
+          .insert(account_id:, exercise_id:, pounds:, train_at_percent: percent)
+      end
     end
 
     # A percentage as it should be stored: the whole number where nothing usable was given,
@@ -155,8 +211,21 @@ class Tectonic < Roda
       number && TRAIN_AT.cover?(number) ? number : WHOLE
     end
 
+    # Emptying the box hands the movement back to the derived estimate, and that is logged
+    # too (#308) -- as a statement carrying no pounds, which is what "I no longer state one"
+    # looks like. Without it, `as_of` reading a block run after a clear would find the
+    # statement *before* the clear and report a number the block was never generated
+    # against, which is worse than reporting nothing.
+    #
+    # Only where there was something to clear. Saving an empty box on a movement that never
+    # had a stated max is not a statement about anything, and a log full of those would put
+    # a null in front of every honest number behind it.
     def self.clear(account_id, exercise_id)
-      DB[:account_training_maxes].where(account_id:, exercise_id:).delete
+      DB.transaction do
+        removed = DB[:account_training_maxes].where(account_id:, exercise_id:).delete
+        DB[:account_training_max_statements].insert(account_id:, exercise_id:) if removed.positive?
+        removed
+      end
     end
 
     def stated? = source == STATED
