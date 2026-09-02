@@ -39,7 +39,7 @@
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900">
                   <%= set.exercise[:name] %>
                   <%- if set[:is_warmup] || set[:is_completed] %>
-                    <div class="text-xs text-gray-400 sm:hidden">
+                    <div class="text-xs text-gray-500 sm:hidden">
                       <%= [('warmup' if set[:is_warmup]), ('done' if set[:is_completed])].compact.join(' · ') %>
                     </div>
                   <%- end %>
