@@ -108,8 +108,8 @@
         eight nav links a keyboard or screen-reader user otherwise steps through on
         every page. sr-only until it holds focus, so nobody else ever sees it. %>
     <a href="#main"
-       class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50
-              rounded-md bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white">Skip to content</a>
+       class="<%= button_style %> sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4
+              focus:z-50 bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white">Skip to content</a>
   <%== render('nav') %>
     <main id="main">
       <div class="max-w-5xl mx-auto px-4">

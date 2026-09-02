@@ -59,7 +59,7 @@ module Programming
   # <main> because the nav's links are sized in views/nav.erb and answer to that file, not
   # this one; a hidden input is dropped because it has no box and nothing can tap it.
   def editor_controls(body)
-    body[%r{<main>(.*)</main>}m, 1]
+    body[%r{<main[^>]*>(.*)</main>}m, 1]
       .scan(/<(input|select|button|a)\s([^>]*)>/)
       .reject { |_tag, attributes| attributes.include?('type="hidden"') }
   end
