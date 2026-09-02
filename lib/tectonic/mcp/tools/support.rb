@@ -98,6 +98,42 @@ class Tectonic < Roda
         end
       end
 
+      # How a load arrives and how it is stored, which are not the same thing for work that
+      # carries none. #321.
+      #
+      # A model sending `weight: 0` for a plank is sending an unambiguous message, and it
+      # was for a long time the *only* message it could send: `weight` was required by
+      # `create_set`'s schema and `Bounds::WEIGHT` starts at zero. So the zeros in the table
+      # are not mistakes, they are the app's own vocabulary being used correctly.
+      #
+      # They are stored as null anyway, on 008's reasoning: "a set with no external load
+      # stores no weight; zero would be a lie of the same kind". Zero is truthy in Ruby, so
+      # a stored one hangs RPE buttons on a row #278 decided should have none, maxes
+      # `Volume::HEAVIEST` for a bodyweight movement, and prints "0 lb x 10".
+      #
+      # **Read rather than refused**, which is the part worth arguing. The prescription side
+      # refuses a written zero by name, and rightly: `next_top_weight` adds an increment
+      # every week, so a zero there compounds into a weighted plank in three weeks. Nothing
+      # on the logging path climbs -- `OneRepMax.estimate` already bails on a non-positive
+      # weight -- so the only thing refusing would buy is a round trip, with nothing stored
+      # until the model tries again. That is the app arguing rather than recording, which is
+      # the wrong side of the line #263 drew.
+      module Load
+        module_function
+
+        # Nil for anything that is not a positive load, so an omitted weight and a zero
+        # reach the column as the same thing -- which is what lets `weight` become optional
+        # without the two spellings meaning different rows.
+        def stored(weight)
+          weight.nil? || !weight.positive? ? nil : weight
+        end
+
+        # Whether a row carries a load worth naming, for the readers that print one.
+        def carried?(weight)
+          !weight.nil? && weight.positive?
+        end
+      end
+
       # What a write actually changed, as field => from/to. An edit tool hands this back
       # so a model can tell the user exactly what moved -- "top weight 155 to 175" --
       # without having read the row beforehand and diffed it itself, which is the version
@@ -274,7 +310,12 @@ class Tectonic < Roda
         # was always right -- view_set has run weights through `weight` for as long as it
         # has existed -- and plenty of MCP clients render only the text, so the half that
         # was wrong is the half most people saw. #256.
+        # Work carrying no load says so in reps rather than as a bare "x10" (#321), which is
+        # what a nil weight interpolated straight would give -- and what a caller logging a
+        # plank would have been confirmed with the moment zeros stopped being stored.
         def load_phrase(set)
+          return "#{set.reps} reps" unless Load.carried?(set.weight)
+
           "#{weight(set.weight)}x#{set.reps}"
         end
 

@@ -111,12 +111,56 @@ describe 'a gap too long to be training' do
     assert_empty session(sets_at(0, Tectonic::Timing::LONG_GAP_SECONDS + 1))[:turnarounds]
   end
 
-  # The overall length is deliberately *not* trimmed by this. The lifter was there; the
-  # session really did run that long, and only the average of the gaps is protected.
+  # The overall length is still not trimmed by it. Since #318 the trimmed figure is a second
+  # number rather than a replacement, so both readings survive and neither destroys the other.
   it 'still counts towards how long the session ran' do
     measured = session(sets_at(0, 120, 120 + Tectonic::Timing::LONG_GAP_SECONDS + 1))
 
     assert_equal 120 + Tectonic::Timing::LONG_GAP_SECONDS + 1, measured[:overall]
+  end
+end
+
+# The span with the hours nobody was training taken back out. #318. A session logged either
+# side of midnight reported 24h and meant nine minutes.
+describe 'the time a session was actually being trained' do
+  include Timings
+
+  it 'is the span with the long gaps subtracted' do
+    walked_off = 120 + Tectonic::Timing::LONG_GAP_SECONDS + 1
+    measured = session(sets_at(0, 120, walked_off, walked_off + 180))
+
+    assert_equal 300, measured[:active]
+    assert_equal walked_off + 180, measured[:overall]
+  end
+
+  # The midnight case the issue reported, to the minute: one set late on a Sunday, four the
+  # next morning three minutes apart.
+  it 'reads a session split across a night as the training it contained' do
+    overnight = 24 * 60 * 60
+    measured = session(sets_at(0, overnight, overnight + 180, overnight + 360))
+
+    assert_equal 86_760, measured[:overall]
+    assert_equal 360, measured[:active]
+  end
+
+  # Nothing to take out is the ordinary session, and it must not read differently from
+  # before -- both numbers agree, which is what lets every surface show only one of them.
+  it 'is the whole span when no gap was too long' do
+    measured = session(sets_at(0, 120, 300))
+
+    assert_equal measured[:overall], measured[:active]
+  end
+
+  # A long tail to finished_at stays in: finishing is something the lifter said, and the ten
+  # minutes spent putting plates away is time the session cost.
+  it 'keeps the time between the last set and being done' do
+    measured = session(sets_at(0, 120), finished_at: Timings::BASE + 5400)
+
+    assert_equal 5400, measured[:active]
+  end
+
+  it 'is nothing at all where there is no span to trim' do
+    assert_nil session(sets_at(0))[:active]
   end
 end
 

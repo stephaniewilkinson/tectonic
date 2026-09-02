@@ -262,8 +262,9 @@ tool cheap; see "Adding a tool".
 
 | What it is for | Tools |
 | --- | --- |
-| Logging training | `create_exercise`, `create_workout`, `create_set`, `complete_set`, `update_set`, `delete_set`, `rate_workout` |
+| Logging training | `create_exercise`, `create_workout`, `update_workout`, `create_set`, `complete_set`, `update_set`, `delete_set`, `rate_workout` |
 | Reading it back | `list_exercises`, `list_workouts`, `get_workout`, `exercise_history` |
+| Aiming at something | `set_goal`, `block_progress` |
 | Writing a plan | `list_programs`, `get_program`, `create_program`, `add_program_week`, `add_program_day`, `update_program_day`, `add_program_lift`, `update_program_lift`, `delete_program_lift`, `generate_program_week` |
 | The connector contract | `search`, `fetch` (handles are `exercise:`, `workout:`, `program:`) |
 | Who am I | `whoami` |

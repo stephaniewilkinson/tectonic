@@ -33,8 +33,7 @@ class Tectonic < Roda
         # the same rule the edit form in the web UI follows: plate math describing the
         # lift that was swapped out is worse than no plate math at all.
         def self.attributes(context, set, arguments)
-          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup)
-          check(fields)
+          fields = written(arguments)
           # The shape the set will be left in, not the one it is in: this is the one tool
           # that can set is_warmup and rpe in a single call, so asking the row as it stands
           # would let a rating through onto a set about to become a warmup.
@@ -46,6 +45,20 @@ class Tectonic < Roda
           return fields if exercise.id == set.exercise_id
 
           { exercise_id: exercise.id, is_barbell: exercise.barbell? }.merge(fields)
+        end
+
+        # The columns as they will be stored: range-checked, and a weight of zero read as
+        # bodyweight on the same terms as in create_set (#321), so a set logged with a load
+        # and then corrected to none can be said the obvious way.
+        #
+        # `key?` rather than a truthiness check, so this fires only on a weight that was
+        # actually sent -- an unmentioned one is left exactly as it was, which is what makes
+        # "send only what changes" true of this field as well as the rest.
+        def self.written(arguments)
+          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup)
+          check(fields)
+          fields[:weight] = Load.stored(fields[:weight]) if fields.key?(:weight)
+          fields
         end
 
         def self.check(fields)
