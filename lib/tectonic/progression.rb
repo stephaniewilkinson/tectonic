@@ -89,6 +89,12 @@ class Tectonic < Roda
     def met?(set)
       return false unless set[:is_completed]
       return true unless set[:planned_weight] && set[:planned_reps]
+      # A set answering a prescribed load with no load at all did not meet it, and cannot be
+      # compared to find that out: since #321 a weight is nil rather than zero for work
+      # carrying none, and `nil >= 225` raises where `0 >= 225` merely answered false. The
+      # rows that reach this are a generated set corrected to bodyweight over MCP, and a
+      # NoMethodError on the progression of a whole block is a poor way to learn about one.
+      return false if set[:weight].nil?
 
       set[:weight] >= set[:planned_weight] && set[:reps] >= set[:planned_reps]
     end

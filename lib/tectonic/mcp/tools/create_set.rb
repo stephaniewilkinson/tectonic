@@ -15,7 +15,9 @@ class Tectonic < Roda
         tool_name 'create_set'
         description 'Log a set of an exercise (by name) into a workout (by date, ' \
                     "'today' by default). Weights are integer pounds, rpe is how hard " \
-                    'that set was on the 1-10 scale.'
+                    'that set was on the 1-10 scale. Leave weight out for work carrying ' \
+                    'no external load -- a plank, a band pull-apart, a bodyweight hip ' \
+                    'thrust -- which is recorded as a rep count with no weight at all.'
         scope :write
         input_schema(
           type: 'object',
@@ -24,7 +26,7 @@ class Tectonic < Roda
             weight: { type: 'number' }, reps: { type: 'integer' }, rpe: { type: 'integer' },
             is_warmup: { type: 'boolean' }, is_completed: { type: 'boolean' }
           },
-          required: %w[exercise weight reps], additionalProperties: false
+          required: %w[exercise reps], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)
@@ -54,7 +56,7 @@ class Tectonic < Roda
         # would lose its plate math either way.
         def self.attributes(arguments, exercise, workout, context)
           { exercise_id: exercise.id, workout_id: workout.id,
-            weight: arguments[:weight], reps: arguments[:reps], rpe: arguments[:rpe],
+            weight: Load.stored(arguments[:weight]), reps: arguments[:reps], rpe: arguments[:rpe],
             is_warmup: arguments.fetch(:is_warmup, false), is_barbell: exercise.barbell?,
             # A set logged as already done is stamped with when it was logged, which is the
             # best this path can say (#281). It is not when it was lifted -- a session typed

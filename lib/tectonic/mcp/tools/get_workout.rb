@@ -134,8 +134,14 @@ class Tectonic < Roda
         # Two numbers from one app differing by exactly 2x with nothing to say which was
         # which, which is worse than either being wrong alone. `load_label` on the session
         # screen has said it all along; only the read tools were silent.
+        #
+        # Unloaded work reads "10 reps" rather than "x10" (#321), which is the same phrasing
+        # the session screen has used since #280 and the one `load_phrase` now confirms a
+        # write with. A bare "x10" is what a nil weight interpolated straight produces, and
+        # it reads as a missing number rather than as an absent load.
         def self.quantity(set)
-          "#{set[:weight]}x#{set[:reps]}#{' per side' if set[:is_per_side]}"
+          count = Load.carried?(set[:weight]) ? "#{set[:weight]}x#{set[:reps]}" : "#{set[:reps]} reps"
+          "#{count}#{' per side' if set[:is_per_side]}"
         end
 
         # Only worth printing where the prescription and the performance disagree; on a

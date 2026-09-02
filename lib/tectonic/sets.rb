@@ -55,8 +55,15 @@ class Tectonic < Roda
     # a rating here, and deliberately: it enforces the two rules that are about meaning --
     # warmups and timed work -- and narrowing it to weight as well would be a migration
     # that clears ratings somebody did record.
+    #
+    # `positive?` rather than `!nil?`, which is #321. Zero is truthy in Ruby, so a set whose
+    # weight was stored as 0 -- the only thing create_set would accept for bodyweight work
+    # until 025 -- passed this test and drew the five buttons #278 exists to withhold. 025
+    # nulls the zeros already in the table; this is what makes a zero from anywhere else
+    # read as the absence of load it means, rather than leaving the rule true of the column
+    # and false of the movement.
     def ratable?
-      !is_warmup && !timed? && !weight.nil?
+      !is_warmup && !timed? && !weight.nil? && weight.positive?
     end
 
     # The work of one set, doubled where the count was per side. A Bulgarian split squat
