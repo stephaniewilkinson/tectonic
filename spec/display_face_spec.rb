@@ -129,12 +129,19 @@ describe 'the surfaces that take the display face' do
   end
 
   # /welcome rather than /, which redirects to it when signed out.
-  it 'gives the marketing page its whole voice, not only its headline' do
+  #
+  # This asserted the opposite until #327. #200 gave the marketing page its whole voice on
+  # the grounds that its job is tone rather than use -- and the face is a display serif, cut
+  # for size. At 18px over two full-width lines it was doing the one job it was not drawn
+  # for, and a reader who has to work at the sentence under the headline stops at the
+  # headline. What survives is the rule #200 was after: the brand face where it works, which
+  # is large.
+  it 'leaves the marketing page s running text in the system face' do
     get '/welcome'
     copy = tags_matching(/<p class="[^"]*text-lg[^"]*">/)
 
     refute_empty copy
-    copy.each { |line| assert_equal ['serif'], face_of(line) }
+    copy.each { |line| assert_empty face_of(line), "#{line} is body text and wants the system face" }
   end
 
   it 'titles /about, which had no heading at all' do
@@ -146,6 +153,42 @@ describe 'the surfaces that take the display face' do
     workout_id = own_workout(account_id)
 
     assert_equal ['serif'], heading_face("/workouts/#{workout_id}")
+  end
+end
+
+# The rule #327 asked for, said once rather than page by page: a brand face is for headings
+# and for the figures that are read rather than used, and never for a paragraph.
+#
+# Asserted over paragraphs rather than by listing the places it is allowed, because the way
+# this goes wrong is somebody reaching for `serif` on a new block of copy to make it feel
+# like the front page -- and a list of allowed places goes on passing while that happens.
+describe 'running text anywhere in the app' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include DisplayFace
+
+  # Every paragraph on a page, with the classes it carries.
+  def paragraphs(path)
+    get path
+    tags_matching(/<p\b[^>]*>/)
+  end
+
+  it 'is set in the system face on the marketing pages' do
+    %w[/welcome /about].each do |path|
+      paragraphs(path).each do |line|
+        assert_empty face_of(line), "#{path}: #{line} is a paragraph and wants the system face"
+      end
+    end
+  end
+
+  it 'is set in the system face on the screens you use' do
+    login
+
+    %w[/workouts /exercises /volume /connections /settings].each do |path|
+      paragraphs(path).each do |line|
+        assert_empty face_of(line), "#{path}: #{line} is a paragraph and wants the system face"
+      end
+    end
   end
 end
 
