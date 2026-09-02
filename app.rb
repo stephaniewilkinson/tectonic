@@ -22,6 +22,7 @@ require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/program_editor'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/training_max'
+require_relative 'lib/tectonic/goal'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
@@ -511,6 +512,21 @@ class Tectonic < Roda
                               train_at: r.params['train_at_percent'])
           r.redirect "/exercises/#{@exercise.id}/"
         end
+        # What you are aiming at on this movement, and when by. #308.
+        #
+        # Here rather than on /settings, which was the other candidate. A goal is a
+        # per-movement number of exactly the kind the training max above is, and putting it
+        # on a settings page would mean a movement picker to say which lift it is about --
+        # a control this page does not need, because the page *is* the answer. It also puts
+        # the target one paragraph from the number it is a target for, which is the
+        # comparison anybody setting one is making.
+        #
+        # Blank clears, on the same terms as the max. See Goal.replace.
+        r.post 'goal' do
+          check_csrf!
+          Goal.replace(@account_id, @exercise.id, r.params['pounds'], by_date: r.params['by_date'])
+          r.redirect "/exercises/#{@exercise.id}/"
+        end
         r.get do
           # Only the viewer's own sets for this movement, so a shared library
           # exercise never surfaces another account's logged sets.
@@ -523,6 +539,9 @@ class Tectonic < Roda
           # page has to say something about: it is the one that makes a percentage lift
           # refuse to generate.
           @training_max = TrainingMax.for(account_id: @account_id, exercise: @exercise)
+          # What this movement is aiming at, if anything (#308). Nil is a state the page has
+          # to say something different about rather than a number to default.
+          @goal = Goal.for(account_id: @account_id, exercise_id: @exercise.id)
           view('exercises/show')
         end
       end
