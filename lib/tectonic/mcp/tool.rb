@@ -29,6 +29,20 @@ class Tectonic < Roda
           @scope || raise("#{name} must declare `scope :read` or `scope :write`")
         end
 
+        # Declares that this tool removes something a person would miss. #354.
+        #
+        # Only the four tools that genuinely destroy say it, which is what makes the word
+        # mean something where it appears: `delete_set`, `delete_workout`, `delete_program`
+        # and `delete_program_lift`. Everything else derives `destructive_hint: false` from
+        # its scope without restating it.
+        def destroys
+          @destroys = true
+        end
+
+        def destroys?
+          @destroys || false
+        end
+
         # Opts a read tool into audit logging. Writes are always audited; a read is
         # logged only when its tool declares `audit_reads`.
         def audit_reads
@@ -37,6 +51,42 @@ class Tectonic < Roda
 
         def audit_reads?
           @audit_reads || false
+        end
+
+        # The annotations a directory listing and a permission prompt read, derived here
+        # rather than declared per tool. #354.
+        #
+        # Both Anthropic's and OpenAI's review criteria require a title and the applicable
+        # readOnlyHint or destructiveHint, and none of the thirty-five tools carried any.
+        # The obvious fix is the wrong one, because of where the gem's defaults sit:
+        # `Annotations#initialize` defaults `destructive_hint` and `open_world_hint` to
+        # **true**, so a tool that declared `annotations(read_only_hint: true)` would go on
+        # announcing itself as destructive and as reaching outside this app. Today nothing
+        # is emitted at all, so that failure does not exist yet -- it would be introduced by
+        # the naive fix, thirty-five times, and be wrong in the direction that makes a
+        # client warn about a read.
+        #
+        # So it is computed from `scope`, which every tool already declares and which
+        # already encodes most of the answer. The two cannot drift, and a new tool is
+        # annotated correctly by declaring the scope it had to declare anyway.
+        #
+        # `open_world_hint` is false everywhere and not derived from anything: every tool
+        # here reads and writes this app's own Postgres and nothing outside it, which is
+        # exactly what that hint is for.
+        #
+        # `idempotent_hint` follows the scope too. A read repeated is the same read; a write
+        # is not promised to be, and several here plainly are not -- create_set logs a
+        # second set. Claiming otherwise would be a worse error than saying nothing, since
+        # it is the hint a client would use to decide a retry is safe.
+        #
+        # An explicit `annotations` declaration still wins, since this only fills in what
+        # nothing set. Nothing uses that today; it is left open because a tool with a
+        # genuinely unusual shape should be able to say so at its own call site.
+        def annotations_value
+          super || ::MCP::Tool::Annotations.new(
+            title: title_value, read_only_hint: scope == :read, destructive_hint: destroys?,
+            idempotent_hint: scope == :read, open_world_hint: false
+          )
         end
 
         # Entry point the mcp gem invokes. Unwraps the account context and runs the

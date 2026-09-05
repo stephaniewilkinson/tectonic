@@ -10,6 +10,7 @@ class Tectonic < Roda
       # lifter is on and which week of it, without pulling every lift of every week.
       class ListPrograms < Tool
         tool_name 'list_programs'
+        title 'List training blocks'
         description "List the account's training blocks with their start date, length in " \
                     'weeks, and which week of the block today falls in. Use get_program ' \
                     'for one block in full.'

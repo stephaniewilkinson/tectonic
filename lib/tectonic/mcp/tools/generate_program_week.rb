@@ -16,6 +16,7 @@ class Tectonic < Roda
       # changes nothing, which is what makes this safe to retry.
       class GenerateProgramWeek < Tool
         tool_name 'generate_program_week'
+        title 'Write a week of sessions'
         description 'Write one week of a block into real workouts: a session per training ' \
                     'day, warmups included, dated from the block. Defaults to the week ' \
                     'today falls in. Running it again for the same week changes nothing.'

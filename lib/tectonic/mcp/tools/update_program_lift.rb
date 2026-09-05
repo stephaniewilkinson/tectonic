@@ -20,6 +20,8 @@ class Tectonic < Roda
         SHAPE_FIELDS = %i[is_weighted is_per_side measure duration_seconds].freeze
 
         tool_name 'update_program_lift'
+
+        title 'Edit a prescribed lift'
         description 'Change a prescribed lift: sets, reps, top_weight or percent_of_max, ' \
                     'the exercise it is, whether it is the main work, or its position in ' \
                     'the day (0 is first). is_weighted, is_per_side, measure and ' \

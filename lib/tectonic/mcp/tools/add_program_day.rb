@@ -15,6 +15,7 @@ class Tectonic < Roda
       # exists with none of its work in it is a thing a lifter can open and be confused by.
       class AddProgramDay < Tool
         tool_name 'add_program_day'
+        title 'Add a training day'
         description 'Add a training day to one week of a block, with its lifts. weekday is ' \
                     '0 for Sunday through 6 for Saturday; the date it falls on follows from ' \
                     "the block's start date. Each lift gives either top_weight or percent_of_max."

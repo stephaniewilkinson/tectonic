@@ -23,6 +23,7 @@ class Tectonic < Roda
       # lifter cannot handle, which is the failure worth being loud about in the description.
       class SetGoal < Tool
         tool_name 'set_goal'
+        title 'Set a goal'
         description 'Set what a movement (by name) is aiming at, in pounds, and optionally ' \
                     'a date to reach it by (YYYY-MM-DD). This is a target, NOT the number ' \
                     'percentages are taken of -- use set_training_max for that. A goal is ' \

@@ -28,6 +28,7 @@ class Tectonic < Roda
       # that have not been done yet.
       class UpdateWorkoutExercise < Tool
         tool_name 'update_workout_exercise'
+        title 'Swap a movement in a session'
         description 'Swap every set of one movement in a session for another, in one ' \
                     'call, instead of one call per set. Sets already marked as lifted ' \
                     'are left alone, since those record what was actually performed.'

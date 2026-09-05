@@ -21,10 +21,12 @@ class Tectonic < Roda
       # produce and a confused model will not.
       class DeleteSet < Tool
         tool_name 'delete_set'
+        title 'Delete a set'
         description 'Delete a set. Returns what was removed so it can be logged again if ' \
                     'that was a mistake. A completed set is training history and needs ' \
                     'confirm true, which you should only send if the user asked for it.'
         scope :write
+        destroys
         input_schema(
           type: 'object',
           properties: { set_id: { type: 'integer' }, confirm: { type: 'boolean' } },

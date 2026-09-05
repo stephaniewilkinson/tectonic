@@ -28,11 +28,13 @@ class Tectonic < Roda
       # the comment there gives the reason -- it exists because a person logged it.
       class DeleteProgram < Tool
         tool_name 'delete_program'
+        title 'Delete a training block'
         description 'Delete a training block and everything prescribed in it. Sessions it ' \
                     'already generated are kept and become hand-logged workouts, since ' \
                     'those days were trained. A block that has generated sessions needs ' \
                     'confirm true.'
         scope :write
+        destroys
         input_schema(
           type: 'object',
           properties: { program_id: { type: 'integer' }, confirm: { type: 'boolean' } },

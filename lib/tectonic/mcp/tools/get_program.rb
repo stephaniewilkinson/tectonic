@@ -12,6 +12,7 @@ class Tectonic < Roda
       # take -- a lift cannot be changed by a model that has only ever seen its name.
       class GetProgram < Tool
         tool_name 'get_program'
+        title 'Read a training block'
         description 'Read one training block in full: its weeks, the days in each week ' \
                     'with the dates they fall on, and every lift in order with its sets, ' \
                     'reps and load. Returns the ids the program edit tools take. ' \

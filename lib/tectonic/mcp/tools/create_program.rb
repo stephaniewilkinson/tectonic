@@ -48,6 +48,8 @@ class Tectonic < Roda
         }.freeze
 
         tool_name 'create_program'
+
+        title 'Create a training block'
         description 'Write a whole training block: its weeks, the days in each week (0 is ' \
                     'Sunday, 6 is Saturday) and the lifts of each day, in one call. Each ' \
                     'lift gives either top_weight in pounds or percent_of_max, or ' \

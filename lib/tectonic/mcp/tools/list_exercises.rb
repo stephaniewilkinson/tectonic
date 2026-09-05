@@ -10,6 +10,7 @@ class Tectonic < Roda
       # never another account's private movements.
       class ListExercises < Tool
         tool_name 'list_exercises'
+        title 'List movements'
         description "List the account's exercises and the shared barbell library."
         scope :read
         input_schema(type: 'object', properties: {}, additionalProperties: false)

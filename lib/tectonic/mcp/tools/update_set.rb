@@ -39,6 +39,8 @@ class Tectonic < Roda
         LIFTED = %i[weight reps].freeze
 
         tool_name 'update_set'
+
+        title 'Correct a set'
         description 'Correct a set: weight, reps, rpe, whether it is a warmup, whether ' \
                     'its reps are per side, or the exercise it is. Send only what ' \
                     'changes. Returns what actually moved. ' \

@@ -14,6 +14,7 @@ class Tectonic < Roda
       # results are account-scoped through the context, so search never leaks a row.
       class Search < Tool
         tool_name 'search'
+        title 'Search'
         description "Search the account's exercises (by name) and workouts (by date). " \
                     'Returns id/title/url rows; pass an id to fetch for the full object.'
         scope :read

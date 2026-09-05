@@ -19,6 +19,8 @@ class Tectonic < Roda
         MAX_LIMIT = 200
 
         tool_name 'exercise_history'
+
+        title 'History of a movement'
         description "The account's own sets of one movement (by name), newest first, with " \
                     'the dates they were lifted and the estimated one-rep max they support. ' \
                     'Narrow with from/to (YYYY-MM-DD). Completed sets only by default, which ' \

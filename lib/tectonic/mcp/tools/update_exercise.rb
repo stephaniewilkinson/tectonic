@@ -20,6 +20,8 @@ class Tectonic < Roda
         TEXT_OR_NULL = { type: %w[string null] }.freeze
 
         tool_name 'update_exercise'
+
+        title 'Edit a movement'
         description 'Change a movement this account owns: its name, its note, its ' \
                     'icon_url, or whether it is loaded on a bar. note is coaching intent ' \
                     'for the movement -- why it is in the program, what to watch for, ' \
