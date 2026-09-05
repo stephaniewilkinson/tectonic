@@ -3,6 +3,9 @@
 require_relative 'spec_helper'
 require 'securerandom'
 require 'date'
+# Not loaded by app.rb: folding movements is a maintenance task, not something a request
+# does, so the web process has no reason to carry it.
+require_relative '../lib/tectonic/exercise_merge'
 
 # #267: a bare "Squat" predating the exercise library, sitting alongside Back Squat,
 # High-Bar Squat and Low-Bar Squat.
@@ -17,15 +20,21 @@ require 'date'
 # invocation: what has to be right is that no set is lost, no prescription is left
 # pointing at a row that no longer exists, and nothing belonging to a movement that
 # merely looks similar is dragged along.
+#
+# #367 added the rest of that sentence. "No set is lost" was true and far too narrow: three
+# of the six tables pointing at exercises are ON DELETE CASCADE, so the delete that ends a
+# merge was quietly taking the stated training max, the goal and the whole statement log
+# with it -- and the fourth, percent_of_exercise_id, has no cascade and failed the delete
+# outright. The describes below cover one table each, because that is the granularity the
+# bug had: five of the six were fine and the list was still wrong.
 module Merge
-  # The task's body, reached directly. Loading the Rakefile to call it would pull in the
-  # migration and OAuth tasks and a second connection with them.
+  # The real move, not a copy of it. This spec used to reimplement the task's body here --
+  # loading the Rakefile to call it would pull in the migration and OAuth tasks and a second
+  # connection with them -- and that is exactly how #367 survived being specced: the Rakefile
+  # grew stale against the schema, and the spec's private copy went stale in the same way and
+  # so agreed with it. The body lives in lib now and both callers reach it.
   def fold(from, into)
-    DB.transaction do
-      Tectonic::WorkoutSet.where(exercise_id: from.id).update(exercise_id: into.id)
-      Tectonic::ProgramLift.where(exercise_id: from.id).update(exercise_id: into.id)
-      from.delete
-    end
+    Tectonic::ExerciseMerge.fold(from, into)
   end
 
   def account
@@ -69,6 +78,32 @@ module Merge
     Tectonic::ProgramLift.create(program_day_id: day.id, exercise_id: exercise.id, position: 0,
                                  sets: 4, reps: 5, top_weight: 155, progression: 'fixed')
   end
+
+  # A lift prescribing one movement at a percentage of another (#295). `reference` is the
+  # movement being folded -- the one the percentage is taken *of* -- so the lift itself sits
+  # on some third movement, or the fold would move it through exercise_id and prove nothing.
+  def priced_off(reference)
+    lift = prescribed(movement("Accessory #{SecureRandom.hex(4)}"))
+    lift.update(percent_of_exercise_id: reference.id, percent_of_max: 70, top_weight: nil)
+    lift
+  end
+
+  # A stated training max and the statement behind it, written the way TrainingMax.store
+  # writes them, with the timestamp exposed so a collision has something to be resolved by.
+  def stated_max(exercise, pounds: 315, at: Time.now)
+    DB[:account_training_maxes].insert(account_id: account, exercise_id: exercise.id, pounds:,
+                                       stated_at: at)
+    DB[:account_training_max_statements].insert(account_id: account, exercise_id: exercise.id,
+                                                pounds:, stated_at: at)
+  end
+
+  def goal_of(exercise, pounds: 405, at: Time.now)
+    DB[:account_goals].insert(account_id: account, exercise_id: exercise.id, pounds:, set_at: at)
+  end
+
+  def maxes_on(exercise) = DB[:account_training_maxes].where(exercise_id: exercise.id).all
+
+  def statements_on(exercise) = DB[:account_training_max_statements].where(exercise_id: exercise.id).count
 end
 
 describe 'folding a legacy movement into the one it meant' do
@@ -152,6 +187,164 @@ describe 'a movement that merely looks similar' do
 
     assert_equal bystander.id, theirs.refresh.exercise_id
     refute_nil Tectonic::Exercise[bystander.id]
+  end
+end
+
+# The four tables #367 is about.
+#
+# Three of them cascade on delete, so the failure they had was not an error -- it was the
+# merge reporting success over a row it had just destroyed. That is why each of these
+# asserts the value survived on the movement that absorbed it, rather than only that the
+# merge did not raise.
+describe 'carrying a stated training max' do
+  include Merge
+
+  before do
+    @legacy = movement("Squat #{SecureRandom.hex(4)}")
+    @real = movement("Back Squat #{SecureRandom.hex(4)}")
+    stated_max(@legacy, pounds: 315)
+  end
+
+  # account_training_maxes is ON DELETE CASCADE (020), so this row went with the movement.
+  # It is the number ProgramGenerator prices every percentage lift off, so losing it does not
+  # announce itself -- the next generated week is simply built off the derived estimate
+  # instead, about ten percent adrift, with nothing saying why.
+  it 'moves the max rather than letting the delete take it' do
+    fold(@legacy, @real)
+
+    assert_equal 1, maxes_on(@real).length
+    assert_equal 315, Tectonic::Plates.numeric(maxes_on(@real).first[:pounds])
+  end
+
+  # The log #308 added so "what did the block I ran in March open at" stays answerable. It
+  # cascades too, and it is the one loss that could not be repaired by restating the number:
+  # a statement log is history, not current state.
+  it 'moves the statements behind it' do
+    fold(@legacy, @real)
+
+    assert_equal 1, statements_on(@real)
+    assert_equal 0, statements_on(@legacy)
+  end
+end
+
+describe 'carrying a goal and a lift priced off the movement' do
+  include Merge
+
+  before do
+    @legacy = movement("Squat #{SecureRandom.hex(4)}")
+    @real = movement("Back Squat #{SecureRandom.hex(4)}")
+  end
+
+  # account_goals cascades as well, and a goal is the thing "am I on pace" is measured
+  # against -- so a merge that dropped it left the question unanswerable and said nothing.
+  it 'moves the goal' do
+    goal_of(@legacy, pounds: 405)
+    fold(@legacy, @real)
+
+    assert_equal 405, Tectonic::Goal.for(account_id: account, exercise_id: @real.id)&.pounds
+  end
+
+  # percent_of_exercise_id (023) is the one with no cascade, so its failure was the opposite
+  # shape: the delete raised, the transaction rolled back, and the merge could not be run at
+  # all while any block was priced off the movement being folded.
+  it 'repoints the lift instead of failing the delete' do
+    lift = priced_off(@legacy)
+    fold(@legacy, @real)
+
+    assert_nil Tectonic::Exercise[@legacy.id]
+    assert_equal @real.id, lift.refresh.percent_of_exercise_id
+  end
+end
+
+# Both per-account tables carry a UNIQUE on (account_id, exercise_id), so an account that has
+# stated something about *both* movements cannot simply have the row moved. The rule is the
+# one TrainingMax.as_of already reads the log by -- the later statement is the one in force --
+# so the surviving row and the log behind it cannot end up disagreeing.
+describe 'an account that has stated a max on both movements' do
+  include Merge
+
+  before do
+    @legacy = movement("Squat #{SecureRandom.hex(4)}")
+    @real = movement("Back Squat #{SecureRandom.hex(4)}")
+  end
+
+  it 'keeps the number stated later, whichever row it was on' do
+    stated_max(@real, pounds: 300, at: Time.now - 86_400)
+    stated_max(@legacy, pounds: 325, at: Time.now)
+    fold(@legacy, @real)
+
+    assert_equal 1, maxes_on(@real).length
+    assert_equal 325, Tectonic::Plates.numeric(maxes_on(@real).first[:pounds])
+  end
+
+  # The same rule read the other way: a legacy row nobody has touched in a year does not
+  # overwrite the number the lifter is actually training off today.
+  it 'keeps the standing number when the legacy one is older' do
+    stated_max(@real, pounds: 300, at: Time.now)
+    stated_max(@legacy, pounds: 225, at: Time.now - 86_400)
+    fold(@legacy, @real)
+
+    assert_equal 1, maxes_on(@real).length
+    assert_equal 300, Tectonic::Plates.numeric(maxes_on(@real).first[:pounds])
+  end
+
+  # Whichever way the collision resolves, the log keeps both -- it has no unique index for
+  # exactly this reason, and a block generated against the superseded number still has to be
+  # able to say so afterwards.
+end
+
+describe 'a collision in the log and in the goal' do
+  include Merge
+
+  before do
+    @legacy = movement("Squat #{SecureRandom.hex(4)}")
+    @real = movement("Back Squat #{SecureRandom.hex(4)}")
+  end
+
+  # Whichever way the collision above resolves, the log keeps both -- it has no unique index
+  # for exactly this reason, and a block generated against the superseded number still has to
+  # be able to say so afterwards.
+  it 'keeps both statements either way' do
+    stated_max(@real, pounds: 300, at: Time.now - 86_400)
+    stated_max(@legacy, pounds: 325, at: Time.now)
+    fold(@legacy, @real)
+
+    assert_equal 2, statements_on(@real)
+  end
+
+  it 'resolves a goal collision on the same rule' do
+    goal_of(@real, pounds: 405, at: Time.now - 86_400)
+    goal_of(@legacy, pounds: 455, at: Time.now)
+    fold(@legacy, @real)
+
+    assert_equal 455, Tectonic::Goal.for(account_id: account, exercise_id: @real.id).pounds
+  end
+end
+
+# The dry run's counts, which are what somebody reads before agreeing to the move. They were
+# part of the bug rather than incidental to it: a preview listing only sets and prescribed
+# lifts is how three cascading tables stayed out of sight for three migrations.
+describe 'saying what would move' do
+  include Merge
+
+  it 'counts every table the move touches' do
+    legacy = movement("Squat #{SecureRandom.hex(4)}")
+    logged(legacy)
+    prescribed(legacy)
+    priced_off(legacy)
+    stated_max(legacy)
+    goal_of(legacy)
+
+    assert_equal ['1 set(s)', '1 prescribed lift(s)', '1 lift(s) priced off it',
+                  '1 stated training max(es)', '1 goal(s)', '1 training max statement(s)'],
+                 Tectonic::ExerciseMerge.tally(legacy)
+  end
+
+  # A movement nothing points at reports an empty list rather than six zeroes, which is what
+  # lets the task say "Nothing points at it" -- the answer that tells somebody they have
+  # named the wrong row.
+  it 'says nothing about a movement nothing points at' do
+    assert_empty Tectonic::ExerciseMerge.tally(movement("Squat #{SecureRandom.hex(4)}"))
   end
 end
 

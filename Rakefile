@@ -327,7 +327,13 @@ end
 # from memory the second time.
 #
 # DRY_RUN=1 says what it would do and writes nothing, which is the way to answer "how many
-# sets does it have" -- the question #267 says to ask first.
+# sets does it have" -- the question #267 says to ask first. It counts every table the move
+# touches since #367, not just the two this task originally moved; a dry run that listed
+# only sets and lifts is how the cascade below stayed invisible for three migrations.
+#
+# The move itself is Tectonic::ExerciseMerge, in lib, because #367 was a second copy of the
+# table list drifting from the schema -- and the spec had a third. One implementation, called
+# by both.
 namespace :exercises do
   desc "Fold one movement into another and delete it: rake 'exercises:merge[Squat,Back Squat]'"
   task :merge, %i[from to] do |_task, args|
@@ -336,12 +342,10 @@ namespace :exercises do
 end
 
 def merge_exercises(from_name, to_name)
-  # The two tables that point at exercises, and the movement itself. Required here rather
-  # than at the top of the file so a task that never touches a movement never opens a
+  # The move itself, which knows every table that points at an exercise. Required here
+  # rather than at the top of the file so a task that never touches a movement never opens a
   # connection by being loaded.
-  require_relative 'lib/tectonic/exercises'
-  require_relative 'lib/tectonic/sets'
-  require_relative 'lib/tectonic/program_lifts'
+  require_relative 'lib/tectonic/exercise_merge'
   abort "Name both: rake 'exercises:merge[Squat,Back Squat]'" if from_name.nil? || to_name.nil?
 
   from = sole_exercise(from_name)
@@ -365,19 +369,19 @@ def sole_exercise(name)
   found.first
 end
 
+# What would move, counted per table. A movement nothing points at says so outright rather
+# than printing an empty list, since "nothing would move" is the answer that tells somebody
+# they have named the wrong row.
 def announce_merge(from, to)
-  sets = Tectonic::WorkoutSet.where(exercise_id: from.id).count
-  lifts = Tectonic::ProgramLift.where(exercise_id: from.id).count
   puts "#{from.name} (id #{from.id}#{', library row' if from.library?}) -> #{to.name} (id #{to.id})"
-  puts "  #{sets} set(s) and #{lifts} prescribed lift(s) would move."
+  carried = Tectonic::ExerciseMerge.tally(from)
+  return puts '  Nothing points at it.' if carried.empty?
+
+  carried.each { |line| puts "  #{line} would move." }
 end
 
 def perform_merge(from, to)
-  DB.transaction do
-    Tectonic::WorkoutSet.where(exercise_id: from.id).update(exercise_id: to.id)
-    Tectonic::ProgramLift.where(exercise_id: from.id).update(exercise_id: to.id)
-    from.delete
-  end
+  Tectonic::ExerciseMerge.fold(from, to)
   puts "Folded #{from.name} into #{to.name}."
 end
 
