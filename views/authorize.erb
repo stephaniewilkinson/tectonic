@@ -37,7 +37,7 @@
       </fieldset>
 
       <div class="flex items-center gap-3">
-        <button type="submit" class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-white hover:bg-lime-600">
+        <button type="submit" class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">
           <%= rodauth.oauth_authorize_button %>
         </button>
         <a href="<%= rodauth.redirect_uri %>?error=access_denied" class="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">

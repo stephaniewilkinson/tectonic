@@ -5,7 +5,7 @@
       <p class="mt-2 text-sm text-gray-700"><%= @workout[:date].strftime('%A %B %-d, %Y') %></p>
     </div>
     <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-      <a href="/workouts/<%= @workout[:id] %>/sets/new" class="<%= button_style %> block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-white hover:bg-lime-600">Add a set</a>
+      <a href="/workouts/<%= @workout[:id] %>/sets/new" class="<%= button_style %> block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-gray-900 hover:bg-lime-600">Add a set</a>
     </div>
   </div>
   <%# Seven nowrap columns do not fit a phone, and the two that fall off the end are the

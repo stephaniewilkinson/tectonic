@@ -2,7 +2,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-3xl font-semibold text-gray-900">Welcome to Tectonic Plates</h1>
     <div class="flex gap-2">
-      <a href="/workouts/new" class="<%= button_style %> bg-lime-500 px-3 py-2 text-sm font-semibold text-white hover:bg-lime-600">Start a new workout</a>
+      <a href="/workouts/new" class="<%= button_style %> bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Start a new workout</a>
       <a href="/workouts/" class="<%= button_style %> bg-sky-800 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-900">Continue a workout</a>
     </div>
   </div>
@@ -50,7 +50,7 @@
         <div class="min-h-20 p-1 <%= cell[:in_month] ? 'bg-white' : 'bg-gray-50 text-gray-500' %>">
           <div class="text-right">
             <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs
-                         <%= 'bg-lime-500 font-semibold text-white' if cell[:today] %>">
+                         <%= 'bg-lime-500 font-semibold text-gray-900' if cell[:today] %>">
               <%= cell[:date].day %>
             </span>
           </div>

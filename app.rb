@@ -1308,9 +1308,18 @@ class Tectonic < Roda
   # Size and padding stay at the call site, exactly as they do for buttons. Several of these
   # inputs are 44px tall for a thumb and several are w-14 because a rep count is two digits
   # wide, and folding either in here would quietly undo a decision somebody made on purpose.
+  # sky-800 rather than lime-500, which is #333. A focus indicator is the only thing telling
+  # a keyboard user where they are on the page, and lime-500 is 1.98:1 on white where WCAG
+  # asks 3:1 -- a pale halo you have to look for. sky-800 is 7.56:1, and it is the colour
+  # this app already reaches for when something has to be seen: the Done button, the focus
+  # ring below, and every Save.
+  #
+  # ring-inset stays. On a field the ring is the field's own border thickening, which is
+  # what a text input is expected to do; #333's offset note is about buttons, where the ring
+  # has to clear a filled edge, and button_style already carries it.
   def field_style
     'rounded-md border-0 shadow-sm ring-1 ring-inset ring-gray-300 ' \
-      'focus:ring-2 focus:ring-inset focus:ring-lime-500'
+      'focus:ring-2 focus:ring-inset focus:ring-sky-800'
   end
 
   # A nav link, which appeared ten times written out in full. What differs between them is
@@ -1320,9 +1329,16 @@ class Tectonic < Roda
     'brand inline-flex min-h-11 shrink-0 items-center border-b-2 px-1 text-base font-medium sm:text-xl'
   end
 
+  # The same correction as field_style, and the case that made #333 urgent: the ring was
+  # lime-500 and the primary button is a lime-500 fill, so tabbing onto Save drew lime on
+  # lime -- 1:1, literally invisible, on the most-tapped control in the app. Not a faint
+  # ring; no ring. sky-800 is 7.56:1 on white and 4.6:1 against the lime button, so it is
+  # visible wherever a button sits.
+  #
+  # outline-offset-2 was already here and is what keeps the ring clear of a filled edge.
   def button_style
     'rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 ' \
-      'focus-visible:outline-offset-2 focus-visible:outline-lime-500'
+      'focus-visible:outline-offset-2 focus-visible:outline-sky-800'
   end
 
   # Fill for one of the RPE buttons, highlighting the current rating. Session and set

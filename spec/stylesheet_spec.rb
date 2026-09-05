@@ -67,7 +67,7 @@ describe 'the stylesheet the app serves' do
   # and appear in no template at all, so a content glob covering only views/ would purge
   # them and leave the session screen and the calendar unstyled in production.
   it 'carries the classes that only Ruby names' do
-    %w[.bg-lime-100 .focus-visible\\:outline-lime-500 .bg-sky-800].each do |utility|
+    %w[.bg-lime-100 .focus-visible\\:outline-sky-800 .focus\\:ring-sky-800 .bg-sky-800].each do |utility|
       assert_includes last_response.body, utility, "#{utility} was purged; check tailwind.config.js content"
     end
   end
