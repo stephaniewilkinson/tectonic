@@ -741,6 +741,27 @@ class Tectonic < Roda
             Workout.where(id: workout_id).update(finished_at: Time.now)
             r.redirect "/workouts/#{workout_id}"
           end
+          # Swapping the movement a whole lift is on, in one tap. #365.
+          #
+          # The decision this serves is made standing at the rack: the sheet says dumbbell
+          # overhead press, the dumbbells are taken, the barbell is free. Before this it
+          # cost one edit per set through the set editor -- three for three sets, six on a
+          # lift with a ramp -- so on 2026-09-01 three sets went into the log as the wrong
+          # movement, because logging the wrong one was quicker than correcting it.
+          #
+          # The whole set of panels comes back rather than the one that was swapped, because
+          # a swap can change the grouping: session_lifts groups consecutive sets of one
+          # movement into a lift, so moving a lift onto the movement its neighbour is on
+          # merges two panels into one and every position after it shifts. Re-rendering the
+          # panel that was posted from would leave the rest of the screen describing a
+          # session that no longer exists.
+          r.post 'swap' do
+            check_csrf!
+            swap_session_exercise(r)
+            next r.redirect("/workouts/#{workout_id}/session") unless r.env['HTTP_HX_REQUEST']
+
+            session_changes(workout_id, @workout.session_fingerprint)
+          end
           # What the screen asks every fifteen seconds: has anything changed under me.
           # #249, and the answer is usually no.
           #
@@ -959,6 +980,30 @@ class Tectonic < Roda
   # whole page is being drawn, one panel is coming back after a tap, or the poll has found
   # something moved. Insertion order is program order: warmups then working sets, lift by
   # lift in the position the program gave them.
+  # Every set of one movement in this session moved onto another. #365.
+  #
+  # Sets already marked as lifted stay exactly where they are, which is #364's rule reaching
+  # the browser: a completed set records a movement that was performed, and a swap says a
+  # different one was. The same line update_workout_exercise draws over MCP, drawn here in
+  # the WHERE clause -- so the two paths cannot come to disagree about what a swap may
+  # touch.
+  #
+  # The movement has to be one this account may select, through visible_exercise, for the
+  # reason the new-set form already goes through it: an id posted by hand would otherwise
+  # attach a stranger's private movement to a set and render its name back.
+  #
+  # A post naming nothing usable changes nothing and is not an error. The form cannot
+  # produce one, the screen is re-rendered either way, and a session mid-lift is the wrong
+  # place to answer a malformed post with a page about it.
+  def swap_session_exercise(request)
+    from = request.params['from_exercise_id'].to_s
+    into = visible_exercise(request.params['exercise_id'])
+    return if from.empty? || into.nil? || from == into.id.to_s
+
+    WorkoutSet.where(workout_id: @workout.id, exercise_id: from, is_completed: false)
+              .update(exercise_id: into.id, is_barbell: into.barbell?)
+  end
+
   def load_session(workout_id)
     @sets = WorkoutSet.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)

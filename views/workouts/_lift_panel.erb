@@ -313,6 +313,52 @@
       <%- end %>
     </ul>
 
+    <%# Swapping the whole lift onto another movement, which is #365's one tap. Before this
+        it was one edit per set through the set editor -- three for three sets, six on a
+        lift with a ramp -- and the cost was paid at the worst possible moment, standing at
+        the rack with the dumbbells taken and the barbell free. Three sets went into the log
+        as the wrong movement on 2026-09-01 because logging the wrong one was quicker.
+
+        Only while something is still unlifted. A completed set records a movement that was
+        performed and does not move (#364), so on a lift that is finished this control could
+        do nothing but say so -- and a disabled-looking row on a screen read at arm's length
+        is worse than a row that is simply not there. The count says how many will move, so
+        a part-finished lift does not promise more than it will do.
+
+        Not the _exercise_options partial the set forms use: that reads @exercises as an
+        array and partitions it into library and own, while the session holds the same rows
+        as a hash keyed by id, because every panel looks a movement up by the id on its
+        sets. Reshaping one to suit the other would cost a query or a copy on the hot path
+        of this screen for a menu most sessions never open.
+
+        The target is #lift-panels rather than this panel: a swap can merge two panels into
+        one, and every position after it shifts. %>
+    <%- pending = lift.reject { |set| set[:is_completed] } %>
+    <%- unless pending.empty? %>
+      <details class="group mt-2">
+        <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><%== render('_chevron') %>Lifted a different movement</summary>
+        <form action="/workouts/<%= @workout[:id] %>/session/swap" method="post"
+              hx-post="/workouts/<%= @workout[:id] %>/session/swap"
+              hx-target="#lift-panels" hx-swap="innerHTML" class="mt-2 flex items-end gap-2">
+          <%== csrf_tag("/workouts/#{@workout[:id]}/session/swap") %>
+          <input type="hidden" name="from_exercise_id" value="<%= lift.first[:exercise_id] %>">
+          <label class="flex-1 text-xs text-gray-500" for="swap-<%= position %>">
+            Swap <%= pending.length %> remaining set<%= 's' if pending.length > 1 %> for
+            <select id="swap-<%= position %>" name="exercise_id"
+                    class="<%= field_style %> mt-1 block w-full py-2 text-base text-gray-900">
+              <%- @exercises.each_value do |exercise| %>
+                <option value="<%= exercise[:id] %>"><%= exercise[:name] %></option>
+              <%- end %>
+            </select>
+          </label>
+          <button type="submit"
+                  class="<%= button_style %> border border-sky-800 bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">
+            Swap
+          </button>
+        </form>
+      </details>
+    <%- end %>
+
     <%# No copy of the rating scale here since #277. It was the footer of every panel that
         asked for a rating, which is how it stayed near the buttons it explains; it is now
         one copy pinned to the foot of the screen, rendered from views/workouts/session.erb,
