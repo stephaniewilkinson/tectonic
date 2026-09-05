@@ -1023,6 +1023,18 @@ class Tectonic < Roda
   # three times over -- once to walk it, then inside every panel to number that panel and
   # to draw a dot per lift -- and a local assigned in one ERB tag and read in the next is
   # an offence to erb_lint, which hands each tag to rubocop as a program of its own.
+  # The sets of a lift nobody has lifted yet, which is exactly what a swap may move (#365)
+  # and therefore what the swap control counts and hides itself over.
+  #
+  # A helper rather than a local in the template, for the reason session_lifts below is one:
+  # erb_lint hands each ERB tag to rubocop as a program of its own, so a local assigned in
+  # one tag and read in the next reads as a useless assignment. The panel asks three times
+  # over -- once to decide whether to draw the control, once for the count, once for the
+  # plural -- which is a reject over a handful of rows already in memory.
+  def unlifted(lift)
+    lift.reject { |set| set[:is_completed] }
+  end
+
   def session_lifts
     @session_lifts ||= @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.to_a
   end

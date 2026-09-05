@@ -333,8 +333,7 @@
 
         The target is #lift-panels rather than this panel: a swap can merge two panels into
         one, and every position after it shifts. %>
-    <%- pending = lift.reject { |set| set[:is_completed] } %>
-    <%- unless pending.empty? %>
+    <%- unless unlifted(lift).empty? %>
       <details class="group mt-2">
         <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><%== render('_chevron') %>Lifted a different movement</summary>
         <form action="/workouts/<%= @workout[:id] %>/session/swap" method="post"
@@ -343,7 +342,7 @@
           <%== csrf_tag("/workouts/#{@workout[:id]}/session/swap") %>
           <input type="hidden" name="from_exercise_id" value="<%= lift.first[:exercise_id] %>">
           <label class="flex-1 text-xs text-gray-500" for="swap-<%= position %>">
-            Swap <%= pending.length %> remaining set<%= 's' if pending.length > 1 %> for
+            Swap <%= unlifted(lift).length %> remaining set<%= 's' if unlifted(lift).length > 1 %> for
             <select id="swap-<%= position %>" name="exercise_id"
                     class="<%= field_style %> mt-1 block w-full py-2 text-base text-gray-900">
               <%- @exercises.each_value do |exercise| %>
