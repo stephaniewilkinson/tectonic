@@ -40,6 +40,20 @@ Style/FrozenStringLiteralComment:
     - views/*.erb
     - views/*/*.erb
 
+# A hyphenated view filename. The cop is about Ruby files and these are templates, but
+# erb_lint hands each one to rubocop as a program of its own -- and on erb_lint 0.9.0 an
+# offence whose location is a PseudoSourceRange, which is what a whole-file cop like this
+# produces, crashes the linter rather than being reported:
+#
+#   undefined method 'begin' for an instance of RuboCop::Cop::Offense::PseudoSourceRange
+#
+# So the exclusion is not cosmetic: without it the lint job dies on the file instead of
+# printing anything about it. Every hyphenated view has to be listed, which is worth
+# knowing before adding one. The names themselves are Rodauth's -- its routes are
+# reset-password and reset-password-request, and a template has to be named after the
+# route it serves.
 Naming/FileName:
   Exclude:
     - "views/create-account.erb"
+    - "views/reset-password.erb"
+    - "views/reset-password-request.erb"
