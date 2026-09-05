@@ -157,25 +157,47 @@ class Tectonic < Roda
     end
 
     # Planned, performed or skipped, decided without inspecting the sets one at a time.
-    # A session that has been lifted at all is performed; a generated one still on or
-    # ahead of its date is planned, and one whose date has passed with nothing lifted
-    # was skipped. A workout typed in by hand is never skipped: it exists because a
-    # person logged it, so once its day is over it reads as history whether or not
-    # anything in it was ticked off.
+    # A session that has been lifted at all is performed; one still on or ahead of its date
+    # is planned; one whose date has passed with nothing lifted was skipped.
     #
     # Today is not over, which is what the >= on the last line is for. The day is still
     # running, and a session with nothing lifted in it yet is one you are about to do
-    # rather than a record of having done it. With > it fell through to performed and
-    # the index filed today's session under History, below every session still to come
-    # -- the row a lifter opened the page to start. A generated session dated today was
-    # never affected either way: program_day_id makes it a plan before any date is
-    # compared.
+    # rather than a record of having done it. With > it fell through and the index filed
+    # today's session under History, below every session still to come -- the row a lifter
+    # opened the page to start.
+    #
+    # This used to end at a bare `:performed`, and #304 is what that cost. The rule it
+    # encoded was:
+    #
+    # > A workout typed in by hand is never skipped: it exists because a person logged it,
+    # > so once its day is over it reads as history whether or not anything in it was
+    # > ticked off.
+    #
+    # That holds for a session somebody typed up *after* training, where the rows are the
+    # record and the completion flags were never going to be ticked. It stopped holding
+    # once `create_workout` and `create_set` became the way an assistant writes a session
+    # **in advance**: those carry no program_day_id, so a plan written on Monday for
+    # Thursday read as `performed` on Friday with nothing done in it. Workout 27 reported
+    # `performed` over 0 of 26 sets while workout 24, differing only in having been
+    # generated, correctly reported `skipped` over 0 of 4.
+    #
+    # So `performed` now means what it says rather than standing in for "neither planned
+    # nor skipped". `performed?` is the first line, so anything reaching the bottom
+    # demonstrably has nothing lifted in it, and that is the one reading certainly wrong.
+    #
+    # What it changes: a hand-logged past session with nothing ticked now reads `skipped`
+    # and the calendar colours it accordingly. That is the intended correction rather than
+    # a side effect -- a session nobody recorded any work in is not a session that
+    # happened. The way to say otherwise is to tick something, which is also what makes it
+    # true.
+    # program_day_id no longer appears here, which is the tell that the rule got simpler
+    # rather than gaining a case: whether a program wrote a session was only ever a proxy
+    # for whether it was a plan, and the date answers that directly.
     def status(today = Date.today)
       return :performed if performed?
-      return :skipped if program_day_id && date.to_date < today
-      return :planned if program_day_id || date.to_date >= today
+      return :planned if date.to_date >= today
 
-      :performed
+      :skipped
     end
   end
 end

@@ -52,13 +52,36 @@ describe 'a generated session' do
   end
 end
 
+# #304, and the reason program_day_id no longer appears in `status` at all: whether a
+# program wrote a session was only ever a proxy for whether it was a plan, and the date
+# answers that directly. A generated session and a hand-logged one on the same date with the
+# same work done now read the same, which is what they are.
 describe 'a workout logged by hand' do
   before do
     @account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
   end
 
-  it 'is history rather than a skipped plan, however long ago it was' do
-    assert_equal :performed, workout_for(@account_id, date: Date.today - 30).status
+  # This asserted `:performed` until #304, on the rule that a hand-logged session "exists
+  # because a person logged it" and so reads as history once its day is over. That held
+  # while typing one up after training was the only way to make one; it stopped holding
+  # when create_workout and create_set became how an assistant writes a session *in
+  # advance*. Workout 27 read `performed` over 0 of 26 sets on that rule.
+  #
+  # Nothing was lifted in this one, and `performed?` is the first clause of status -- so
+  # reaching any later clause means demonstrably nothing was done. Calling that "performed"
+  # is the one reading certainly wrong.
+  it 'is skipped once its day has passed with nothing lifted in it' do
+    assert_equal :skipped, workout_for(@account_id, date: Date.today - 30).status
+  end
+
+  # The case the old rule was protecting, which still works and now works for the right
+  # reason: a session typed up after training has lifted sets in it, so it never reaches
+  # the clause that changed.
+  it 'is still history when something in it was actually lifted' do
+    workout = workout_for(@account_id, date: Date.today - 30)
+    log_one_set(workout, is_completed: true)
+
+    assert_equal :performed, workout.status
   end
 
   it 'is planned when it was deliberately dated ahead' do
@@ -93,11 +116,11 @@ describe 'a session dated today' do
     assert_equal :performed, workout.status
   end
 
-  # Both neighbours, so the boundary cannot quietly move by a day again: yesterday is
-  # over, and an untouched session logged for it is a record of a day that has been and
-  # gone, while tomorrow has not started.
-  it 'sits between a yesterday that is history and a tomorrow that is a plan' do
-    assert_equal :performed, workout_for(@account_id, date: Date.today - 1).status
+  # Both neighbours, so the boundary cannot quietly move by a day again. Yesterday is over,
+  # and an untouched session logged for it is a session that did not happen -- which is
+  # #304's correction: it read as a record of one before.
+  it 'sits between a yesterday that is over and a tomorrow that has not started' do
+    assert_equal :skipped, workout_for(@account_id, date: Date.today - 1).status
     assert_equal :planned, workout_for(@account_id, date: Date.today + 1).status
   end
 end
@@ -141,6 +164,34 @@ describe 'the workouts index' do
     positions = ['Upcoming', Date.today.strftime('%b %d, %Y'), 'History',
                  (Date.today - 2).strftime('%b %d, %Y')].map { |text| last_response.body.index(text) }
     assert_equal positions.compact.sort, positions
+  end
+end
+
+# The pair from the issue, held against each other. They differed only in whether a program
+# generated them, and reported different statuses over the same emptiness.
+describe 'the two sessions in #304' do
+  before do
+    @account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
+  end
+
+  it 'reads the same for a generated and a hand-logged past session with nothing done' do
+    day = program_day_for(@account_id)
+    generated = workout_for(@account_id, date: Date.today - 8, program_day_id: day.id)
+    by_hand = workout_for(@account_id, date: Date.today - 8)
+    log_one_set(generated, is_completed: false)
+    log_one_set(by_hand, is_completed: false)
+
+    assert_equal :skipped, generated.status
+    assert_equal by_hand.status, generated.status
+  end
+
+  # A plan written on Monday for Thursday, which is what create_workout and create_set
+  # produce and what the old fallback called history the moment Friday arrived.
+  it 'calls a session written ahead a plan until its day passes' do
+    ahead = workout_for(@account_id, date: Date.today + 3)
+    log_one_set(ahead, is_completed: false)
+
+    assert_equal :planned, ahead.status
   end
 end
 
