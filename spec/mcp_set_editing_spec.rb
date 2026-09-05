@@ -151,3 +151,124 @@ describe 'the write kill switch' do
   end
 end
 
+# #364: update_set rewrote a completed set without a word, and the loss it caused was real
+# -- three sets of DB Overhead Tricep Extension performed at 14x20, 20x10 and 20x15 became
+# Band Tricep Pushdown with the loads and reps discarded. delete_set has guarded exactly
+# this since it was written; this is the same guard arriving on the tool that does the same
+# damage.
+describe 'update_set moving a lifted set onto another movement' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: %w[read write])
+    @set = written_set(@token.account_id, is_completed: true)
+  end
+
+  # No confirm on this one. A swap says a different movement was performed, so there is no
+  # reading under which the recorded load and reps are still true.
+  it 'refuses to move a lifted set onto a different movement' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, exercise: 'Band Tricep Pushdown' })
+
+    assert tool_result['isError']
+    assert_includes tool_result.dig('content', 0, 'text'), 'a different set'
+    assert_equal 155, Tectonic::Plates.numeric(@set.refresh.weight)
+  end
+
+  it 'points at delete and create rather than leaving the model stuck' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, exercise: 'Band Tricep Pushdown' })
+
+    assert_includes tool_result.dig('content', 0, 'text'), "delete set #{@set.id}"
+    assert_includes tool_result.dig('content', 0, 'text'), 'create the Band Tricep Pushdown set'
+  end
+
+  # The refusal is about a *different* movement. Re-sending the name the set already carries
+  # is not a swap, and an assistant echoing back a row it just read should not be stopped.
+  it 'allows naming the movement the set is already on' do
+    call_tool('update_set', raw: @token.raw,
+                            arguments: { set_id: @set.id, exercise: @set.exercise.name, rpe: 8 })
+
+    refute tool_result['isError']
+    assert_equal 8, @set.refresh.rpe
+  end
+end
+
+# The other half of the guard: the numbers themselves, behind the same confirm delete_set
+# uses rather than refused outright, because correcting a typo is legitimate.
+describe 'update_set over the weight and reps of a lifted set' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: %w[read write])
+    @set = written_set(@token.account_id, is_completed: true)
+  end
+
+  it 'refuses a weight change without confirm, and writes nothing' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, weight: 225 })
+
+    assert tool_result['isError']
+    assert_includes tool_result.dig('content', 0, 'text'), 'rewrites training that happened'
+    assert_equal 155, Tectonic::Plates.numeric(@set.refresh.weight)
+  end
+
+  it 'names both fields when both would move' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, weight: 225, reps: 3 })
+
+    assert_includes tool_result.dig('content', 0, 'text'), 'weight and reps'
+  end
+
+  # Correcting a typo has to stay possible. That was never in doubt; the point of #364 is
+  # that it should not happen silently.
+  it 'allows the correction once confirmed' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, weight: 225, confirm: true })
+
+    refute tool_result['isError']
+    assert_equal 225, Tectonic::Plates.numeric(@set.refresh.weight)
+  end
+end
+
+# What the guard deliberately lets through, which is as much a part of it as the refusals:
+# a guard that stopped these would make rating a set a two-step call and turn every echoed
+# row into an error.
+describe 'update_set on a lifted set where nothing is being rewritten' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: %w[read write])
+    @set = written_set(@token.account_id, is_completed: true)
+  end
+
+  # Rating a set after lifting it is the ordinary way round, and it overwrites nothing that
+  # was measured, so it never asks for confirmation.
+  it 'leaves rating a completed set unguarded' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, rpe: 9 })
+
+    refute tool_result['isError']
+    assert_equal 9, @set.refresh.rpe
+  end
+
+  # Re-sending the value a row already holds moves nothing, so it is not an overwrite and
+  # does not need confirming.
+  it 'does not ask about a value that is already there' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, weight: 155, reps: 5 })
+
+    refute tool_result['isError']
+  end
+end
+
+# The guard is about completed sets only. A written-but-not-lifted set is a prescription,
+# and correcting one is what this tool is for.
+describe 'update_set on a set that has not been lifted' do
+  include Rack::Test::Methods
+
+  it 'changes weight and movement freely' do
+    token = mint(scopes: %w[read write])
+    set = written_set(token.account_id)
+    call_tool('update_set', raw: token.raw,
+                            arguments: { set_id: set.id, weight: 225, exercise: 'Front Squat' })
+
+    refute tool_result['isError']
+    assert_equal 225, Tectonic::Plates.numeric(set.refresh.weight)
+    assert_equal 'Front Squat', set.refresh.exercise.name
+  end
+end
+
