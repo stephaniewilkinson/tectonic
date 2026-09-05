@@ -3,7 +3,7 @@
     <%= @set.exercise[:name] %> &mdash; <%= weight_label(@set[:weight]) %> &times; <%= @set[:reps] %>
   </h1>
   <%- if provenance(@set) %>
-    <p class="mt-1 text-xs text-gray-400"><%= provenance(@set) %></p>
+    <p class="mt-1 text-xs text-gray-500"><%= provenance(@set) %></p>
   <%- end %>
   <dl class="mt-6 divide-y divide-gray-200 border-y border-gray-200 text-sm">
     <div class="flex justify-between py-3">
