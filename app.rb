@@ -1387,8 +1387,16 @@ class Tectonic < Roda
       flash['error']
   end
 
+  # px-3 is here rather than at each call site, which is #368. Most fields carried a py-*
+  # and no horizontal padding at all, so the text a person typed sat flush against the left
+  # edge of its own box -- readable, but it looks like a rendering fault, and on a number
+  # box being read at arm's length it costs a moment every time.
+  #
+  # Tailwind emits pl-* and pr-* after px-*, so a field that wants an asymmetric inset --
+  # a select with a chevron, the search box with an icon -- still overrides one side by
+  # naming it, and only the redundant symmetric copies came out of the call sites.
   def field_style
-    'rounded-md border-0 shadow-sm ring-1 ring-inset ring-gray-300 ' \
+    'rounded-md border-0 px-3 shadow-sm ring-1 ring-inset ring-gray-300 ' \
       'focus:ring-2 focus:ring-inset focus:ring-sky-800'
   end
 

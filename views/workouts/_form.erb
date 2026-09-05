@@ -14,8 +14,13 @@
             lime. The six dark: variants it arrived with went with it. There is no dark
             theme here -- layout.erb is bg-gray-100 whatever the device says -- and
             Tailwind's CDN defaults darkMode to media, so on a phone set to dark this one
-            input drew grey with white text in the middle of a page that stayed light. %>
-        <input autocomplete="on" value="<%= Date.today.strftime('%m/%d/%Y') %>" name="date" id="date" required datepicker datepicker-autohide datepicker-buttons type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-lime-500 focus:border-lime-500 block w-full pl-10 p-2.5">
+            input drew grey with white text in the middle of a page that stayed light.
+
+            It is also the one field that does not go through field_style, so #333's focus
+            ring never reached it and it was left the only lime one in the app. Named here
+            rather than moved onto the helper because the rest of this input is Flowbite's
+            own shape, and matching only the ring is the smaller claim. %>
+        <input autocomplete="on" value="<%= Date.today.strftime('%m/%d/%Y') %>" name="date" id="date" required datepicker datepicker-autohide datepicker-buttons type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-sky-800 focus:border-sky-800 block w-full pl-10 p-2.5">
       </div>
       <input type="hidden" name="id" id="id" value="<%= @workout&.id || nil %>">
     </div>
@@ -42,15 +47,27 @@
       the record keeps the line breaks somebody puts between two thoughts.
 
       Blank clears, the same as the name above it, so a note written after a bad day can be
-      taken back off rather than being permanent the moment it is typed. %>
+      taken back off rather than being permanent the moment it is typed.
+
+      Only on a session that exists, which is #368: this form is shared between New workout
+      and Edit workout, and on the new one it asked how a session went before anybody had
+      done it. There is no answer to that question at that moment, and a box with no
+      possible answer reads as a box you have failed to fill in.
+
+      A session logged after the fact is the case this costs something -- the note is
+      knowable then, and now takes a second step. That is the rarer way round, and the field
+      is on the very next screen; asking everybody a question nobody can answer to save it
+      was the worse trade. %>
+  <%- if @workout %>
   <div class="mt-4">
     <label for="note" class="block text-sm font-medium leading-6 text-gray-900">How it went</label>
     <div class="mt-2">
       <textarea name="note" id="note" rows="3" autocomplete="off"
                 placeholder="Bar felt slow today, slept badly"
                 class="<%= field_style %> block w-full max-w-sm py-1.5 text-gray-900
-                       placeholder:text-gray-400 sm:text-sm sm:leading-6"><%= @workout&.note %></textarea>
+                       placeholder:text-gray-400 sm:text-sm sm:leading-6"><%= @workout.note %></textarea>
     </div>
   </div>
+  <%- end %>
   <input type="submit" value="Save" class="<%= button_style %> mt-4 block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-gray-900 hover:bg-lime-600">
 </form>

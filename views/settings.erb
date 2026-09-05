@@ -57,7 +57,7 @@
       <div class="mt-1 flex items-center gap-2">
         <input type="number" id="bar_weight" name="bar_weight" min="1" step="any" autocomplete="off"
                value="<%= weight_label(@equipment.bar_weight) %>"
-               class="<%= field_style %> w-28 px-3 py-1.5 text-gray-900">
+               class="<%= field_style %> w-28 py-1.5 text-gray-900">
         <span class="text-sm text-gray-500">lb</span>
       </div>
     </div>
@@ -85,7 +85,7 @@
                    id="plates_<%= denomination.to_s.tr('.', '_') %>"
                    name="plates[<%= denomination %>]"
                    value="<%= @equipment.pairs.fetch(denomination, 0) %>"
-                   class="<%= field_style %> w-20 px-3 py-1.5 text-gray-900">
+                   class="<%= field_style %> w-20 py-1.5 text-gray-900">
             <span class="text-sm text-gray-500">pairs</span>
           </div>
         <%- end %>
