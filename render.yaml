@@ -8,6 +8,30 @@
 # creates a second service instead of adopting the current one. Env vars are marked
 # `sync: false` so the values already set in the dashboard are left untouched --
 # in particular SESSION_SECRET, which would log everyone out if regenerated.
+
+# The database, declared so the blueprint describes the whole deployment rather than only
+# the half that serves requests (#348). Like the service above, this governs nothing until
+# the Blueprint is linked in the dashboard -- `name` matches the existing instance exactly so
+# linking adopts it rather than creating a second one, which for a database would be a second
+# empty database and a very bad afternoon.
+#
+# `plan: starter` is not a suggestion here, it is the backup policy. Render Postgres backups
+# go by tier: free has none at all, and starter and above get point-in-time recovery over a
+# three-day window plus logical backups retained seven days after they are taken. Dropping
+# this instance to free would silently remove every backup this app has, which is exactly the
+# failure #348 is about and exactly the one nothing would announce.
+#
+# ipAllowList is deliberately absent rather than set: the current instance allows 0.0.0.0/0,
+# and narrowing it from a blueprint that is not yet linked would either do nothing or, once
+# linked, lock out whatever is connecting from outside Render. Worth doing, worth doing
+# deliberately, and not as a side effect of documenting the database.
+databases:
+  - name: tectonic_production
+    databaseName: tectonic_production_7oho
+    plan: starter
+    region: oregon
+    postgresMajorVersion: "15"
+
 services:
   - type: web
     name: tectonic
