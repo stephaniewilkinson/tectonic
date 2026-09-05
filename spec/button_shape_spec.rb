@@ -29,8 +29,11 @@ module ButtonShape
   # Only the elements that can actually take focus. A tint on a div cannot draw a focus
   # ring and has no business carrying one.
   CONTROL = /<(?:a|button|input)\b[^>]*class="([^"]*)"/
+  # sky-800 rather than lime-500 on the ring since #333: the ring was the same colour as the
+  # button it had to appear on, so tabbing onto Save drew lime on lime and there was no
+  # indicator at all.
   SHAPE = %w[rounded-md shadow-sm focus-visible:outline focus-visible:outline-2
-             focus-visible:outline-offset-2 focus-visible:outline-lime-500].freeze
+             focus-visible:outline-offset-2 focus-visible:outline-sky-800].freeze
 
   def filled_controls(body)
     body.scan(CONTROL).flatten.map(&:split).select { |classes| classes.grep(FILL).any? }
@@ -43,7 +46,25 @@ module ButtonShape
     controls = filled_controls(last_response.body)
 
     refute_empty controls, "#{path} has no primary button left on it to check"
-    controls.each { |classes| assert_shape(classes, path) }
+    controls.each do |classes|
+      assert_shape(classes, path)
+      assert_readable(classes, path)
+    end
+  end
+
+  # #331: white on lime-500 is 1.98:1, where WCAG AA asks 4.5:1 on text this size -- so the
+  # most-tapped control in the app read as a pale green rectangle with something faintly
+  # written on it. The fix is gray-900 on the same lime (8.98:1), which is the trade the nav
+  # had already made on this exact background.
+  #
+  # Asserted over the rendered markup rather than over the helper, because the fill and the
+  # text colour are written at each call site: there were seventeen of them, and one left
+  # behind would be invisible in exactly the places nobody with good eyesight looks.
+  def assert_readable(classes, path)
+    return unless classes.include?('bg-lime-500')
+
+    refute_includes classes, 'text-white',
+                    "a lime button on #{path} still has white text, which is 1.98:1"
   end
 
   def assert_shape(classes, path)
