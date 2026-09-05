@@ -13,6 +13,7 @@ class Tectonic < Roda
       # account's own workout), after range-checking weight and reps.
       class CreateSet < Tool
         tool_name 'create_set'
+        title 'Log a set'
         description 'Log a set of an exercise (by name) into a workout (by date, ' \
                     "'today' by default). Weights are integer pounds, rpe is how hard " \
                     'that set was on the 1-10 scale. Leave weight out for work carrying ' \

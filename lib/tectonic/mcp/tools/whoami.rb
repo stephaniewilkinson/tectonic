@@ -11,6 +11,7 @@ class Tectonic < Roda
       # subclass Tool, name it, declare a schema and a scope, and write `perform`.
       class Whoami < Tool
         tool_name 'whoami'
+        title 'Who this token belongs to'
         description 'Report the authenticated account id, email, and granted scopes.'
         scope :read
         input_schema(type: 'object', properties: {}, additionalProperties: false)

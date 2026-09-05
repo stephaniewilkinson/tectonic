@@ -16,6 +16,7 @@ class Tectonic < Roda
       # sitting there uncompleted.
       class CompleteSet < Tool
         tool_name 'complete_set'
+        title 'Mark a set as lifted'
         description 'Mark a set as lifted. Pass weight, reps or rpe to record what was ' \
                     'actually done, which leaves what was prescribed intact for comparison. ' \
                     'Pass completed false to undo.'

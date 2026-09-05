@@ -24,10 +24,12 @@ class Tectonic < Roda
       # that has deleted the wrong one has everything it needs to write it back.
       class DeleteWorkout < Tool
         tool_name 'delete_workout'
+        title 'Delete a session'
         description 'Delete a workout and every set in it. Returns what was removed. A ' \
                     'session with completed sets is training history and needs confirm ' \
                     'true, which you should only send if the user asked for it.'
         scope :write
+        destroys
         input_schema(
           type: 'object',
           properties: { workout_id: { type: 'integer' }, confirm: { type: 'boolean' } },

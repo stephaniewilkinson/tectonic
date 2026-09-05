@@ -39,6 +39,8 @@ class Tectonic < Roda
         MAX_BLOCKS = 24
 
         tool_name 'block_progress'
+
+        title 'Block progress'
         description 'What each training block opened at, movement by movement, against any ' \
                     'goal set for that movement. Answers "am I on pace": it returns the ' \
                     'training max each block was generated against, newest block first, ' \

@@ -40,6 +40,7 @@ class Tectonic < Roda
       # the plan all along.
       class SetWorkingWeight < Tool
         tool_name 'set_working_weight'
+        title 'Set a working weight'
         description 'Put one weight on every working set of one movement in a session, ' \
                     'for switching a lift from ascending to flat or dropping what is left ' \
                     'after a bad set. Takes a workout_id and an exercise name. Skips ' \

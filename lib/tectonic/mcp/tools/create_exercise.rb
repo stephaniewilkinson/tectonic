@@ -10,6 +10,7 @@ class Tectonic < Roda
       # name (its own or a shared library movement) rather than duplicating it.
       class CreateExercise < Tool
         tool_name 'create_exercise'
+        title 'Add a movement'
         description 'Add an exercise for the account, deduplicating by name against the ' \
                     "account's own movements and the shared library. Set is_barbell for a " \
                     'movement loaded on a bar, which is what gives its sets plate math; a ' \

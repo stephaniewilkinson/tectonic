@@ -35,6 +35,7 @@ class Tectonic < Roda
       # judge whether two was what the user meant, which is the split #263 drew.
       class UpdateWorkout < Tool
         tool_name 'update_workout'
+        title 'Edit a session'
         description 'Correct a session: its date, its name, or its note. Moving a session ' \
                     'to another date is how a workout logged under the wrong day is fixed, ' \
                     'since create_workout would open a second one. Send only what changes; ' \

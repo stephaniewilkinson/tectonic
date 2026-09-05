@@ -29,6 +29,8 @@ class Tectonic < Roda
         NUMBER_OR_NULL = { type: %w[integer null] }.freeze
 
         tool_name 'update_program'
+
+        title 'Edit a training block'
         description "Change a training block's own settings: its name, block number, " \
                     'notes, start date, whether working sets ascend to the top weight, ' \
                     'and the rep count main work is converted to. Send only what changes. ' \

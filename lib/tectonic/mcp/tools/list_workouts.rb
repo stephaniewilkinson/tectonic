@@ -19,6 +19,8 @@ class Tectonic < Roda
         MAX_LIMIT = 200
 
         tool_name 'list_workouts'
+
+        title 'List sessions'
         description "List the account's workouts, most recent first, with set counts, " \
                     'whether each is planned, performed or skipped, and how long each one ' \
                     'took. Narrow with from/to (YYYY-MM-DD) and limit; the default is the ' \

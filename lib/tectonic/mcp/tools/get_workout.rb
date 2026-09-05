@@ -15,6 +15,7 @@ class Tectonic < Roda
       # prose sentence that had already thrown away the warmup flags and the prescription.
       class GetWorkout < Tool
         tool_name 'get_workout'
+        title 'Read a session'
         description 'Read one session in full: its sets in order with weight, reps, RPE, ' \
                     'whether each was a warmup and whether it was completed, what the ' \
                     'program prescribed, the session rating, and how long it took. Give a ' \

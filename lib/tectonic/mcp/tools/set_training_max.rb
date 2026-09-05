@@ -22,6 +22,7 @@ class Tectonic < Roda
       # zero: that hands the question back to the estimate, which is the only way back.
       class SetTrainingMax < Tool
         tool_name 'set_training_max'
+        title 'Set a training max'
         description 'Set the number percentages of one movement (by name) are taken of, ' \
                     'in pounds. Which number that should be depends on the programme and ' \
                     'the app does not guess: a 5/3/1-style block wants roughly 90% of a ' \

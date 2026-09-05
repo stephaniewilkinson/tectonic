@@ -14,6 +14,7 @@ class Tectonic < Roda
       # block it belongs to.
       class AddProgramLift < Tool
         tool_name 'add_program_lift'
+        title 'Add a lift to a day'
         description 'Add a lift to a training day. Give either top_weight in pounds or ' \
                     'percent_of_max, or is_weighted false for work carrying no external ' \
                     'load. measure is reps or time; a timed lift gives duration_seconds ' \

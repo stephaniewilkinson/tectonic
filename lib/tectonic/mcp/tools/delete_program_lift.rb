@@ -16,10 +16,12 @@ class Tectonic < Roda
       # deleted the wrong one can put it straight back with add_program_lift.
       class DeleteProgramLift < Tool
         tool_name 'delete_program_lift'
+        title 'Remove a lift from a day'
         description 'Remove a lift from a training day. Returns what was removed, so it ' \
                     'can be added back if it was the wrong one. Sessions already generated ' \
                     'from this day are not touched.'
         scope :write
+        destroys
         input_schema(
           type: 'object',
           properties: { program_lift_id: { type: 'integer' } },

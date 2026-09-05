@@ -10,6 +10,7 @@ class Tectonic < Roda
       # so calling it twice for the same date logs into one workout, not two.
       class CreateWorkout < Tool
         tool_name 'create_workout'
+        title 'Start a session'
         description "Open the account's workout for a date ('today' or YYYY-MM-DD), " \
                     'reusing an existing one on that day instead of creating a duplicate. ' \
                     'An optional name says which session it is, for a day with more than ' \

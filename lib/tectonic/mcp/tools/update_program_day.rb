@@ -13,6 +13,7 @@ class Tectonic < Roda
       # they are worth being able to do separately.
       class UpdateProgramDay < Tool
         tool_name 'update_program_day'
+        title 'Edit a training day'
         description "Change a training day's weekday (0 Sunday to 6 Saturday) or its focus. " \
                     'Moving it re-dates the session in every week it is written into. ' \
                     'Sessions already generated keep the date they were generated on.'
