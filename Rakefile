@@ -334,6 +334,116 @@ end
 # The move itself is Tectonic::ExerciseMerge, in lib, because #367 was a second copy of the
 # table list drifting from the schema -- and the spec had a third. One implementation, called
 # by both.
+# A namespace of its own rather than a task under db:, because this is the one thing in here
+# that is about the database *not* being there.
+namespace :backup do
+  desc "Rehearse a restore from a dump: rake 'backup:drill[tectonic.dump]'"
+  task :drill, [:dump] do |_task, args|
+    restore_drill(args[:dump])
+  end
+end
+
+# The half of #348 that a runbook cannot do on its own: actually restoring, and finding out
+# whether what came back is a database or a directory of files that parse.
+#
+# A backup nobody has restored is a belief rather than a backup, and the ways it fails are
+# quiet -- a dump taken with the wrong --format, an extension the restoring server does not
+# have, a role the dump references and the target lacks. None of those announce themselves
+# until the day they matter, which is the day nothing else is going well either.
+#
+# So this restores into a scratch database and then *asks the restored copy questions*: is
+# it at the migration version this checkout expects, are the tables there, and did the rows
+# arrive. A restore that exits zero having written nothing passes a naive drill and fails
+# this one.
+#
+# Deliberately local and deliberately cheap, so it can be run on a laptop against a dump
+# downloaded from Render rather than being a thing that needs a maintenance window. The
+# scratch database is dropped and recreated each time, so the drill cannot pass by finding
+# the data a previous run left behind -- which is the failure mode of every restore test
+# that reuses a target.
+DRILL_DATABASE = 'tectonic_restore_drill'
+
+def restore_drill(dump)
+  abort "Name a dump: rake 'db:drill[backup.dump]'" if dump.nil?
+  abort "No such file: #{dump}" unless File.exist?(dump)
+
+  puts "Restoring #{dump} into #{DRILL_DATABASE}..."
+  sh "dropdb --if-exists #{DRILL_DATABASE}"
+  sh "createdb #{DRILL_DATABASE}"
+  load_dump(dump)
+  report_drill(inspect_restored)
+end
+
+# pg_restore for a custom or directory dump, psql for plain SQL. Which one a dump needs is
+# not something a person should have to remember mid-incident, and getting it wrong is the
+# most common way a restore appears to do nothing: pg_restore given plain SQL exits without
+# error and writes not one row.
+def load_dump(dump)
+  plain = dump.end_with?('.sql')
+  command = plain ? "psql -q -d #{DRILL_DATABASE} -f" : "pg_restore --no-owner --no-privileges -d #{DRILL_DATABASE}"
+  sh "#{command} #{dump}"
+end
+
+# What the restored copy actually contains. Read through a connection of its own rather than
+# through the app's DB constant, which is already pointed somewhere else by the time a rake
+# task runs.
+def inspect_restored
+  require 'sequel'
+  Sequel.connect("postgres:///#{DRILL_DATABASE}") { |db| restored_facts(db, db.tables) }
+end
+
+# Guarded on the table existing, because the interesting case is the restore that produced
+# some of the schema and not the rest -- which raises rather than reporting if asked
+# straight, and a drill that crashes says less than one that says what is missing.
+def restored_facts(db, tables)
+  counted = %i[accounts workouts sets].to_h do |table|
+    [table, (db[table].count if tables.include?(table))]
+  end
+  counted.merge(tables: tables.length,
+                version: (db[:schema_info].get(:version) if tables.include?(:schema_info)))
+end
+
+# The drill's verdict, and it fails loudly rather than printing numbers for somebody to
+# squint at. Three ways a restore can be wrong while appearing to work, each checked:
+# nothing arrived, the schema is from a different era than this checkout, or the tables are
+# there and empty.
+def report_drill(found)
+  puts "  schema version #{found[:version].inspect} (this checkout expects #{LATEST_VERSION})"
+  puts "  #{found[:tables]} tables, #{found[:accounts].to_i} accounts, " \
+       "#{found[:workouts].to_i} workouts, #{found[:sets].to_i} sets"
+  problem = drill_verdict(found)
+  abort problem if problem
+
+  puts "PASSED: #{DRILL_DATABASE} is a working copy. Drop it with: dropdb #{DRILL_DATABASE}"
+end
+
+# Why the drill failed, or nil if it did not. Three ways a restore is wrong while appearing
+# to work, in the order they are worth telling apart.
+def drill_verdict(found)
+  return 'FAILED: nothing was restored at all -- the dump did not load.' if found[:tables].zero?
+  return schema_only_verdict if found[:version].nil?
+  return stale_verdict(found[:version]) if found[:version] != LATEST_VERSION
+  return 'FAILED: schema and version restored, but no accounts came with them.' if found[:accounts].to_i.zero?
+
+  nil
+end
+
+# Tables but no rows, which is what a dump taken with pg_dump -s gives and is the most
+# dangerous near-miss of the three: it restores without error, the app boots against it, and
+# every account is simply gone. Worth its own sentence rather than being folded into "did
+# not load", because the remedy is different -- the dump was taken wrongly, not corrupted.
+def schema_only_verdict
+  'FAILED: the tables are there but empty -- this looks like a schema-only dump ' \
+    '(pg_dump -s). Take it without -s, or the restore brings back an empty app.'
+end
+
+# A restore that loaded but is from a different era than this checkout. Usable, and not the
+# same as a failure -- so the message says which of the two it is rather than only "failed".
+def stale_verdict(version)
+  "FAILED: restored at version #{version}, but this checkout migrates to #{LATEST_VERSION}. " \
+    'The data is intact; the app would need migrating before it could serve it.'
+end
+
 namespace :exercises do
   desc "Fold one movement into another and delete it: rake 'exercises:merge[Squat,Back Squat]'"
   task :merge, %i[from to] do |_task, args|
