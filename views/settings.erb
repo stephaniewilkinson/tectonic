@@ -72,10 +72,17 @@
       <div class="mt-3 space-y-2">
         <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
           <div class="flex items-center gap-3">
-            <span class="w-16 text-right font-mono text-sm text-gray-900">
+            <%# A real label, not a lookalike span: the "45 lb" text was beside each box
+                with nothing connecting the two, so a screen reader heard ten anonymous
+                spin buttons -- on the form that decides what the whole app can load.
+                The id swaps the dot out of 2.5 and 1.25 because a dot in an id is legal
+                HTML that CSS and querySelector both read as a class boundary. %>
+            <label for="plates_<%= denomination.to_s.tr('.', '_') %>"
+                   class="w-16 text-right font-mono text-sm text-gray-900">
               <%= denomination %> lb
-            </span>
+            </label>
             <input type="number" min="0" step="1" autocomplete="off"
+                   id="plates_<%= denomination.to_s.tr('.', '_') %>"
                    name="plates[<%= denomination %>]"
                    value="<%= @equipment.pairs.fetch(denomination, 0) %>"
                    class="<%= field_style %> w-20 px-3 py-1.5 text-gray-900">
