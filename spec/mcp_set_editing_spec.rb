@@ -272,3 +272,102 @@ describe 'update_set on a set that has not been lifted' do
   end
 end
 
+# #320: create_set wrote every column a logged set needs except this one, so a set logged
+# by an assistant was bilateral whatever the movement was. The session screen was right and
+# the row was wrong -- load_label appends "per side" only when the flag is set, so a
+# Single-Leg Hip Thrust rendered with nothing on it, and Volume::WORKED_REPS counted half
+# the reps and half the tonnage of every unilateral movement.
+
+# A unilateral movement, as the library and the program editor describe one.
+def unilateral(account_id)
+  Tectonic::Exercise.create(account_id:, name: "Bulgarian Split Squat #{SecureRandom.hex(4)}",
+                            is_barbell: false, default_is_per_side: true)
+end
+
+describe 'logging a set that is counted per side' do
+  include Rack::Test::Methods
+
+  before { @token = mint(scopes: %w[read write]) }
+
+  it 'records the flag when a caller sends it' do
+    call_tool('create_set', raw: @token.raw,
+                            arguments: { exercise: 'Single-Leg Hip Thrust', reps: 10, weight: 95, is_per_side: true })
+
+    assert tool_result['structuredContent']['is_per_side']
+  end
+
+  # The rule create_set already followed for is_barbell: a fact about the movement is taken
+  # off the movement rather than asked of a model that will omit it.
+  it "takes the movement's own default when the caller says nothing" do
+    exercise = unilateral(@token.account_id)
+    call_tool('create_set', raw: @token.raw, arguments: { exercise: exercise.name, reps: 8, weight: 40 })
+
+    assert tool_result['structuredContent']['is_per_side']
+  end
+
+  it 'leaves an ordinary movement bilateral' do
+    call_tool('create_set', raw: @token.raw, arguments: { exercise: 'Back Squat', reps: 5, weight: 225 })
+
+    refute tool_result['structuredContent']['is_per_side']
+  end
+end
+
+describe 'per side, overridden and confirmed' do
+  include Rack::Test::Methods
+
+  before { @token = mint(scopes: %w[read write]) }
+
+  # An explicit false still wins over a movement that defaults to true -- a lifter doing
+  # both legs at once on a machine is entitled to say so.
+  it 'lets the caller override the default' do
+    exercise = unilateral(@token.account_id)
+    call_tool('create_set', raw: @token.raw,
+                            arguments: { exercise: exercise.name, reps: 16, weight: 40, is_per_side: false })
+
+    refute tool_result['structuredContent']['is_per_side']
+  end
+
+  it 'says so in the sentence it confirms with, not only in the payload' do
+    call_tool('create_set', raw: @token.raw,
+                            arguments: { exercise: 'Single-Leg Hip Thrust', reps: 10, weight: 95, is_per_side: true })
+
+    assert_includes tool_result.dig('content', 0, 'text'), '95x10 per side'
+  end
+end
+
+describe 'correcting a set that should have been per side' do
+  include Rack::Test::Methods
+
+  before do
+    @token = mint(scopes: %w[read write])
+    @set = written_set(@token.account_id)
+  end
+
+  it 'sets the flag through update_set' do
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, is_per_side: true })
+
+    refute tool_result['isError']
+    assert @set.refresh.is_per_side
+  end
+
+  # Not behind #364's confirm. The rep count on the row does not move; what changes is how
+  # it should be read, and this is the correction the bug in #320 created the need for.
+  it 'does not need confirming on a set already lifted' do
+    @set.update(is_completed: true)
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, is_per_side: true })
+
+    refute tool_result['isError']
+    assert @set.refresh.is_per_side
+  end
+
+  # The point of the flag: Volume reads a per-side eight as sixteen reps of work.
+  it 'doubles the worked reps once it is set' do
+    @set.update(reps: 8, is_per_side: false)
+
+    assert_equal 8, @set.refresh.counted_reps
+    call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, is_per_side: true })
+
+    assert_equal 16, @set.refresh.counted_reps
+  end
+end
+
