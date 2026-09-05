@@ -164,6 +164,22 @@ class Tectonic < Roda
     # views/create-account.erb before removing it.
     require_login_confirmation? false
     require_password_confirmation? false
+    # What a second signup on one address is told. #345.
+    #
+    # Until the unique index in 027 there was nothing to say, because the second signup
+    # succeeded: two rows, and login resolving forever to the first, so the person who
+    # signed up twice got "wrong password" on an account they had just created and -- with
+    # no reset flow in this app -- no way out of it.
+    #
+    # The refusal names the way out rather than only the problem. Rodauth's default is
+    # "there is already an account with this login", which is true and leaves a person on a
+    # signup form with nothing to do next; the address they typed is the address they want,
+    # so the answer is almost always to log in with it.
+    # Lower case and no full stop at the front: Rodauth renders this after its own generic
+    # reason, so the pair has to read as one sentence. views/_form_error.erb raises the
+    # first letter of whichever sentence it ends up showing.
+    already_an_account_with_this_login_message \
+      'an account with this email address already exists. Log in instead, or use another address'
     after_login do
       remember_login
     end
@@ -1356,6 +1372,21 @@ class Tectonic < Roda
   # ring-inset stays. On a field the ring is the field's own border thickening, which is
   # what a text input is expected to do; #333's offset note is about buttons, where the ring
   # has to clear a filled edge, and button_style already carries it.
+  # Why a sign-in or sign-up was refused, or nil where nothing was. #345.
+  #
+  # The field error is preferred over the flash because it is the specific one: Rodauth's
+  # create-account flash reads "There was an error creating your account" whatever went
+  # wrong, while the field error names which thing. The flash is the fallback for a refusal
+  # that belongs to no single input.
+  #
+  # A helper rather than a local in the partial, for the reason `unlifted` is one: erb_lint
+  # hands each ERB tag to rubocop as a program of its own, so a local assigned in one tag
+  # and read in the next reads as a useless assignment.
+  def form_error
+    rodauth.field_error(rodauth.login_param) || rodauth.field_error(rodauth.password_param) ||
+      flash['error']
+  end
+
   def field_style
     'rounded-md border-0 shadow-sm ring-1 ring-inset ring-gray-300 ' \
       'focus:ring-2 focus:ring-inset focus:ring-sky-800'

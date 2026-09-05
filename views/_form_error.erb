@@ -1,0 +1,34 @@
+<%# Why a sign-in or sign-up was refused, on the page that refused it. #345.
+
+    Nothing in this app rendered a Rodauth error before. A refused post came back as the
+    same form with nothing said on it -- the fields cleared, the page apparently reloaded
+    for no reason -- which reads as the button not working rather than as an answer. That
+    was survivable while the only refusals were a wrong password on a form that at least
+    suggests its own problem; #345 makes it not, because the unique index means a second
+    signup on one address is now *correctly* refused, and a correct refusal nobody can see
+    is a person stuck in the same place for a new reason.
+
+    Both halves are read, because Rodauth puts the message in one or the other depending on
+    the failure: field_error for something wrong with a named input, the error flash for
+    everything else. Reading only one leaves a class of refusal silent, which is the bug
+    this partial exists to end.
+
+    role="alert" so it is announced rather than merely drawn -- the form is re-rendered in
+    place with a 422 and no navigation, so a screen reader is told nothing otherwise. That
+    is #336's rule arriving on the pages outside the session screen.
+
+    The field error is preferred over the flash because it is the specific one: Rodauth's
+    create-account flash is "There was an error creating your account" whatever went wrong,
+    while the field error names which thing. The flash is the fallback for a refusal that
+    belongs to no single input.
+
+    Rodauth builds that field error as its generic reason followed by the specific one --
+    "invalid login, an account with this email address already exists ...". The messages
+    configured in app.rb are written as lower-case clauses so the pair reads as one
+    sentence, and the first letter is raised here rather than there, because that is a fact
+    about displaying a sentence rather than about what the sentence says. %>
+<%- if form_error %>
+  <div role="alert" class="mt-6 rounded-md bg-rose-100 p-3 text-sm text-rose-800 ring-1 ring-rose-800/25">
+    <%= form_error.sub(/\A./, &:upcase) %>
+  </div>
+<%- end %>
