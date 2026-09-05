@@ -84,9 +84,15 @@ describe 'the date field on the new workout form' do
 
   # This one does reach the screen: focus it and the border changes colour, and it was
   # the only field in the app that changed to blue rather than lime.
-  it 'rings and borders lime on focus' do
-    assert_includes classes_of(input('date')), 'focus:ring-lime-500'
-    assert_includes classes_of(input('date')), 'focus:border-lime-500'
+  #
+  # sky-800 since #333, which took every focus ring off lime -- lime-500 is 1.98:1 on white
+  # against the 3:1 an indicator is asked for. This field does not go through field_style,
+  # so it kept the old colour after that change and was once again the only one that
+  # differed; #368 brought it back into line. What the spec is really holding is that it
+  # matches the rest, so it now names the colour the rest of them use.
+  it 'rings and borders like every other field on focus' do
+    assert_includes classes_of(input('date')), 'focus:ring-sky-800'
+    assert_includes classes_of(input('date')), 'focus:border-sky-800'
     refute_includes last_response.body, 'blue-500'
   end
 
