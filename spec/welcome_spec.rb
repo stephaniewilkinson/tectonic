@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'spec_helper'
+require_relative 'route_ownership_spec' # reuses its account/login helpers; idempotent require
 require 'rack/test'
 
 # The front page, which since #255 is the whole of the funnel: GTM.md records that there
@@ -48,12 +49,16 @@ describe 'what the front page leads with' do
   # The page opened "Lift heavier" and described a workout logger, which is what every
   # competitor says and most of them say with more reviews behind it. #255 was answered
   # with option 1: lead with the thing none of them has.
+  #
+  # It leads with the assistant and not with a vendor, which is #326 correcting the half of
+  # #255 that named Claude. The lead is the same; the word is generic, because a product
+  # that speaks an open protocol should not read as built for one client.
   it 'names the assistant in the headline' do
-    assert_match(/<h1[^>]*>[^<]*Claude/, @body)
+    assert_match(/<h1[^>]*>[^<]*AI/, @body)
   end
 
   it 'gets to the connector before it gets to the log' do
-    assert_operator @body.index('Claude'), :<, @body.index('lifting log')
+    assert_operator @body.index('AI'), :<, @body.index('lifting log')
   end
 
   # "MCP" was on this page with nothing explaining it, which asks a reader to already know
@@ -61,7 +66,36 @@ describe 'what the front page leads with' do
   # it is searching for exactly that word -- but after the plain-language version, not
   # instead of it.
   it 'names the assistants before it names the protocol' do
-    assert_operator @body.index('Claude'), :<, @body.index('MCP')
+    assert_operator @body.index('AI'), :<, @body.index('MCP')
+  end
+
+  # The whole of #326: no vendor is named anywhere a reader is being told what this is. The
+  # per-client setup steps on /connections are the exception and are asserted there.
+  it 'names no vendor at all' do
+    refute_match(/\bClaude\b/, @body)
+    refute_match(/\bChatGPT\b/, @body)
+  end
+end
+
+# The exception, and the reason for it: on the setup steps the name *is* the instruction,
+# because "Settings, then Connectors" is a different sequence in each client.
+describe 'the setup steps on the connections page' do
+  include Rack::Test::Methods
+  include RouteOwnership
+
+  it 'still names each client, because a generic word would leave a reader hunting' do
+    login
+    get '/connections'
+
+    assert_includes last_response.body, 'Claude:'
+    assert_includes last_response.body, 'ChatGPT:'
+  end
+
+  it 'says what it is in generic words above them' do
+    login
+    get '/connections'
+
+    assert_includes last_response.body, 'Connect your AI assistant'
   end
 end
 

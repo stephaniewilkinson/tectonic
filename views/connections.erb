@@ -1,7 +1,7 @@
 <div class="mx-auto max-w-2xl">
   <h1 class="text-3xl font-semibold text-gray-900">Assistants</h1>
   <p class="mt-2 text-sm text-gray-600">
-    Connect Claude or ChatGPT and it can read your training and write it: plan a block,
+    Connect your AI assistant and it can read your training and write it: plan a block,
     log a session, correct a set you typed wrong. It sees your account and nothing else.
   </p>
 
@@ -28,6 +28,13 @@
       paste yet. Whoever runs it needs to set <code class="font-mono">MCP_PUBLIC_BASE_URL</code>.
     </p>
   <%- end %>
+  <%# The one place a product is named, and #326 deliberately left it alone. Everywhere else
+      the copy says "your AI assistant", because naming a vendor makes a product that speaks
+      an open protocol read as built for one client. Here the name *is* the instruction:
+      "Settings, then Connectors" is a different sequence in each of these, and a reader
+      given a generic word would be left hunting through menus.
+
+      A list rather than a sentence, so a client added later is a line rather than a rewrite. %>
   <dl class="mt-4 space-y-1 text-sm text-gray-600">
     <div><dt class="inline font-medium text-gray-900">Claude:</dt> <dd class="inline">Settings, then Connectors, then Add custom connector.</dd></div>
     <div><dt class="inline font-medium text-gray-900">ChatGPT:</dt> <dd class="inline">Settings, then Connectors, then add an MCP server.</dd></div>
