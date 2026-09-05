@@ -103,7 +103,14 @@
                   hx-disabled-elt="find button"
                   hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%# The name a screen reader hears, which the visible word cannot be. #338: a
+                  twelve-set session draws twelve buttons called "Done", and a list of the
+                  page's controls read as "Done, button" twelve times with no way to tell the
+                  squat from the bench. The label says what this one acts on; the visible
+                  text stays one word, because that is what makes the screen usable at arm's
+                  length with chalk on. %>
               <button type="submit"
+                      aria-label="<%= set[:is_completed] ? 'Undo' : 'Done' %>: <%= accessible_name(set) %>"
                       class="<%= button_style %> min-h-11 border px-5 py-3 text-base font-semibold
                              <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
@@ -223,7 +230,14 @@
                   hx-disabled-elt="find button"
                   hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%# The name a screen reader hears, which the visible word cannot be. #338: a
+                  twelve-set session draws twelve buttons called "Done", and a list of the
+                  page's controls read as "Done, button" twelve times with no way to tell the
+                  squat from the bench. The label says what this one acts on; the visible
+                  text stays one word, because that is what makes the screen usable at arm's
+                  length with chalk on. %>
               <button type="submit"
+                      aria-label="<%= set[:is_completed] ? 'Undo' : 'Done' %>: <%= accessible_name(set) %>"
                       class="<%= button_style %> min-h-11 border px-5 py-3 text-base font-semibold
                              <%= complete_style(set) %>">
                 <%= set[:is_completed] ? 'Undo' : 'Done' %>
@@ -243,16 +257,24 @@
               than here because the MCP tools and the database constraint enforce the same
               one. Warmups never reach this list at all. %>
           <%- if set.ratable? %>
+          <%# A group, so the "RPE" caption is announced with the buttons rather than as loose
+              text beside them -- it was a bare span, attached to nothing, so even the scale
+              went unsaid. #338. %>
           <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
+                role="group" aria-labelledby="rpe-label-<%= set[:id] %>"
                 hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML" class="mt-2 flex items-center gap-2">
             <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
-            <span class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
+            <span id="rpe-label-<%= set[:id] %>" class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
             <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
                 row rather than leaving dead space, so the targets are as wide as the
                 screen allows; min-h-12 is 48px, which clears the 44px minimum. %>
             <%- (6..10).each do |rating| %>
-              <button value="<%= rating %>" class="<%= rpe_style(set, rating) %> min-h-12 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
+              <%# Named per button as well as grouped, because the complaint in #338 is a
+                  screen reader's *list* of controls -- sixty entries reading "6, button",
+                  "7, button" -- and a list is exactly where the group's label is lost. %>
+              <button value="<%= rating %>" aria-label="RPE <%= rating %> for <%= accessible_name(set) %>"
+                      class="<%= rpe_style(set, rating) %> min-h-12 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
                 <%= rating %>
               </button>
             <%- end %>

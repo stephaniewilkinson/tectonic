@@ -951,7 +951,12 @@ class Tectonic < Roda
     panels = session_lifts.each_with_index.map do |lift, position|
       render('workouts/_lift_panel', locals: { lift:, position: })
     end
-    panels.join + render('workouts/_progress', locals: { oob: true }) + session_poll(workout_id, fingerprint)
+    # "Session updated" rather than a set sentence: the poll fires because something moved
+    # elsewhere -- an assistant's write, or another tab -- and which row it was is not
+    # something this response knows. The count is the part that is always true and always
+    # useful. #336.
+    panels.join + render('workouts/_progress', locals: { oob: true }) +
+      announce("Session updated. #{session_count_phrase}") + session_poll(workout_id, fingerprint)
   end
 
   # The poller, re-armed with what the session now is. Every response that changes this
@@ -970,10 +975,44 @@ class Tectonic < Roda
     position = session_lifts.index { |lift| lift.any? { |set| set[:id] == set_id.to_i } } || 0
     render('workouts/_lift_panel', locals: { lift: session_lifts[position], position: }) +
       render('workouts/_progress', locals: { oob: true }) +
+      announce(tap_sentence(set_id)) +
       # Re-armed with what this tap just made true. Without it the poller would still be
       # asking about the digest the page loaded with, find it changed -- by the lifter, a
       # second ago -- and swap every panel back over the top of their own tap. #249.
       session_poll(workout_id)
+  end
+
+  # The live region, sent back beside whatever else a response is swapping. #336.
+  def announce(message)
+    render('workouts/_announcement', locals: { message:, oob: true })
+  end
+
+  # What a tap did, in the order the screen says it visually: what was acted on, what it
+  # now is, and where that leaves the session. "Back Squat, 225 lb x 5. Done. 3 of 12 sets."
+  #
+  # Read back off the row after the write rather than assembled from what was posted, so a
+  # correction saved without completing announces the new load and still says "not done" --
+  # which is #215's distinction, and the one a lifter most needs confirmed without looking.
+  def tap_sentence(set_id)
+    set = @sets.find { |row| row[:id] == set_id.to_i }
+    return session_count_phrase unless set
+
+    "#{accessible_name(set)}. #{set[:is_completed] ? 'Done' : 'Not done'}. #{session_count_phrase}"
+  end
+
+  def session_count_phrase
+    "#{@sets.count { |set| set[:is_completed] }} of #{@sets.length} sets."
+  end
+
+  # A set named the way a screen reader has to hear it: which movement, and what is on the
+  # bar. #338 -- a twelve-set session carries twelve buttons whose accessible name is "Done"
+  # and up to sixty whose name is a single digit, with nothing in any of them saying which
+  # set they act on. The visible text stays one word or one digit, which is what makes the
+  # screen usable with chalk on; only the announced name grows.
+  #
+  # Not named set_description: rubocop reads a set_ prefix as a writer for `description`.
+  def accessible_name(set)
+    "#{@exercises[set[:exercise_id]]&.name}, #{load_label(set)}"
   end
 
   # Everything the session screen renders from, which is the same two reads whether the

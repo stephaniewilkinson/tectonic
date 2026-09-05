@@ -1,0 +1,27 @@
+<%# What just happened, said once, to the readers who cannot see it happen. #336.
+
+    This screen changes without a page load -- Done, Undo, a rating, a correction, and the
+    background poll that notices an assistant's write all swap markup in place. A sighted
+    lifter sees the row turn green, the bar advance and the count go from 2 to 3 of 12.
+    Everyone else was told nothing at all, and the only way to find out whether a tap had
+    registered was to navigate back into the row and read it -- one-handed, mid-set, which
+    is the moment this app exists for. WCAG 4.1.3 is about exactly that.
+
+    role="status" carries an implicit aria-live="polite", and both are written out because
+    support for the pair is better than for either alone. Polite rather than assertive: it
+    waits for a pause instead of cutting across whatever is being read, which is what a
+    confirmation should do. A confirmation that interrupted the row you were reading would
+    be its own bug.
+
+    sr-only rather than hidden. A region with display:none is not announced at all, so the
+    sentence has to be in the layout and merely unpainted.
+
+    Empty on the first render, because nothing has happened yet -- and it has to be on the
+    page from the start regardless: a live region announces changes to itself, so one that
+    arrives already carrying its sentence is a region that says nothing. Every response
+    that changes this screen sends it back with hx-swap-oob, which costs no extra request.
+
+    Outside #lift-panels, like the poller above it, or the poll's innerHTML swap would take
+    the region away and the next announcement would have nowhere to land. %>
+<div id="session-announcement"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %>
+     role="status" aria-live="polite" class="sr-only"><%= defined?(message) ? message : '' %></div>
