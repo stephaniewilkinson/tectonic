@@ -167,7 +167,13 @@ describe 'a poll that finds a set has been deleted under it' do
     poll(workout_id, stale)
 
     assert_equal 200, last_response.status
-    refute_includes last_response.body, '155'
+    # With the unit, for the reason spelled out on the describe above -- this is the same
+    # assertion that was fixed there and missed here. Three bare digits match any id the
+    # sets sequence happens to hand this fixture, and they also match a substring of the
+    # session fingerprint the poller carries: a 32-character hex digest contains "155" in
+    # a few runs per thousand. Green on almost every seed and red on a few, for a reason
+    # that has nothing to do with the app. No id and no digest is ever followed by " lb".
+    refute_includes last_response.body, '155 lb'
   end
 end
 
