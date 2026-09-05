@@ -27,14 +27,17 @@
 
       <div>
         <%# A "Forgot password?" sat beside this label at href="#" for as long as the page
-            existed. reset_password is not in the enable list in app.rb and this app
-            configures no mailer, so there has never been anything behind it: it promised a
-            way back in at the one moment somebody needs one, and then declined. Nothing
-            replaces it, not even a line saying recovery does not exist, because that
-            sentence would sit under every sign-in forever to deliver a verdict rather than
-            a remedy. The link belongs here again once reset_password is enabled and a mail
-            provider is wired up, and not before. %>
-        <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
+            existed, promising a way back in at the one moment somebody needs one and then
+            declining. It was removed rather than left pointing at nothing, with the note:
+
+              The link belongs here again once reset_password is enabled and a mail
+              provider is wired up, and not before.
+
+            #344 is that, so it is back and it goes somewhere. %>
+        <div class="flex items-baseline justify-between">
+          <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
+          <a href="/reset-password-request" class="text-sm font-semibold leading-6 text-lime-700 hover:text-lime-800">Forgot password?</a>
+        </div>
         <div class="mt-2">
           <input id="password" name="password" type="password" autocomplete="current-password" required
                         class="<%= field_style %> block w-full py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">

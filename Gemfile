@@ -19,7 +19,12 @@ gem 'mcp', '1.2.0'
 # lib/tectonic/db.rb requires logger, which stopped being a default gem in Ruby
 # 4.0. It was only reaching production as a transitive dependency of the test and
 # development groups, which Render does not install.
+# Not used to send anything: every email this app sends goes through Resend's HTTP API in
+# lib/tectonic/mailer.rb. Rodauth's email_base feature does an unconditional `require 'mail'`
+# in post_configure, so enabling :reset_password without this gem fails at boot rather than
+# at send time -- which is a strange way to discover a missing dependency, hence the note.
 gem 'logger'
+gem 'mail'
 gem 'puma'
 gem 'rack'
 # Caps how long a request may occupy a thread. Required in config.ru rather than here,

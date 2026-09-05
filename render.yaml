@@ -77,3 +77,15 @@ services:
       # start: losing error reporting is not worth an outage.
       - key: SENTRY_DSN
         sync: false
+      # Resend's API key, which is the whole of the mail configuration -- lib/tectonic/mailer
+      # posts to one endpoint and there is no SMTP anywhere. Absent, the app boots and the
+      # reset flow still works end to end except for the send: the link is written to the log
+      # instead. That is deliberate, so a checkout or a preview deploy is walkable without a
+      # credential, but on production an absent key means nobody can recover an account.
+      - key: RESEND_API_KEY
+        sync: false
+      # The From address. Must be on a domain verified with Resend or the API refuses every
+      # send -- which is the most common way this is set up wrongly, so the refusal is logged
+      # with Resend's own response body rather than swallowed.
+      - key: MAIL_FROM
+        value: tectonic plates <noreply@tectonicplates.app>
