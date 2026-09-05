@@ -23,6 +23,7 @@ require_relative 'lib/tectonic/program_editor'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/goal'
+require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
@@ -144,7 +145,7 @@ class Tectonic < Roda
     # User login plus the OAuth 2.1 authorization server that issues the tokens every
     # MCP client authenticates with. All auth -- web sessions and machine access --
     # runs through this one Rodauth config rather than any hand-rolled path.
-    enable :login, :logout, :create_account, :remember, :json,
+    enable :login, :logout, :create_account, :remember, :json, :reset_password,
            :oauth_authorization_code_grant, :oauth_pkce,
            :oauth_client_credentials_grant, :oauth_jwt,
            :oauth_resource_indicators, :oauth_dynamic_client_registration,
@@ -155,15 +156,59 @@ class Tectonic < Roda
     # leaves every sign-up rejected for disagreeing with a parameter the form no longer
     # sends -- and the message names a field that is not on the page.
     #
-    # What the password confirmation was buying is a typo nobody can see, and it is not
-    # bought anywhere else: reset_password is not in the enable list above and there is no
-    # mailer in this app, so an account created under a mistyped password is gone. The
-    # remaining box says autocomplete="new-password", which asks a password manager to
-    # generate and keep the credential instead of leaving a human to type it twice; that
-    # is the whole of the mitigation, and it is worth reading the note in
-    # views/create-account.erb before removing it.
+    # What the password confirmation was buying is a typo nobody can see. That used to be
+    # unrecoverable -- reset_password was not enabled and there was no mailer, so an account
+    # created under a mistyped password was gone. #344 changed that: a typo now costs a reset
+    # email rather than the account, which is what made leaving these off defensible rather
+    # than merely convenient.
+    #
+    # The remaining box still says autocomplete="new-password", asking a password manager to
+    # generate and keep the credential instead of leaving a human to type it twice. That is
+    # now the first line rather than the only one.
     require_login_confirmation? false
     require_password_confirmation? false
+    # Losing a password no longer loses the account. #344.
+    #
+    # This app had no reset flow at all, and said so in two places -- views/create-account.erb
+    # warns that "an account created under a mistyped password is gone", and the note below on
+    # require_password_confirmation? gives that as the reason the second password box was
+    # worth arguing about. Both described a hole rather than a decision.
+    #
+    # #345 made it worse before this made it better: one email is now one account, so somebody
+    # who has lost their password can no longer sign up again with the same address and start
+    # over. The two are only both right together.
+    #
+    # **The same page is shown whether or not the address has an account**, which is Rodauth's
+    # default and is kept deliberately. A form that says "no such account" is a form that
+    # tells anybody which of a list of addresses lift here, and this app's whole subject is
+    # something people are entitled to keep private.
+    # An address with no account is answered exactly as one with an account, which Rodauth
+    # does not do by default: it refuses with a 401 and "no matching login", and that turns
+    # the form into an oracle for which addresses have accounts here. On an app whose whole
+    # subject is what somebody lifts, that is a worse leak than it looks -- it is not "is
+    # this address registered", it is "does this person train, and where".
+    #
+    # So a miss takes the same redirect and the same flash as a hit, and writes nothing. The
+    # cost is that somebody who mistypes their own address is told an email is on the way and
+    # never gets one; the reset page says "if there is an account" rather than "we have sent
+    # you an email" so that the sentence stays true in both cases.
+    before_reset_password_request_route do
+      next unless request.post?
+      next if account_from_login(param(login_param).to_s)
+
+      set_notice_flash reset_password_email_sent_notice_flash
+      redirect reset_password_email_sent_redirect
+    end
+    reset_password_email_sent_redirect { '/login' }
+    reset_password_redirect { '/' }
+    # Rodauth builds a Mail object by default and expects an SMTP setup this app does not
+    # have. One override sends it through Resend's HTTP API instead -- see lib/tectonic/mailer,
+    # including why a delivery failure is logged rather than raised into the request.
+    send_reset_password_email do
+      Mailer.deliver(to: account[login_column], subject: 'Reset your tectonic plates password',
+                     text: scope.reset_password_body(reset_password_email_link))
+    end
+
     # What a second signup on one address is told. #345.
     #
     # Until the unique index in 027 there was nothing to say, because the second signup
@@ -1372,6 +1417,31 @@ class Tectonic < Roda
   # ring-inset stays. On a field the ring is the field's own border thickening, which is
   # what a text input is expected to do; #333's offset note is about buttons, where the ring
   # has to clear a filled edge, and button_style already carries it.
+  # The reset email, in plain text. #344.
+  #
+  # Plain text and not HTML, because the whole message is one link and a sentence saying what
+  # it does. An HTML mail would need a second copy of the same words for clients that do not
+  # render it, and two copies of a security-relevant sentence is two things to keep in step.
+  #
+  # It says how long the link lasts and what to do if it was not you, which are the two
+  # questions somebody receiving an unexpected one actually has. It does not say "ignore this
+  # email" and stop there: a reset request nobody made is worth knowing about, so the last
+  # line names the address it was requested for.
+  def reset_password_body(link)
+    <<~TEXT
+      Somebody asked to reset the password for your tectonic plates account.
+
+      Open this link to choose a new one:
+
+      #{link}
+
+      The link works once and expires in 24 hours.
+
+      If this was not you, nothing has changed and you can ignore this message -- your
+      current password still works. Somebody typed your address into the reset form.
+    TEXT
+  end
+
   # Why a sign-in or sign-up was refused, or nil where nothing was. #345.
   #
   # The field error is preferred over the flash because it is the specific one: Rodauth's
