@@ -17,6 +17,8 @@
     swapped away by the poll it issues. %>
 <%== render('workouts/_session_poll',
             locals: { workout_id: @workout[:id], fingerprint: @fingerprint }) %>
+<%# Empty, and outside #lift-panels for the same reason as the poller. #336. %>
+<%== render('workouts/_announcement') %>
 
 <%# One lift a screen, swiped between, rather than five lifts down one scroll. Five lifts
     and twenty sets is a page nobody can find their place in: the lift you are on is
