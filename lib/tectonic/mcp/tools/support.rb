@@ -313,10 +313,21 @@ class Tectonic < Roda
         # Work carrying no load says so in reps rather than as a bare "x10" (#321), which is
         # what a nil weight interpolated straight would give -- and what a caller logging a
         # plank would have been confirmed with the moment zeros stopped being stored.
+        # "40x8 per side" since #320, so the sentence a model reads back says what the
+        # structured payload says. Without it a unilateral set is confirmed as "40x8" and
+        # the doubling only surfaces later in a volume figure, which is the hardest place to
+        # trace a mismatch back from -- the same complaint #306 fixed on the read side, in
+        # the one line that had been left saying it the old way.
         def load_phrase(set)
-          return "#{set.reps} reps" unless Load.carried?(set.weight)
+          return "#{set.reps} reps#{per_side(set)}" unless Load.carried?(set.weight)
 
-          "#{weight(set.weight)}x#{set.reps}"
+          "#{weight(set.weight)}x#{set.reps}#{per_side(set)}"
+        end
+
+        # The words get_workout's quantity_label already uses, so one session cannot be
+        # described two ways by two tools.
+        def per_side(set)
+          set.is_per_side ? ' per side' : ''
         end
 
         # A workout with its sets in the order they are meant to be lifted, and where it

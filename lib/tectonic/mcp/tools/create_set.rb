@@ -17,14 +17,17 @@ class Tectonic < Roda
                     "'today' by default). Weights are integer pounds, rpe is how hard " \
                     'that set was on the 1-10 scale. Leave weight out for work carrying ' \
                     'no external load -- a plank, a band pull-apart, a bodyweight hip ' \
-                    'thrust -- which is recorded as a rep count with no weight at all.'
+                    'thrust -- which is recorded as a rep count with no weight at all. ' \
+                    'is_per_side says the rep count is per side; leave it out and the ' \
+                    "movement's own default decides, which is right for most callers."
         scope :write
         input_schema(
           type: 'object',
           properties: {
             exercise: { type: 'string' }, date: { type: 'string' },
             weight: { type: 'number' }, reps: { type: 'integer' }, rpe: { type: 'integer' },
-            is_warmup: { type: 'boolean' }, is_completed: { type: 'boolean' }
+            is_warmup: { type: 'boolean' }, is_completed: { type: 'boolean' },
+            is_per_side: { type: 'boolean' }
           },
           required: %w[exercise reps], additionalProperties: false
         )
@@ -54,10 +57,22 @@ class Tectonic < Roda
         # loaded on a bar is a fact about the lift, not something a model should be asked
         # to assert, and a schema that asked would get it wrong or omitted and the set
         # would lose its plate math either way.
+        #
+        # is_per_side is the same fact of the same kind, and defaults the same way (#320).
+        # It was missing entirely, so every set an assistant logged was bilateral whatever
+        # the movement was -- which is why a Single-Leg Hip Thrust rendered without the "per
+        # side" the session screen was perfectly willing to draw. The screen was right and
+        # the row was wrong. `Volume::WORKED_REPS` doubles on this flag, so the same gap was
+        # counting half the reps and half the tonnage of every unilateral movement.
+        #
+        # Defaulting to the exercise's own `default_is_per_side` rather than to false is
+        # what makes most callers right without knowing the field exists -- the rule
+        # ProgramWriter.shape_of already follows on the prescription side.
         def self.attributes(arguments, exercise, workout, context)
           { exercise_id: exercise.id, workout_id: workout.id,
             weight: Load.stored(arguments[:weight]), reps: arguments[:reps], rpe: arguments[:rpe],
             is_warmup: arguments.fetch(:is_warmup, false), is_barbell: exercise.barbell?,
+            is_per_side: arguments.fetch(:is_per_side, exercise.default_is_per_side),
             # A set logged as already done is stamped with when it was logged, which is the
             # best this path can say (#281). It is not when it was lifted -- a session typed
             # up in the evening stamps the evening -- so the turnarounds such a session

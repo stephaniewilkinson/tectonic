@@ -39,8 +39,9 @@ class Tectonic < Roda
         LIFTED = %i[weight reps].freeze
 
         tool_name 'update_set'
-        description 'Correct a set: weight, reps, rpe, whether it is a warmup, or the ' \
-                    'exercise it is. Send only what changes. Returns what actually moved. ' \
+        description 'Correct a set: weight, reps, rpe, whether it is a warmup, whether ' \
+                    'its reps are per side, or the exercise it is. Send only what ' \
+                    'changes. Returns what actually moved. ' \
                     'Changing the weight or reps of a completed set needs confirm true, ' \
                     'which you should only send if the user asked for the correction; ' \
                     'changing its exercise is refused, since that is a different set.'
@@ -50,7 +51,7 @@ class Tectonic < Roda
           properties: { set_id: { type: 'integer' }, weight: { type: 'number' },
                         reps: { type: 'integer' }, rpe: { type: 'integer' },
                         is_warmup: { type: 'boolean' }, exercise: { type: 'string' },
-                        confirm: { type: 'boolean' } },
+                        is_per_side: { type: 'boolean' }, confirm: { type: 'boolean' } },
           required: ['set_id'], additionalProperties: false
         )
 
@@ -131,8 +132,13 @@ class Tectonic < Roda
         # `key?` rather than a truthiness check, so this fires only on a weight that was
         # actually sent -- an unmentioned one is left exactly as it was, which is what makes
         # "send only what changes" true of this field as well as the rest.
+        # is_per_side is here rather than in LIFTED above, and so is not behind confirm.
+        # Correcting it does not overwrite anything that was measured -- the rep count on
+        # the row is unchanged -- it says how that count should be read, and #320 is
+        # precisely the case of a set logged bilaterally that was not. A guard would put
+        # confirm in front of the fix for the bug that made the flag necessary.
         def self.written(arguments)
-          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup)
+          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup, :is_per_side)
           check(fields)
           fields[:weight] = Load.stored(fields[:weight]) if fields.key?(:weight)
           fields
