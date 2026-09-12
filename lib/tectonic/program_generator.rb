@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'db'
+require_relative 'error_reporting'
 require_relative 'exercises'
 require_relative 'program_days'
 require_relative 'program_lifts'
@@ -44,6 +45,16 @@ class Tectonic < Roda
       week = @program.week(number)
       raise ArgumentError, "Program #{@program.id} has no week #{number}; it has #{@program.weeks}." unless week
 
+      # What this was working on, so a failure inside the transaction arrives with the block
+      # and week it was writing rather than a bare backtrace. #385 names the generator as the
+      # place a note like this pays for itself immediately, and the reason is the shape of the
+      # work: one transaction writes a whole week of sessions, so the backtrace points into
+      # Warmup or SetScheme with nothing saying which programme was being generated.
+      #
+      # Ids and numbers rather than names -- a context is structured detail, and this is the
+      # detail that lets the failure be reproduced.
+      ErrorReporting.note('program', program_id: @program.id, week: number,
+                                     account_id: @program.account_id, block: @program.block)
       DB.transaction do
         week.program_days.sort_by(&:weekday).map { |day| generate_day(week, day, week.date_for(day.weekday)) }
       end

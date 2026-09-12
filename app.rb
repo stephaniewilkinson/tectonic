@@ -331,6 +331,18 @@ class Tectonic < Roda
   end
 
   route do |r|
+    # Who is asking and what they asked for, attached before anything can fail. #385.
+    #
+    # Before r.assets and r.public rather than after, so a failure serving an asset is
+    # described too -- and because this is the only point every request passes through.
+    #
+    # `rodauth.session_value` rather than `account_from_session[:id]`, which is what the rest
+    # of this file uses: that one loads the account row, and this needs the id alone on every
+    # request including the ones that never touch an account. session_value reads the session
+    # and is nil when nobody is logged in.
+    #
+    # It is a no-op wherever reporting is off, which is every local run and the whole suite.
+    ErrorReporting.describe_request(path: r.path, account_id: rodauth.session_value)
     r.assets
     r.public
     r.rodauth
