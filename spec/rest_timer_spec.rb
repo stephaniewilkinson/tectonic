@@ -111,16 +111,22 @@ describe 'finishing a set' do
   # touching the cue, so a script keying on "something was swapped" would re-offer a timer for
   # a set finished minutes ago, on every poll, forever.
   #
-  # Asserted on the set and not only the stamp because the stamp alone is not identity: these
-  # two taps land inside the same second in a test and routinely do on a superset tapped off
-  # in one motion, so a cue keyed on the whole second would ignore the second one.
-  it 'sends a cue the second tap can be told apart by, inside the same second' do
+  # The set is carried as well as the stamp, and that is what makes the same-second case
+  # work: two sets finished inside one second share a whole second -- a superset tapped off
+  # in one motion -- so a cue keyed on the stamp alone would ignore the second tap and go on
+  # counting the first set's rest.
+  #
+  # Asserted as the invariant rather than by racing two taps into one second. An earlier
+  # version of this did the latter and passed locally for exactly as long as it took a slower
+  # runner to straddle a second boundary. That the set differs is true either way, and it is
+  # the property the timer actually relies on.
+  it 'identifies a cue by the set as well as the stamp' do
     tap_done(@workout_id, @set_id)
     first = cue
     second_set = written_set(@workout_id, @exercise_id)
     tap_done(@workout_id, second_set)
 
-    assert_equal first[:at].to_i, cue[:at].to_i, 'these taps are meant to share a whole second'
+    refute_empty first[:set].to_s, 'a cue with no set cannot be told from one a second later'
     refute_equal first[:set], cue[:set]
   end
 end
