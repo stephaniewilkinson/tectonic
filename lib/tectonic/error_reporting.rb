@@ -83,6 +83,63 @@ class Tectonic < Roda
       end
     end
 
+    # A path with its ids taken out, for use as a Sentry tag. #385.
+    #
+    # `route: request.path` is what the issue suggests and is the one thing that would make
+    # the tag useless: a tag is what Sentry filters and groups on, and `/workouts/43689/session`
+    # is a distinct value per session. A month of traffic would be thousands of route tags with
+    # one event each, which answers no question at all -- where "every failure on the session
+    # screen" is the question worth being able to ask.
+    #
+    # So numeric segments become `:id`. It is a small transform and it is the whole difference
+    # between a tag and a copy of the URL. Nothing else is touched: the words in a path are the
+    # app's own vocabulary, not anybody's data.
+    # The root is its own case, because String#split drops the trailing empty field: "/"
+    # splits to nothing at all and would join back to an empty tag, which is worse than no
+    # tag -- Sentry would group the busiest page in the app under a blank.
+    def route_tag(path)
+      segments = path.to_s.split('/')
+      return '/' if segments.empty?
+
+      segments.map { |segment| segment.match?(/\A\d+\z/) ? ':id' : segment }.join('/')
+    end
+
+    # Who and where, attached to whatever this request goes on to report. #385.
+    #
+    # Nothing called `Sentry.set_user`, so "users affected" read zero on every issue and an
+    # error seen 400 times was indistinguishable from one seen 400 times by a single lifter
+    # with a stuck client. The id alone is right: send_default_pii is off on purpose and an
+    # email address would walk that back from a different file.
+    #
+    # The surface tag is the division this app most needs and could not make: the web app and
+    # the MCP endpoint share a Sentry project through the same URLMap, deliberately, so
+    # without it a tool failure and a page failure are the same haystack.
+    #
+    # Rescued, like every other reporting hook here: enrichment that raised would turn a
+    # request that was going to work into a 500.
+    def describe_request(path:, account_id: nil)
+      return unless on?
+
+      Sentry.set_tags(surface: 'web', route: route_tag(path))
+      Sentry.set_user(id: account_id) if account_id
+    rescue StandardError => e
+      warn "Could not describe the request to Sentry: #{e.message}"
+    end
+
+    # Structured detail for the operation about to run, so a failure inside it arrives with
+    # the thing it was working on rather than a bare backtrace. #385.
+    #
+    # A context rather than a tag, because these are ids and would be exactly the high
+    # cardinality `route_tag` exists to avoid -- and because a context is the right shape for
+    # "what was this doing", which is a bag of fields rather than something to group on.
+    def note(name, fields)
+      return unless on?
+
+      Sentry.set_context(name, fields)
+    rescue StandardError => e
+      warn "Could not note #{name} to Sentry: #{e.message}"
+    end
+
     # A rake task that failed, reported before the process exits.
     #
     # **`Sentry.close` matters and is easy to miss.** The Ruby SDK sends events on a
