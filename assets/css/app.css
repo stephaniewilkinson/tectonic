@@ -181,6 +181,26 @@ button.htmx-request {
     }
 }
 
+/* The hidden attribute means hidden, including on a flex row. #281.
+ *
+ * Tailwind's preflight sets `[hidden] { display: none }`, and then every display utility in
+ * the stylesheet after it overrides that: `.flex` is `display: flex`, the same specificity
+ * and later in the file, so an element carrying both `hidden` and `flex` is shown. That is
+ * the default behaviour and it is a trap, because the markup reads as though it is hidden
+ * and the element is on screen.
+ *
+ * It was found by the rest timer's own browser spec -- the countdown arrived already
+ * running, because the div that holds it is a flex row and its `hidden` did nothing. The
+ * fix belongs here rather than in that one template: the next flex element anybody hides
+ * would hit exactly the same thing, and the failure is silent both times.
+ *
+ * !important because that is what it takes to beat a utility of equal specificity, and
+ * because there is no case in this app where an element should carry `hidden` and still be
+ * displayed -- a thing worth showing does not claim to be hidden. */
+[hidden] {
+    display: none !important;
+}
+
 /* Weight and reps are typed on a touch keypad, so the native number spinners
    just clutter the inputs. Tailwind has no utility for the spin-button
    pseudo-elements, so hide them here for every number field. */

@@ -1,0 +1,290 @@
+<%# The rest timer. #281.
+
+    #281 shipped as measurement -- stamps, totals, turnarounds -- and the issue was reopened
+    because none of it counts your rest: the header clock says how long you have been
+    training, which between sets is not the number you want. This is the countdown.
+
+    **It is offered, never started for you.** A Done tap arms this bar; a second tap on a
+    duration starts it. Auto-starting was the obvious shortcut and is wrong twice over: a
+    lifter who taps Done and walks to the water fountain gets a beep they did not ask for,
+    and starting a countdown to a number the app chose would be the app deciding how long
+    somebody should rest. Offering a number it measured is a readout. Counting down to one
+    it picked is a prescription, and #263 settled that those belong to the assistant.
+
+    **The suggestion is the lifter's own median turnaround for that movement**, from
+    usual_turnaround in app.rb, and it is the only number here that claims anything. The
+    four beside it are plain durations wearing no advice -- they are not "for a heavy
+    single" or "for accessories", because the app cannot see which this is and inventing the
+    distinction is exactly the guess #263 threw out. A movement with no history shows the
+    four alone rather than a made-up usual.
+
+    Outside #session-body, with the RPE footer and for the same reason: a Done tap swaps a
+    lift panel and the poll swaps every panel, so anything inside that region is replaced
+    several times a session and a countdown inside it would restart on every poll. Here it
+    is rendered once per page load, htmx never touches it, and the clock lives in a closure
+    that nothing swaps.
+
+    Fixed above that footer rather than in the flow, so the session scrolls behind it and it
+    is never further than the bottom of the screen from whichever panel you swiped to.
+    rest_timer_offset clears the footer's collapsed height where there is a footer to clear.
+
+    Hidden until armed, and it is `hidden` in markup rather than a class so the degradation
+    is the honest one: with JavaScript off nothing here ever appears, which is right, because
+    a countdown with no script is a row of buttons that do nothing. Nothing else on the
+    screen changes -- the session clock is still server-rendered, the turnarounds are still
+    measured, and this adds no server-side state that a scriptless browser would miss.
+
+    z-30 puts it over the RPE footer's z-20, which only matters while the footer is open:
+    an opened reference table covers the screen, and a running countdown is the one thing
+    that should stay visible through it. %>
+<div id="rest-timer" hidden
+     class="fixed inset-x-0 z-30 <%= rest_timer_offset %> border-t border-gray-300 bg-white">
+  <div class="mx-auto flex max-w-md items-center gap-2 px-4 py-2">
+    <%# The offer: what to count down from. Scrollable rather than wrapped, because a second
+        row would change the bar's height and push the last Done button around under a thumb
+        that is already reaching for it. %>
+    <div data-rest-offer class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+      <%# The measured one, filled in and unhidden by the script when the cue carries a
+          usual. It leads because it is the only suggestion here that is about this lifter;
+          the rest are just numbers. %>
+      <%# Through button_style like every other button in the app, which is what #333 put
+          there: the focus ring is sky-800 because a ring the colour of the button it sits on
+          is no ring at all. The filled one is checked by spec/button_shape_spec.rb, which
+          reads the rendered class list rather than the helper precisely so a call site
+          cannot quietly keep a radius of its own.
+
+          text-sky-100 rather than an opacity for the quiet half of the label. The session
+          screen bans opacity outright -- fading a warmup is what the load size replaced
+          (#214) -- and a spec holds it to that, so the subdued reading has to come from a
+          colour. sky-100 on sky-800 is 12.2:1. %>
+      <button type="button" data-rest-start="usual" hidden
+              class="<%= button_style %> min-h-11 shrink-0 border border-sky-800 bg-sky-800
+                     px-3 text-sm font-medium text-white hover:bg-sky-900">
+        <span data-rest-usual class="tabular-nums"></span>
+        <span class="font-normal text-sky-100">your usual</span>
+      </button>
+      <%- [[60, '1:00'], [120, '2:00'], [180, '3:00'], [300, '5:00']].each do |seconds, label| %>
+        <button type="button" data-rest-start="<%= seconds %>"
+                class="<%= button_style %> min-h-11 shrink-0 border border-sky-800 bg-white
+                       px-3 text-sm font-medium tabular-nums text-sky-900 hover:bg-sky-50">
+          <%= label %>
+        </button>
+      <%- end %>
+    </div>
+
+    <%# The running state, in the same bar rather than a second one: the offer is replaced by
+        the clock, so the bar never changes height between armed and running. %>
+    <div data-rest-running hidden class="flex min-w-0 flex-1 items-center gap-2">
+      <%# aria-hidden for the same reason the session clock is (#336): a number changing every
+          second in a live region is a screen reader nobody can use. The zero announcement
+          below is the part worth speaking, and it fires once. %>
+      <span data-rest-clock aria-hidden="true"
+            class="shrink-0 text-2xl font-semibold tabular-nums text-gray-900"></span>
+      <span data-rest-movement aria-hidden="true"
+            class="min-w-0 flex-1 truncate text-xs text-gray-500"></span>
+      <%# Plus and minus rather than a dial. The issue's screenshot has a picker, and a picker
+          is the wrong control for this screen: its whole design is one tap, one-handed, with
+          chalk on -- the same argument that keeps a Start tap off every set. Two buttons that
+          step by thirty seconds reach any duration from any preset and can be hit without
+          looking, which a scroll wheel cannot. %>
+      <button type="button" data-rest-step="-30" aria-label="Thirty seconds less"
+              class="<%= button_style %> min-h-11 shrink-0 border border-gray-300 px-2
+                     text-sm tabular-nums text-gray-700 hover:bg-gray-50">&minus;30</button>
+      <button type="button" data-rest-step="30" aria-label="Thirty seconds more"
+              class="<%= button_style %> min-h-11 shrink-0 border border-gray-300 px-2
+                     text-sm tabular-nums text-gray-700 hover:bg-gray-50">+30</button>
+    </div>
+
+    <%# One control for both states: it stops a running timer and puts the offer away. %>
+    <button type="button" data-rest-dismiss aria-label="Close rest timer"
+            class="<%= button_style %> min-h-11 shrink-0 px-2 text-xl leading-none
+                   text-gray-400 hover:text-gray-700">
+      &times;
+    </button>
+  </div>
+  <%# Spoken once, when the rest is up. This is the announcement the ticking clock above
+      deliberately is not: polite so it waits for a gap rather than cutting across whatever
+      is being read, and emptied again on the next arm so it cannot be re-read stale. %>
+  <p data-rest-announce aria-live="polite" class="sr-only"></p>
+</div>
+
+<%# The clock itself.
+
+    Counts from Date.now() against a fixed end rather than decrementing a counter, so a tab
+    the phone throttled in a pocket comes back with the right number instead of however many
+    ticks it was allowed to run. The same reasoning as the session clock above it, which
+    counts from a paint time for the same reason -- and like that one this never asks the
+    browser what time it is on the server, so a phone with a wrong clock is still right.
+
+    It ticks at 250ms and not 1000ms. The display only changes once a second, but a timer
+    that samples on the second boundary shows 0:00 up to a second late, and the beep with
+    it -- which on the one number in this app somebody is waiting for is the difference
+    between a gym timer and an approximation of one.
+
+    **Past zero it counts up.** The issue asks for this explicitly and it is the half that
+    makes the thing honest: a rest timer that stops at zero implies the rest ended there,
+    when what actually happened is that you took another forty seconds. The count up is
+    grey and prefixed, not red or amber -- going over is information, not a warning, and
+    amber on this screen means a warning and only a warning (#214).
+
+    The beep is built on the tap that starts the timer, because that tap is the user gesture
+    an AudioContext needs: constructed on load it would be suspended on iOS and silent at
+    zero, which is the failure that would go unnoticed until somebody missed a rest. Two
+    short notes rather than one, so it reads as a signal rather than as a notification from
+    something else. Vibration is asked for and ignored where it is not supported -- iOS
+    Safari implements none of navigator.vibrate -- which is why the beep is the primary and
+    the buzz is the addition.
+
+    A wake lock is held while the timer runs. Without one the phone dims and locks partway
+    through a three-minute rest and the beep arrives to a sleeping page; with one the screen
+    stays up exactly as long as the rest does and is released the moment it ends. It is
+    requested inside a try because the API is absent on older Safari and refuses when the
+    page is not visible, and neither is a reason to fail to time a rest.
+
+    **The honest limit, from the issue:** none of this can reach a phone whose screen is off
+    and locked. A web page gets no timer that survives that, so the buzz in your pocket is
+    what a native app is for and this does not pretend otherwise. %>
+<script>
+  (function () {
+    var bar = document.getElementById('rest-timer');
+    if (!bar) { return; }
+
+    var offer = bar.querySelector('[data-rest-offer]');
+    var running = bar.querySelector('[data-rest-running]');
+    var clock = bar.querySelector('[data-rest-clock]');
+    var movementLabel = bar.querySelector('[data-rest-movement]');
+    var usualButton = bar.querySelector('[data-rest-start="usual"]');
+    var usualLabel = bar.querySelector('[data-rest-usual]');
+    var announce = bar.querySelector('[data-rest-announce]');
+    var body = document.getElementById('session-page');
+
+    var endsAt = 0, usual = 0, seenAt = '', rang = false, lock = null, audio = null;
+
+    function spell(total) {
+      var sign = total < 0 ? '+' : '';
+      var seconds = Math.abs(total);
+      return sign + Math.floor(seconds / 60) + ':' + ('0' + (seconds % 60)).slice(-2);
+    }
+
+    // Two short notes on the tap's own AudioContext. Wrapped because a browser with audio
+    // blocked should still count the rest down.
+    function beep() {
+      try {
+        if (!audio) { audio = new (window.AudioContext || window.webkitAudioContext)(); }
+        if (audio.state === 'suspended') { audio.resume(); }
+        [0, 0.18].forEach(function (offset) {
+          var tone = audio.createOscillator(), level = audio.createGain();
+          tone.frequency.value = 880;
+          level.gain.setValueAtTime(0.0001, audio.currentTime + offset);
+          level.gain.exponentialRampToValueAtTime(0.25, audio.currentTime + offset + 0.01);
+          level.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + offset + 0.14);
+          tone.connect(level); level.connect(audio.destination);
+          tone.start(audio.currentTime + offset); tone.stop(audio.currentTime + offset + 0.15);
+        });
+      } catch (error) { /* no audio: the number on screen is still the timer */ }
+    }
+
+    function hold() {
+      if (!navigator.wakeLock) { return; }
+      navigator.wakeLock.request('screen').then(function (sentinel) { lock = sentinel; })
+        .catch(function () { /* refused or unsupported; the timer runs either way */ });
+    }
+
+    function release() {
+      if (lock) { lock.release().catch(function () {}); lock = null; }
+    }
+
+    function show(mode) {
+      bar.hidden = mode === 'none';
+      offer.hidden = mode !== 'offer';
+      running.hidden = mode !== 'running';
+      // The bar is fixed, so it covers whatever the page ends with. The session wrapper
+      // already clears the RPE footer; this clears the timer on top of it, and only while
+      // there is one -- a class rather than markup so a scriptless page keeps its own
+      // padding exactly as it was.
+      if (body) { body.classList.toggle('pb-40', mode !== 'none'); }
+    }
+
+    function tick() {
+      if (running.hidden) { return; }
+      var left = Math.round((endsAt - Date.now()) / 1000);
+      clock.textContent = spell(left);
+      clock.classList.toggle('text-gray-900', left > 0);
+      clock.classList.toggle('text-gray-500', left <= 0);
+      if (left <= 0 && !rang) {
+        rang = true;
+        beep();
+        if (navigator.vibrate) { navigator.vibrate([200, 100, 200]); }
+        announce.textContent = 'Rest over.';
+        release();
+      }
+    }
+
+    function start(seconds) {
+      endsAt = Date.now() + seconds * 1000;
+      rang = false;
+      announce.textContent = '';
+      show('running');
+      hold();
+      tick();
+    }
+
+    function arm(cue) {
+      usual = parseInt(cue.getAttribute('data-usual'), 10) || 0;
+      var movement = cue.getAttribute('data-movement') || '';
+      usualButton.hidden = !usual;
+      if (usual) { usualLabel.textContent = spell(usual) + ' '; }
+      movementLabel.textContent = movement;
+      // A cue landing mid-rest is a set finished before the last one's timer ran out, which
+      // is a real thing to do -- supersets, or simply tapping ahead. The new rest is the one
+      // that matters, so the offer takes the bar back rather than the old countdown keeping
+      // it. Nothing is lost: the clock it replaces was already past the set it belonged to.
+      show('offer');
+    }
+
+    bar.addEventListener('click', function (event) {
+      var target = event.target.closest('[data-rest-start], [data-rest-step], [data-rest-dismiss]');
+      if (!target) { return; }
+      if (target.hasAttribute('data-rest-dismiss')) {
+        release();
+        show('none');
+      } else if (target.hasAttribute('data-rest-step')) {
+        endsAt += parseInt(target.getAttribute('data-rest-step'), 10) * 1000;
+        // Stepping back up past zero is a rest that is running again, so the bell re-arms.
+        if (endsAt > Date.now()) { rang = false; }
+        tick();
+      } else {
+        var asked = target.getAttribute('data-rest-start');
+        start(asked === 'usual' ? usual : parseInt(asked, 10));
+      }
+    });
+
+    // The cue is swapped out of band on every tap, so this reads it after every swap and
+    // acts only when the completion stamp is one it has not seen. A poll swaps panels
+    // without touching the cue, which is exactly why the stamp and not the swap is the
+    // signal -- otherwise every poll would re-offer a timer for a set finished minutes ago.
+    // The set and the stamp together, because the stamp alone is not identity: two sets
+    // finished inside the same second share a whole second, and keying on that would ignore
+    // the second tap and keep counting the first set's rest.
+    function keyOf(cue) {
+      var at = cue.getAttribute('data-at') || '';
+      return at && cue.getAttribute('data-set') + ':' + at;
+    }
+
+    function readCue() {
+      var cue = document.getElementById('rest-cue');
+      if (!cue) { return; }
+      var key = keyOf(cue);
+      if (!key || key === seenAt) { return; }
+      seenAt = key;
+      arm(cue);
+    }
+
+    document.body.addEventListener('htmx:afterSwap', readCue);
+    // Whatever is on the page at load is marked seen rather than acted on: arriving on a
+    // session whose last set was finished an hour ago should not open a rest timer.
+    var first = document.getElementById('rest-cue');
+    if (first) { seenAt = keyOf(first); }
+    setInterval(tick, 250);
+  })();
+</script>

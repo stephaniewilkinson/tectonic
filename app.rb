@@ -1033,14 +1033,100 @@ class Tectonic < Roda
 
   def session_body(workout_id, set_id)
     load_session(workout_id)
-    position = session_lifts.index { |lift| lift.any? { |set| set[:id] == set_id.to_i } } || 0
-    render('workouts/_lift_panel', locals: { lift: session_lifts[position], position: }) +
+    tapped = @sets.find { |set| set[:id] == set_id.to_i }
+    session_panel(tapped) +
       render('workouts/_progress', locals: { oob: true }) +
       announce(tap_sentence(set_id)) +
+      # What the rest timer offers, for the set this tap just finished (#281). Out of band
+      # like the progress header, and for the same reason: the timer lives outside the
+      # swapped region so a countdown survives the next poll, and this is how the server
+      # tells it a set was finished and what this lifter usually takes after one.
+      rest_cue(tapped) +
       # Re-armed with what this tap just made true. Without it the poller would still be
       # asking about the digest the page loaded with, find it changed -- by the lifter, a
       # second ago -- and swap every panel back over the top of their own tap. #249.
       session_poll(workout_id)
+  end
+
+  # The one lift panel a tap changes, which is the panel holding the set that was tapped.
+  # Position zero where the set cannot be found, which is what the fallback always meant:
+  # render something coherent rather than raise on a row that has gone.
+  def session_panel(tapped)
+    id = tapped && tapped[:id]
+    position = session_lifts.index { |lift| lift.any? { |set| set[:id] == id } } || 0
+    render('workouts/_lift_panel', locals: { lift: session_lifts[position], position: })
+  end
+
+  # How many of a movement's own turnarounds to read before taking the middle one. #281.
+  #
+  # A bound rather than the whole history, because this runs inside a Done tap and a lifter
+  # three years in has thousands of squat sets -- and the median of the last sixty is the
+  # number wanted anyway. What somebody took between sets in 2023 is not what they take now,
+  # and letting it vote would make the suggestion drift towards a lifter who no longer
+  # exists. Sixty is roughly the last ten sessions of a movement trained in sixes.
+  TURNAROUND_SAMPLE = 60
+
+  # What this lifter usually takes between sets of one movement, or nil where there is not
+  # enough of their own history to say. #281.
+  #
+  # The whole of the suggestion, and deliberately the whole of it: the timer offers this
+  # number and a row of plain durations, and nothing anywhere picks a rest for somebody. A
+  # median off their own sets is a measurement; "rest 3 minutes before a heavy single" is a
+  # coaching opinion, and #263 already settled that those belong to the assistant rather
+  # than to the app.
+  #
+  # Scoped through the account's own workouts rather than by exercise alone, since the
+  # library movements are shared -- without it a first squat session would be offered the
+  # median turnaround of every lifter on the instance.
+  def usual_turnaround(exercise_id)
+    return nil unless exercise_id
+
+    rows = WorkoutSet.where(exercise_id:, is_completed: true)
+                     .exclude(completed_at: nil)
+                     .where(workout_id: Workout.where(account_id: @account_id).select(:id))
+                     .order(Sequel.desc(:id))
+                     .limit(TURNAROUND_SAMPLE)
+                     .select(:workout_id, :completed_at)
+                     .all.map(&:values)
+    Timing.between_sets_of(rows)
+  end
+
+  # A cue with nothing in it, which is what a tap that did not finish a set sends. Named
+  # rather than written inline so the two branches below are plainly the same element.
+  NO_REST_CUE = { oob: true, set_id: nil, at: nil, seconds: nil, movement: nil }.freeze
+
+  # The out-of-band element that tells the rest timer a set was just finished. Rendered on
+  # every tap, carrying nothing when the tap un-completed a set or only corrected one --
+  # taking a mis-tap back is not the end of a set, and neither is fixing the weight two reps
+  # in, so neither may offer a rest.
+  #
+  # The set as well as the stamp, because the stamp alone is not identity. Two sets finished
+  # inside the same second -- a superset tapped off in one motion, or an assistant writing
+  # both -- carry the same whole second, and a timer keyed on that would ignore the second
+  # tap and go on counting the first set's rest. Sub-second precision for the matching
+  # reason: a set un-completed and re-completed straight away is the same set with a new
+  # stamp, and that is a new rest.
+  def rest_cue(set)
+    return render('workouts/_rest_cue', locals: NO_REST_CUE) unless set && set[:is_completed] && set[:completed_at]
+
+    render('workouts/_rest_cue', locals: {
+             oob: true, set_id: set[:id], at: set[:completed_at].to_f,
+             seconds: usual_turnaround(set[:exercise_id]),
+             movement: @exercises[set[:exercise_id]]&.name
+           })
+  end
+
+  # Where the rest timer sits, which depends on whether the RPE footer is under it. Both are
+  # fixed to the bottom of the screen, so the timer has to clear the footer's collapsed
+  # height -- min-h-11, 2.75rem -- plus whatever the phone's home indicator takes.
+  #
+  # A helper rather than a local assigned in the template, because erb_lint hands each ERB
+  # tag to rubocop as a program of its own and a local set in one tag and read in the next
+  # is an undefined variable to it. The same reason session_lifts lives here.
+  def rest_timer_offset
+    return 'bottom-[calc(2.75rem+env(safe-area-inset-bottom))]' if @sets.any?(&:ratable?)
+
+    'bottom-[env(safe-area-inset-bottom)]'
   end
 
   # The live region, sent back beside whatever else a response is swapping. #336.
