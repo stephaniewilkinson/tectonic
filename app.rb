@@ -557,7 +557,17 @@ class Tectonic < Roda
           # everybody else reads.
           @exercise = Exercise.owned_by(@account_id).where(id: r.params['id']).first
           r.redirect '/exercises' unless @exercise
+          # Read before the update, because it is the *change* that has to reach the sets and
+          # afterwards there is nothing left to compare against. #392.
+          was_per_side = @exercise.default_is_per_side
           @exercise.update(name: r.params['name'], is_barbell:, default_is_per_side:, note:)
+          # Saying a movement is counted per side is a statement about the movement, not about
+          # today, so the sets that were following the old answer follow the new one. Silently
+          # would be wrong -- this rewrites logged training -- so the page says how many moved.
+          if default_is_per_side != was_per_side
+            moved = Exercise.align_sets_per_side(@exercise, @account_id, was: was_per_side)
+            session['exercise.notice'] = per_side_notice(moved, default_is_per_side) if moved.positive?
+          end
           r.redirect "/exercises/#{@exercise.id}/"
         end
       end
@@ -618,6 +628,10 @@ class Tectonic < Roda
           # What this movement is aiming at, if anything (#308). Nil is a state the page has
           # to say something different about rather than a number to default.
           @goal = Goal.for(account_id: @account_id, exercise_id: @exercise.id)
+          # What the last edit did to sets already logged, read once and taken out of the
+          # session (#392). Delete rather than read, so a reload does not re-announce an edit
+          # made ten minutes ago -- the same shape program_action uses for its refusals.
+          @notice = session.delete('exercise.notice')
           view('exercises/show')
         end
       end
@@ -1644,6 +1658,22 @@ class Tectonic < Roda
   # than a tint over the whole row that has to be learnt before it says anything.
   def row_style(set)
     set[:is_completed] ? 'border-lime-300 bg-lime-50' : 'border-gray-200 bg-white'
+  end
+
+  # What changing a movement's per-side answer did to the training already logged. #392.
+  #
+  # Said out loud rather than done quietly, because it rewrites sets somebody has already
+  # lifted and it moves the volume on those sessions by half. A lifter who marks the clamshell
+  # per side and sees nothing happen cannot tell this from the bug they were hitting; one who
+  # sees "12 logged sets now count per side" knows exactly what it did and can undo it by
+  # unticking the box.
+  #
+  # The count is the whole of the message. Naming the sessions would be a list that grows
+  # without bound on a movement trained for a year, and "which ones" is answerable by looking
+  # at them.
+  def per_side_notice(moved, per_side)
+    sets = moved == 1 ? '1 logged set' : "#{moved} logged sets"
+    "#{sets} of this movement now count #{per_side ? 'per side' : 'both sides together'}."
   end
 
   # A set lifted differently from the way it was written. Sets entered by hand

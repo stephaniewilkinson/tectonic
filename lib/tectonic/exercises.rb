@@ -46,6 +46,34 @@ class Tectonic < Roda
       account_id.nil?
     end
 
+    # Sets already logged, brought into line when the movement's own answer changes. #392.
+    #
+    # A set carries its own is_per_side, copied from the movement when it was written, and
+    # that copy is right: a set records how it was done, the way planned_weight records what
+    # was asked for. Changing a movement must not reach back and rewrite training.
+    #
+    # Except that this particular flag is not a choice somebody made per set. It is a fact
+    # about the movement -- a split squat is done one leg at a time and always was -- and the
+    # only reason a logged set says otherwise is that the app did not know yet. Marking the
+    # clamshell per side and finding yesterday's session still counting both legs as one is
+    # #392, and the volume on that session is out by half until this runs.
+    #
+    # **Only the sets still carrying the old answer move.** A set an assistant set explicitly
+    # against the default was a decision about that set, and this is not entitled to overrule
+    # it. So the update is scoped to rows whose flag equals what the movement used to say,
+    # which is exactly the set of rows that were following the movement rather than differing
+    # from it.
+    #
+    # Scoped through the account's own workouts as well as by exercise. It cannot matter today
+    # -- only a private movement is editable, so every set of it is the owner's -- but the
+    # scope is what keeps that true if a library movement ever becomes editable, and an
+    # unscoped UPDATE on a shared row would rewrite every account's training at once.
+    def self.align_sets_per_side(exercise, account_id, was:)
+      WorkoutSet.where(exercise_id: exercise.id, is_per_side: was)
+                .where(workout_id: Workout.where(account_id:).select(:id))
+                .update(is_per_side: !was)
+    end
+
     # A note as it should be stored: nil when there is nothing in it. The textarea is
     # posted whether or not anyone typed in it, so "left blank" arrives as an empty
     # string, and the two spellings read differently afterwards -- '' is truthy, so a
