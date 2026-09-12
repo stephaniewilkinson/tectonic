@@ -4,12 +4,24 @@
     because none of it counts your rest: the header clock says how long you have been
     training, which between sets is not the number you want. This is the countdown.
 
-    **It is offered, never started for you.** A Done tap arms this bar; a second tap on a
-    duration starts it. Auto-starting was the obvious shortcut and is wrong twice over: a
-    lifter who taps Done and walks to the water fountain gets a beep they did not ask for,
-    and starting a countdown to a number the app chose would be the app deciding how long
-    somebody should rest. Offering a number it measured is a readout. Counting down to one
-    it picked is a prescription, and #263 settled that those belong to the assistant.
+    **The clock starts with the set; the bell needs a length.** #395, and it is the better
+    answer than the one this shipped with.
+
+    It first refused to start at all until a duration was tapped, on the reasoning that a
+    lifter who taps Done and walks to the fountain should not be beeped at by a countdown
+    they never asked for. That reasoning was about the *bell* and got applied to the *clock*,
+    which cost the number a lifter most wants between sets -- how long they have been
+    standing there -- and made them ask for it every single set.
+
+    The two are separate now. A Done tap starts the clock counting up, silently, because the
+    rest began when the set ended and that is simply true. Nothing happens at any particular
+    number until somebody names one, and then it counts down to it and rings.
+
+    **A prescribed rest is a length somebody named.** A block writing five minutes between
+    singles counts down and rings without a second tap, because that number was written into
+    the programme by a person. The measured median never does: it sits on the bar as an offer
+    and takes a tap, because the app worked it out and #263 settled that the app does not
+    decide how long anybody rests.
 
     **The suggestion is the lifter's own median turnaround for that movement**, from
     usual_turnaround in app.rb, and it is the only number here that claims anything. The
@@ -40,7 +52,26 @@
 <div id="rest-timer" hidden
      class="fixed inset-x-0 z-30 <%= rest_timer_offset %> border-t border-gray-300 bg-white">
   <div class="mx-auto flex max-w-md items-center gap-2 px-4 py-2">
-    <%# The offer: what to count down from. Scrollable rather than wrapped, because a second
+    <%# The clock, which is on screen from the moment a set is ticked off rather than from the
+        moment a length is chosen. #395.
+        aria-hidden for the same reason the session clock is (#336): a number changing every
+        second in a live region is a screen reader nobody can use. The announcement at the
+        foot of the bar is the part worth speaking, and it fires once. %>
+    <span data-rest-clock aria-hidden="true"
+          class="shrink-0 text-2xl font-semibold tabular-nums text-gray-900"></span>
+    <%# Named only once there is a countdown to name. While the durations are on offer the
+        room goes to them: on a 420px screen the movement and five buttons do not both fit,
+        and the buttons are the thing a thumb is reaching for. %>
+    <span data-rest-movement hidden aria-hidden="true"
+          class="min-w-0 flex-1 truncate text-xs text-gray-500"></span>
+    <%# Where the countdown's number came from, said while it is counting rather than only
+        while it is offered. A prescribed rest starts on its own (#395), so its button is
+        never seen -- and without this the lifter would watch a countdown with nothing saying
+        whether the block asked for it or the app worked it out. The word is copied from the
+        labels on the button below rather than written twice, so the two cannot drift. %>
+    <span data-rest-source hidden aria-hidden="true"
+          class="shrink-0 text-xs text-gray-500"></span>
+    <%# The offer: what to count down to. Scrollable rather than wrapped, because a second
         row would change the bar's height and push the last Done button around under a thumb
         that is already reaching for it. %>
     <div data-rest-offer class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
@@ -80,16 +111,9 @@
       <%- end %>
     </div>
 
-    <%# The running state, in the same bar rather than a second one: the offer is replaced by
-        the clock, so the bar never changes height between armed and running. %>
-    <div data-rest-running hidden class="flex min-w-0 flex-1 items-center gap-2">
-      <%# aria-hidden for the same reason the session clock is (#336): a number changing every
-          second in a live region is a screen reader nobody can use. The zero announcement
-          below is the part worth speaking, and it fires once. %>
-      <span data-rest-clock aria-hidden="true"
-            class="shrink-0 text-2xl font-semibold tabular-nums text-gray-900"></span>
-      <span data-rest-movement aria-hidden="true"
-            class="min-w-0 flex-1 truncate text-xs text-gray-500"></span>
+    <%# The adjustment, which replaces the offer once there is a length to adjust. In the same
+        bar rather than a second one, so the bar never changes height between the two states. %>
+    <div data-rest-steps hidden class="flex shrink-0 items-center gap-2">
       <%# Plus and minus rather than a dial. The issue's screenshot has a picker, and a picker
           is the wrong control for this screen: its whole design is one tap, one-handed, with
           chalk on -- the same argument that keeps a Start tap off every set. Two buttons that
@@ -135,19 +159,24 @@
     grey and prefixed, not red or amber -- going over is information, not a warning, and
     amber on this screen means a warning and only a warning (#214).
 
-    The beep is built on the tap that starts the timer, because that tap is the user gesture
-    an AudioContext needs: constructed on load it would be suspended on iOS and silent at
-    zero, which is the failure that would go unnoticed until somebody missed a rest. Two
-    short notes rather than one, so it reads as a signal rather than as a notification from
-    something else. Vibration is asked for and ignored where it is not supported -- iOS
-    Safari implements none of navigator.vibrate -- which is why the beep is the primary and
-    the buzz is the addition.
+    **The ring lasts ten seconds** (#396), as a pulse train rather than one held tone. The
+    pair of notes it replaces was over in a third of a second, which is nothing at all across
+    a gym with a phone face down on a bench. A continuous ten-second note reads as a fault; a
+    pulse reads as a timer, and the gaps are what let you hear somebody talking over it. Ten
+    seconds is also long enough that it has to be stoppable, so every tap on the bar silences
+    it and so does the next set -- otherwise the one control a lifter reaches for, getting
+    back under the bar, is the one that does not work.
 
-    A wake lock is held while the timer runs. Without one the phone dims and locks partway
-    through a three-minute rest and the beep arrives to a sleeping page; with one the screen
-    stays up exactly as long as the rest does and is released the moment it ends. It is
-    requested inside a try because the API is absent on older Safari and refuses when the
-    page is not visible, and neither is a reason to fail to time a rest.
+    Vibration is asked for and ignored where it is not supported -- iOS Safari implements none
+    of navigator.vibrate -- which is why the beep is the primary and the buzz is the addition.
+
+    A wake lock is held while a countdown runs, and only then. Without one the phone dims and
+    locks partway through a three-minute rest and the beep arrives to a sleeping page. It is
+    not held while the clock is merely counting up: that state lasts from one set to the next
+    all session, and forcing the screen on for the whole of a workout to time a rest nobody
+    asked to be told about is a battery cost with nothing on the other side of it. Requested
+    inside a try because the API is absent on older Safari and refuses when the page is not
+    visible, and neither is a reason to fail to time a rest.
 
     **The honest limit, from the issue:** none of this can reach a phone whose screen is off
     and locked. A web page gets no timer that survives that, so the buzz in your pocket is
@@ -158,39 +187,67 @@
     if (!bar) { return; }
 
     var offer = bar.querySelector('[data-rest-offer]');
-    var running = bar.querySelector('[data-rest-running]');
+    var steps = bar.querySelector('[data-rest-steps]');
     var clock = bar.querySelector('[data-rest-clock]');
     var movementLabel = bar.querySelector('[data-rest-movement]');
+    var sourceLabel = bar.querySelector('[data-rest-source]');
     var suggestedButton = bar.querySelector('[data-rest-start="suggested"]');
     var suggestedLabel = bar.querySelector('[data-rest-suggested]');
     var labels = bar.querySelectorAll('[data-rest-label]');
     var announce = bar.querySelector('[data-rest-announce]');
     var body = document.getElementById('session-page');
 
-    var endsAt = 0, suggested = 0, seenAt = '', rang = false, lock = null, audio = null;
+    // How long the ring lasts. #396 asks for ten seconds, and ten seconds is the right ask:
+    // the old pair of notes was over in a third of a second, which is nothing at all across a
+    // gym with a phone face down on a bench. A pulse every eight tenths rather than one held
+    // tone, because a continuous ten-second note reads as a fault and a pulse train reads as
+    // a timer -- and because the gaps are what let you hear somebody talking over it.
+    var RING_SECONDS = 10, PULSE_EVERY = 0.8;
 
-    function spell(total) {
-      var sign = total < 0 ? '+' : '';
-      var seconds = Math.abs(total);
-      return sign + Math.floor(seconds / 60) + ':' + ('0' + (seconds % 60)).slice(-2);
+    // startedAt is when the set was ticked off, which is when the rest began. target is the
+    // length somebody asked for, or 0 while nobody has. The two are kept apart because #395
+    // is exactly that distinction: the clock runs from the first, the bell needs the second.
+    // target is null while nobody has named a length, and a number once somebody has --
+    // null rather than 0 because a lifter can wind the clock down to zero, and "no length"
+    // and "a length of none" are different states that 0 alone cannot tell apart.
+    var startedAt = 0, target = null, suggested = 0, seenAt = '';
+    var rang = false, lock = null, audio = null, ringing = [];
+
+    function spell(seconds) {
+      var whole = Math.abs(Math.round(seconds));
+      return Math.floor(whole / 60) + ':' + ('0' + (whole % 60)).slice(-2);
     }
 
-    // Two short notes on the tap's own AudioContext. Wrapped because a browser with audio
-    // blocked should still count the rest down.
+    // Ten seconds of pulses on the tap's own AudioContext. Wrapped because a browser with
+    // audio blocked should still count the rest.
+    //
+    // The context is built on a tap rather than on load, because that tap is the user gesture
+    // it needs: constructed on load it would be suspended on iOS and silent at zero, which is
+    // the failure nobody notices until they miss a rest.
     function beep() {
       try {
         if (!audio) { audio = new (window.AudioContext || window.webkitAudioContext)(); }
         if (audio.state === 'suspended') { audio.resume(); }
-        [0, 0.18].forEach(function (offset) {
+        for (var offset = 0; offset < RING_SECONDS; offset += PULSE_EVERY) {
           var tone = audio.createOscillator(), level = audio.createGain();
           tone.frequency.value = 880;
           level.gain.setValueAtTime(0.0001, audio.currentTime + offset);
           level.gain.exponentialRampToValueAtTime(0.25, audio.currentTime + offset + 0.01);
-          level.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + offset + 0.14);
+          level.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + offset + 0.3);
           tone.connect(level); level.connect(audio.destination);
-          tone.start(audio.currentTime + offset); tone.stop(audio.currentTime + offset + 0.15);
-        });
+          tone.start(audio.currentTime + offset); tone.stop(audio.currentTime + offset + 0.32);
+          ringing.push(tone);
+        }
       } catch (error) { /* no audio: the number on screen is still the timer */ }
+    }
+
+    // Ten seconds is long enough that it has to be stoppable, or the one control a lifter
+    // reaches for -- getting back under the bar -- is the one that does not work. Every tap on
+    // the bar silences it, and so does the next set.
+    function silence() {
+      ringing.forEach(function (tone) { try { tone.stop(); } catch (error) { /* already done */ } });
+      ringing = [];
+      if (navigator.vibrate) { navigator.vibrate(0); }
     }
 
     function hold() {
@@ -203,10 +260,16 @@
       if (lock) { lock.release().catch(function () {}); lock = null; }
     }
 
+    // Three states, not two. The bar is away; or it is counting the rest with no length set,
+    // which is what a Done tap leaves behind; or it is counting down to one. #395 is the
+    // middle state -- it did not exist before, and it is the one a lifter is in most of the
+    // time, because most sets are followed by getting on with it rather than by a decision.
     function show(mode) {
       bar.hidden = mode === 'none';
-      offer.hidden = mode !== 'offer';
-      running.hidden = mode !== 'running';
+      offer.hidden = mode !== 'counting';
+      steps.hidden = mode !== 'running';
+      movementLabel.hidden = mode !== 'running';
+      sourceLabel.hidden = mode !== 'running' || !sourceLabel.textContent;
       // The bar is fixed, so it covers whatever the page ends with. The session wrapper
       // already clears the RPE footer; this clears the timer on top of it, and only while
       // there is one -- a class rather than markup so a scriptless page keeps its own
@@ -215,23 +278,38 @@
     }
 
     function tick() {
-      if (running.hidden) { return; }
-      var left = Math.round((endsAt - Date.now()) / 1000);
-      clock.textContent = spell(left);
+      if (bar.hidden) { return; }
+      var elapsed = Math.round((Date.now() - startedAt) / 1000);
+      // No length asked for: the clock is a stopwatch on this rest and nothing is going to
+      // happen at any particular number, so it counts plainly and stays quiet.
+      if (target === null) {
+        clock.textContent = spell(elapsed);
+        clock.classList.add('text-gray-900');
+        clock.classList.remove('text-gray-500');
+        return;
+      }
+      var left = target - elapsed;
+      clock.textContent = (left < 0 ? '+' : '') + spell(left);
       clock.classList.toggle('text-gray-900', left > 0);
       clock.classList.toggle('text-gray-500', left <= 0);
       if (left <= 0 && !rang) {
         rang = true;
         beep();
-        if (navigator.vibrate) { navigator.vibrate([200, 100, 200]); }
+        if (navigator.vibrate) { navigator.vibrate([300, 500, 300, 500, 300, 500, 300]); }
         announce.textContent = 'Rest over.';
         release();
       }
     }
 
-    function start(seconds) {
-      endsAt = Date.now() + seconds * 1000;
-      rang = false;
+    // A length, counted from when the set was finished rather than from this tap. "Rest two
+    // minutes" is two minutes after the bar went down, not two minutes after you got round to
+    // saying so -- and #395's whole point is that the rest started at the Done tap.
+    function aim(seconds) {
+      target = seconds;
+      // Already past it when it was set. That is a statement about the rest you took rather
+      // than an alarm you asked for, so the bell is marked spent and the clock simply reads
+      // how far over you are.
+      rang = (Date.now() - startedAt) / 1000 >= seconds;
       announce.textContent = '';
       show('running');
       hold();
@@ -239,37 +317,58 @@
     }
 
     function arm(cue) {
+      silence();
       suggested = parseInt(cue.getAttribute('data-suggested'), 10) || 0;
       var kind = cue.getAttribute('data-kind') || '';
       suggestedButton.hidden = !suggested;
       if (suggested) { suggestedLabel.textContent = spell(suggested) + ' '; }
       // Which label shows is a fact about where the number came from, so it is read off the
       // cue rather than assumed. A prescription and a measured median are different claims.
+      // The same word is carried to the running row, so a countdown that started on its own
+      // still says whose number it is counting.
+      sourceLabel.textContent = '';
       for (var i = 0; i < labels.length; i++) {
-        labels[i].hidden = labels[i].getAttribute('data-rest-label') !== kind;
+        var matches = labels[i].getAttribute('data-rest-label') === kind;
+        labels[i].hidden = !matches;
+        if (matches) { sourceLabel.textContent = labels[i].textContent; }
       }
       movementLabel.textContent = cue.getAttribute('data-movement') || '';
-      // A cue landing mid-rest is a set finished before the last one's timer ran out, which
-      // is a real thing to do -- supersets, or simply tapping ahead. The new rest is the one
-      // that matters, so the offer takes the bar back rather than the old countdown keeping
-      // it. Nothing is lost: the clock it replaces was already past the set it belonged to.
-      show('offer');
+      // The rest began when the set was ticked off, which is this cue. A cue landing mid-rest
+      // is a set finished before the last one's timer ran out -- supersets, or simply tapping
+      // ahead -- and the new rest is the one that matters, so it takes the bar over.
+      startedAt = Date.now();
+      target = null;
+      rang = false;
+      announce.textContent = '';
+      release();
+      show('counting');
+      // A rest the block prescribed counts down and rings, because that length is one
+      // somebody wrote into the programme rather than one this app worked out -- which is
+      // what #395 means by the user having given it. A median the app measured never rings
+      // unasked: it is offered on the bar and takes a tap, like every other number there.
+      if (suggested && kind === 'prescribed') { aim(suggested); } else { tick(); }
     }
 
     bar.addEventListener('click', function (event) {
-      var target = event.target.closest('[data-rest-start], [data-rest-step], [data-rest-dismiss]');
-      if (!target) { return; }
-      if (target.hasAttribute('data-rest-dismiss')) {
+      var tapped = event.target.closest('[data-rest-start], [data-rest-step], [data-rest-dismiss]');
+      if (!tapped) { return; }
+      silence();
+      if (tapped.hasAttribute('data-rest-dismiss')) {
         release();
         show('none');
-      } else if (target.hasAttribute('data-rest-step')) {
-        endsAt += parseInt(target.getAttribute('data-rest-step'), 10) * 1000;
-        // Stepping back up past zero is a rest that is running again, so the bell re-arms.
-        if (endsAt > Date.now()) { rang = false; }
+      } else if (tapped.hasAttribute('data-rest-step')) {
+        target += parseInt(tapped.getAttribute('data-rest-step'), 10);
+        // Floored at nothing rather than at Bounds::REST's five seconds. That floor is about
+        // what a programme may prescribe; this is a lifter winding the clock down to end the
+        // rest now, which is a real gesture and lands on zero by design.
+        if (target < 0) { target = 0; }
+        // Stepping back up past the elapsed time is a rest that is running again, so the bell
+        // re-arms.
+        if (target > (Date.now() - startedAt) / 1000) { rang = false; }
         tick();
       } else {
-        var asked = target.getAttribute('data-rest-start');
-        start(asked === 'suggested' ? suggested : parseInt(asked, 10));
+        var asked = tapped.getAttribute('data-rest-start');
+        aim(asked === 'suggested' ? suggested : parseInt(asked, 10));
       }
     });
 

@@ -46,7 +46,7 @@ module RestingBrowser
   # until htmx has swapped the panel in and the script has read the cue.
   def finish_a_set
     first('button', text: 'Done').click
-    assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
+    assert has_css?('#rest-timer', visible: true, wait: 5)
   end
 
   def start_a_rest_of(label)
@@ -81,18 +81,41 @@ describe 'the rest timer arming' do
     assert timer.visible?
   end
 
-  # The offer is an offer. Arming must not start anything, because a lifter who taps Done and
-  # walks off should not be beeped at by a countdown they never asked for.
-  it 'does not start itself' do
+  # #395. The clock runs from the Done tap, because the rest began when the set ended. This
+  # replaces an assertion that it did *not* start until a duration was tapped -- that rule was
+  # about the bell and was wrongly applied to the clock, which cost a lifter the number they
+  # most want between sets and made them ask for it every set.
+  it 'starts counting the moment a set is finished' do
     finish_a_set
 
-    refute has_css?('#rest-timer [data-rest-running]', visible: true)
+    assert_equal '0:00', clock_text
+    sleep 2.5
+
+    assert_operator seconds_in(clock_text), :>, 0
+  end
+end
+
+# Counting is not counting down. Nothing is going to happen at any particular number until
+# somebody names one, so the durations stay on offer and the clock stays silent.
+describe 'the rest timer before a length is chosen' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include RestingBrowser
+
+  before { session_with_a_set }
+
+  it 'keeps the durations on offer while nothing has been asked for' do
+    finish_a_set
+
+    assert has_css?('#rest-timer [data-rest-offer]', visible: true)
+    refute has_css?('#rest-timer [data-rest-steps]', visible: true)
   end
 
-  it 'starts on a tap and shows the time it was given' do
+  it 'turns into a countdown on a tap and shows the time it was given' do
     start_a_rest_of '1:00'
 
-    assert_equal '1:00', clock_text
+    assert has_css?('#rest-timer [data-rest-steps]', visible: true)
+    assert_operator seconds_in(clock_text), :<=, 60
   end
 end
 
@@ -165,33 +188,50 @@ describe 'the rest the programme prescribed' do
   include BrowserSpec
   include RestingBrowser
 
-  it 'is what the bar offers, named as the prescription it is' do
-    session_prescribing(300)
+  # The one length the timer counts down to without being asked. #395 says the bell needs a
+  # length somebody gave it, and a block writing five minutes between singles is a person
+  # giving one -- so this needs no second tap, where the measured median does.
+  def finish_the_working_set
     # The first Done on this screen is the warmup rung, which carries no prescription, so the
     # working set is the one to tap.
     all('button', text: 'Done').last.click
-
-    assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
-    assert_includes suggestion_text, '5:00'
-    assert_includes suggestion_text, 'prescribed'
+    assert has_css?('#rest-timer', visible: true, wait: 5)
   end
 
-  it 'starts the countdown at the prescribed length' do
+  it 'counts down from the prescribed length with no second tap' do
     session_prescribing(300)
-    all('button', text: 'Done').last.click
-    assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
-    find('[data-rest-start="suggested"]').click
+    finish_the_working_set
 
-    assert_equal '5:00', clock_text
+    assert has_css?('#rest-timer [data-rest-steps]', visible: true)
+    assert_operator seconds_in(clock_text), :<=, 300
+    assert_operator seconds_in(clock_text), :>, 290
   end
 
-  # A ramp rung prescribes nothing -- three minutes between heavy singles is not three minutes
-  # between the 95lb and 135lb rungs -- so tapping one must not offer the working sets' rest.
-  it 'is not offered on a warmup rung, which prescribes none' do
+  # It starts on its own, so its button is never seen -- and without the word beside the clock
+  # a lifter would watch a countdown with nothing saying whether the block asked for it or the
+  # app worked it out.
+  it 'says whose number it is counting, beside the clock' do
+    session_prescribing(300)
+    finish_the_working_set
+
+    assert_equal 'prescribed', find('[data-rest-source]').text
+  end
+end
+
+# A ramp rung prescribes nothing -- three minutes between heavy singles is not three minutes
+# between the 95lb and 135lb rungs -- so tapping one counts up and rings at nothing, exactly
+# as a session with no block at all does.
+describe 'a warmup rung under a block that prescribes a rest' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include RestingBrowser
+
+  it 'is left counting up, with the durations still on offer' do
     session_prescribing(300)
     first('button', text: 'Done').click
 
     assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
+    refute has_css?('#rest-timer [data-rest-steps]', visible: true)
     refute_includes suggestion_text, 'prescribed'
   end
 end
@@ -212,7 +252,7 @@ describe 'the rest timer against the poll' do
     page.execute_script("htmx.trigger(document.getElementById('session-poll'), 'load')")
     sleep 2
 
-    assert has_css?('#rest-timer [data-rest-running]', visible: true)
+    assert has_css?('#rest-timer [data-rest-steps]', visible: true)
     assert_operator seconds_in(clock_text), :<, before
   end
 end
