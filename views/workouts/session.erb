@@ -6,7 +6,12 @@
     24 is 96px against a collapsed footer of 44px plus its safe-area inset, which is more
     than the arithmetic needs. That slack is deliberate: it is the gap between the last Done
     button and the footer, and a thumb aiming at the first needs to not find the second. %>
-<div class="mx-auto max-w-md pb-24">
+<%# The id is the rest timer's handle on this element (#281). That bar is fixed, so when it
+    is on screen it covers whatever the page ends with -- the script adds bottom padding
+    here while it shows and takes it away again afterwards. Selected by id rather than by
+    its class run, which would make these three utilities load-bearing and break the timer
+    silently the next time the padding was tuned. %>
+<div id="session-page" class="mx-auto max-w-md pb-24">
   <div class="flex items-baseline justify-between">
     <h1 class="text-3xl font-semibold text-gray-900">
       <%= @workout[:date].strftime('%A %b %-d') %>
@@ -62,6 +67,19 @@
 <%- if @sets.any?(&:ratable?) %>
   <%== render('workouts/_rpe_help') %>
 <%- end %>
+
+<%# The rest timer and the element the server cues it through. #281.
+
+    Out here with the RPE footer and for the identical reason, which is worth stating rather
+    than leaving to the shared placement: #session-body is replaced on every Done tap and
+    every fifteen-second poll, and a countdown is state. Inside that region the timer would
+    restart four times a minute. Rendered once out here, htmx never touches it.
+
+    The cue is rendered empty on first paint. A session opened an hour after its last set
+    should not greet you with a rest timer, so the script marks whatever stamp it finds at
+    load as already seen and waits for a tap to bring it a new one. %>
+<%== render('workouts/_rest_cue', locals: { seconds: nil, movement: nil, at: nil, set_id: nil }) %>
+<%== render('workouts/_rest_timer') %>
 
 <%# One thing left in here, and it is not the one that used to be.
     A tap used to replace the whole of #session-body, which destroyed the scroller along

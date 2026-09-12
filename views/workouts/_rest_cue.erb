@@ -1,0 +1,50 @@
+<%# What the server tells the rest timer, and nothing else. #281.
+
+    This element holds no state and draws nothing. It exists because the timer cannot live
+    inside #session-body: a countdown is state, that region is replaced on every Done tap
+    and every fifteen-second poll, and state inside a swapped element is state that resets
+    -- the same reasoning that put the RPE footer outside it. So the timer sits outside and
+    this carries the one fact it cannot work out for itself, which is that a set was just
+    finished and what this lifter usually takes after one of that movement.
+
+    Swapping it is therefore always safe. htmx replaces this span on every tap while the
+    countdown above it runs untouched in a closure, which is exactly the split wanted: the
+    server owns the suggestion, the browser owns the clock.
+
+    data-set and data-at together are what make a cue new. The poll fires every fifteen
+    seconds and swaps panels without touching this span, so the script cannot use "something
+    was swapped" as its signal -- it would re-offer a timer for a set finished four minutes
+    ago, on every poll, forever. Comparing the pair answers it exactly: a tap that finished a
+    set carries a pair the script has not seen, and nothing else does.
+
+    The pair rather than the stamp alone, because a stamp is not identity. Two sets finished
+    inside the same second carry the same whole second, and a timer keyed on that would
+    ignore the second tap and go on counting the first set's rest -- which is precisely what
+    a superset tapped off in one motion looks like. The stamp is written to sub-second
+    precision for the matching reason: a set un-completed and re-completed straight away is
+    the same set with a new stamp, and that is a new rest.
+
+    Empty on an un-complete, which is the case worth being explicit about. Tapping Done a
+    second time takes a mis-tap back; that is not the end of a set and must not offer a
+    rest. With no attributes the script finds no new stamp and does nothing -- and it
+    deliberately does not stop a timer already running, because a mis-tap corrected is not a
+    reason to lose the rest you are in the middle of.
+
+    data-usual is absent rather than zero where there is no history. A movement lifted for
+    the first time has no turnaround to take a median of, and a zero would be read as a
+    suggestion of none. The timer hides its "your usual" button in that case and offers the
+    plain durations, which is the honest thing to show somebody the app has not watched yet. %>
+<%# Written as three always-present attributes rather than three conditional ones so that
+    every value goes through ERB's escaping. A movement is named by the lifter -- exercises
+    are user-created here -- so its name is untrusted text, and building the attribute as a
+    raw string would be the one place on this screen where that was not true. Empty is the
+    absent case: the script parses these and finds NaN, which is what it already tests for. %>
+<%# `oob` is a local with a default so the two callers read the same way _progress does: the
+    session view renders this plainly on first paint, and the complete route renders it with
+    oob: true. It matters that the first paint does not carry the attribute -- htmx only
+    performs out-of-band swaps on response content, so it would be inert either way, but an
+    element claiming to be a swap target while sitting in the document it is a target in is
+    a thing a reader has to rule out. %>
+<span id="rest-cue"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %> hidden
+      data-set="<%= set_id %>" data-at="<%= at %>"
+      data-usual="<%= seconds %>" data-movement="<%= movement %>"></span>
