@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative '../lib/tectonic/duplicate_accounts'
+
 # One mailbox, one account. #345.
 #
 # Nothing enforced uniqueness on `accounts.email`, so the same address could sign up twice
@@ -15,11 +17,12 @@
 # `account_goals` on (account_id, exercise_id), `exercises` on the library name. This one
 # was simply missed.
 #
-# **It refuses to run rather than choosing a winner.** If two rows already share an address,
-# one of them owns training somebody did, and which one survives is a question about a person
-# rather than about data -- so this names them and stops. That is deliberately louder than a
-# migration that quietly renamed the loser: a failed deploy is noticed, and the alternative
-# is discovering months later that a session went somewhere unreachable.
+# **It clears the duplicates that own nothing, and refuses on the ones that do.** The rule
+# and the reasoning behind it are in `Tectonic::DuplicateAccounts`; this end of it is the
+# reading and the writing. A row owning nothing is a failed second sign-up rather than
+# somebody's training, so deleting it costs nobody anything and the deploy is not worth
+# stopping for it. A pair that both own training is the case worth stopping for, and still
+# does, by name.
 #
 # Case is left alone, and that is a known remaining gap rather than an oversight.
 # `Foo@example.com` and `foo@example.com` are one mailbox and would still make two rows.
@@ -30,17 +33,21 @@
 Sequel.migration do
   # CONCURRENTLY, following 017 and 023, so the index is built without holding a write lock
   # on accounts -- and it cannot run inside a transaction, which is what no_transaction is
-  # for. The duplicate check above it is a read and needs no transaction of its own.
+  # for. The reads and the deletes below need no transaction of their own: each address is
+  # settled independently, and a half-finished run leaves a database this migration can be
+  # run against again.
   no_transaction
 
   up do
-    duplicated = from(:accounts).select_group(:email).having { count.function.* > 1 }.select_map(:email)
-    unless duplicated.empty?
-      raise Sequel::Error,
-            "These addresses already have more than one account: #{duplicated.join(', ')}. " \
-            'Each pair has to be resolved by hand before email can be made unique, because ' \
-            'one of the two rows owns training that somebody did. Merge or remove them, then ' \
-            'run this again.'
+    deletions, unresolved = Tectonic::DuplicateAccounts.plan(Tectonic::DuplicateAccounts.duplicates(self))
+    refusal = Tectonic::DuplicateAccounts.refusal(unresolved)
+    raise Sequel::Error, refusal if refusal
+
+    # Said out loud rather than done silently. These rows are gone after this, and the deploy
+    # log is the only place that will ever record which ones they were.
+    unless deletions.empty?
+      puts "Removing #{deletions.length} duplicate account(s) owning nothing: #{deletions.sort.join(', ')}"
+      from(:accounts).where(id: deletions).delete
     end
 
     add_index :accounts, :email, unique: true, name: :accounts_email_key, concurrently: true
