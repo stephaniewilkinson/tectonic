@@ -1,0 +1,28 @@
+<%# A clock time, rendered by the reader's own browser. #397.
+
+    This is the first time-of-day anywhere in the app, and it lands directly on top of the
+    defect #349 names: there is no timezone, not per account and not in config, so the server
+    is UTC and every naive stamp in the database is UTC. Printing one straight would tell a
+    lifter in California that their six o'clock session started at one in the morning -- which
+    is not a small wrongness on a page whose whole subject is when you trained.
+
+    So the instant goes over the wire and the browser formats it. That is correct today for
+    every reader wherever they are, it needs no configuration, and it does not pre-empt #349:
+    when an account grows a timezone, this keeps working and the *server's* idea of "today"
+    is the thing that gets fixed there. It is also the trick the session clock already uses --
+    the server sends a number and the browser turns it into something to read.
+
+    data-local is epoch seconds, which is unambiguous. The stamp is stored naive and written
+    by this process, so Ruby reads it back in the same zone it was written in and `to_i` is
+    the true instant regardless of what that zone is.
+
+    The <time> element carries the same instant in datetime, offset and all, so the page is
+    machine-readable whether or not any script runs.
+
+    **The fallback says UTC out loud.** With JavaScript off the visible text is the UTC
+    reading, labelled, rather than a bare number that looks local and is not. An unlabelled
+    wrong clock time is worse than an awkward right one -- and unlike the session clock's
+    fallback, which is an elapsed count and therefore zone-free, this one cannot be made
+    honest by leaving the label off. %>
+<time data-local="<%= at.to_i %>"
+      datetime="<%= at.strftime('%Y-%m-%dT%H:%M:%S%:z') %>"><%= at.utc.strftime('%H:%M UTC') %></time>
