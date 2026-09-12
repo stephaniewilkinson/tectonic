@@ -84,7 +84,47 @@
       <%= @timing[:discarded] %> long <%= @timing[:discarded] == 1 ? 'gap' : 'gaps' %> not counted
     <%- end %>
   </p>
+  <%# When it started and when it ended. #397.
+
+      A second line rather than a fifth clause on the one above, which is already three
+      clauses long on a phone. It answers a different question too: the line above is how
+      long the session took, this is where it sat in the day -- which is what somebody
+      reading back a week of training actually wants, and is the difference between "48m"
+      and "48m, and it was the six o'clock session".
+
+      Only on a session that has ended. While one is still running the finish time does not
+      exist yet, and the line above already says "so far" about it; printing a start alone
+      under that reads as though the session were over. The stamps themselves are the same
+      two `overall` has always subtracted -- this stops throwing the ends away. %>
+  <%- if @timing[:started_at] && @timing[:overall_basis] == :finished %>
+    <p class="mt-1 text-sm text-gray-500">
+      <%== render('workouts/_clock_time', locals: { at: @timing[:started_at] }) %>
+      to
+      <%== render('workouts/_clock_time', locals: { at: @timing[:ended_at] }) %>
+    </p>
+  <%- end %>
 <%- end %>
+
+<%# The clock times above, put into the reader's own timezone. #397.
+
+    Rewritten here rather than sent ready-made, because the server has no idea where anybody
+    is -- see the note in _clock_time.erb and #349. toLocaleTimeString asks the browser, which
+    does know, and formats it the way that reader's locale writes a time.
+
+    Every [data-local] on the page rather than two elements by id, so a third time added later
+    needs nothing here. Degrades to the labelled UTC reading the server wrote, which is why
+    that fallback says UTC rather than looking local. %>
+<script>
+  (function () {
+    var times = document.querySelectorAll('time[data-local]');
+    for (var i = 0; i < times.length; i++) {
+      var at = parseInt(times[i].getAttribute('data-local'), 10);
+      if (!at) { continue; }
+      times[i].textContent =
+        new Date(at * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+  })();
+</script>
 
 <%# One column on a phone. grid-cols-2 was unprefixed, so it applied at every width and
     put a 392px table inside a 161px card -- and the card's overflow-hidden ate the rest

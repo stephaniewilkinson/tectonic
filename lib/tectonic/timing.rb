@@ -56,7 +56,25 @@ class Tectonic < Roda
       span = overall(workout, stamps)
       { overall: span, active: active(span, stamps), overall_basis: basis(workout, stamps),
         turnarounds: gaps, discarded: discarded(stamps), held: held(sets),
-        typical_turnaround: median(gaps), sets_done: stamps.length }
+        typical_turnaround: median(gaps), sets_done: stamps.length,
+        started_at: stamps.first, ended_at: ended_at(workout, stamps) }
+    end
+
+    # The two ends of a session as instants rather than as a length. #397.
+    #
+    # `overall` has always been the subtraction of exactly these two, so this adds no new idea
+    # about when a session began or finished -- it stops throwing the ends away. Which end is
+    # which is already settled: the first stamp, and either the moment the lifter said they
+    # were done or the last stamp if they never did.
+    #
+    # Nil where there is nothing to say, like everything else here. A session with no stamps
+    # has no beginning to report, and answering with the date at midnight would be inventing
+    # one. A reader has to handle nil anyway, because the record already prints nothing at all
+    # for such a session.
+    def ended_at(workout, stamps)
+      return nil if stamps.empty?
+
+      finished_at(workout) || stamps.last
     end
 
     # The stamps a session carries, oldest first. Sets with none are simply absent: a set
