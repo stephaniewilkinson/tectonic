@@ -4,6 +4,26 @@ require 'rake/testtask'
 require 'dotenv/load'
 require_relative '.env'
 
+# Error reporting for everything rake runs. #386.
+#
+# `render.yaml` runs `rake db:migrate && rake library:exercises` on every deploy, before the
+# new version accepts a single request, and until this line neither had any reporting at all:
+# Sentry was initialised in config.ru, which the web server loads and rake does not. A
+# migration that raised failed the deploy into a build log that is not searchable across
+# deploys and that nobody is subscribed to -- which is how seven merged commits sat
+# undeployed for six days in September while CI stayed green.
+#
+# `install_rake_reporting!` hooks the one place rake funnels a failed task through, so every
+# task is covered rather than a list of the ones somebody remembered to wrap. It is a no-op
+# where there is nothing to report to, which is every local run and every CI run.
+#
+# roda is required first because lib/ reopens `class Tectonic < Roda` and the superclass has
+# to exist; migrator_db does the same thing further down for the same reason.
+require 'roda'
+require_relative 'lib/tectonic/error_reporting'
+Tectonic::ErrorReporting.setup!
+Tectonic::ErrorReporting.install_rake_reporting!
+
 # The migration the squashed schema lives in. Everything up to and including the old
 # 024 was folded into it, so any database already carrying that schema is at this
 # version by definition, whatever number it happens to record.
