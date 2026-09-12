@@ -16,6 +16,25 @@
     <p class="mt-1 text-xs text-gray-500"><%= provenance(@exercise) %></p>
   <%- end %>
 
+  <%# What changing the per-side answer did to training already logged. #392.
+
+      It reaches back and rewrites sets somebody has lifted, and moves the volume on those
+      sessions by half, so it says so. A lifter who ticks "counted per side" and sees nothing
+      happen cannot tell the fix from the bug they were hitting.
+
+      amber because this is the colour this app warns in and nothing else (#214), and a line
+      saying "12 logged sets were just rewritten" is the one thing on this page that has
+      earned it. Read once and gone: it is taken out of the session by the route, so a reload
+      does not re-announce an edit made ten minutes ago.
+
+      role="status" rather than alert: it is the outcome of something the lifter just did and
+      asked for, not an interruption. %>
+  <%- if @notice %>
+    <p role="status" class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      <%= @notice %>
+    </p>
+  <%- end %>
+
   <%# Above the chart rather than below the sets, because the note is why the movement is
       in the program and the chart is how it is going -- one is read before the other.
       A note is free prose, typed either by the account or by the assistant it connected,
