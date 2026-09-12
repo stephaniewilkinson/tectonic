@@ -5,6 +5,7 @@ require_relative 'config'
 require_relative 'logging'
 require_relative 'request_context'
 require_relative '../mcp_audit_log'
+require_relative '../error_reporting'
 
 class Tectonic < Roda
   module MCP
@@ -171,16 +172,77 @@ class Tectonic < Roda
         end
 
         # A pre-body refusal: audited and logged as refused, returned as an error result.
+        #
+        # A refusal is never reported. It is the tool declining on purpose -- the designed
+        # outcome of a bad request, not a fault -- and reporting it would bury the crashes
+        # under noise. It does leave a breadcrumb, so that when a crash does arrive the report
+        # shows what the assistant was refused just before it, which is often the whole story:
+        # a model that has been told twice it lacks a scope and then hits an exception was
+        # probably doing something the app has never been driven through.
+        #
+        # The refusal *message* is deliberately left out of the breadcrumb. Several are built
+        # from what the caller sent -- "No exercise named ..." carries a movement name -- and
+        # that is a lifter's data, on the same reasoning that sends argument keys rather than
+        # argument values from `report` below.
         def refuse(message)
+          leave_breadcrumb
           settle('refused', message)
           @tool.refuse(message)
         end
 
+        def leave_breadcrumb
+          return unless ErrorReporting.on?
+
+          Sentry.add_breadcrumb(
+            Sentry::Breadcrumb.new(category: 'mcp', level: 'info',
+                                   message: "refused #{@tool.tool_name}")
+          )
+        rescue StandardError
+          # A breadcrumb is a nicety; losing one must not turn a refusal into a failure.
+        end
+
         # An unexpected exception: audit the real cause, but return a generic message so
         # no internals leak to the client.
+        #
+        # **Reported before it is answered.** #384. This rescue is the last thing between the
+        # failure and a well-formed MCP response, so nothing propagates out to
+        # Sentry::Rack::CaptureExceptions in config.ru and every unexpected failure in every
+        # tool was invisible in Sentry by construction. Two things made that the worst place
+        # in the app for it to be true: nobody watches this traffic -- an LLM drives the
+        # endpoint, and one told "please try again" will retry, apologise to the lifter, and
+        # never mention it -- and `exception.message` is the least useful part of an
+        # exception. `undefined method 'each' for nil` was the whole artifact; the class, the
+        # backtrace, the cause, the tool and the arguments were all present at the raise site
+        # and none of them kept.
+        #
+        # Capturing first and answering second is the order that matters: the report exists
+        # whether or not the response after it is well formed.
         def crash(exception)
+          report(exception)
           settle('error', exception.message)
           @tool.refuse('The tool failed unexpectedly and made no change. Please try again.')
+        end
+
+        # What Sentry is told about a crash, and what it is deliberately not told.
+        #
+        # `argument_keys` rather than `arguments`: the values are a lifter's training data and
+        # send_default_pii is off on purpose in config.ru, so shipping them would undo that
+        # decision from a different file. The keys are enough to tell "create_set blew up with
+        # a weight given" from "create_set blew up without one", which is the diagnostic
+        # question, and they are the tool's own schema rather than anybody's data.
+        #
+        # Rescued because a reporting failure must not become the lifter's failure: the
+        # response below is well formed and the audit row still gets written whatever happens
+        # here. That is the same rule ErrorReporting.capture_task_failure follows for rake.
+        def report(exception)
+          return unless ErrorReporting.on?
+
+          Sentry.capture_exception(exception, tags: { surface: 'mcp', tool: @tool.tool_name },
+                                              extra: { account_id: @context.account_id,
+                                                       argument_keys: @arguments.keys })
+        rescue StandardError => e
+          MCP.log_call(tool: @tool.tool_name, account: @context.account_id,
+                       status: "report-failed:#{e.class}", duration_ms: elapsed_ms)
         end
 
         # Writes the audit row (structurally, not per tool) and the structured log line.
