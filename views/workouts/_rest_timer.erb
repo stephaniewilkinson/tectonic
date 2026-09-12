@@ -44,10 +44,17 @@
         row would change the bar's height and push the last Done button around under a thumb
         that is already reaching for it. %>
     <div data-rest-offer class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
-      <%# The measured one, filled in and unhidden by the script when the cue carries a
-          usual. It leads because it is the only suggestion here that is about this lifter;
-          the rest are just numbers. %>
-      <%# Through button_style like every other button in the app, which is what #333 put
+      <%# The suggestion, filled in and unhidden by the script when the cue carries one. It
+          leads because it is the only number here that claims anything: either the rest the
+          programme wrote for this lift, or -- for a lift prescribing none -- the median of
+          this lifter's own turnarounds on the movement. The four beside it are just numbers.
+
+          Two labels and one button, because which one shows is a fact about the number and
+          not about the layout. Saying "your usual" over the programme's prescription, or
+          "prescribed" over a median the app worked out, would each be a claim the app is not
+          entitled to make.
+
+          Through button_style like every other button in the app, which is what #333 put
           there: the focus ring is sky-800 because a ring the colour of the button it sits on
           is no ring at all. The filled one is checked by spec/button_shape_spec.rb, which
           reads the rendered class list rather than the helper precisely so a call site
@@ -57,11 +64,12 @@
           screen bans opacity outright -- fading a warmup is what the load size replaced
           (#214) -- and a spec holds it to that, so the subdued reading has to come from a
           colour. sky-100 on sky-800 is 12.2:1. %>
-      <button type="button" data-rest-start="usual" hidden
+      <button type="button" data-rest-start="suggested" hidden
               class="<%= button_style %> min-h-11 shrink-0 border border-sky-800 bg-sky-800
                      px-3 text-sm font-medium text-white hover:bg-sky-900">
-        <span data-rest-usual class="tabular-nums"></span>
-        <span class="font-normal text-sky-100">your usual</span>
+        <span data-rest-suggested class="tabular-nums"></span>
+        <span data-rest-label="prescribed" hidden class="font-normal text-sky-100">prescribed</span>
+        <span data-rest-label="usual" hidden class="font-normal text-sky-100">your usual</span>
       </button>
       <%- [[60, '1:00'], [120, '2:00'], [180, '3:00'], [300, '5:00']].each do |seconds, label| %>
         <button type="button" data-rest-start="<%= seconds %>"
@@ -153,12 +161,13 @@
     var running = bar.querySelector('[data-rest-running]');
     var clock = bar.querySelector('[data-rest-clock]');
     var movementLabel = bar.querySelector('[data-rest-movement]');
-    var usualButton = bar.querySelector('[data-rest-start="usual"]');
-    var usualLabel = bar.querySelector('[data-rest-usual]');
+    var suggestedButton = bar.querySelector('[data-rest-start="suggested"]');
+    var suggestedLabel = bar.querySelector('[data-rest-suggested]');
+    var labels = bar.querySelectorAll('[data-rest-label]');
     var announce = bar.querySelector('[data-rest-announce]');
     var body = document.getElementById('session-page');
 
-    var endsAt = 0, usual = 0, seenAt = '', rang = false, lock = null, audio = null;
+    var endsAt = 0, suggested = 0, seenAt = '', rang = false, lock = null, audio = null;
 
     function spell(total) {
       var sign = total < 0 ? '+' : '';
@@ -230,11 +239,16 @@
     }
 
     function arm(cue) {
-      usual = parseInt(cue.getAttribute('data-usual'), 10) || 0;
-      var movement = cue.getAttribute('data-movement') || '';
-      usualButton.hidden = !usual;
-      if (usual) { usualLabel.textContent = spell(usual) + ' '; }
-      movementLabel.textContent = movement;
+      suggested = parseInt(cue.getAttribute('data-suggested'), 10) || 0;
+      var kind = cue.getAttribute('data-kind') || '';
+      suggestedButton.hidden = !suggested;
+      if (suggested) { suggestedLabel.textContent = spell(suggested) + ' '; }
+      // Which label shows is a fact about where the number came from, so it is read off the
+      // cue rather than assumed. A prescription and a measured median are different claims.
+      for (var i = 0; i < labels.length; i++) {
+        labels[i].hidden = labels[i].getAttribute('data-rest-label') !== kind;
+      }
+      movementLabel.textContent = cue.getAttribute('data-movement') || '';
       // A cue landing mid-rest is a set finished before the last one's timer ran out, which
       // is a real thing to do -- supersets, or simply tapping ahead. The new rest is the one
       // that matters, so the offer takes the bar back rather than the old countdown keeping
@@ -255,7 +269,7 @@
         tick();
       } else {
         var asked = target.getAttribute('data-rest-start');
-        start(asked === 'usual' ? usual : parseInt(asked, 10));
+        start(asked === 'suggested' ? suggested : parseInt(asked, 10));
       }
     });
 

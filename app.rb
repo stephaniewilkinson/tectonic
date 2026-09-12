@@ -1093,7 +1093,29 @@ class Tectonic < Roda
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named
   # rather than written inline so the two branches below are plainly the same element.
-  NO_REST_CUE = { oob: true, set_id: nil, at: nil, seconds: nil, movement: nil }.freeze
+  NO_REST_CUE = { oob: true, set_id: nil, at: nil, seconds: nil, kind: nil, movement: nil }.freeze
+
+  # What the timer should count, and where the number came from. #281.
+  #
+  # The prescription wins. A block writing five singles at 90% means five minutes between
+  # them, and defaulting that to whatever this lifter happened to average -- including the
+  # sessions where they rushed it -- makes the timer describe the habit rather than the
+  # instruction. The measured median is the fallback, not the default.
+  #
+  # The kind travels with the number because the button has to say which it is. "5:00
+  # prescribed" and "3:10 your usual" are different claims, and a timer showing one under
+  # the other's name would be the app passing its own measurement off as the programme's
+  # instruction, or the reverse.
+  #
+  # Nil for both is a real answer: a hand-logged session of a movement never trained before
+  # has no prescription and no history, and the bar offers the plain durations alone.
+  def rest_suggestion(set)
+    prescribed = set[:planned_rest_seconds]
+    return [prescribed, 'prescribed'] if prescribed
+
+    measured = usual_turnaround(set[:exercise_id])
+    measured ? [measured, 'usual'] : [nil, nil]
+  end
 
   # The out-of-band element that tells the rest timer a set was just finished. Rendered on
   # every tap, carrying nothing when the tap un-completed a set or only corrected one --
@@ -1109,10 +1131,10 @@ class Tectonic < Roda
   def rest_cue(set)
     return render('workouts/_rest_cue', locals: NO_REST_CUE) unless set && set[:is_completed] && set[:completed_at]
 
+    seconds, kind = rest_suggestion(set)
     render('workouts/_rest_cue', locals: {
              oob: true, set_id: set[:id], at: set[:completed_at].to_f,
-             seconds: usual_turnaround(set[:exercise_id]),
-             movement: @exercises[set[:exercise_id]]&.name
+             seconds:, kind:, movement: @exercises[set[:exercise_id]]&.name
            })
   end
 
@@ -1275,7 +1297,7 @@ class Tectonic < Roda
   # The fields a lift edit may set. Named rather than taken wholesale so a form cannot
   # reach a column it has no business in, and so the pricing rule sees both prices when
   # one is being swapped for the other.
-  LIFT_FIELDS = %w[sets reps top_weight percent_of_max target_rpe note].freeze
+  LIFT_FIELDS = %w[sets reps top_weight percent_of_max target_rpe rest_seconds note].freeze
 
   # Every programme write is the same shape: check the token, try it, and come back to the
   # block with either nothing to say or the writer's own refusal to show. The refusal is

@@ -116,9 +116,16 @@ class Tectonic < Roda
         def lift(row)
           { id: row.id, position: row.position, exercise: row.exercise&.name,
             exercise_id: row.exercise_id, sets: row.sets, reps: row.reps,
-            top_weight: Presenter.weight(row.top_weight), percent_of_max: row.percent_of_max,
-            is_barbell: row.is_barbell, is_main: row.is_main,
-            target_rpe: row.target_rpe, note: row.note }.merge(reference_of(row))
+            is_barbell: row.is_barbell, is_main: row.is_main, note: row.note }
+            .merge(prescription_of(row)).merge(reference_of(row))
+        end
+
+        # What the lift asks for, as against what it is. The load and the two instructions
+        # that travel onto the rows the generator writes -- an effort to take the working
+        # sets at, and a rest to take between them.
+        def prescription_of(row)
+          { top_weight: Presenter.weight(row.top_weight), percent_of_max: row.percent_of_max,
+            target_rpe: row.target_rpe, rest_seconds: row.rest_seconds }
         end
       end
     end

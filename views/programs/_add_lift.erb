@@ -26,6 +26,12 @@
   <input type="number" name="target_rpe" min="1" max="10" step="1" autocomplete="off"
          aria-label="target RPE" placeholder="RPE"
          class="<%= field_style %> min-h-11 w-16 px-2 text-base">
+  <%# The rest, available from the moment the lift is written for #265's reason said again:
+      "five singles, five minutes between" is one instruction, and having to add the lift and
+      then edit it to say the second half would make the rest feel like an afterthought. %>
+  <input type="number" name="rest_seconds" min="5" max="1800" step="5" autocomplete="off"
+         aria-label="prescribed rest in seconds" placeholder="rest s"
+         class="<%= field_style %> min-h-11 w-20 px-2 text-base">
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Add lift</button>
 </form>
