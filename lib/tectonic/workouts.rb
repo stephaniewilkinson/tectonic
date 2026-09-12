@@ -147,9 +147,14 @@ class Tectonic < Roda
     # it notices nothing new today. It is here to keep the list's stated rule true rather
     # than true by accident, which is what a column drawn on the screen and missing from
     # here would leave it.
+    # planned_rest_seconds joins it with #281's second half. The session screen does not print
+    # it, but the rest timer is armed from it, so an assistant that represcribes a lift's rest
+    # and regenerates the day has changed what the screen will do -- and a poll answering 204
+    # would leave the next Done tap offering the rest the block asked for yesterday.
     SESSION_COLUMNS = %i[id exercise_id weight reps rpe is_warmup is_completed
                          measure duration_seconds is_per_side
-                         planned_weight planned_reps planned_rpe completed_at].freeze
+                         planned_weight planned_reps planned_rpe planned_rest_seconds
+                         completed_at].freeze
 
     def session_fingerprint
       rows = WorkoutSet.where(workout_id: id).order(:id).select(*SESSION_COLUMNS).all

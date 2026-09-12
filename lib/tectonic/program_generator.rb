@@ -363,6 +363,7 @@ class Tectonic < Roda
         workout_id: workout.id, exercise_id: lift.exercise_id,
         weight: set[:weight], reps: set[:reps], duration_seconds: set[:duration_seconds],
         planned_weight: set[:weight], planned_reps: set[:reps], planned_rpe: target_rpe(lift, is_warmup:),
+        planned_rest_seconds: rest_seconds(lift, is_warmup:),
         # A set is done the way the lift that wrote it is done, so the two never disagree
         # about whether it was counted per side or held for time. Stored form rather than
         # the symbol: this is a dataset insert, which does not typecast, and Sequel reads a
@@ -389,6 +390,26 @@ class Tectonic < Roda
     # level earlier, where the tool can name the field it is refusing.
     def target_rpe(lift, is_warmup:)
       lift.target_rpe unless is_warmup
+    end
+
+    # The rest this lift asks for, copied onto the working sets and onto nothing else. #281,
+    # and the fourth of the planned_ set, carried onto the row for the same reason as the
+    # other three: a session generated on Monday keeps the prescription it was generated
+    # with when the block is edited on Wednesday.
+    #
+    # Off a warmup on the same rule as the target above, but for a different reason worth
+    # saying. A target RPE cannot sit on a ramp because a ramp is submaximal by definition
+    # and the question does not apply. A prescribed rest cannot sit on one because it would
+    # be *wrong*: three minutes between heavy singles is not three minutes between the 95lb
+    # and 135lb rungs, and putting it there would print an instruction nobody should follow.
+    # A ramp step falls back to the measured turnaround instead, which is the number the
+    # lifter's own warmups actually took.
+    #
+    # Unlike the target there is no shape to filter for. Rest means the same thing on a
+    # plank as on a squat, which is why program_lifts_rest_seconds_in_range carries no
+    # measure clause and why nothing here has to check one.
+    def rest_seconds(lift, is_warmup:)
+      lift.rest_seconds unless is_warmup
     end
   end
 end

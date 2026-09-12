@@ -83,6 +83,11 @@ class Tectonic < Roda
             percent_of_max: attributes[:percent_of_max], note: attributes[:note],
             progression: progression_for(attributes, shape),
             is_main: attributes.fetch(:is_main, false), target_rpe: attributes[:target_rpe],
+            # No shape clause beside it, unlike target_rpe. Rest is the one prescription that
+            # means the same thing whatever the movement is -- a plank has a rest between
+            # holds and press-ups have one -- so the only question is whether the number is a
+            # plausible rest, which Bounds::REST answers on its own. #281.
+            rest_seconds: attributes[:rest_seconds],
             is_barbell: barbell?(attributes, exercise, shape) }.merge(shape)
         end
 
@@ -159,6 +164,7 @@ class Tectonic < Roda
           Bounds.check(Bounds::SECONDS, shape[:duration_seconds], 'Duration', unit: ' seconds')
           Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
           Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
+          Bounds.check(Bounds::REST, attributes[:rest_seconds], 'Rest', unit: ' seconds')
         end
 
         # A lift is counted one way or the other, and the way it is counted decides which

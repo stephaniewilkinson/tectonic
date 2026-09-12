@@ -78,7 +78,7 @@
     The cue is rendered empty on first paint. A session opened an hour after its last set
     should not greet you with a rest timer, so the script marks whatever stamp it finds at
     load as already seen and waits for a tap to bring it a new one. %>
-<%== render('workouts/_rest_cue', locals: { seconds: nil, movement: nil, at: nil, set_id: nil }) %>
+<%== render('workouts/_rest_cue', locals: { seconds: nil, kind: nil, movement: nil, at: nil, set_id: nil }) %>
 <%== render('workouts/_rest_timer') %>
 
 <%# One thing left in here, and it is not the one that used to be.

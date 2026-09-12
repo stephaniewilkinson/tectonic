@@ -30,11 +30,18 @@
     deliberately does not stop a timer already running, because a mis-tap corrected is not a
     reason to lose the rest you are in the middle of.
 
-    data-usual is absent rather than zero where there is no history. A movement lifted for
-    the first time has no turnaround to take a median of, and a zero would be read as a
-    suggestion of none. The timer hides its "your usual" button in that case and offers the
+    data-suggested is the number the timer defaults to and data-kind says where it came from.
+    The programme's own rest wins; the median of this lifter's turnarounds is the fallback for
+    a lift prescribing none. The kind has to travel with the number because the button says
+    which it is -- "5:00 prescribed" and "3:10 your usual" are different claims, and showing
+    one under the other's name would be the app passing its own measurement off as the
+    programme's instruction, or the reverse.
+
+    Both absent rather than zero where there is neither. A hand-logged session of a movement
+    never trained before has no prescription and no history, and a zero would be read as a
+    suggestion of none. The timer hides the suggestion button in that case and offers the
     plain durations, which is the honest thing to show somebody the app has not watched yet. %>
-<%# Written as three always-present attributes rather than three conditional ones so that
+<%# Written as always-present attributes rather than conditional ones so that
     every value goes through ERB's escaping. A movement is named by the lifter -- exercises
     are user-created here -- so its name is untrusted text, and building the attribute as a
     raw string would be the one place on this screen where that was not true. Empty is the
@@ -47,4 +54,5 @@
     a thing a reader has to rule out. %>
 <span id="rest-cue"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %> hidden
       data-set="<%= set_id %>" data-at="<%= at %>"
-      data-usual="<%= seconds %>" data-movement="<%= movement %>"></span>
+      data-suggested="<%= seconds %>" data-kind="<%= kind %>"
+      data-movement="<%= movement %>"></span>

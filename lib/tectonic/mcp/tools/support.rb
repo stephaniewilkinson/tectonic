@@ -28,6 +28,15 @@ class Tectonic < Roda
         # A held position measured in seconds, up to an hour, which covers a plank at one
         # end and a walk or a bike interval at the other.
         SECONDS = (1..3600)
+        # A prescribed rest between sets, in seconds. #281.
+        #
+        # Narrower than SECONDS at both ends and for reasons that are about rest rather than
+        # about time. Half an hour is past any real prescription -- five to eight minutes is
+        # the outer edge of a heavy single -- and an hour, which SECONDS admits for a bike
+        # interval, is not a rest anybody writes down. Five seconds at the bottom admits the
+        # short rests of rest-pause and drop-set work while refusing a zero, which would arm
+        # a timer that fires the instant it starts.
+        REST = (5..1800)
 
         module_function
 

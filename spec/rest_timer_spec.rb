@@ -26,8 +26,15 @@ module RestTimer
     body = last_response.body
     { set: body[/id="rest-cue"[^>]*data-set="([^"]*)"/, 1],
       at: body[/id="rest-cue"[^>]*data-at="([^"]*)"/, 1],
-      usual: body[/id="rest-cue"[^>]*data-usual="([^"]*)"/, 1],
+      suggested: body[/id="rest-cue"[^>]*data-suggested="([^"]*)"/, 1],
+      kind: body[/id="rest-cue"[^>]*data-kind="([^"]*)"/, 1],
       movement: body[/id="rest-cue"[^>]*data-movement="([^"]*)"/, 1] }
+  end
+
+  # A set carrying the rest its block prescribed, which is what the generator writes onto
+  # every working set of a lift with a rest_seconds on it.
+  def prescribed_set(workout_id, exercise_id, seconds)
+    written_set(workout_id, exercise_id, planned_rest_seconds: seconds)
   end
 
   # A movement this account has trained before, with gaps of a known length between its sets
@@ -185,20 +192,110 @@ describe 'what the timer suggests' do
     @set_id = written_set(@workout_id, @exercise_id)
   end
 
-  # The only number here that claims anything, and it is a measurement: the median of this
-  # lifter's own turnarounds on this movement. Nothing anywhere picks a rest for anybody.
-  it 'is the median of this lifter you have actually seen' do
+  # The default, and the whole point of #281's second half. A block writing five singles at
+  # 90% means five minutes between them; defaulting that to whatever this lifter happened to
+  # average -- including the sessions where they rushed it -- would make the timer describe
+  # the habit rather than the instruction.
+  it 'is the rest the programme prescribed' do
+    prescribed = prescribed_set(@workout_id, @exercise_id, 300)
+    tap_done(@workout_id, prescribed)
+
+    assert_equal '300', cue[:suggested]
+    assert_equal 'prescribed', cue[:kind]
+  end
+
+  # The measured median does not merely lose, it is not consulted. A lifter who rushes their
+  # squats for a month must not see the timer quietly drift down to match.
+  it 'prefers the prescription even where there is a history to average' do
+    history(@account_id, @exercise_id, gaps: [60, 60])
+    prescribed = prescribed_set(@workout_id, @exercise_id, 300)
+    tap_done(@workout_id, prescribed)
+
+    assert_equal '300', cue[:suggested]
+  end
+end
+
+# The fallback, for a lift prescribing nothing: a measurement, and labelled as one. It was the
+# whole of the suggestion before the prescription existed, and is still the right answer for a
+# hand-logged session and for the warmup rungs a block never prescribes a rest for.
+describe 'what the timer falls back to' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionTiming
+  include RestTimer
+
+  before do
+    @account_id = login
+    @workout_id, @exercise_id = scratch_workout(@account_id)
+    @set_id = written_set(@workout_id, @exercise_id)
+  end
+
+  it 'is the median of this lifter where nothing is prescribed' do
     history(@account_id, @exercise_id, gaps: [120, 120])
     tap_done(@workout_id, @set_id)
 
-    assert_equal '120', cue[:usual]
+    assert_equal '120', cue[:suggested]
+    assert_equal 'usual', cue[:kind]
   end
 
   it 'takes the middle gap rather than the average, so one long break cannot move it' do
     history(@account_id, @exercise_id, gaps: [60, 90, 600])
     tap_done(@workout_id, @set_id)
 
-    assert_equal '90', cue[:usual]
+    assert_equal '90', cue[:suggested]
+  end
+end
+
+# Which of the two numbers it is has to be said, because they are different claims. Showing a
+# median under the word "prescribed" would be the app passing its own measurement off as the
+# programme's instruction; the reverse would disown an instruction somebody wrote.
+describe 'saying where the number came from' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionTiming
+  include RestTimer
+
+  before do
+    @account_id = login
+    @workout_id, @exercise_id = scratch_workout(@account_id)
+  end
+
+  it 'offers the prescribed label to a timer counting a prescription' do
+    tap_done(@workout_id, prescribed_set(@workout_id, @exercise_id, 180))
+
+    assert_equal 'prescribed', cue[:kind]
+  end
+
+  it 'offers the usual label to a timer counting a median' do
+    history(@account_id, @exercise_id, gaps: [90, 90])
+    tap_done(@workout_id, written_set(@workout_id, @exercise_id))
+
+    assert_equal 'usual', cue[:kind]
+  end
+
+  it 'claims neither where it has nothing to suggest' do
+    tap_done(@workout_id, written_set(@workout_id, @exercise_id))
+
+    assert_empty cue[:kind].to_s
+    assert_empty cue[:suggested].to_s
+  end
+end
+
+# Both labels are rendered and the script shows whichever the cue names, so both have to be
+# on the page for either to appear.
+describe 'the two words the bar can say' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionTiming
+  include RestTimer
+
+  it 'carries both for the script to choose between' do
+    account_id = login
+    workout_id, = scratch_workout(account_id)
+    get "/workouts/#{workout_id}/session"
+
+    assert_includes last_response.body, 'data-rest-label="prescribed"'
+    assert_includes last_response.body, 'data-rest-label="usual"'
   end
 end
 
@@ -222,7 +319,7 @@ describe 'what the timer will not guess at' do
   it 'says nothing about a movement it has never watched' do
     tap_done(@workout_id, @set_id)
 
-    assert_empty cue[:usual].to_s
+    assert_empty cue[:suggested].to_s
   end
 
   # The library movements are shared, so without the account scope a first squat session
@@ -232,7 +329,7 @@ describe 'what the timer will not guess at' do
     history(stranger, @exercise_id, gaps: [300, 300])
     tap_done(@workout_id, @set_id)
 
-    assert_empty cue[:usual].to_s
+    assert_empty cue[:suggested].to_s
   end
 
   # Planned sets carry no completed_at at all, but the flag is asserted as well as the stamp
@@ -242,7 +339,7 @@ describe 'what the timer will not guess at' do
     3.times { written_set(workout_id, @exercise_id, is_completed: false) }
     tap_done(@workout_id, @set_id)
 
-    assert_empty cue[:usual].to_s
+    assert_empty cue[:suggested].to_s
   end
 end
 

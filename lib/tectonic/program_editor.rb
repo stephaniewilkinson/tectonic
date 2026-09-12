@@ -151,7 +151,8 @@ class Tectonic < Roda
       whole = merged(lift, written)
       shape = MCP::Tools::ProgramWriter.shape_of(whole, lift.exercise)
       MCP::Tools::ProgramWriter.check_load(whole, shape)
-      lift.update(**rounded_load(written.slice(:sets, :reps, :top_weight, :percent_of_max, :target_rpe, :note),
+      lift.update(**rounded_load(written.slice(:sets, :reps, :top_weight, :percent_of_max, :target_rpe,
+                                               :rest_seconds, :note),
                                  lift, shape),
                   progression: MCP::Tools::ProgramWriter.progression_for(whole, shape))
       refresh_session(lift.program_day)
@@ -190,7 +191,7 @@ class Tectonic < Roda
       { sets: lift.sets, reps: lift.reps, duration_seconds: lift.duration_seconds,
         top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
         is_weighted: lift.is_weighted, measure: lift.measure, target_rpe: lift.target_rpe,
-        is_per_side: lift.is_per_side }.merge(attributes)
+        rest_seconds: lift.rest_seconds, is_per_side: lift.is_per_side }.merge(attributes)
     end
 
     # Form values arrive as strings keyed by strings; blank means "not given" rather than

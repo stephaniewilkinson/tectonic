@@ -23,6 +23,13 @@ class Tectonic < Roda
                     'effort the working sets are meant to be taken at -- how autoregulated ' \
                     'programming is written, and the better instruction than a percentage ' \
                     'coming off a layoff. It belongs only on a loaded lift counted in reps. ' \
+                    'rest_seconds, 5 to 1800, is the rest the working sets are meant to take ' \
+                    'between them, and is what the session screen counts down after one is ' \
+                    'ticked off. Unlike target_rpe it applies to any movement, held or ' \
+                    'counted, loaded or not. Left out, the timer falls back to the median ' \
+                    'rest this lifter actually takes between sets of the movement, so give ' \
+                    'it when the programme genuinely prescribes one and leave it out rather ' \
+                    'than inventing a number. ' \
                     'percent_of names a different movement whose max the percentage is of: ' \
                     'a deficit deadlift written at 70% of the competition deadlift, or ' \
                     'supplemental work off the main lift. It defaults to the lift itself. ' \
@@ -38,6 +45,7 @@ class Tectonic < Roda
             is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: { type: 'integer' },
+            rest_seconds: { type: 'integer' },
             percent_of: { type: 'string' }, note: { type: 'string' }
           },
           required: %w[program_day_id exercise sets], additionalProperties: false

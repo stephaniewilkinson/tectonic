@@ -30,9 +30,12 @@ class Tectonic < Roda
                     'flagging a count as per side after the fact. target_rpe, 1 to 10, is ' \
                     'the effort its working ' \
                     'sets are meant to be taken at, on a loaded lift counted in reps; send ' \
-                    'null to clear it. Send only what changes. To swap how the load is ' \
-                    'written, set one of top_weight/percent_of_max and null the other. ' \
-                    'Returns what actually moved.'
+                    'null to clear it. rest_seconds, 5 to 1800, is the rest its working sets ' \
+                    'are meant to take between them and what the session screen counts down ' \
+                    'after one; it applies to any movement, and null clears it back to the ' \
+                    'median rest this lifter actually takes. Send only what changes. To swap ' \
+                    'how the load is written, set one of top_weight/percent_of_max and null ' \
+                    'the other. Returns what actually moved.'
         scope :write
         input_schema(
           type: 'object',
@@ -42,6 +45,7 @@ class Tectonic < Roda
             top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
+            rest_seconds: NUMBER_OR_NULL,
             percent_of: { type: %w[string null] }, is_weighted: { type: 'boolean' },
             is_per_side: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
             duration_seconds: { type: 'integer' }, note: { type: 'string' }
@@ -70,7 +74,7 @@ class Tectonic < Roda
         # lift that was swapped out is worse than none -- the same rule the web UI follows.
         def self.fields(context, lift, arguments)
           written = arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
-                                    :is_main, :is_barbell, :target_rpe, :note)
+                                    :is_main, :is_barbell, :target_rpe, :rest_seconds, :note)
           attributes = round_load(context, lift, written, arguments)
                        .merge(reference(context, arguments))
                        .merge(reshaped(lift, arguments))

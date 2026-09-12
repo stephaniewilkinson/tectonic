@@ -26,6 +26,18 @@ module RestingBrowser
     workout_id
   end
 
+  # The same, with the working set carrying the rest its block prescribed -- which is what the
+  # generator writes onto a lift with a rest_seconds on it.
+  def session_prescribing(seconds)
+    account_id = sign_up_for_session
+    workout_id, = generated_session(account_id)
+    DB[:sets].where(workout_id:, is_warmup: false).update(planned_rest_seconds: seconds)
+    visit "/workouts/#{workout_id}/session"
+    workout_id
+  end
+
+  def suggestion_text = find('[data-rest-start="suggested"]', visible: :all).text
+
   def timer = find('#rest-timer', visible: :all)
 
   def clock_text = find('[data-rest-clock]', visible: :all).text
@@ -142,6 +154,45 @@ describe 'the rest timer under a thumb' do
     find('[data-rest-dismiss]').click
 
     refute timer.visible?
+  end
+end
+
+# What the timer defaults to, on the screen. The number and the word have to agree: a median
+# shown under "prescribed" would be the app passing its own measurement off as the programme's
+# instruction, and the reverse would disown an instruction somebody wrote.
+describe 'the rest the programme prescribed' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include RestingBrowser
+
+  it 'is what the bar offers, named as the prescription it is' do
+    session_prescribing(300)
+    # The first Done on this screen is the warmup rung, which carries no prescription, so the
+    # working set is the one to tap.
+    all('button', text: 'Done').last.click
+
+    assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
+    assert_includes suggestion_text, '5:00'
+    assert_includes suggestion_text, 'prescribed'
+  end
+
+  it 'starts the countdown at the prescribed length' do
+    session_prescribing(300)
+    all('button', text: 'Done').last.click
+    assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
+    find('[data-rest-start="suggested"]').click
+
+    assert_equal '5:00', clock_text
+  end
+
+  # A ramp rung prescribes nothing -- three minutes between heavy singles is not three minutes
+  # between the 95lb and 135lb rungs -- so tapping one must not offer the working sets' rest.
+  it 'is not offered on a warmup rung, which prescribes none' do
+    session_prescribing(300)
+    first('button', text: 'Done').click
+
+    assert has_css?('#rest-timer [data-rest-offer]', visible: true, wait: 5)
+    refute_includes suggestion_text, 'prescribed'
   end
 end
 

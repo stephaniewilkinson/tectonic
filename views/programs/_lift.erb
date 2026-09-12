@@ -37,6 +37,18 @@
   <input type="number" name="target_rpe" value="<%= lift.target_rpe %>" min="1" max="10" step="1" autocomplete="off"
          aria-label="target RPE" placeholder="RPE"
          class="<%= field_style %> min-h-11 w-16 px-2 text-base">
+  <%# The rest this lift asks for, in seconds, and what the session screen's timer counts
+      after a set of it (#281). Seconds rather than a mm:ss control because the box has to
+      accept what a programme is written in -- "180" and "2:30" are the same instruction and
+      only one of them is a number a form can validate without parsing.
+
+      Blank stays the common case and stays cheap to leave, exactly as the RPE box beside it:
+      a lift with nothing here falls back to the median of what this lifter actually takes
+      between sets of the movement, which is a measurement and is the better answer than a
+      number nobody wrote down. Clearing it is the same gesture as never setting one. %>
+  <input type="number" name="rest_seconds" value="<%= lift.rest_seconds %>" min="5" max="1800" step="5"
+         autocomplete="off" aria-label="prescribed rest in seconds" placeholder="rest s"
+         class="<%= field_style %> min-h-11 w-20 px-2 text-base">
   <button type="submit" class="min-h-11 rounded-md bg-white px-3 text-sm font-semibold text-gray-700
                                shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Save</button>
 </form>
