@@ -80,6 +80,24 @@ class Tectonic < Roda
         # and IP addresses of people's training logs to a third party, which is a decision for
         # whoever owns the Sentry project rather than a line in a config file.
         config.environment = ENV.fetch('RACK_ENV')
+        # Which deploy an event came from. #387.
+        #
+        # Without it every event in the project belongs to the same unnamed version, and the
+        # thing that costs most is regression detection: Sentry reopens a resolved issue when
+        # it reappears in a *later* release, and with no release there is no later -- so
+        # resolving is permanent until somebody notices by hand, and a bug that comes back
+        # after a fix comes back into the same issue with nothing announcing it.
+        #
+        # It is worth more here than in most apps because of render.yaml's preDeployCommand.
+        # Migrations run on deploy, so a whole class of production error is *caused* by a
+        # specific deploy -- a column that changed shape, a backfill that half-ran -- and
+        # those are exactly the errors where "which release did this start in" is the entire
+        # diagnosis.
+        #
+        # RENDER_GIT_COMMIT is exported by the host, so this is the deployed SHA rather than
+        # anything this repository has to be told. Nil locally and in CI, which is today's
+        # behaviour exactly.
+        config.release = ENV.fetch('RENDER_GIT_COMMIT', nil)
       end
     end
 
