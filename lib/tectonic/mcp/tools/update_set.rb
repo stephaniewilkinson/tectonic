@@ -109,9 +109,10 @@ class Tectonic < Roda
           set[field] != sent
         end
 
-        # A set moved onto another movement takes that movement's barbell flag with it,
-        # the same rule the edit form in the web UI follows: plate math describing the
-        # lift that was swapped out is worse than no plate math at all.
+        # A set moved onto another movement takes that movement's barbell flag with it, and
+        # leaves the old movement's prescription behind -- both through WorkoutSet.moved_to,
+        # which is the one place that rule lives now (#406). Plate math describing the lift
+        # that was swapped out is worse than none, and so is a planned weight.
         def self.attributes(context, set, arguments)
           fields = written(arguments)
           # The shape the set will be left in, not the one it is in: this is the one tool
@@ -124,7 +125,7 @@ class Tectonic < Roda
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           return fields if exercise.id == set.exercise_id
 
-          { exercise_id: exercise.id, is_barbell: exercise.barbell? }.merge(fields)
+          WorkoutSet.moved_to(exercise).merge(fields)
         end
 
         # The columns as they will be stored: range-checked, and a weight of zero read as

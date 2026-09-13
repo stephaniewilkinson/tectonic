@@ -85,16 +85,17 @@ class Tectonic < Roda
                 'create the ones that happened.'
         end
 
-        # The move itself. is_barbell travels with the set, the same rule update_set and the
-        # web editor follow: plate math describing the movement that was swapped out is
-        # worse than none at all.
+        # The move itself, through WorkoutSet.moved_to so that this and update_set and the
+        # session screen's swap control cannot disagree about what moving a set means (#406):
+        # the new movement's barbell flag travels with it, and the old movement's
+        # prescription does not. Plate math describing the movement that was swapped out is
+        # worse than none at all, and so is a planned weight.
         def self.move(context, workout, from, sets, to_name)
           into = Resolver.exercise(context, name: to_name)
           lifted, pending = sets.partition(&:is_completed)
           return unchanged(from, into) if into.id == from.id
 
-          WorkoutSet.where(id: pending.map(&:id))
-                    .update(exercise_id: into.id, is_barbell: into.barbell?)
+          WorkoutSet.where(id: pending.map(&:id)).update(**WorkoutSet.moved_to(into))
           ok(moved_phrase(workout, from, into, pending, lifted),
              structured: { moved: pending.length, left_lifted: lifted.length,
                            workout: Presenter.view_workout_detail(workout.refresh) })

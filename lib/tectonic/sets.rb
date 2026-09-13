@@ -99,6 +99,35 @@ class Tectonic < Roda
     def self.completion(done, at: Time.now)
       { is_completed: done, completed_at: done ? at : nil }
     end
+
+    # A set moved onto another movement: the new movement's facts, and none of the old
+    # movement's prescription. #406.
+    #
+    # Two generated Barbell Hip Thrust sets at 85 lb were swapped to bodyweight Single-Leg
+    # Hip Thrust and the session read `Single-Leg Hip Thrust 10 reps per side (planned
+    # 85x8)` -- a bodyweight movement supposedly prescribed at 85 lb. The planned columns
+    # said what the *other* lift was asked for, and nothing cleared them.
+    #
+    # **A prescription belongs to the movement it was written for.** planned_weight,
+    # planned_reps, planned_rpe and planned_rest_seconds are all answers to "what was this
+    # lift asked for", so a row that is no longer that lift is carrying somebody else's
+    # answer. Nil is the honest value: a set swapped at the rack was never prescribed.
+    #
+    # Cleared rather than refused, which is the other fix #406 offers. Refusing is right for
+    # a *completed* set and UpdateSet.refuse_swap already does it -- a different movement is
+    # a different set, and the work is gone either way. It is wrong for an unlifted one:
+    # swapping a planned movement is the ordinary thing a lifter does standing at a busy
+    # rack, and it is what update_workout_exercise exists for.
+    #
+    # Here rather than at the call sites, for the reason `completion` gives above: three
+    # paths move a set onto another movement -- update_set, update_workout_exercise, and the
+    # session screen's swap control -- and all three already remembered to carry is_barbell
+    # across. A rule remembered at three places is a rule forgotten at one, and the one that
+    # forgot this was all three.
+    def self.moved_to(exercise)
+      { exercise_id: exercise.id, is_barbell: exercise.barbell?,
+        planned_weight: nil, planned_reps: nil, planned_rpe: nil, planned_rest_seconds: nil }
+    end
   end
 end
 
