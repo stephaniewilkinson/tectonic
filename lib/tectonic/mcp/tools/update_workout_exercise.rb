@@ -98,7 +98,7 @@ class Tectonic < Roda
           WorkoutSet.where(id: pending.map(&:id)).update(**WorkoutSet.moved_to(into))
           ok(moved_phrase(workout, from, into, pending, lifted),
              structured: { moved: pending.length, left_lifted: lifted.length,
-                           workout: Presenter.view_workout_detail(workout.refresh) })
+                           workout: Presenter.view_workout_detail(workout.refresh, on: context.today) })
         end
 
         # Naming the movement a session is already on is not a swap. Said plainly rather

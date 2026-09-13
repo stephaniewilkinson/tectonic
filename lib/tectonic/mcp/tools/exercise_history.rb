@@ -60,10 +60,18 @@ class Tectonic < Roda
         # the sets belong to -- still inside the account-scoped dataset, which is what
         # keeps another account's lifting unreachable from here.
         def self.window(context, rows, arguments)
+          from, to = bounds(context, arguments)
           workouts = context.workouts
-          workouts = workouts.where { date >= Resolver.parse_date(arguments[:from]) } if arguments[:from]
-          workouts = workouts.where { date < (Resolver.parse_date(arguments[:to]) + 1) } if arguments[:to]
+          workouts = workouts.where { date >= from } if from
+          workouts = workouts.where { date < (to + 1) } if to
           rows.where(workout_id: workouts.select(:id))
+        end
+
+        # Parsed before the datasets are built, so each bound is read once and so "today"
+        # means the lifter's today rather than the server's (#349).
+        def self.bounds(context, arguments)
+          [arguments[:from] && Resolver.parse_date(arguments[:from], on: context.today),
+           arguments[:to] && Resolver.parse_date(arguments[:to], on: context.today)]
         end
 
         def self.limit_for(arguments)
@@ -115,7 +123,7 @@ class Tectonic < Roda
         # block that finished in March is answered with what was true in March. Without a
         # window it means now, which is what "what can I lift" asks.
         def self.estimated(context, exercise, arguments)
-          exercise.estimated_max(account_id: context.account_id, on: as_of(arguments))
+          exercise.estimated_max(account_id: context.account_id, on: as_of(context, arguments))
         end
 
         # What a percentage lift would generate against: the stated max if there is one and
@@ -124,11 +132,11 @@ class Tectonic < Roda
         # the same movement -- which would make this tool describe a block it is not
         # generating.
         def self.resolved_max(context, exercise, arguments)
-          TrainingMax.for(account_id: context.account_id, exercise:, on: as_of(arguments))
+          TrainingMax.for(account_id: context.account_id, exercise:, on: as_of(context, arguments))
         end
 
-        def self.as_of(arguments)
-          arguments[:to] ? Resolver.parse_date(arguments[:to]) : Date.today
+        def self.as_of(context, arguments)
+          arguments[:to] ? Resolver.parse_date(arguments[:to], on: context.today) : context.today
         end
 
         # `compact` before `max`, which is a second bug found while fixing the first. The

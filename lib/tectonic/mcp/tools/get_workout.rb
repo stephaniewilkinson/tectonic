@@ -30,7 +30,7 @@ class Tectonic < Roda
 
         def self.perform(context:, arguments:)
           workout = find(context, arguments)
-          detail = Presenter.view_workout_detail(workout)
+          detail = Presenter.view_workout_detail(workout, on: context.today)
           ok([headline(detail), *note_line(detail), *detail[:sets].map { |set| line(set) }].join("\n"),
              structured: detail)
         end
@@ -159,7 +159,7 @@ class Tectonic < Roda
         def self.find(context, arguments)
           return by_id(context, arguments[:workout_id]) if arguments[:workout_id]
 
-          date = Resolver.parse_date(arguments[:date])
+          date = Resolver.parse_date(arguments[:date], on: context.today)
           Resolver.find_workout(context, date:) ||
             (raise Tool::Refusal, "No workout on #{date.strftime('%Y-%m-%d')} for this account.")
         end

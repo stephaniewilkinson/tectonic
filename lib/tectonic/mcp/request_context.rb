@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative '../clock'
 require_relative '../workouts'
 require_relative '../exercises'
 require_relative '../sets'
@@ -19,7 +20,7 @@ class Tectonic < Roda
     # this (never a raw model, never an account_id argument), which is the scoping
     # guarantee every future tool inherits for free.
     class RequestContext
-      attr_reader :account_id, :email, :scopes, :application_id
+      attr_reader :account_id, :email, :scopes, :application_id, :time_zone
 
       # Builds a context from a verified access token's JWT claims: `sub` is the
       # account (the resource owner for the authorization-code grant), `client_id`
@@ -31,6 +32,7 @@ class Tectonic < Roda
         account_id = account_id_from(claims, application)
         account = account_id && DB[:accounts].where(id: account_id).first
         new(account_id:, email: account && account[:email],
+            time_zone: account && account[:time_zone],
             scopes: claims['scope'].to_s.split, application_id: application&.id)
       end
 
@@ -41,11 +43,25 @@ class Tectonic < Roda
         sub.match?(/\A\d+\z/) ? sub.to_i : application&.account_id
       end
 
-      def initialize(account_id:, email:, scopes:, application_id:)
+      def initialize(account_id:, email:, scopes:, application_id:, time_zone: nil)
         @account_id = account_id
         @email = email
         @scopes = scopes.map(&:to_s).freeze
         @application_id = application_id
+        @time_zone = time_zone
+      end
+
+      # What day it is where this lifter is. #349.
+      #
+      # Read off the account row from_claims already loads, so it costs no extra query -- and
+      # memoised, so every tool in one request agrees about what "today" means even if the
+      # request straddles midnight.
+      #
+      # This is the second of the three failures #349 names: asked to log "today", an assistant
+      # on the server's clock opened a second empty workout beside the real one, which is the
+      # exact duplicate create_workout's own description promises not to create.
+      def today
+        @today ||= Clock.today(@time_zone)
       end
 
       # The account's workouts, and nothing else's.

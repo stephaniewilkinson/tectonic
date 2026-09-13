@@ -200,7 +200,10 @@ class Tectonic < Roda
         # calling token. Matching casts the timestamp to a date so it is idempotent
         # on the day regardless of the stored time-of-day.
         def workout(context, date:)
-          day = date.is_a?(Date) ? date : parse_date(date)
+          # The lifter's today, not the server's (#349). This is the method create_workout
+          # calls, so a nil date here is the exact case that used to open a second, empty
+          # workout beside the real one every US evening.
+          day = date.is_a?(Date) ? date : parse_date(date, on: context.today)
           context.workouts.where(Sequel.cast(:date, :date) => day).order(:id).first ||
             Workout.create(account_id: context.account_id, date: day,
                            created_by_oauth_application_id: context.application_id, created_at: Time.now)
@@ -210,7 +213,7 @@ class Tectonic < Roda
         # tools: a question about a day that was never trained has to be answerable as
         # "nothing there" rather than by quietly creating an empty session to answer it.
         def find_workout(context, date:)
-          day = date.is_a?(Date) ? date : parse_date(date)
+          day = date.is_a?(Date) ? date : parse_date(date, on: context.today)
           context.workouts.where(Sequel.cast(:date, :date) => day).order(:id).first
         end
 
@@ -224,9 +227,14 @@ class Tectonic < Roda
 
         # 'today' or nil for the current day, an ISO YYYY-MM-DD otherwise; anything
         # else refuses with a message a model can correct from.
-        def parse_date(raw)
+        #
+        # `on` is what "today" means, and callers with a request context pass its own -- the
+        # lifter's day rather than the server's (#349). It defaults to the server's so that the
+        # handful of callers with no account in scope read as they always did, and so that a
+        # caller which forgets is wrong by hours rather than broken.
+        def parse_date(raw, on: Date.today)
           text = raw.to_s.strip
-          return Date.today if text.empty? || text.casecmp('today').zero?
+          return on if text.empty? || text.casecmp('today').zero?
 
           Date.iso8601(text)
         rescue ArgumentError
@@ -353,10 +361,13 @@ class Tectonic < Roda
         # `timing` is #281's half: how long the session ran, what a normal turnaround
         # between sets was, and how many gaps were too long to count as training. Off the
         # rows already fetched, so it costs no query.
-        def view_workout_detail(workout)
+        # `on` is the lifter's today (#349), passed by every caller that has a request context.
+        # It defaults to the server's so a caller without one reads as it always did -- and so
+        # that forgetting is an hour of wrongness rather than a crash.
+        def view_workout_detail(workout, on: Date.today)
           sets = workout.sets_dataset.order(:id).all
           view_workout(workout, sets).merge(
-            status: workout.status.to_s, program_day_id: workout.program_day_id,
+            status: workout.status(on).to_s, program_day_id: workout.program_day_id,
             timing: Timing.session(workout, sets.map(&:values)),
             sets: sets.map { |set| view_set(set) }
           )
