@@ -1769,6 +1769,37 @@ class Tectonic < Roda
     set[:is_completed] ? 'border-lime-300 bg-lime-50' : 'border-gray-200 bg-white'
   end
 
+  # A number as a chart table should print it. #337, and #256 underneath it.
+  #
+  # Tonnage and every weight column are numeric(7,2), so Sequel hands back a BigDecimal and
+  # printing one raw gives 0.125e4 -- the correct rendering of a BigDecimal and no use at all
+  # to a lifter. The charts escaped this because Chartkick serialises to JSON; a table does
+  # not, which is how adding the text alternative surfaced it in two more places.
+  #
+  # Through Plates.numeric, which is what weight_label already uses and which reads the
+  # denominator, so BigDecimal, Float, Integer and Rational all come out the way somebody
+  # would write them. Named for the job rather than reusing weight_label, because half of
+  # what goes through it is a set count.
+  def chart_number(value)
+    value && Plates.numeric(value)
+  end
+
+  # The week columns for the table beside the top-set chart, in the order the chart draws
+  # them. #337.
+  #
+  # Off the weekly rows rather than off the series, for two reasons. The chart plots a line
+  # per lift and each line skips the weeks that lift was not trained, so no single series
+  # carries the full set of columns -- and collecting them from every series gives a set with
+  # no order in it.
+  #
+  # Sorting that set would not fix it either, which is the trap: the labels are "%b %-d", so
+  # "Sep 10" sorts before "Sep 2" and December sorts before February. The rows are already in
+  # week order and Volume.chart keys off the same labels the chart's axis uses, so this is
+  # both chronological and guaranteed to match what is drawn.
+  def chart_weeks(rows)
+    Volume.chart(rows, :sets).keys
+  end
+
   # What changing a movement's per-side answer did to the training already logged. #392.
   #
   # Said out loud rather than done quietly, because it rewrites sets somebody has already

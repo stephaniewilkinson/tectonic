@@ -1,0 +1,47 @@
+<%# The numbers a chart draws, as a table. #337.
+
+    Five charts rendered as a bare <canvas> with no accessible name, no description and no
+    text equivalent. WCAG 1.1.1 asks for one, and a screen reader announced nothing at all --
+    not even that a chart was there. /volume is a page whose whole purpose is four charts, so
+    to a reader it was four summary numbers followed by silence, with no indication that
+    anything was missing.
+
+    **A table rather than an aria-label summarising the trend**, which is what #337 asks for
+    and is the same split this project draws everywhere else: a summary is the app deciding
+    what the chart means, and a table is the reader deciding. "Tonnage is trending up" is a
+    claim; twelve numbers are what the claim was made from.
+
+    In a <details>, closed, so it is one line for everybody and the whole table for anybody
+    who wants it. Not visually hidden: a table of numbers is useful to people who can see the
+    chart too -- reading an exact value off a bar is guesswork -- and something on screen is
+    something that gets noticed when it goes wrong, which a hidden one never is.
+
+    The canvas beside it is aria-hidden. It carries nothing this does not, and a screen
+    reader announcing an unlabelled canvas before reading the table would be announcing
+    furniture. Chartkick renders the canvas itself, so the attribute goes on a wrapper.
+
+    `rows` is [label, value] pairs, which is the shape Volume.chart and Volume.by_exercise
+    already return -- so nothing had to be reshaped to make this possible, and there is no
+    second source of truth to drift. %>
+<details class="mt-2">
+  <summary class="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+    Show as a table
+  </summary>
+  <table class="mt-2 w-full border-collapse text-left text-sm">
+    <caption class="sr-only"><%= caption %></caption>
+    <thead>
+      <tr class="border-b border-gray-300 text-xs uppercase tracking-wide text-gray-500">
+        <th scope="col" class="py-1 pr-3 font-medium"><%= label_heading %></th>
+        <th scope="col" class="py-1 font-medium"><%= value_heading %></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200">
+      <%- rows.each do |label, value| %>
+        <tr>
+          <th scope="row" class="py-1 pr-3 font-normal text-gray-700"><%= label %></th>
+          <td class="py-1 tabular-nums text-gray-900"><%= chart_number(value) %></td>
+        </tr>
+      <%- end %>
+    </tbody>
+  </table>
+</details>
