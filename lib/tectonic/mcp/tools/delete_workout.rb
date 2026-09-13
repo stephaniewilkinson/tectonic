@@ -38,7 +38,7 @@ class Tectonic < Roda
 
         def self.perform(context:, arguments:)
           workout = find(context, arguments[:workout_id])
-          removed = Presenter.view_workout_detail(workout)
+          removed = Presenter.view_workout_detail(workout, on: context.today)
           refuse_lifted(removed, arguments)
           DB.transaction do
             WorkoutSet.where(workout_id: workout.id).delete

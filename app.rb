@@ -375,12 +375,17 @@ class Tectonic < Roda
     r.root do
       r.redirect '/welcome' unless rodauth.logged_in?
       @account_id = rodauth.account_from_session[:id]
-      @month = Calendar.month_of(r.params['month'])
+      # The lifter's today throughout, not the server's (#349). Read once and passed down
+      # rather than asked for four times, so the month, the grid and the tally cannot land on
+      # different sides of midnight -- which is the third failure that issue names: a Monday
+      # evening session marked missed on the calendar while it was being lifted.
+      today = Clock.today_for(@account_id)
+      @month = Calendar.month_of(r.params['month'], today)
       @previous = @month << 1
       @following = @month >> 1
       @week_starts_on = week_starts_on(@account_id)
-      @weeks = Calendar.weeks(@account_id, @month, Date.today, @week_starts_on)
-      @tally = Calendar.tally(@weeks)
+      @weeks = Calendar.weeks(@account_id, @month, today, @week_starts_on)
+      @tally = Calendar.tally(@weeks, today)
       view('home')
     end
 
@@ -464,6 +469,21 @@ class Tectonic < Roda
         r.redirect '/settings'
       end
 
+      # Where this account is, which decides what day it is for them (#349). Refused by name
+      # rather than written and ignored: a zone nothing can resolve would be stored happily
+      # and then read as UTC by every caller, which is the failure this exists to end.
+      #
+      # Blank is a real answer and means UTC -- the behaviour every account had before this
+      # column existed -- so it is written rather than refused.
+      r.post 'zone' do
+        check_csrf!
+        chosen = r.params['time_zone'].to_s.strip
+        if chosen.empty? || Clock.zone?(chosen)
+          DB[:accounts].where(id: @account_id).update(time_zone: chosen.empty? ? nil : chosen)
+        end
+        r.redirect '/settings'
+      end
+
       r.post do
         check_csrf!
         Equipment.replace(@account_id, bar_weight: r.params['bar_weight'],
@@ -474,6 +494,8 @@ class Tectonic < Roda
       r.get do
         @week_starts_on = week_starts_on(@account_id)
         @equipment = Equipment.for_account(@account_id)
+        @time_zone = Clock.zone_of(@account_id)
+        @today = Clock.today(@time_zone)
         view('settings')
       end
     end
@@ -919,8 +941,12 @@ class Tectonic < Roda
         # backwards, so both lists open on the workout nearest today. with_performance
         # answers "has anything been lifted here" for the whole page in the query that
         # fetches it, which is what keeps the split off the sets table.
+        # Read once rather than per workout: this is a query, and asking it inside the
+        # partition would ask it once per row of the list it is partitioning.
+        @today = Clock.today_for(@account_id)
         planned, history = Workout.where(account_id: @account_id).with_performance.with_set_count
-                                  .reverse(:date).all.partition { |workout| workout.status == :planned }
+                                  .reverse(:date).all
+                                  .partition { |workout| workout.status(@today) == :planned }
         @upcoming = planned.reverse
         @workouts = history
         view 'workouts/index'
@@ -972,9 +998,14 @@ class Tectonic < Roda
   # today", but no index covers that expression, so it would sort every workout the
   # account owns; these are both a LIMIT 1 lookup and the second only runs on the days
   # the first finds nothing.
+  # `today` is the lifter's, not the server's (#349). This is the first of the three failures
+  # that issue names and the one it leads with: on the server's clock a lifter in New York at
+  # 8:30pm Monday is already on Tuesday, so this missed Monday's session and dropped them on
+  # the new-workout stub instead of the session they had come back to finish.
   def login_destination(account_id)
     mine = Workout.where(account_id:)
-    today = mine.where(Sequel.cast(:date, :date) => Date.today).order(:id).first
+    on = Clock.today_for(account_id)
+    today = mine.where(Sequel.cast(:date, :date) => on).order(:id).first
     return "/workouts/#{today.id}/session" if today
     return '/workouts/new' unless mine.empty?
 

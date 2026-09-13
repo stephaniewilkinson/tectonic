@@ -9,6 +9,46 @@
 
       No units here. That was the largest part of #189 and it was dropped outright: pounds
       everywhere, no kg, so there is nothing to choose. %>
+  <%# Where you are, which is the whole of what decides what day it is here. #349.
+
+      This app ran on the server's clock, and the server is UTC, so a lifter in New York at
+      half past eight on a Monday evening was on Tuesday as far as it was concerned: signing
+      in missed the session they came back to finish, asking an assistant to log "today"
+      opened a second empty workout beside the real one, and the session they were halfway
+      through was marked missed on the calendar.
+
+      The date under the picker is the point of the whole setting, so it is shown rather than
+      described: it is either today or it is not, and a lifter can tell at a glance which.
+
+      A list rather than a text box, because "EST" and "GMT+5" are what people type and
+      neither resolves -- and it is a curated list rather than all six hundred IANA names,
+      because this is set on a phone. Whatever is already stored stays in the list even when
+      it is not one of the offerings, so a zone set by hand is never quietly replaced by the
+      nearest one on offer. %>
+  <h2 class="mt-8 text-xl font-semibold text-gray-900">Time zone</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    What counts as today, which decides which session you land on when you sign in and which
+    day a workout is logged against. Unset means UTC.
+  </p>
+
+  <form method="post" action="/settings/zone" class="mt-4">
+    <%== csrf_tag('/settings/zone') %>
+    <label for="time_zone" class="block text-sm font-medium text-gray-900">Your time zone</label>
+    <select name="time_zone" id="time_zone"
+            class="<%= field_style %> mt-2 min-h-11 w-full px-2 text-base">
+      <option value="">Unset (UTC)</option>
+      <%- Tectonic::Clock.zone_options(@time_zone).each do |zone| %>
+        <option value="<%= zone %>" <%= 'selected' if zone == @time_zone %>><%= zone %></option>
+      <%- end %>
+    </select>
+    <p class="mt-2 text-sm text-gray-500">
+      Today here is <%= @today.strftime('%A %-d %B %Y') %>.
+    </p>
+    <button type="submit"
+            class="<%= button_style %> mt-4 min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold
+                   text-gray-900 hover:bg-lime-600">Save</button>
+  </form>
+
   <h2 class="mt-8 text-xl font-semibold text-gray-900">Week</h2>
   <p class="mt-2 text-sm text-gray-600">
     Which day the calendar grid begins on. It has always begun on Sunday, and not by

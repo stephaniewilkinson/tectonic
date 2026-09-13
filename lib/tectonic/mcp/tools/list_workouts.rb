@@ -41,14 +41,23 @@ class Tectonic < Roda
           # escaped it. Two queries now, however long the page.
           workouts = matching.with_performance.order(Sequel.desc(:date), Sequel.desc(:id))
                              .limit(limit_for(arguments)).eager(:sets).all
-          ok(summary(workouts, total), structured: payload(workouts, total, arguments))
+          ok(summary(workouts, total, context.today),
+             structured: payload(workouts, total, arguments, context.today))
         end
 
         def self.window(context, arguments)
+          from, to = bounds(context, arguments)
           workouts = context.workouts
-          workouts = workouts.where { date >= Resolver.parse_date(arguments[:from]) } if arguments[:from]
-          workouts = workouts.where { date < (Resolver.parse_date(arguments[:to]) + 1) } if arguments[:to]
+          workouts = workouts.where { date >= from } if from
+          workouts = workouts.where { date < (to + 1) } if to
           workouts
+        end
+
+        # Parsed before the datasets are built, so each bound is read once and so "today"
+        # means the lifter's today rather than the server's (#349).
+        def self.bounds(context, arguments)
+          [arguments[:from] && Resolver.parse_date(arguments[:from], on: context.today),
+           arguments[:to] && Resolver.parse_date(arguments[:to], on: context.today)]
         end
 
         def self.limit_for(arguments)
@@ -68,8 +77,13 @@ class Tectonic < Roda
             long_gaps: measured[:discarded], typical_turnaround_seconds: measured[:typical_turnaround] }
         end
 
-        def self.payload(workouts, total, arguments)
-          rows = workouts.map { |w| Presenter.view_workout(w).merge(status: w.status.to_s, timing: timing_of(w)) }
+        # `on` is the lifter's today (#349), threaded from the request context rather than
+        # asked for here: a status is :planned or :skipped depending on which side of midnight
+        # the reader is on, and on the server's clock a Monday evening session reads as missed.
+        def self.payload(workouts, total, arguments, on)
+          rows = workouts.map do |w|
+            Presenter.view_workout(w).merge(status: w.status(on).to_s, timing: timing_of(w))
+          end
           { workouts: rows,
             shown: workouts.length, total:, withheld: total - workouts.length, limit: limit_for(arguments) }
         end
@@ -81,8 +95,8 @@ class Tectonic < Roda
         # workout; the text was a single sentence carrying a total and nothing else, so a
         # client rendering only the text -- which many are -- got a number where it had been
         # told to expect a list, and no id to follow up with.
-        def self.summary(workouts, total)
-          [count_line(workouts, total), *workouts.map { |workout| row(workout) }].join("\n")
+        def self.summary(workouts, total, on)
+          [count_line(workouts, total), *workouts.map { |workout| row(workout, on) }].join("\n")
         end
 
         def self.count_line(workouts, total)
@@ -95,11 +109,11 @@ class Tectonic < Roda
         # One workout: when, what it is called, how much of it is done, and where it sits
         # in the plan. `label` rather than `name` because a generated session has no name
         # of its own and is known by its program day's focus.
-        def self.row(workout)
+        def self.row(workout, on)
           view = Presenter.view_workout(workout)
           done = "#{view[:completed]} of #{view[:sets]} set(s) done"
           "  [workout #{view[:id]}] #{view[:date]}#{" #{view[:label]}" if view[:label]}: " \
-            "#{done}, #{workout.status}#{', finished' if view[:finished]}#{took(workout)}"
+            "#{done}, #{workout.status(on)}#{', finished' if view[:finished]}#{took(workout)}"
         end
 
         # Silent on a session with no stamps, which is every one trained before #281. A "0m"
