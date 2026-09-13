@@ -1,0 +1,38 @@
+<%# Where this account is, asked of the browser rather than of the lifter. #349.
+
+    `Intl.DateTimeFormat().resolvedOptions().timeZone` returns an IANA name -- "America/New_York"
+    -- which is exactly what accounts.time_zone stores, so there is nothing to map and no list
+    to keep in step. The browser has known this the whole time; the app simply never asked.
+
+    Rendered only when the session carries the flag set at sign-in, which is only set when the
+    account has no zone. So this is one request, once, for an account that has never answered,
+    and nothing at all for everybody else -- no fetch on every page, no query on every request.
+
+    **It fills a blank and never overrules an answer.** The server writes only where the column
+    is still null; a lifter who set their home zone deliberately and is signing in from an
+    airport keeps the one they chose rather than becoming a resident of the airport.
+
+    Nothing on the page changes and nothing waits for it. The answer is a 204, the fetch is not
+    awaited, and a failure is swallowed: this is an improvement to a default, and an account
+    with no zone is on UTC either way -- which is what every account was before #349. A browser
+    with no Intl, or one that answers with something unresolvable, simply stays there.
+
+    keepalive, so that signing in and immediately navigating does not cancel the request. It is
+    a few dozen bytes and it is the one chance to ask.
+
+    The CSRF token is for this path specifically, the same as every other form in this app: the
+    route_csrf plugin scopes a token to the route it was minted for, so one lifted from here
+    cannot be replayed against anything else. %>
+<script>
+  (function () {
+    try {
+      var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (!zone) { return; }
+      var body = new FormData();
+      body.append('time_zone', zone);
+      body.append('_csrf', '<%= csrf_token('/settings/zone/detected') %>');
+      fetch('/settings/zone/detected', { method: 'POST', body: body, keepalive: true })
+        .catch(function () { /* UTC is the answer either way */ });
+    } catch (error) { /* no Intl: nothing to send */ }
+  })();
+</script>

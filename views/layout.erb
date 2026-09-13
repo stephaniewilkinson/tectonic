@@ -116,5 +116,13 @@
         <%== yield %>
       </div>
     </main>
+    <%# Asked once, after a sign-in by an account that has never said where it is (#349). The
+        flag is set in after_login and cleared by the endpoint, so this is absent from every
+        page of every session that has already answered -- which is all of them after the
+        first. Last in the body because it changes nothing on the page and should not be in
+        the way of anything that does. %>
+    <%- if session['zone.detect'] %>
+      <%== render('_detect_zone') %>
+    <%- end %>
   </body>
 </html>
