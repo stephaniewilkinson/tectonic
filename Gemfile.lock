@@ -252,6 +252,7 @@ DEPENDENCIES
   sequel
   sequel_pg
   tilt
+  tzinfo
 
 RUBY VERSION
   ruby 4.0.6
