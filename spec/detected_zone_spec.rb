@@ -200,11 +200,15 @@ describe 'what a real browser knows about itself' do
   include BrowserSpec
   include Capybara::DSL
 
-  it 'answers with an IANA name' do
+  # Asserted by resolving it rather than by matching a shape. The first version of this
+  # required a Region/City pair and failed on CI, whose browser answers "UTC" -- which is a
+  # perfectly good IANA identifier with no slash in it, and one this app offers in its own
+  # list. The shape was my assumption; being resolvable is the actual requirement.
+  it 'answers with a name this app can resolve' do
     visit '/welcome'
     answered = page.evaluate_script('Intl.DateTimeFormat().resolvedOptions().timeZone')
 
-    assert_match(%r{\A[A-Za-z_]+/[A-Za-z_/+-]+\z}, answered)
+    refute_nil answered
     assert Tectonic::Clock.zone?(answered), "the app refuses what the browser says: #{answered}"
   end
 end
