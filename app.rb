@@ -227,6 +227,7 @@ class Tectonic < Roda
       'an account with this email address already exists. Log in instead, or use another address'
     after_login do
       remember_login
+      scope.ask_the_browser_for_the_zone(account_id)
     end
     # Signing in lands on whatever there is to do rather than on the calendar; where that
     # is is decided in login_destination below.
@@ -241,7 +242,22 @@ class Tectonic < Roda
     # login and prefers it, so someone who followed a link to a workout, or to the OAuth
     # consent screen, still arrives where they were going.
     login_redirect { scope.login_destination(account_id) }
-    create_account_redirect { scope.login_destination(account_id) }
+    # The same question asked of a brand new account, which has no zone by definition -- and
+    # asked here rather than in after_create_account, which is where it obviously belongs and
+    # does not work.
+    #
+    # Creating an account does not go through `login`, so after_login never fires for it:
+    # create_account calls `autologin_session`, which calls `login_session`, which clears the
+    # session against fixation and then sets it again. Anything after_create_account put in
+    # the session is wiped by that, silently, a few lines later. This block is the first thing
+    # that runs with the new session in place.
+    #
+    # Found by a browser that detected its zone correctly, posted nothing, and left no trace
+    # of why -- which is the only way this kind of ordering shows itself.
+    create_account_redirect do
+      scope.ask_the_browser_for_the_zone(account_id)
+      scope.login_destination(account_id)
+    end
 
     # A background request cannot be answered with a redirect to the login page: the
     # browser follows it inside the fetch, so what htmx receives is the sign-in markup
@@ -481,7 +497,35 @@ class Tectonic < Roda
         if chosen.empty? || Clock.zone?(chosen)
           DB[:accounts].where(id: @account_id).update(time_zone: chosen.empty? ? nil : chosen)
         end
+        session.delete('zone.detect')
         r.redirect '/settings'
+      end
+
+      # What the browser says the zone is. #349.
+      #
+      # Posted once after a sign-in by the script in the layout, and answered with 204: nothing
+      # on the page changes, and a redirect would be a navigation nobody asked for in the
+      # middle of reading a session.
+      #
+      # **It fills a blank and never overrules an answer.** The write is conditional on the
+      # column still being null, in the query rather than in a read-then-write, so two tabs
+      # racing cannot have the second overwrite a zone the first just set. Somebody who chose
+      # their home zone deliberately and is signing in from an airport keeps the one they chose.
+      #
+      # Validated like any other input, because it is one: this arrives from a browser and a
+      # name nothing can resolve would be stored and then read as UTC by every caller, which is
+      # the failure the whole of #349 exists to end.
+      #
+      # The flag is cleared whatever happens, including on a name that is refused. A browser
+      # that cannot answer this will not answer it better on the next page load, and a detector
+      # that reposts on every page for the rest of the session is worse than not detecting.
+      r.post 'zone/detected' do
+        check_csrf!
+        detected = r.params['time_zone'].to_s.strip
+        DB[:accounts].where(id: @account_id, time_zone: nil).update(time_zone: detected) if Clock.zone?(detected)
+        session.delete('zone.detect')
+        response.status = 204
+        ''
       end
 
       r.post do
@@ -998,6 +1042,24 @@ class Tectonic < Roda
   # today", but no index covers that expression, so it would sort every workout the
   # account owns; these are both a LIMIT 1 lookup and the second only runs on the days
   # the first finds nothing.
+  # Whether to ask the browser where this account is, decided once at sign-in. #349.
+  #
+  # The browser knows the answer exactly -- `Intl.DateTimeFormat().resolvedOptions().timeZone`
+  # returns an IANA name, which is precisely what the column stores -- and the lifter does not
+  # have to be asked a question they did not come here to answer. A settings page that opens on
+  # a dropdown of forty zones is a worse first impression than one that is already right.
+  #
+  # A session flag rather than a check on every request: the layout renders the detector when
+  # this is set, and the endpoint clears it. That is one query per sign-in instead of one per
+  # page, and it fires exactly once.
+  #
+  # Only when nothing is set. Detection fills a blank; it never overrules an answer somebody
+  # gave, because the case for that is somebody who set their home zone deliberately and is now
+  # signing in from an airport.
+  def ask_the_browser_for_the_zone(account_id)
+    session['zone.detect'] = true unless Clock.zone_of(account_id)
+  end
+
   # `today` is the lifter's, not the server's (#349). This is the first of the three failures
   # that issue names and the one it leads with: on the server's clock a lifter in New York at
   # 8:30pm Monday is already on Tuesday, so this missed Monday's session and dropped them on
