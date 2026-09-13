@@ -1,0 +1,51 @@
+<%# The same thing for the one chart with a line per lift. #337.
+
+    "Top set each week" plots a series per movement, so a two-column table cannot hold it: the
+    question it answers is how several lifts moved against each other over the same weeks, and
+    flattening that to label/value would lose the comparison the chart exists to make.
+
+    A column per week and a row per lift, which is the orientation that reads aloud correctly:
+    a screen reader walks a row and says "Back Squat, 145, 150, 155", which is the sentence
+    somebody wants. The other way round it would say "week of 1 September, 155, 95, 60" and
+    the lifts would have to be held in your head.
+
+    Scrollable, because a twelve-week window is twelve columns and a phone is not that wide.
+
+    The line chart skips the weeks a lift was not trained -- a week off squats is no tonnage
+    but it is not a top set of zero -- so a cell with nothing in it is that same absence, and
+    it says so rather than printing a dash a reader would have to interpret. %>
+<details class="mt-2">
+  <summary class="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+    Show as a table
+  </summary>
+  <div class="mt-2 overflow-x-auto">
+    <table class="w-full border-collapse text-left text-sm">
+      <caption class="sr-only"><%= caption %></caption>
+      <thead>
+        <tr class="border-b border-gray-300 text-xs uppercase tracking-wide text-gray-500">
+          <th scope="col" class="py-1 pr-3 font-medium">Lift</th>
+          <%- weeks.each do |week| %>
+            <th scope="col" class="py-1 pr-3 font-medium"><%= week %></th>
+          <%- end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <%- series.each do |name, by_week| %>
+          <tr>
+            <th scope="row" class="whitespace-nowrap py-1 pr-3 font-normal text-gray-700"><%= name %></th>
+            <%- weeks.each do |week| %>
+              <%# Through weight_label, which is #256's answer and applies here for the same
+                  reason: the weight columns are numeric(7,2), so Sequel hands back a
+                  BigDecimal and printing it raw gives 0.155e3 -- the correct rendering of a
+                  BigDecimal and no use at all to a lifter. The chart escaped this because
+                  Chartkick serialises to JSON; a table does not. %>
+              <td class="py-1 pr-3 tabular-nums text-gray-900">
+                <%= chart_number(by_week[week]) || 'not trained' %>
+              </td>
+            <%- end %>
+          </tr>
+        <%- end %>
+      </tbody>
+    </table>
+  </div>
+</details>

@@ -73,12 +73,20 @@
     <div class="mt-8">
       <h2 class="text-sm font-semibold text-gray-900">Weekly tonnage</h2>
       <p class="mt-1 text-xs text-gray-500">Weight times reps, summed. A week with no training is a real zero, so it is drawn as one.</p>
-      <%== column_chart(Tectonic::Volume.chart(@rows, :tonnage), ytitle: 'Tonnage') %>
+      <%# aria-hidden because the table below carries every number in it, and an unlabelled
+          canvas announced before the table is furniture read aloud (#337). %>
+      <div aria-hidden="true"><%== column_chart(Tectonic::Volume.chart(@rows, :tonnage), ytitle: 'Tonnage') %></div>
+      <%== render('_chart_table', locals: { caption: 'Weekly tonnage', label_heading: 'Week',
+                                            value_heading: 'Tonnage',
+                                            rows: Tectonic::Volume.chart(@rows, :tonnage) }) %>
     </div>
 
     <div class="mt-8">
       <h2 class="text-sm font-semibold text-gray-900">Weekly working sets</h2>
-      <%== column_chart(Tectonic::Volume.chart(@rows, :sets), ytitle: 'Sets') %>
+      <div aria-hidden="true"><%== column_chart(Tectonic::Volume.chart(@rows, :sets), ytitle: 'Sets') %></div>
+      <%== render('_chart_table', locals: { caption: 'Weekly working sets', label_heading: 'Week',
+                                            value_heading: 'Sets',
+                                            rows: Tectonic::Volume.chart(@rows, :sets) }) %>
     </div>
 
     <%- if @top_sets.any? %>
@@ -93,9 +101,14 @@
         <%# The one chart on the site with a line per lift, and so the one that asks for
             the full palette: the site default is a single colour, which would leave
             every lift after the first in Chart.js's own grey. %>
-        <%== line_chart(@top_sets.map { |name, weeks| { name:, data: weeks } },
-                        ytitle: 'Weight', curve: false, min: nil, discrete: true,
-                        colors: Tectonic::CHART_COLORS) %>
+        <div aria-hidden="true">
+          <%== line_chart(@top_sets.map { |name, weeks| { name:, data: weeks } },
+                          ytitle: 'Weight', curve: false, min: nil, discrete: true,
+                          colors: Tectonic::CHART_COLORS) %>
+        </div>
+        <%== render('_chart_series_table', locals: { caption: 'Top set each week, by lift',
+                                                     series: @top_sets,
+                                                     weeks: chart_weeks(@rows) }) %>
         <%- if @withheld.positive? %>
           <p class="mt-1 text-xs text-gray-500">
             Showing the <%= @top_sets.length %> most-trained lifts; <%= @withheld %>
@@ -109,7 +122,9 @@
       <div class="mt-8">
         <h2 class="text-sm font-semibold text-gray-900">Working sets per lift</h2>
         <p class="mt-1 text-xs text-gray-500">Where the work went over the last <%= @weeks %> weeks.</p>
-        <%== bar_chart(@by_exercise, ytitle: 'Sets') %>
+        <div aria-hidden="true"><%== bar_chart(@by_exercise, ytitle: 'Sets') %></div>
+        <%== render('_chart_table', locals: { caption: 'Working sets per lift', label_heading: 'Lift',
+                                              value_heading: 'Sets', rows: @by_exercise }) %>
       </div>
     <%- end %>
   <%- end %>
