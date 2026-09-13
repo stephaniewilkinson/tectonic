@@ -56,9 +56,17 @@ describe 'editing a lift whose session is already generated' do
   end
 end
 
-# Once a lifter has answered a prescription, those rows are what happened rather than a
-# plan to be revised. Rewriting them would delete training.
-describe 'editing a lift whose session has been lifted' do
+# Once a lifter has answered a prescription, that row is what happened rather than a plan to
+# be revised. Rewriting it would delete training.
+#
+# **The protected unit is the set, not the day it sits in.** #407. This used to stop the
+# moment one set in the session was ticked off, and the two assertions below used to pin that
+# -- the session unchanged at [145, 150, 155], and "left alone". Both were describing the bug:
+# on 2026-09-14 the squats were done and the hip thrusts were not, so a hip thrust removed
+# from the programme stayed in the session as four untouched planned sets, read as current
+# programming, and had to be found by hand. It compounds across a block, because every
+# partially-trained session keeps whatever the programme used to say for the rest of it.
+describe 'editing a lift whose session has been part lifted' do
   include Rack::Test::Methods
   include SessionRefreshing
 
@@ -69,7 +77,48 @@ describe 'editing a lift whose session has been lifted' do
     Tectonic::WorkoutSet.where(workout_id: workout.id).exclude(is_warmup: true).first.update(is_completed: true)
   end
 
-  it 'leaves the session alone' do
+  it 'leaves the lifted set exactly as it was and rewrites the rest' do
+    call_tool('update_program_lift', raw: @token.raw,
+                                     arguments: { program_lift_id: @lift.id, top_weight: 225 })
+
+    assert_equal [145, 220, 225], working_weights(@day)
+  end
+
+  # The set already done covers the row the plan would have written in its place, so the
+  # session still holds three working sets rather than four.
+  it 'writes the rest of the plan rather than a second copy of it' do
+    call_tool('update_program_lift', raw: @token.raw,
+                                     arguments: { program_lift_id: @lift.id, top_weight: 225 })
+
+    assert_equal 3, working_weights(@day).length
+  end
+
+  # A model that is not told how much was rewritten and how much was kept cannot tell the
+  # lifter what their session now is.
+  it 'says what it rewrote and what it kept' do
+    call_tool('update_program_lift', raw: @token.raw,
+                                     arguments: { program_lift_id: @lift.id, top_weight: 225 })
+    said = tool_result['content'].first['text']
+
+    assert_equal 225, @lift.refresh.top_weight
+    assert_includes said, '1 left because it was completed'
+  end
+end
+
+# The one case where "left alone" is still the whole answer: nothing in the session is
+# unfinished, so there is nothing to rewrite around.
+describe 'editing a lift whose session is entirely lifted' do
+  include Rack::Test::Methods
+  include SessionRefreshing
+
+  before do
+    @token = mint(scopes: %w[read write])
+    _program, @day, @lift = a_block(@token.account_id)
+    workout = Tectonic::Workout.where(program_day_id: @day.id).first
+    Tectonic::WorkoutSet.where(workout_id: workout.id).update(is_completed: true)
+  end
+
+  it 'leaves every set as it was' do
     call_tool('update_program_lift', raw: @token.raw,
                                      arguments: { program_lift_id: @lift.id, top_weight: 225 })
 
@@ -82,6 +131,29 @@ describe 'editing a lift whose session has been lifted' do
 
     assert_equal 225, @lift.refresh.top_weight
     assert_includes tool_result['content'].first['text'], 'left alone'
+  end
+end
+
+# The case the issue was filed from: a movement taken out of the programme, in a session
+# where something else had already been lifted.
+describe 'removing a lift from a session that has other work in it' do
+  include Rack::Test::Methods
+  include SessionRefreshing
+
+  it 'takes the removed movement out rather than leaving it as current programming' do
+    token = mint(scopes: %w[read write])
+    _program, day, lift = a_block(token.account_id)
+    workout = Tectonic::Workout.where(program_day_id: day.id).first
+    other = Tectonic::Exercise.create(account_id: token.account_id, name: "Hip Thrust #{SecureRandom.hex(4)}")
+    # A lifted set of a different movement, which is what used to skip the whole day.
+    Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id: other.id, weight: 95, reps: 8,
+                                is_warmup: false, is_completed: true, completed_at: Time.now,
+                                is_barbell: true)
+    call_tool('delete_program_lift', raw: token.raw, arguments: { program_lift_id: lift.id })
+    left = Tectonic::WorkoutSet.where(workout_id: workout.id).all
+
+    assert_equal 1, left.length, 'only the lifted set should remain'
+    assert_equal other.id, left.first.exercise_id
   end
 end
 

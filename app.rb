@@ -1234,8 +1234,12 @@ class Tectonic < Roda
     into = visible_exercise(request.params['exercise_id'])
     return if from.empty? || into.nil? || from == into.id.to_s
 
+    # Through WorkoutSet.moved_to, so this and the two MCP paths cannot come to different
+    # conclusions about what moving a set means (#406). The new movement's barbell flag comes
+    # with it; the old movement's prescription does not, because a planned weight belonging to
+    # a lift this row is no longer is worse than no prescription at all.
     WorkoutSet.where(workout_id: @workout.id, exercise_id: from, is_completed: false)
-              .update(exercise_id: into.id, is_barbell: into.barbell?)
+              .update(**WorkoutSet.moved_to(into))
   end
 
   def load_session(workout_id)

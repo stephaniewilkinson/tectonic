@@ -60,25 +60,56 @@ class Tectonic < Roda
       end
     end
 
-    # Writes this day's session again from the plan as it now stands, so an edit to a
-    # prescription reaches the session that prescription already produced. Answers what it
-    # did: :rewritten, :lifted for a session with work in it, or :none where the day has
-    # not been generated at all.
+    # What a refresh did, in enough detail to say so. The outcome is what it always was, and
+    # the two counts are what #407 asks for: "3 sets updated, 2 left because they were
+    # completed" rather than a bare statement that something was skipped.
     #
-    # A session with any completed set is left alone, and that is the whole rule. Once a
-    # lifter has answered a prescription the row is a record of what happened, not a plan
-    # to be revised, and rewriting it would delete training. An untrained session is only
-    # ever a copy of the plan, so replacing it wholesale is the same operation as having
-    # generated it a moment later.
+    # `to_s` is the outcome, because the structured half of every tool response already
+    # carried the old symbol under that name.
+    Refresh = Struct.new(:outcome, :written, :kept) do
+      def to_s = outcome.to_s
+    end
+
+    # Writes this day's session again from the plan as it now stands, so an edit to a
+    # prescription reaches the session that prescription already produced.
+    #
+    # **The completed sets are what is protected, not the day they sit in.** #407. This used
+    # to return :lifted and stop the moment one set in the session was ticked off, which is
+    # right about the completed rows and wrong about everything around them: on 2026-09-14
+    # the squats were done and the hip thrusts were not, so a hip thrust removed from the
+    # programme stayed in the session as four untouched planned sets. It read as current
+    # programming and had to be found by hand.
+    #
+    # It compounds, which is the real cost: every partially-trained session silently keeps
+    # whatever the programme used to say, for the rest of the block, and nothing surfaces the
+    # divergence.
+    #
+    # So the unit is the set. Completed rows are never touched -- once a lifter has answered a
+    # prescription the row is a record of what happened rather than a plan to be revised --
+    # and everything else is deleted and written again from the plan.
+    #
+    # The subtlety is not writing a second copy of work already done. A session with two of
+    # three squat sets completed needs one more squat set, not three, so the plan is generated
+    # against a tally of what is already standing and each completed set covers the first
+    # matching row the plan would have written. See Standing.
     def refresh(day)
       workout = existing_workout(day)
-      return :none unless workout
-      return :lifted if lifted?(workout)
+      return Refresh.new(:none, 0, 0) unless workout
 
-      DB.transaction do
-        WorkoutSet.where(workout_id: workout.id).delete
-        rewrite(day, workout)
+      kept = WorkoutSet.where(workout_id: workout.id, is_completed: true).count
+      written = DB.transaction do
+        WorkoutSet.where(workout_id: workout.id, is_completed: false).delete
+        rewrite(day, workout, Standing.for(workout))
       end
+      Refresh.new(outcome_of(written, kept), written, kept)
+    end
+
+    # Nothing written and something kept is a session that was entirely lifted, which is the
+    # one case where the old answer is still the whole answer.
+    def outcome_of(written, kept)
+      return :lifted if written.zero? && kept.positive?
+      return :partly if kept.positive?
+
       :rewritten
     end
 
@@ -91,16 +122,53 @@ class Tectonic < Roda
     # just written one: adding a lift asks the day for its lifts to work out the next
     # position, which caches the association as it was a moment before the new row
     # existed, and the session would then be rewritten without it.
-    def rewrite(day, workout)
+    def rewrite(day, workout, standing = Standing.none)
       week = day.program_week
       workout.update(date: week.date_for(day.weekday))
-      ProgramLift.where(program_day_id: day.id).order(:position).each do |lift|
-        insert_sets(workout, week, lift)
+      # `.all.sum` and not `.sum`: on a dataset that second one is Sequel's SQL aggregate and
+      # builds a SUM() over the table rather than adding up what the block returns.
+      ProgramLift.where(program_day_id: day.id).order(:position).all.sum do |lift|
+        insert_sets(workout, week, lift, standing)
       end
     end
 
-    def lifted?(workout)
-      WorkoutSet.where(workout_id: workout.id, is_completed: true).limit(1).any?
+    # What is already lifted in a session, so a regeneration writes the rest of the plan
+    # rather than a second copy of it. #407.
+    #
+    # Counted per movement and per warmup-or-working, because those are the two things that
+    # decide whether a row the plan is about to write is the same row as one already done.
+    # Nothing finer: matching on weight or reps would mean a set lifted differently from the
+    # prescription -- which is most of them -- failed to match and got written again.
+    #
+    # Each completed set covers exactly one row and is then spent, so three completed squat
+    # sets against a plan that now asks for five leave two to write.
+    #
+    # A completed set of a movement the plan no longer contains covers nothing, and nothing
+    # is written for it. It simply stays, which is the whole of what makes this safe: the
+    # training is still there, and the four planned sets beside it are not.
+    class Standing
+      def self.for(workout)
+        counts = WorkoutSet.where(workout_id: workout.id, is_completed: true)
+                           .select_hash_groups(%i[exercise_id is_warmup], :id)
+                           .transform_values(&:length)
+        new(counts)
+      end
+
+      def self.none = new({})
+
+      def initialize(counts)
+        @counts = counts
+      end
+
+      # Whether the plan's next row of this kind is already accounted for by work that
+      # happened. Spends the tally as it goes, so this is asked once per row.
+      def covers?(lift, is_warmup)
+        key = [lift.exercise_id, is_warmup]
+        return false unless @counts.fetch(key, 0).positive?
+
+        @counts[key] -= 1
+        true
+      end
     end
 
     def generate_day(week, day, date)
@@ -124,16 +192,17 @@ class Tectonic < Roda
       Workout.where(account_id: @program.account_id, program_day_id: day.id).first
     end
 
-    def insert_sets(workout, week, lift)
-      return write_flat(workout, lift, nil) unless lift.is_weighted
-      return write_flat(workout, lift, top_weight(week, lift)) if lift.timed?
+    # Answers how many rows it actually wrote, because a refresh has to be able to say so
+    # (#407) and because a row covered by work already done is not written at all.
+    def insert_sets(workout, week, lift, standing = Standing.none)
+      return write_flat(workout, lift, nil, standing) unless lift.is_weighted
+      return write_flat(workout, lift, top_weight(week, lift), standing) if lift.timed?
 
       top = top_weight(week, lift)
-      Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
-                       loading: loading(lift)).each do |set|
-        insert_set(workout, lift, set, is_warmup: true)
-      end
-      working_sets(lift, top).each { |set| insert_set(workout, lift, set, is_warmup: false) }
+      ramp = Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
+                              loading: loading(lift))
+      ramp.sum { |set| insert_set(workout, lift, set, is_warmup: true, standing:) } +
+        working_sets(lift, top).sum { |set| insert_set(workout, lift, set, is_warmup: false, standing:) }
     end
 
     # Every set at the same load, with no ramp before them. Two kinds of work want this.
@@ -142,9 +211,9 @@ class Tectonic < Roda
     # null adds nothing to a sum where a zero only fails to add anything by accident of
     # arithmetic. Timed work is measured in seconds, and a ladder of durations is not a
     # warmup: nobody ramps up to a plank.
-    def write_flat(workout, lift, weight)
+    def write_flat(workout, lift, weight, standing = Standing.none)
       Array.new(lift.sets) { { weight:, **quantity(lift) } }
-           .each { |set| insert_set(workout, lift, set, is_warmup: false) }
+           .sum { |set| insert_set(workout, lift, set, is_warmup: false, standing:) }
     end
 
     # What this lift counts, as the two columns a set stores it in. The measure names
@@ -369,11 +438,22 @@ class Tectonic < Roda
     # Weight and reps start out equal to the planned values. Lifting the set as
     # written only flips is_completed; lifting it differently changes weight or
     # reps and leaves the planned columns behind as the record of the prescription.
-    def insert_set(workout, lift, set, is_warmup:)
-      WorkoutSet.insert(
-        workout_id: workout.id, exercise_id: lift.exercise_id,
+    def insert_set(workout, lift, set, is_warmup:, standing: Standing.none)
+      # A row the plan would write that work already done stands in for. Not written, and
+      # counted as nothing written -- the set it would have been is on the table already,
+      # with what actually happened in it rather than what was asked for.
+      return 0 if standing.covers?(lift, is_warmup)
+
+      WorkoutSet.insert(**planned_row(workout, lift, set, is_warmup:))
+      1
+    end
+
+    # The row as the generator writes it.
+    def planned_row(workout, lift, set, is_warmup:)
+      { workout_id: workout.id, exercise_id: lift.exercise_id,
         weight: set[:weight], reps: set[:reps], duration_seconds: set[:duration_seconds],
-        planned_weight: set[:weight], planned_reps: set[:reps], planned_rpe: target_rpe(lift, is_warmup:),
+        planned_weight: set[:weight], planned_reps: set[:reps],
+        planned_rpe: target_rpe(lift, is_warmup:),
         planned_rest_seconds: rest_seconds(lift, is_warmup:),
         # A set is done the way the lift that wrote it is done, so the two never disagree
         # about whether it was counted per side or held for time. Stored form rather than
@@ -381,8 +461,7 @@ class Tectonic < Roda
         # symbol here as the name of a column.
         measure: Measured.stored(lift.measure), is_per_side: lift.is_per_side,
         is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
-        created_by_oauth_application_id: @created_by
-      )
+        created_by_oauth_application_id: @created_by }
     end
 
     # The effort this lift asks for, copied onto the working sets and onto nothing else.

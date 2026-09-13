@@ -13,10 +13,11 @@ class Tectonic < Roda
       # apply a change was to know generation had already happened and then fix every set
       # by hand -- and nothing anywhere said that it had.
       #
-      # A session with any completed set is left alone. Once a lifter has answered a
-      # prescription those rows are a record of what happened rather than a plan to be
-      # revised. That refusal is reported rather than raised: the edit to the plan is
-      # still correct and still wanted, and it is only the session that could not follow.
+      # A completed set is left alone. Once a lifter has answered a prescription that row is a
+      # record of what happened rather than a plan to be revised, and the sets around it are
+      # rewritten regardless -- the protected unit is the set, not the day it sits in (#407).
+      # What could not follow is reported rather than raised: the edit to the plan is still
+      # correct and still wanted, and it is only part of the session that stood still.
       module SessionRefresh
         module_function
 
@@ -27,10 +28,19 @@ class Tectonic < Roda
         # What happened to the session, as a sentence to append to whatever the tool was
         # already saying. Silence where there was no session to touch, because a block
         # edited before anyone generated it is the ordinary case and needs no remark.
-        def sentence(outcome, day)
-          case outcome
-          when :rewritten then " The planned session on #{Date::DAYNAMES[day.weekday]} was rewritten to match."
-          when :lifted then " The #{Date::DAYNAMES[day.weekday]} session has lifted sets in it, so it was left alone."
+        # The counts are the point of the :partly case (#407). "The session was left alone"
+        # was the whole answer when one lifted set stopped the day, and it is no longer true:
+        # a session can now be half rewritten, and a model that is not told how much was
+        # rewritten and how much was kept cannot tell the lifter what their session is.
+        def sentence(refresh, day)
+          named = Date::DAYNAMES[day.weekday]
+          case refresh.outcome
+          when :rewritten then " The planned session on #{named} was rewritten to match."
+          when :partly
+            " The #{named} session was rewritten around what had already been lifted: " \
+            "#{refresh.written} #{refresh.written == 1 ? 'set' : 'sets'} updated, " \
+            "#{refresh.kept} left because #{refresh.kept == 1 ? 'it was' : 'they were'} completed."
+          when :lifted then " The #{named} session has lifted sets in it, so it was left alone."
           else ''
           end
         end
