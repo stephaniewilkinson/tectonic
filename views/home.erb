@@ -36,18 +36,48 @@
     </p>
   <%- end %>
 
-  <div class="mt-4 grid grid-cols-7 gap-px rounded-t-lg bg-gray-200 text-center text-xs font-semibold leading-6 text-gray-500">
-    <%- Tectonic::Calendar.day_names(@week_starts_on).each do |name| %>
-      <div class="bg-gray-50 py-2"><%= name %></div>
-    <%- end %>
-  </div>
+  <%# A real table, not two grids of divs. #339.
 
-  <div class="grid grid-cols-7 gap-px rounded-b-lg bg-gray-200 text-sm">
-    <%- @weeks.each do |week| %>
-      <%- week.each do |cell| %>
+      It was a grid of seven day names and, separately, a grid of thirty-odd cells, with
+      nothing connecting a cell to the column above it. A screen reader read "Mon Tue Wed Thu
+      Fri Sat Sun" and then a flat run of dates: no information was lost -- each cell carries
+      its own date and the entries inside carry sr-only text -- but there was no way to
+      navigate it as a calendar. Answering "what am I doing on Thursday" meant listening to
+      the whole month and counting, where a sighted reader glances at a column.
+
+      <th scope="col"> is the whole fix. It gives a screen reader real table navigation, so a
+      cell is announced with the day it sits under, and it costs nothing visually: a table
+      carries the same grid with border-separate and a one-pixel spacing, which is what the
+      gap-px on a grey background was doing before.
+
+      #339 offers role="grid" with role="columnheader" as the alternative, keeping the divs.
+      The table is simpler and less to get wrong -- the roles have to be applied to every
+      level and a row missing one is a grid a reader cannot move around at all.
+
+      The rounding is on the wrapper rather than the table, because border-separate does not
+      clip its cells to the table's own corners. %>
+  <div class="mt-4 overflow-hidden rounded-lg">
+    <table class="w-full table-fixed border-separate border-spacing-px bg-gray-200 text-sm">
+      <caption class="sr-only">Training calendar for <%= @month.strftime('%B %Y') %></caption>
+      <thead>
+        <tr>
+          <%- Tectonic::Calendar.day_columns(@week_starts_on).each do |short, full| %>
+            <th scope="col" class="bg-gray-50 py-2 text-center text-xs font-semibold leading-6 text-gray-500">
+              <span aria-hidden="true"><%= short %></span>
+              <span class="sr-only"><%= full %></span>
+            </th>
+          <%- end %>
+        </tr>
+      </thead>
+      <tbody>
+        <%- @weeks.each do |week| %>
+          <tr>
+          <%- week.each do |cell| %>
         <%# A day outside the month is still drawn, so a week that straddles a boundary
             reads as a week; it is just dimmed, because the month is what is being read. %>
-        <div class="min-h-20 p-1 <%= cell[:in_month] ? 'bg-white' : 'bg-gray-50 text-gray-500' %>">
+        <%# h-20 and align-top rather than min-h-20: a table cell's height is decided by its
+            row, so a minimum on the cell is not what holds an empty week open. %>
+        <td class="h-20 p-1 align-top <%= cell[:in_month] ? 'bg-white' : 'bg-gray-50 text-gray-500' %>">
           <div class="text-right">
             <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs
                          <%= 'bg-lime-500 font-semibold text-gray-900' if cell[:today] %>">
@@ -81,9 +111,12 @@
               <span class="hidden truncate sm:inline" aria-hidden="true"><%= entry[:label] || entry[:word] %></span>
             </a>
           <%- end %>
-        </div>
-      <%- end %>
-    <%- end %>
+        </td>
+          <%- end %>
+          </tr>
+        <%- end %>
+      </tbody>
+    </table>
   </div>
 
   <%# On a phone this is now the key to the grid rather than a footnote to it, so each
