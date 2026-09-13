@@ -159,3 +159,72 @@ jobs:
 
       - name: erb_lint
         run: bundle exec erb_lint views/*/* views/*
+
+  # Does the app boot with only the gems Render actually installs?
+  #
+  # Render runs `bundle install` without the development and test groups, so a gem that is
+  # required directly but only *resolved* through one of those groups is present in every
+  # local run and every other job here, and absent in production alone. The deploy then
+  # builds, migrates, and dies on `cannot load such file`.
+  #
+  # That has now happened twice -- `logger`, and `tzinfo` for #349 -- and neither the suite
+  # nor the linters could see it, because all three install every group. This installs what
+  # production installs and boots what production boots.
+  #
+  # It needs a database because app.rb connects at require time, and the two secrets because
+  # SESSION_SECRET and OAUTH_JWT_PRIVATE_KEY are read at boot and one of them refuses to be
+  # absent. They are generated here rather than stored: nothing signs anything that outlives
+  # the job.
+  production-boot:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: tectonic
+          POSTGRES_PASSWORD: tectonic
+          POSTGRES_DB: tectonic_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: .ruby-version
+
+      - name: Install only what production installs
+        run: |
+          bundle config set --local without 'development test'
+          bundle install --jobs 4
+
+      # The schema has to exist before the boot, because app.rb connects and reflects its
+      # tables at require time -- an empty database fails on `relation "oauth_applications"
+      # does not exist` before any of this job's actual question is reached.
+      #
+      # It is also the order Render runs things in: preDeployCommand migrates, then the new
+      # version boots. So this runs the pre-deploy command under the production bundle too,
+      # which is worth having on its own -- that is the one command in this system that can
+      # leave the database in a state the code does not expect.
+      - name: Migrate, the way the pre-deploy command does
+        env:
+          RACK_ENV: production
+          DATABASE_URL: postgres://tectonic:tectonic@localhost:5432/tectonic_test
+        run: bundle exec rake db:migrate
+
+      - name: Boot it
+        env:
+          RACK_ENV: production
+          DATABASE_URL: postgres://tectonic:tectonic@localhost:5432/tectonic_test
+        run: |
+          export SESSION_SECRET=$(ruby -rsecurerandom -e 'print SecureRandom.hex(64)')
+          export OAUTH_JWT_PRIVATE_KEY="$(openssl genrsa 2048 2>/dev/null)"
+          bundle exec ruby -e "require 'rack'; Rack::Builder.parse_file('config.ru'); puts 'booted'"

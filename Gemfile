@@ -44,6 +44,16 @@ gem 'sentry-ruby'
 gem 'sequel'
 gem 'sequel_pg'
 gem 'tilt'
+# lib/tectonic/clock.rb requires tzinfo to turn an IANA zone name into the lifter's own
+# today (#349). It was resolving locally and in CI as a transitive dependency of erb_lint,
+# which is in the development group -- and Render does not install that group, so the
+# deploy built fine, migrated fine, and then failed to boot on `cannot load such file --
+# tzinfo`.
+#
+# The same mistake as `logger` above, and the second time it has been made: a gem that is
+# required directly has to be declared directly, whatever happens to be pulling it in
+# today. CI cannot catch this on its own because it installs every group.
+gem 'tzinfo'
 
 group :development do
   gem 'better_html'
