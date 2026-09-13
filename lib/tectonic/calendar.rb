@@ -24,6 +24,11 @@ class Tectonic < Roda
     # Date#wday order and rotated on the way out, because wday is what every date arithmetic
     # here counts in and rewriting the list would mean rewriting that too.
     DAY_NAMES = %w[Sun Mon Tue Wed Thu Fri Sat].freeze
+    # The same days spelled out, for the column headers a screen reader reads. #339 is about
+    # being able to answer "what am I doing on Thursday" without counting, and "Thu" announced
+    # on its own is a step short of that -- some readers spell it, some say "thoo". The
+    # abbreviation stays on screen, where a seventh of a phone is not wide enough for more.
+    FULL_DAY_NAMES = %w[Sunday Monday Tuesday Wednesday Thursday Friday Saturday].freeze
     # The days a grid may begin on, as Date#wday numbers: Sunday and Monday. Named here
     # because the route and the database constraint have to agree about it, and two places
     # holding the same pair of numbers is one place too many.
@@ -63,6 +68,14 @@ class Tectonic < Roda
     # The column headings, beginning on the account's chosen day.
     def day_names(starts_on = 0)
       DAY_NAMES.rotate(starts_on)
+    end
+
+    # The columns as [what is drawn, what is read]. One method rather than two rotated
+    # separately, because the two lists have to stay in step and rotating them apart is the
+    # one way this goes wrong -- a header reading "Thu" and announcing "Friday" is worse than
+    # one that only says "Thu".
+    def day_columns(starts_on = 0)
+      day_names(starts_on).zip(FULL_DAY_NAMES.rotate(starts_on))
     end
 
     def weeks(account_id, month, today = Date.today, starts_on = 0)
