@@ -9,6 +9,8 @@ require_relative '../../workouts'
 require_relative '../../sets'
 require_relative '../../measured'
 require_relative '../../timing'
+require_relative '../../session_diagnosis'
+require_relative '../../turnarounds'
 
 class Tectonic < Roda
   module MCP
@@ -416,11 +418,35 @@ class Tectonic < Roda
         # that forgetting is an hour of wrongness rather than a crash.
         def view_workout_detail(workout, on: Date.today)
           sets = workout.sets_dataset.order(:id).all
+          timing = Timing.session(workout, sets.map(&:values))
           view_workout(workout, sets).merge(
             status: workout.status(on).to_s, program_day_id: workout.program_day_id,
-            timing: Timing.session(workout, sets.map(&:values)),
+            timing:, diagnosis: diagnosis(workout, sets, timing),
             sets: sets.map { |set| view_set(set) }
           )
+        end
+
+        # Why the session ran the way it did. #409, and the same three facts the record page
+        # prints below the fold: how many rests ran over their prescription, the longest single
+        # gap, and how much was left unfinished.
+        #
+        # Here as well as on the screen because this is the surface that most needs it. A
+        # session an assistant reads back is a list of sets and a length, and "62m" over 15 of
+        # 30 sets has three explanations that look identical -- which is the whole of #409. The
+        # structured half carries the numbers and the sentence carries the reading of them, so
+        # a client rendering only one of the two still gets the answer.
+        #
+        # Nil on a session with no stamps to measure between, which is every session logged
+        # before #281 and every one not yet trained.
+        def diagnosis(workout, sets, timing)
+          return nil unless timing[:overall]
+
+          found = SessionDiagnosis.of(sets.map(&:values),
+                                      turnaround: Turnarounds.lookup(workout.account_id),
+                                      active_seconds: timing[:active])
+          { rests_over_prescription: found.over_rest, rests_compared: found.compared,
+            longest_gap_seconds: found.longest_gap, unfinished_sets: found.unfinished,
+            prescribed_seconds: found.prescribed_seconds, summary: SessionDiagnosis.sentence(found) }
         end
 
         # Who and when, both nil for a human-made row so a client can tell the two apart.
