@@ -117,8 +117,8 @@ describe 'the nav a signed-in account reads' do
     assert_includes classes_of(nav_tag), 'bg-lime-500'
   end
 
-  it 'clears AA on all eight links, at rest and hovered' do
-    assert_equal 8, nav_links.length
+  it 'clears AA on all seven links, at rest and hovered' do
+    assert_equal 7, nav_links.length
     nav_links.each { |link| assert_legible link }
   end
 

@@ -56,8 +56,8 @@ describe 'the nav a signed-in account sees' do
     get '/workouts'
   end
 
-  it 'names the brand face on every one of the eight links' do
-    assert_brand_on_every_link 8
+  it 'names the brand face on every one of the seven links' do
+    assert_brand_on_every_link 7
   end
 
   # The face is named on the link now, so the size utilities no longer carry it and are

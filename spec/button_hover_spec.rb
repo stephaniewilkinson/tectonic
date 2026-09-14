@@ -101,7 +101,7 @@ describe 'the buttons on the pages an account sees' do
   # the only two things to do there, they are the brand pair side by side, and both of
   # them turned grey.
   it 'steps every one of them down its own scale' do
-    ['/', '/start', '/logout', '/settings', '/programs',
+    ['/', '/start', '/logout', '/settings',
      '/workouts', '/workouts/new', "/workouts/#{@workout}",
      "/workouts/#{@workout}/sets", "/workouts/#{@workout}/sets/new",
      "/workouts/#{@workout}/sets/#{@set}/edit",
