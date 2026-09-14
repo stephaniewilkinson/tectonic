@@ -58,14 +58,17 @@ class Tectonic < Roda
                     'is_weighted false for work carrying no external load; measure is ' \
                     'reps or time, and a timed lift gives duration_seconds. start_date ' \
                     'defaults to the Monday of the current week; weeks are numbered by ' \
-                    'their position unless numbered explicitly.'
+                    'their position unless numbered explicitly. time_budget_minutes says ' \
+                    'how long a session of this block is meant to take; set it and ' \
+                    'generate_program_week says so when a day runs past it.'
         scope :write
         input_schema(
           type: 'object',
           properties: {
             name: { type: 'string' }, block: { type: 'integer' }, start_date: { type: 'string' },
             notes: { type: 'string' }, preferred_reps: { type: 'integer' },
-            is_ascending: { type: 'boolean' }, weeks: { type: 'array', items: WEEK }
+            is_ascending: { type: 'boolean' }, time_budget_minutes: { type: 'integer' },
+            weeks: { type: 'array', items: WEEK }
           },
           required: %w[name weeks], additionalProperties: false
         )
@@ -81,13 +84,31 @@ class Tectonic < Roda
         def self.write(context, arguments)
           refuse_duplicate(context, arguments)
           DB.transaction do
-            program = Program.create(account_id: context.account_id, name: arguments[:name].to_s.strip,
-                                     block: arguments[:block], notes: arguments[:notes],
-                                     start_date: start_date(arguments), preferred_reps: arguments[:preferred_reps],
-                                     is_ascending: arguments.fetch(:is_ascending, true))
+            program = Program.create(**settings(context, arguments))
             arguments[:weeks].each_with_index { |week, index| ProgramWriter.week(context, program, week, index + 1) }
             program
           end
+        end
+
+        # The block's own columns, as against the weeks under it. Split out when the time
+        # budget made one more of them (#408) -- a literal naming every setting inside the
+        # transaction that also writes the weeks is a method doing two jobs, and rubocop
+        # counted it before a reader would have.
+        def self.settings(context, arguments)
+          { account_id: context.account_id, name: arguments[:name].to_s.strip,
+            block: arguments[:block], notes: arguments[:notes],
+            start_date: start_date(arguments), preferred_reps: arguments[:preferred_reps],
+            time_budget_minutes: budget(arguments),
+            is_ascending: arguments.fetch(:is_ascending, true) }
+        end
+
+        # Range-checked here rather than left to programs_time_budget_in_range, so a block
+        # written with a nonsense budget is refused by name instead of failing as a database
+        # error halfway through writing its weeks. #408.
+        def self.budget(arguments)
+          Bounds.check(Bounds::BUDGET_MINUTES, arguments[:time_budget_minutes], 'time_budget_minutes',
+                       unit: ' minutes')
+          arguments[:time_budget_minutes]
         end
 
         # A block is identified by its name and number, which is how a lifter refers to

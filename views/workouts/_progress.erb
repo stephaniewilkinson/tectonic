@@ -90,5 +90,23 @@
         <span aria-hidden="true">so far</span>
       <%- end %>
     <%- end %>
+    <%# What is still to come, beside how long you have been here (#408). The two together
+        answer "am I going to make it", which is the question a lifter with a lunch hour is
+        actually asking and which neither number answers alone.
+
+        A third fact on a line whose own comment argues that two is the limit, and it earns
+        the place: it is four characters wide, it is the only number on this screen that
+        looks forwards, and the alternative -- a second line -- pushes the first Done button
+        further down every phone.
+
+        "about" is not hedging. Roughly a fifth of this is a working-time constant nobody
+        measured, and on a movement with no history the rest is a constant too; the word is
+        what stops a number that is honest about being an estimate from reading as a
+        promise. Announced rather than aria-hidden, unlike the clock beside it: this one
+        does not tick, so a screen reader says it once. %>
+    <%- if remaining_estimate %>
+      <span aria-hidden="true">&middot;</span>
+      about <%= Timing.phrase(remaining_estimate.seconds) %> left
+    <%- end %>
   </p>
 </div>

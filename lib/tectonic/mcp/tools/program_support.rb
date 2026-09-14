@@ -90,7 +90,11 @@ class Tectonic < Roda
           { id: block.id, name: block.name, block: block.block,
             start_date: block.start_date.strftime('%Y-%m-%d'), weeks: block.weeks,
             current_week: block.week_on&.number, preferred_reps: block.preferred_reps,
-            is_ascending: block.is_ascending }
+            is_ascending: block.is_ascending,
+            # How long a session of this block is meant to take, or null where the block was
+            # not written against a clock -- which is most of them, and which is why nothing
+            # here defaults it. #408.
+            time_budget_minutes: block.time_budget_minutes }
         end
 
         # The whole block, which is what an assistant asked to review or revise a plan
