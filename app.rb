@@ -1956,6 +1956,21 @@ class Tectonic < Roda
     @sets.count { |set| set[:is_completed] && !set[:is_warmup] }
   end
 
+  # Sets on this movement that were logged and never ticked off.
+  #
+  # The state nothing in the app used to have a word for, and the one the "nothing has been
+  # lifted here" complaint was actually about: thirteen squat sets from 2023 to 2025, every one
+  # of them `is_completed = false`, listed on the page in a table while the paragraph above
+  # them said nothing had been logged.
+  #
+  # They are not a mistake in the data so much as a mistake in what the page then says about
+  # it. A set written and not ticked is, by this app's model, training that was planned and not
+  # performed -- which is a real distinction and the right one. What is wrong is answering it
+  # with "nothing has been logged".
+  def unfinished_sets
+    @sets.count { |set| !set[:is_completed] }
+  end
+
   # A number as a chart table should print it. #337, and #256 underneath it.
   #
   # Tonnage and every weight column are numeric(7,2), so Sequel hands back a BigDecimal and

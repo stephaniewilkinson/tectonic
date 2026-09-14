@@ -125,6 +125,32 @@
       single to guess from. So a lift written as a percentage of this movement cannot be
       generated yet. Set a max below &mdash; that is the fix for a movement you train in eights
       &mdash; or log a heavier set of five or fewer.
+    <%- elsif unfinished_sets.positive? %>
+      <%# The state the original report was actually about, and the one the first two attempts
+          at this sentence both missed.
+
+          Exercise 1 carries thirteen squat sets logged between 2023 and 2025, none of them
+          ticked off. They are drawn in the table further down this very page, and the
+          paragraph above them said "nothing has been lifted here" -- then, after the first
+          fix, "nothing has been logged here yet", which is the same untruth in new words.
+
+          The app is not wrong to ignore them. A set written and never marked done is, by this
+          app's model, training that was planned rather than performed, and an estimate must
+          not come from a set nobody has said happened. What it is wrong about is describing
+          that as an absence, when the sets are on the screen.
+
+          So this names the number, names the reason, and gives the action that actually
+          works -- ticking a set off, which is a thing the set editor does. %>
+      <%= unfinished_sets %> <%= unfinished_sets == 1 ? 'set is' : 'sets are' %> logged here,
+      <%# Both halves say "not", which the first draft of the singular did not: it read "it has
+          been marked as done", the exact opposite of the state it describes, while the plural
+          beside it was right. A spec caught it. Negation carried by a word that only appears in
+          one branch of a ternary is worth writing out on both sides. %>
+      but <%= unfinished_sets == 1 ? 'it has not' : 'none of them has' %> been marked as done. The
+      app reads an unticked set as training that was written down rather than performed, so
+      nothing here can be estimated from yet.
+      Mark <%= unfinished_sets == 1 ? 'it' : 'them' %> done from the set page, or set a max
+      below.
     <%- else %>
       Nothing has been logged here yet, so a lift written as a percentage of this movement
       cannot be generated yet. Set a max below, or log a completed set.
