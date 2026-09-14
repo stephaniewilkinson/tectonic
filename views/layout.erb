@@ -56,6 +56,12 @@
         The name being close to unsearchable is a larger problem than a meta tag and #342 flags
         a rename as a real option nobody has costed. This does not fix that.
 
+        "Free while it is in beta" is #430, and it is here for a search reason rather than a
+        marketing one: "free" is a word people put in the query box, and a description that
+        omits it loses the comparison before anybody clicks. The clause is the same one the
+        front page carries, because two surfaces making different promises about price is the
+        one kind of drift this particular sentence must not have.
+
         A page may override both; every page that does not gets these. The default is a
         statement about the app rather than about whichever page is being rendered, which is
         what makes it the right fallback for forty pages behind a login that no crawler will
@@ -64,7 +70,7 @@
     <%- @page_description ||= 'A barbell strength tracker with an MCP connector. Ask Claude or ' \
                               'ChatGPT to write a whole training block - weeks, days, ' \
                               'progressions, warmup ramps, plate maths for your own rack - ' \
-                              'then log every set against it.' %>
+                              'then log every set against it. Free while it is in beta.' %>
     <!-- HTML Meta Tags -->
     <title><%= @page_title %></title>
     <meta name="description" content="<%= @page_description %>">
