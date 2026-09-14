@@ -20,6 +20,7 @@ require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/timing'
 require_relative 'lib/tectonic/session_length'
 require_relative 'lib/tectonic/session_diagnosis'
+require_relative 'lib/tectonic/session_close'
 require_relative 'lib/tectonic/turnarounds'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/clock'
@@ -404,6 +405,9 @@ class Tectonic < Roda
       # otherwise never pass the hook above again -- and this is the page somebody lands on to
       # ask what they are doing this week.
       ProgramSchedule.ensure_ahead(@account_id, today)
+      # And here for the same reason, which is sharper for this one: a session left open two
+      # weeks ago is a cell on this very grid, and it would be drawn as 24h of training.
+      SessionClose.sweep(@account_id)
       @month = Calendar.month_of(r.params['month'], today)
       @previous = @month << 1
       @following = @month >> 1
@@ -895,9 +899,19 @@ class Tectonic < Roda
           # Sets left undone stay undone. That is the whole point: deciding to stop with
           # three of ten done is a thing that happens, and the record should say so rather
           # than ask whether you are sure.
+          # `at=last` is the nudge answering rather than the control at the top of the screen
+          # being tapped, and the difference is the whole of #410's first half. A prompt seen
+          # an hour later must not add that hour to how long the session took -- which is the
+          # 24h 46m reading this issue exists to fix, so producing a new version of it would
+          # be a poor joke. The bare post keeps stamping now, because tapping finish is a
+          # lifter standing in the gym saying they are done.
+          #
+          # It falls back to now where there is nothing lifted to stamp instead: a session
+          # somebody opened, did nothing in, and closed is finished at the moment they closed
+          # it, which is the only honest answer available.
           r.post 'finish' do
             check_csrf!
-            Workout.where(id: workout_id).update(finished_at: Time.now)
+            Workout.where(id: workout_id).update(finished_at: finish_stamp(workout_id, r.params['at']))
             r.redirect "/workouts/#{workout_id}"
           end
           # Swapping the movement a whole lift is on, in one tap. #365.
@@ -1076,6 +1090,11 @@ class Tectonic < Roda
     # "there is no session for today" is a thing to find out never rather than on a Monday
     # morning. Idempotent and cheap once a week has been written, and it cannot raise.
     ProgramSchedule.ensure_ahead(account_id, on)
+    # And nothing closes a session (#410). Beside the line above because it is the same kind of
+    # housekeeping and runs in the same two places: a session left open from an afternoon
+    # nobody came back to gets the ending it should have had, stamped at its own last set
+    # rather than at this moment. Like the line above, it cannot raise into the request.
+    SessionClose.sweep(account_id)
     mine = Workout.where(account_id:)
     today = mine.where(Sequel.cast(:date, :date) => on).order(:id).first
     return "/workouts/#{today.id}/session" if today
@@ -1171,6 +1190,11 @@ class Tectonic < Roda
       # swapped region so a countdown survives the next poll, and this is how the server
       # tells it a set was finished and what this lifter usually takes after one.
       rest_cue(tapped) +
+      # And when the session last did anything, which is what decides whether to ask if it is
+      # over (#410). Unlike the rest cue this is about the session rather than the tap, so it
+      # is sent on every tap including an un-complete -- taking a mis-tap back is still the
+      # session moving, and the quiet has to restart from it.
+      quiet_cue(oob: true) +
       # Re-armed with what this tap just made true. Without it the poller would still be
       # asking about the digest the page loaded with, find it changed -- by the lifter, a
       # second ago -- and swap every panel back over the top of their own tap. #249.
@@ -1232,6 +1256,40 @@ class Tectonic < Roda
 
     @session_diagnosis ||= SessionDiagnosis.of(@sets.map(&:values), turnaround: method(:usual_turnaround),
                                                                     active_seconds: @timing[:active])
+  end
+
+  # When this session last did anything, and how long to leave it before asking whether it is
+  # over. #410. Both computed server-side off the rows already in hand, so the browser is
+  # told a fact rather than asked to work one out.
+  def quiet_cue(oob: false)
+    rows = @sets.map(&:values)
+    render('workouts/_quiet_cue',
+           locals: { oob:, last_at: SessionClose.ends_at(rows)&.to_f, quiet_after: SessionClose.quiet_after(rows) })
+  end
+
+  # Where the nudge sits: above the rest timer, because the two are true at once. A rest that
+  # ran to twenty minutes is exactly when this fires, and covering the countdown at that moment
+  # would hide the one thing on screen explaining why it is asking.
+  def nudge_offset
+    return 'bottom-[calc(2.75rem+3.5rem+env(safe-area-inset-bottom))]' if @sets.any?(&:ratable?)
+
+    'bottom-[calc(3.5rem+env(safe-area-inset-bottom))]'
+  end
+
+  # When a session ended, according to who is saying so. #410.
+  #
+  # The nudge answers with the last set that was ticked off, because the lifter is answering a
+  # question about a silence rather than reporting where they are standing. The control at the
+  # top of the screen answers with now, because tapping it is a statement made in the gym.
+  #
+  # Now is also the fallback for a session with nothing lifted in it: opened, nothing done,
+  # closed. There is no last set to reach for and the moment of closing is the only honest
+  # answer left.
+  def finish_stamp(workout_id, asked)
+    return Time.now unless asked == 'last'
+
+    rows = WorkoutSet.where(workout_id:).select(:is_completed, :completed_at).all.map(&:values)
+    SessionClose.ends_at(rows) || Time.now
   end
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named

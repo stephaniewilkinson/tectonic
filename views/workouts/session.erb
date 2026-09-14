@@ -81,6 +81,18 @@
 <%== render('workouts/_rest_cue', locals: { seconds: nil, kind: nil, movement: nil, at: nil, set_id: nil }) %>
 <%== render('workouts/_rest_timer') %>
 
+<%# And the question about whether the session is over at all. #410.
+
+    Out here with the timer, for the identical reason: how long the screen has been quiet is
+    state, and #session-body is replaced on every tap and every poll.
+
+    Its cue is rendered *filled in* on first paint, which is where it differs from the rest
+    cue above. A session opened an hour after its last set should not greet you with a rest
+    timer -- but it absolutely should be asked whether it is finished, because that is exactly
+    the session #410 is about. %>
+<%== quiet_cue %>
+<%== render('workouts/_session_nudge') %>
+
 <%# One thing left in here, and it is not the one that used to be.
     A tap used to replace the whole of #session-body, which destroyed the scroller along
     with everything in it and took its scrollLeft with it -- so finishing a set on lift

@@ -1,0 +1,136 @@
+<%# "Still going, or done?" #410.
+
+    Sessions stayed open until somebody said otherwise, and workout 28 shows what that costs:
+    **24h 46m**, because the first set was marked late one evening and the rest the next
+    morning. Several sessions sit at `performed` with a handful of sets done and no ending at
+    all, so nothing can tell "stopped here" from "still going".
+
+    The finish control has existed since #218 and `finished_at` is already the honest end of a
+    session. What was missing is anything that reaches for it on the lifter's behalf.
+
+    **A question rather than an action**, which is what lets it fire on a guess. Twenty minutes
+    of quiet is a lifter who has gone home, or one who is talking to somebody by the water
+    fountain, and the app cannot tell those apart -- so it asks, and being wrong costs one tap.
+    The automatic close, which is a write rather than a question, waits six hours.
+
+    **"That's it" stamps the last completed set, not now.** #410 is explicit and it is the
+    whole point: a prompt seen an hour later must not add that hour to how long the session
+    took, which is the reading this issue exists to fix. The finish *button* at the top of the
+    screen keeps stamping the current time and is right to -- tapping it is a lifter standing
+    in the gym saying they are done, and the ten minutes spent putting plates away is time the
+    session cost. Answering this is not that.
+
+    Above the rest timer rather than replacing it, because the two can be true at once: a rest
+    that ran to twenty minutes is exactly when this fires, and taking the countdown away at
+    that moment would remove the one thing on screen that explains why it is asking.
+
+    Hidden in markup rather than by a class, so the degradation is honest: with JavaScript off
+    nothing here ever appears. That is right -- the question is only ever raised by a clock,
+    and a scriptless page has none. Such a page loses nothing else: the finish control still
+    works, and the automatic close is server-side and reaches it anyway. %>
+<div id="session-nudge" hidden
+     class="fixed inset-x-0 <%= nudge_offset %> z-40 border-t border-gray-300 bg-amber-50">
+  <div class="mx-auto flex max-w-md items-center gap-3 px-4 py-3">
+    <%# The number is the whole of the case for asking. "Still training?" on its own is a
+        question out of nowhere; "nothing for 24 minutes" is the reason, and a lifter who has
+        been chatting recognises it immediately. Announced rather than hidden: unlike the rest
+        clock beside it this does not tick, so a screen reader says it once. %>
+    <p class="min-w-0 flex-1 text-sm text-gray-900">
+      Nothing logged for <span data-quiet-for class="font-semibold tabular-nums"></span>.
+      Still training?
+    </p>
+    <%# Still going is a plain button and closes the bar. It re-arms: another quiet period
+        later it asks again, because a lifter who says they are still here at twenty minutes
+        may well have left at fifty, and asking once and then never again would make the
+        first answer stand for the rest of the day. %>
+    <button type="button" data-nudge-dismiss
+            class="<%= button_style %> min-h-11 shrink-0 border border-gray-300 bg-white px-3
+                   text-sm font-medium text-gray-700 hover:bg-gray-50">
+      Still going
+    </button>
+    <%# A real form, so this works the moment it is rendered and does not depend on the script
+        for anything but being shown. `at=last` is what separates it from the finish control at
+        the top of the screen: same route, different statement about when the session ended. %>
+    <form action="/workouts/<%= @workout[:id] %>/session/finish" method="post" class="shrink-0">
+      <%== csrf_tag("/workouts/#{@workout[:id]}/session/finish") %>
+      <input type="hidden" name="at" value="last">
+      <button type="submit"
+              class="<%= button_style %> min-h-11 bg-gray-900 px-3 text-sm font-medium text-white hover:bg-gray-800">
+        That&rsquo;s it
+      </button>
+    </form>
+  </div>
+</div>
+
+<%# The clock that decides when to ask.
+
+    It counts from the cue's stamp against Date.now(), the same way the rest timer does and
+    for the same reason: a tab the phone throttled in a pocket comes back with the right
+    number rather than however many ticks it was allowed to run, and nothing here ever asks
+    the browser what time it is on the server, so a phone with a wrong clock is still right.
+
+    Ticking every five seconds rather than every 250ms, unlike the timer beside it. Nothing is
+    waiting on a particular second here -- the difference between asking at 20:00 and 20:04 is
+    nothing to anybody -- and this runs for the whole of a session rather than for the length
+    of one rest.
+
+    **Dismissing pushes the question forward rather than ending it.** `askedAt` is set to now,
+    and the next question comes a full quiet period after that. A lifter who says they are
+    still here at twenty minutes may have left at fifty.
+
+    Re-reading the cue on every swap is what keeps it honest: a Done tap replaces the cue with
+    a new stamp, the quiet restarts from there, and any dismissal is forgotten because the
+    session plainly moved. %>
+<script>
+  (function () {
+    var bar = document.getElementById('session-nudge');
+    if (!bar) { return; }
+
+    var quietFor = bar.querySelector('[data-quiet-for]');
+    var lastAt = 0, quietAfter = 0, askedAt = 0;
+
+    function spell(seconds) {
+      var minutes = Math.floor(seconds / 60);
+      return minutes < 60 ? minutes + 'm' : Math.floor(minutes / 60) + 'h ' + (minutes % 60) + 'm';
+    }
+
+    // Read off the cue rather than remembered, so a tap that moved the session moves this too.
+    // A cue with no stamp is a session with nothing lifted, which has no quiet to measure.
+    function readCue() {
+      var cue = document.getElementById('quiet-cue');
+      if (!cue) { return; }
+      var at = parseFloat(cue.getAttribute('data-last-at'));
+      var after = parseInt(cue.getAttribute('data-quiet-after'), 10);
+      if (isNaN(at) || isNaN(after)) { lastAt = 0; return; }
+      // A stamp this has not seen means the session moved, so the quiet restarts and any
+      // earlier "still going" is spent -- it was an answer about a different silence.
+      if (at !== lastAt) { askedAt = 0; bar.hidden = true; }
+      lastAt = at * 1000;
+      quietAfter = after;
+    }
+
+    function tick() {
+      if (!lastAt) { return; }
+      var since = (Date.now() - Math.max(lastAt, askedAt)) / 1000;
+      if (since < quietAfter) { return; }
+      quietFor.textContent = spell((Date.now() - lastAt) / 1000);
+      bar.hidden = false;
+    }
+
+    bar.addEventListener('click', function (event) {
+      if (!event.target.closest('[data-nudge-dismiss]')) { return; }
+      askedAt = Date.now();
+      bar.hidden = true;
+    });
+
+    // Re-read and re-decide together. A swap that moved the session should put the question
+    // away at once rather than up to five seconds later, and a swap that did not should be
+    // able to raise it at once too -- waiting for the next interval would make the bar appear
+    // a beat after whatever the lifter just did, which reads as a reaction to the tap.
+    function refresh() { readCue(); tick(); }
+
+    document.body.addEventListener('htmx:afterSwap', refresh);
+    setInterval(tick, 5000);
+    refresh();
+  })();
+</script>
