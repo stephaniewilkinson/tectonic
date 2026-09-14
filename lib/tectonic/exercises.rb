@@ -102,6 +102,48 @@ class Tectonic < Roda
       OneRepMax.best_reading(lifted_sets(account_id, on))
     end
 
+    # What recent training implies, as against what has ever been demonstrated. #307, and
+    # the windowed companion #293 named and deliberately left unbuilt.
+    #
+    # `estimated_reading` above answers "the most that has been demonstrated", which is the
+    # right meaning for a max and is also the one that goes quietly stale: there is no lower
+    # bound on it, so a number earned on a single three years ago outranks everything since
+    # and nothing about the number says so. #293 answered half of that by carrying the date.
+    # This answers the other half, by saying what the last twelve, twenty-six and fifty-two
+    # weeks each support on their own.
+    #
+    # **It does not replace the lifetime best and must not.** Nothing here decays, expires or
+    # discounts anything -- a window is a second reading beside the first, and the gap between
+    # them is information rather than a correction. A lifetime best of 315 from 2023 next to a
+    # twelve-week best of 290 is a lifter who has not been near their best recently; the same
+    # 315 next to a twelve-week 315 is a lifter who is there now. Collapsing the two would
+    # throw away exactly the distinction the reader is reaching for. Which of them to open a
+    # block at is a judgement, and this app does not make judgements -- it reports both and
+    # leaves the arguing to somebody who can be argued with.
+    #
+    # **One query, not one per window.** The widest window is read once and the narrower ones
+    # are taken from those rows in memory. Three queries for three answers about the same
+    # movement would be three round trips on a read that already makes several, and they
+    # could disagree at a date boundary if a set landed between them.
+    #
+    # `sets` rides along with each reading because a number off one set and a number off forty
+    # are not the same claim, and the caller cannot tell them apart from the pounds alone.
+    def recent_readings(account_id:, windows:, on: Date.today)
+      rows = lifted_sets(account_id, on, since: on - (windows.max * 7))
+      windows.map { |weeks| window_reading(rows, weeks, on) }
+    end
+
+    # One window's worth of those rows. Nil pounds rather than an absent entry where the
+    # window holds nothing readable, so a caller gets the same three windows every time and
+    # "nothing in the last twelve weeks" is itself an answer -- which on a movement somebody
+    # has stopped training is the most useful thing this can say.
+    def window_reading(rows, weeks, on)
+      since = on - (weeks * 7)
+      inside = rows.select { |row| row[:date].to_date >= since }
+      { weeks:, sets: inside.length, pounds: nil, on: nil }
+        .merge(OneRepMax.best_reading(inside) || {})
+    end
+
     # An account's own completed sets of this movement, up to and including a date. Scoped
     # through the workouts rather than the sets alone, because a library movement is
     # shared and the work done on it is not: another account's lifting must never reach
@@ -110,9 +152,13 @@ class Tectonic < Roda
     # lifter did not rate it, and it was sitting on the row unread since #265. The session's
     # date joins it with #293, which is what lets a reader say when a max was earned -- from
     # a join rather than a second query, so the number and its date cannot disagree.
-    def lifted_sets(account_id, on)
-      mine = Workout.where(account_id:).where { date < (on + 1) }.select(:id)
-      WorkoutSet.where(exercise_id: id, workout_id: mine, is_completed: true)
+    # `since` is the lower bound #307 needed and this never had: every caller before it
+    # wanted everything up to a date, which is what a lifetime best means. Absent, it still
+    # does, so the three existing callers are untouched.
+    def lifted_sets(account_id, on, since: nil)
+      mine = Workout.where(account_id:).where { date < (on + 1) }
+      mine = mine.where { date >= since } if since
+      WorkoutSet.where(exercise_id: id, workout_id: mine.select(:id), is_completed: true)
                 .join(:workouts, id: :workout_id).select(*READ_COLUMNS).all
     end
 

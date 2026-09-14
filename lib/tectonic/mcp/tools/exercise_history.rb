@@ -6,6 +6,10 @@ require_relative 'support'
 require_relative '../../one_rep_max'
 require_relative '../../training_max'
 require_relative '../../timing'
+# Volume::WINDOWS, so the windows an assistant is given here are the same three the volume
+# page draws. Two lists of weeks in one app, free to drift, would make "the last 12 weeks"
+# mean one thing on a chart and another in a conversation about the same movement.
+require_relative '../../volume'
 
 class Tectonic < Roda
   module MCP
@@ -27,7 +31,12 @@ class Tectonic < Roda
                     'is what training history means; pass include_planned for written but ' \
                     'unlifted sets too. Also reports how long this lifter typically takes ' \
                     'between sets of this movement, measured from their own sessions, which ' \
-                    'is what to price a prescribed day with.'
+                    'is what to price a prescribed day with. ' \
+                    'estimated_1rm is the most that has ever been demonstrated, so it can be ' \
+                    'years old; `recent` reports what the last 12, 26 and 52 weeks each imply ' \
+                    'on their own, with the date and the number of sets behind each. Use the ' \
+                    'gap between them to judge what a next block should open at -- the app ' \
+                    'reports both and proposes neither.'
         scope :read
         input_schema(
           type: 'object',
@@ -39,7 +48,9 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           exercise = find(context, arguments[:exercise])
           rows = history(context, exercise, arguments).all
-          ok(summary(exercise, rows, context, arguments), structured: payload(context, exercise, rows, arguments))
+          recent = recent_readings(context, exercise, arguments)
+          ok(summary(exercise, rows, context, arguments, recent),
+             structured: payload(context, exercise, rows, arguments).merge(recent:))
         end
 
         # The movement by name among the ones this account can see, without creating it:
@@ -103,6 +114,56 @@ class Tectonic < Roda
             .merge(max_fields(context, exercise, arguments))
         end
 
+        # What the last twelve, twenty-six and fifty-two weeks each imply, beside the lifetime
+        # best above. #307.
+        #
+        # `estimated_1rm` means the most that has ever been demonstrated, which is the right
+        # meaning for a max (#293) and is also the one that goes stale without saying so: a
+        # single from three years ago outranks everything since. #293 answered half of that by
+        # carrying the date. This is the other half -- the same arithmetic over a window, so a
+        # reader can see that the lifetime best is 315 from 2023 while the last twelve weeks
+        # support 290.
+        #
+        # **Reported, not resolved.** Nothing here decays or discounts the lifetime figure, and
+        # this tool does not propose a number to open a block at. That is the judgement #307
+        # asks for and it belongs to whoever is reading this, over honest numbers with their
+        # dates and their sample sizes attached -- which is the same line #263 drew and the
+        # reason this is four extra fields rather than a new tool that coaches.
+        #
+        # Windowed off the same `as_of` the estimate uses, so asking about a block that
+        # finished in March is answered with the twelve weeks before March rather than the
+        # twelve before today. Independent of `from`/`to`/`limit`, which narrow the *sets that
+        # are listed*: a caller asking for one session's worth of rows still gets the full
+        # windows, because the windows are context for those rows rather than a summary of
+        # them.
+        # Read once in `perform` and handed to both the payload and the sentence, so the two
+        # cannot describe the same movement differently and the extra query is one rather than
+        # two.
+        def self.recent_readings(context, exercise, arguments)
+          exercise.recent_readings(account_id: context.account_id, windows: Volume::WINDOWS,
+                                   on: as_of(context, arguments))
+                  .map { |reading| readable(reading) }
+        end
+
+        # One window on its way out of the door. Both conversions are the kind of bug that only
+        # shows up in the payload half, which is the half nobody reads by eye.
+        #
+        # `pounds` through Presenter.weight is #256, walked into again: weight is numeric(7,2),
+        # Sequel hands back a BigDecimal, and BigDecimal serialises to JSON as the *string*
+        # "0.275e3". The prose was right from the first line it was written, because it went
+        # through the presenter; the structured field a client actually parses was a string
+        # nobody could do arithmetic on. That issue found this in two places and there was a
+        # third waiting for the next field to be added.
+        #
+        # `on` is the day the set behind the reading was lifted. The column is a timestamp, so
+        # it comes back as a Time and would serialise with an hour and a timezone on it -- an
+        # answer more precise than the question, and a different shape from every other date in
+        # this payload.
+        def self.readable(reading)
+          reading.merge(pounds: Presenter.weight(reading[:pounds]),
+                        on: reading[:on]&.to_date&.strftime('%Y-%m-%d'))
+        end
+
         # The resolved max as three keys: the number, which of the two kinds it is, and the
         # day it is as of. Split out because they are one fact in three parts and because a
         # payload naming every field of every fact in one literal is a method doing several
@@ -149,10 +210,37 @@ class Tectonic < Roda
         # the next block will be built on, and it says which kind it is -- many clients show
         # only this text, and "max 315" that turns out to be a guess off a set from before a
         # layoff is the misreading #264 is about.
-        def self.summary(exercise, rows, context, arguments)
+        def self.summary(exercise, rows, context, arguments, recent)
           heaviest = Presenter.weight(rows.map(&:weight).compact.max)
           "#{exercise.name}: #{rows.length} set(s), heaviest #{heaviest || 'none'}, " \
-            "#{max_phrase(resolved_max(context, exercise, arguments))}#{pace(rows)}."
+            "#{max_phrase(resolved_max(context, exercise, arguments))}#{pace(rows)}." \
+            "#{recent_phrase(recent)}"
+        end
+
+        # The windows in the sentence and not only in the payload, which is #262's lesson and
+        # the reason this tool prints its sets at all: plenty of clients render only the text,
+        # and a lifetime best that reads as current is exactly the misreading #307 is about.
+        #
+        # Silent where no window holds anything readable, rather than printing three nils. A
+        # movement with nothing in the last year has said everything it can say with the
+        # lifetime figure above, and three empty clauses would be noise on every bodyweight
+        # movement in the account -- none of which can be read for a max at all.
+        def self.recent_phrase(recent)
+          readable = recent.select { |reading| reading[:pounds] }
+          return '' if readable.empty?
+
+          " Recently: #{readable.map { |reading| window_phrase(reading) }.join(', ')}."
+        end
+
+        # The sample size is in the sentence too, because 290 off one set and 290 off forty are
+        # not the same claim and a reader with only the number cannot tell them apart.
+        def self.window_phrase(reading)
+          sets = reading[:sets]
+          # Already through the presenter by the time it gets here, which is what `readable`
+          # is for -- the sentence and the payload now carry the same number rather than two
+          # renderings of it.
+          "last #{reading[:weeks]} weeks imply #{reading[:pounds]} " \
+            "(#{sets} #{sets == 1 ? 'set' : 'sets'})"
         end
 
         def self.max_phrase(resolved)
