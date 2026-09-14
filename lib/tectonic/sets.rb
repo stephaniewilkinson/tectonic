@@ -124,9 +124,16 @@ class Tectonic < Roda
     # session screen's swap control -- and all three already remembered to carry is_barbell
     # across. A rule remembered at three places is a rule forgotten at one, and the one that
     # forgot this was all three.
+    # The setup columns are cleared with the prescription, and for the same reason #406 gave
+    # about the planned ones: they say what the *other* lift was asked for. Two generated
+    # Barbell Hip Thrust sets swapped to a bodyweight Single-Leg Hip Thrust read as a
+    # bodyweight movement supposedly prescribed at 85 lb; a bench angle left behind on a
+    # movement that does not use a bench is the same bug wearing different numbers, and on the
+    # one line of the row a lifter acts on before touching the bar. #412.
     def self.moved_to(exercise)
       { exercise_id: exercise.id, is_barbell: exercise.barbell?,
-        planned_weight: nil, planned_reps: nil, planned_rpe: nil, planned_rest_seconds: nil }
+        planned_weight: nil, planned_reps: nil, planned_rpe: nil, planned_rest_seconds: nil,
+        bench_angle_degrees: nil, rack_hole: nil, safety_hole: nil }
     end
   end
 end

@@ -73,6 +73,23 @@
                   <%= plate_label(set) %>
                 </span>
               <%- end %>
+              <%# How the room is set up for this lift. #412.
+
+                  Its own line under the load rather than another clause on it, which is where
+                  it differs from "per side" and "commanded": those say what the *set* is and
+                  belong in the phrase a lifter reads at arm's length, and this says what to do
+                  to the bench and the rack before touching the bar. It is also the one line
+                  here that is read once and then not again for the rest of the lift.
+
+                  The same grey as the plate math above it, because it is the same kind of
+                  thing: a fact about how to load and stand up this set, read after the number
+                  rather than instead of it.
+
+                  Silent where nothing was prescribed, which is almost every set. A row saying
+                  "bench —" on every barbell curl would be worse than the note this replaces. %>
+              <%- if Tectonic::Setup.phrase(set) %>
+                <div class="text-xs text-gray-500"><%= Tectonic::Setup.phrase(set) %></div>
+              <%- end %>
               <%- if changed_from_plan?(set) %>
                 <%# Grey, and not the amber it wore until #214. This line is the whole of how
                     a changed set is now marked -- the row tint went to two states, done and
@@ -199,6 +216,23 @@
                 <div class="text-xs text-gray-500">
                   <span class="uppercase tracking-wide">Target</span> RPE <%= set[:planned_rpe] %>
                 </div>
+              <%- end %>
+              <%# How the room is set up for this lift. #412.
+
+                  Its own line under the load rather than another clause on it, which is where
+                  it differs from "per side" and "commanded": those say what the *set* is and
+                  belong in the phrase a lifter reads at arm's length, and this says what to do
+                  to the bench and the rack before touching the bar. It is also the one line
+                  here that is read once and then not again for the rest of the lift.
+
+                  The same grey as the plate math above it, because it is the same kind of
+                  thing: a fact about how to load and stand up this set, read after the number
+                  rather than instead of it.
+
+                  Silent where nothing was prescribed, which is almost every set. A row saying
+                  "bench —" on every barbell curl would be worse than the note this replaces. %>
+              <%- if Tectonic::Setup.phrase(set) %>
+                <div class="text-xs text-gray-500"><%= Tectonic::Setup.phrase(set) %></div>
               <%- end %>
               <%- if changed_from_plan?(set) %>
                 <%# Grey, and not the amber it wore until #214. This line is the whole of how

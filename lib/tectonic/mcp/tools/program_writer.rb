@@ -5,6 +5,7 @@ require_relative '../tool'
 require_relative 'program_support'
 require_relative 'support'
 require_relative '../../measured'
+require_relative '../../setup'
 
 class Tectonic < Roda
   module MCP
@@ -95,7 +96,7 @@ class Tectonic < Roda
             # that wants commanded work says so on the lift that wants it, usually the top
             # single and not the back-offs.
             is_commanded: attributes.fetch(:is_commanded, false),
-            is_barbell: barbell?(attributes, exercise, shape) }.merge(shape)
+            is_barbell: barbell?(attributes, exercise, shape) }.merge(shape).merge(Setup.of(attributes))
         end
 
         # The three facts that say how a movement is done, each taken from the movement
@@ -162,6 +163,7 @@ class Tectonic < Roda
           # through this writer.
           Bounds.target_fits!(attributes[:target_rpe], measure: shape[:measure], weighted: shape[:is_weighted])
           Bounds.commands_fit!(attributes[:is_commanded], measure: shape[:measure])
+          Bounds.setup_fits!(attributes)
           Bounds.reference_fits!(attributes[:percent_of], percent: attributes[:percent_of_max])
           check_priced(attributes, shape)
         end

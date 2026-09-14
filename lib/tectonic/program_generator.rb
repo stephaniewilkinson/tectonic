@@ -12,6 +12,7 @@ require_relative 'rounding'
 require_relative 'equipment'
 require_relative 'measured'
 require_relative 'set_scheme'
+require_relative 'setup'
 require_relative 'sets'
 require_relative 'training_max'
 require_relative 'warmup'
@@ -461,6 +462,14 @@ class Tectonic < Roda
         # symbol here as the name of a column.
         measure: Measured.stored(lift.measure), is_per_side: lift.is_per_side,
         is_commanded: commanded?(lift, is_warmup:),
+        # And how the room is set up, onto the warmup rows as well as the working ones (#412).
+        # This is the one instruction on a lift that is *more* wanted on a ramp than under it:
+        # the whole cost the issue names is getting under the bar at the wrong J-hook height
+        # and having to re-unrack mid-warmup, which by definition happens on the first rung.
+        # An effort and a rest are properties of the working sets and stop there; a bench
+        # angle is a property of the bench, and the bench does not change between the ramp and
+        # the top set.
+        **Setup.of(lift),
         is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
         created_by_oauth_application_id: @created_by }
     end

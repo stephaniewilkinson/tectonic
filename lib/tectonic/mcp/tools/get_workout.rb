@@ -2,6 +2,7 @@
 
 require_relative '../tool'
 require_relative 'support'
+require_relative '../../setup'
 
 class Tectonic < Roda
   module MCP
@@ -101,12 +102,31 @@ class Tectonic < Roda
         # went. A warmup says so, because a ramp counted as working sets inflates the
         # volume of every session read off this.
         def self.line(set)
-          parts = ["  #{set[:exercise]} #{quantity(set)}"]
-          parts << "(planned #{set[:planned_weight]}x#{set[:planned_reps]})" if revised?(set)
-          parts << 'warmup' if set[:is_warmup]
-          parts << (set[:is_completed] ? 'done' : 'not done')
-          parts << rating(set) if set[:rpe] || set[:planned_rpe]
-          parts.join(' ')
+          ["  #{set[:exercise]} #{quantity(set)}", *planned(set), *(['warmup'] if set[:is_warmup]),
+           set[:is_completed] ? 'done' : 'not done', *rated(set), *setup(set)].join(' ')
+        end
+
+        # Both split out as arrays so `line` is one expression rather than six appends. The
+        # shape is the same for all four optional clauses: a set that has nothing to say about
+        # one contributes no words rather than an empty string that leaves a double space.
+        def self.planned(set)
+          revised?(set) ? ["(planned #{set[:planned_weight]}x#{set[:planned_reps]})"] : []
+        end
+
+        def self.rated(set)
+          set[:rpe] || set[:planned_rpe] ? [rating(set)] : []
+        end
+
+        # How the room was set up for it (#412). An assistant asked to write next week's block
+        # has to be able to see that this row was done on a 30 degree bench, or it writes the
+        # same movement with nothing said about the bench and the lifter is back to guessing --
+        # which is the whole of the issue.
+        #
+        # An array so the caller can splat it: a set with no setup contributes no words rather
+        # than an empty pair of brackets, which is almost every set.
+        def self.setup(set)
+          said = Setup.phrase(set)
+          said ? ["(#{said})"] : []
         end
 
         # The effort, as asked for and as answered. #265, and this is the read-back that

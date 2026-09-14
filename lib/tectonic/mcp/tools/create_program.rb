@@ -31,6 +31,8 @@ class Tectonic < Roda
             is_main: { type: 'boolean' }, is_barbell: { type: 'boolean' },
             target_rpe: { type: 'integer' }, rest_seconds: { type: 'integer' },
             is_commanded: { type: 'boolean' },
+            bench_angle_degrees: { type: 'integer' }, rack_hole: { type: 'integer' },
+            safety_hole: { type: 'integer' },
             percent_of: { type: 'string' },
             note: { type: 'string' }
           },

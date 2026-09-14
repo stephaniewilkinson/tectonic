@@ -33,7 +33,9 @@ class Tectonic < Roda
                     'null to clear it. rest_seconds, 5 to 1800, is the rest its working sets ' \
                     'are meant to take between them and what the session screen counts down ' \
                     'after one; it applies to any movement, and null clears it back to the ' \
-                    'median rest this lifter actually takes. is_commanded says its working ' \
+                    'median rest this lifter actually takes. bench_angle_degrees, ' \
+                    'rack_hole and safety_hole say how the room is set up for this ' \
+                    'lift; null clears any of them. is_commanded says its working ' \
                     'sets are done under meet commands -- start, press, rack -- rather than ' \
                     'at the lifter\'s own tempo, and belongs only on a lift counted in reps. ' \
                     'Send only what changes. To swap ' \
