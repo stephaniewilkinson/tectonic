@@ -35,6 +35,13 @@ class Tectonic < Roda
                     'competition condition, not a tempo: a paused bench in training is not ' \
                     'a commanded one, and the library already has Paused Bench Press as its ' \
                     'own movement for that. It belongs only on a lift counted in reps. ' \
+                    'bench_angle_degrees, rack_hole and safety_hole say how the room is set ' \
+                    'up for this lift -- the bench angle in degrees (0 is flat, negative is ' \
+                    'decline), and which numbered hole the J-hooks and the safeties go in. ' \
+                    'They are copied onto every set the lift generates, warmups included, and ' \
+                    'printed on the session screen, so a lifter does not have to guess what ' \
+                    '"incline bench" meant. Bench angle changes what a movement trains, so it ' \
+                    'is a programming variable rather than a preference. ' \
                     'percent_of names a different movement whose max the percentage is of: ' \
                     'a deficit deadlift written at 70% of the competition deadlift, or ' \
                     'supplemental work off the main lift. It defaults to the lift itself. ' \
@@ -51,6 +58,8 @@ class Tectonic < Roda
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: { type: 'integer' },
             rest_seconds: { type: 'integer' }, is_commanded: { type: 'boolean' },
+            bench_angle_degrees: { type: 'integer' }, rack_hole: { type: 'integer' },
+            safety_hole: { type: 'integer' },
             percent_of: { type: 'string' }, note: { type: 'string' }
           },
           required: %w[program_day_id exercise sets], additionalProperties: false

@@ -4,6 +4,7 @@ require 'date'
 require_relative '../tool'
 require_relative '../../program_generator'
 require_relative 'support'
+require_relative '../../setup'
 
 class Tectonic < Roda
   module MCP
@@ -145,7 +146,7 @@ class Tectonic < Roda
         def prescription_of(row)
           { top_weight: Presenter.weight(row.top_weight), percent_of_max: row.percent_of_max,
             target_rpe: row.target_rpe, rest_seconds: row.rest_seconds,
-            is_commanded: row.is_commanded }
+            is_commanded: row.is_commanded }.merge(Setup.of(row))
         end
       end
     end

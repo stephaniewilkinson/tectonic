@@ -10,6 +10,7 @@ require_relative '../../sets'
 require_relative '../../measured'
 require_relative '../../timing'
 require_relative '../../session_diagnosis'
+require_relative '../../setup'
 require_relative '../../turnarounds'
 
 class Tectonic < Roda
@@ -47,6 +48,13 @@ class Tectonic < Roda
         # left to programs_time_budget_in_range, so a client gets a sentence instead of a
         # database error.
         BUDGET_MINUTES = (10..300)
+        # How the room is set up. #412, and the ranges are 034's.
+        #
+        # A decline bench goes to about -30 and a fully upright one is 90; past either is not a
+        # bench angle. Racks are numbered from the bottom and the tallest have around forty
+        # positions, so fifty is past every rack and one is the lowest hole there is.
+        BENCH_ANGLE = (-30..90)
+        RACK_HOLE = (1..50)
 
         module_function
 
@@ -129,6 +137,18 @@ class Tectonic < Roda
         # Refused by name rather than left to the check constraint, which is check_load's
         # rule for all three: a constraint violation reaches a client as a database error and
         # reads as the tool being broken, where this names the field and says what to do.
+        # The three setup numbers, checked together because a caller sends them together and a
+        # refusal naming one while another is also wrong is a round trip for nothing.
+        #
+        # Refused by name rather than left to the check constraints, which enforce them again:
+        # a constraint violation reaches a client as a database error and reads as the tool
+        # being broken. #412.
+        def setup_fits!(attributes)
+          check(BENCH_ANGLE, attributes[:bench_angle_degrees], 'Bench angle', unit: ' degrees')
+          check(RACK_HOLE, attributes[:rack_hole], 'J-hook hole')
+          check(RACK_HOLE, attributes[:safety_hole], 'Safety hole')
+        end
+
         def commands_fit!(commanded, measure:)
           return unless commanded
           return if measure == Measured::REPS
@@ -347,7 +367,7 @@ class Tectonic < Roda
         def performed(set)
           { is_warmup: set.is_warmup, is_completed: set.is_completed,
             is_per_side: set.is_per_side, is_commanded: set.is_commanded,
-            completed_at: set.completed_at&.iso8601 }
+            completed_at: set.completed_at&.iso8601 }.merge(Setup.of(set))
         end
 
         # The three columns saying what was asked for, split out from what was done. They

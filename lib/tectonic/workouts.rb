@@ -155,8 +155,13 @@ class Tectonic < Roda
     # the row. A block represcribed under commands and regenerated changes what the session
     # screen says, and a poll answering 204 would leave the phrase on the page disagreeing
     # with the row behind it.
+    # The setup columns join it with #412, on the plainest reason on the list again: they are
+    # printed on the row. A block represcribed at a different bench angle and regenerated
+    # changes what the session screen says, and a poll answering 204 would leave a lifter
+    # setting the bench to a number the row behind the page no longer holds.
     SESSION_COLUMNS = %i[id exercise_id weight reps rpe is_warmup is_completed
                          measure duration_seconds is_per_side is_commanded
+                         bench_angle_degrees rack_hole safety_hole
                          planned_weight planned_reps planned_rpe planned_rest_seconds
                          completed_at].freeze
 
