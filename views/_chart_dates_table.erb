@@ -1,0 +1,62 @@
+<%# The progress chart, read aloud. #337's rule applied to #434's chart.
+
+    The chart it sits under is `aria-hidden`, like every other canvas in this app, and the
+    reason this one needs a table where the old chart on this page did not is worth stating:
+    that chart drew one series -- the heaviest set each day -- and the full set list is
+    directly below it, so a table would have been the same training said twice. This one draws
+    what each block opened at, the goal, and the pace line to it, and **none of those appear
+    anywhere else on the page.** Without this they would be visible only to somebody who can
+    see a canvas.
+
+    A row per date and a column per series, which is the orientation that reads correctly
+    here -- and it is the opposite of _chart_series_table, deliberately. That one compares
+    several lifts across the same weeks, so a reader wants "Back Squat, 145, 150, 155" and the
+    lift has to lead. This one is one lift over time, so a reader wants "12 March: heaviest
+    155, estimated 1RM 174, training max 168" -- the date leads, because the question is what
+    was true on a given day rather than how two things compare.
+
+    Dates rather than the evenly spaced labels the old chart used, because that is the whole
+    change #434 makes: the goal sits at its own date in the future and the pace line runs to
+    it, and a table of categories would lose the elapsed time the chart exists to show.
+
+    Empty where a series has nothing on a date, which is most cells: a session is one date, a
+    block opening is another, and the goal is one row on its own at the bottom. An empty cell
+    is that absence and says so rather than printing a dash somebody has to interpret. %>
+<details class="mt-2">
+  <summary class="cursor-pointer text-xs text-gray-500 hover:text-gray-700">
+    Show as a table
+  </summary>
+  <div class="mt-2 max-h-96 overflow-auto">
+    <table class="w-full border-collapse text-left text-sm">
+      <caption class="sr-only"><%= caption %></caption>
+      <thead>
+        <tr class="border-b border-gray-300 text-xs uppercase tracking-wide text-gray-500">
+          <th scope="col" class="py-1 pr-3 font-medium">Date</th>
+          <%- series.each_key do |name| %>
+            <th scope="col" class="py-1 pr-3 font-medium"><%= name %></th>
+          <%- end %>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <%# Every date any series has a point on, in order. Built here rather than passed in
+            because it is derived entirely from `series` -- two arguments that had to agree
+            about the same axis would be two things to keep in step, which is the trap the
+            volume table's `weeks` local already has to be careful about. %>
+        <%- series.values.flat_map(&:keys).uniq.sort.each do |date| %>
+          <tr>
+            <th scope="row" class="whitespace-nowrap py-1 pr-3 font-normal text-gray-700">
+              <%= date.strftime('%-d %b %Y') %>
+            </th>
+            <%- series.each_value do |points| %>
+              <%# Through chart_number, which is #256's answer: these weights are numeric(7,2),
+                  so Sequel hands back a BigDecimal and printing it raw gives 0.155e3 -- the
+                  correct rendering of a BigDecimal and no use at all to a lifter. The chart
+                  escapes this because Chartkick serialises to JSON; a table does not. %>
+              <td class="py-1 pr-3 tabular-nums text-gray-900"><%= chart_number(points[date]) %></td>
+            <%- end %>
+          </tr>
+        <%- end %>
+      </tbody>
+    </table>
+  </div>
+</details>

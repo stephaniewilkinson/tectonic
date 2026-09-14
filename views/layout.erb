@@ -124,12 +124,21 @@
         workout page carried it. A view that charts says so by setting @charts, which is
         set by the time this runs because Roda renders the template first and this layout
         around it. Chart.js is named before Chartkick, which adapts it. The vendored
-        chartjs-adapter-date-fns bundle, 215KB of it, is not loaded at all: it teaches
-        Chart.js to read dates for a time axis, and the one chart in the app plots its
-        days as evenly spaced categories, so nothing ever parses a date. A chart that
-        wants a real calendar will need it back. %>
+        chartjs-adapter-date-fns bundle, 215KB of it, is not loaded for most of them: it
+        teaches Chart.js to read dates for a time axis, and the volume charts plot their
+        weeks as evenly spaced categories, so nothing there ever parses a date.
+
+        **That day came with #434**, which is the chart the note above predicted: a lift's
+        progress against a goal has a marker at a future date and a pace line running to it,
+        and neither can sit on an axis made of the days somebody happened to train. A page
+        that needs the calendar says so with @calendar, and only that page pays the 215KB --
+        which is the whole of why the flag is separate rather than folded into @charts. It is
+        also not the gym-floor screen: the session view draws no chart at all. %>
     <%- if @charts %>
       <script src="/js/chart.umd.js"></script>
+      <%- if @calendar %>
+        <script src="/js/chartjs-adapter-date-fns.bundle.js"></script>
+      <%- end %>
       <script src="/js/chartkick.js"></script>
     <%- end %>
     <%# And the same for htmx, which is 50KB and was loaded on every page in the app while

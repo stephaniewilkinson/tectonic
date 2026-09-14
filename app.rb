@@ -29,6 +29,7 @@ require_relative 'lib/tectonic/program_schedule'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/goal'
+require_relative 'lib/tectonic/progress_chart'
 require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
 require_relative 'lib/tectonic/oauth/redirect_uri'
@@ -715,6 +716,12 @@ class Tectonic < Roda
           # What this movement is aiming at, if anything (#308). Nil is a state the page has
           # to say something different about rather than a number to default.
           @goal = Goal.for(account_id: @account_id, exercise_id: @exercise.id)
+          # Everything that belongs on one axis for this lift: what was lifted, what each
+          # block opened at, what the sessions imply, the goal, and the even-pace line to it
+          # (#434). Built here rather than in the template because it asks the database
+          # several questions and a view that queries is a view nobody can read.
+          @progress = ProgressChart.of(account_id: @account_id, exercise: @exercise,
+                                       today: Clock.today_for(@account_id))
           # What the last edit did to sets already logged, read once and taken out of the
           # session (#392). Delete rather than read, so a reload does not re-announce an edit
           # made ten minutes ago -- the same shape program_action uses for its refusals.
@@ -1884,6 +1891,55 @@ class Tectonic < Roda
   # than a tint over the whole row that has to be learnt before it says anything.
   def row_style(set)
     set[:is_completed] ? 'border-lime-300 bg-lime-50' : 'border-gray-200 bg-white'
+  end
+
+  # The progress series as Chartkick wants them, with the drawing decisions attached. #434.
+  #
+  # The styling lives here rather than in ProgressChart because that module answers what is
+  # true and this answers what it should look like -- and because a `borderDash` in a file
+  # that reads the database is a file doing two jobs.
+  #
+  # Chartkick merges a per-series `dataset:` into the Chart.js dataset, which is what makes a
+  # step line and a dashed line possible without dropping to raw Chart.js and losing the
+  # palette every other chart in this app is drawn with.
+  #
+  # **Lifted and the goal are points with no line through them.** Joining sessions with a line
+  # would draw a slope between two Tuesdays that nothing happened between, and the goal is one
+  # point by definition -- a line from it would go nowhere.
+  #
+  # **`stepped: "after"` on the two that step.** A training max in this app changes when a
+  # block opens and at no other time, so the flat run and the vertical jump are the shape of
+  # the quantity rather than a style applied to it.
+  #
+  # **The pace line is grey and dashed and is never coloured as pass or fail.** #263 and #308
+  # are emphatic that the app does not judge whether progress is enough, and a red line under
+  # a blue one would be that judgement made in CSS.
+  # **`spanGaps` is the one that is not cosmetic, and it was invisible until somebody looked.**
+  #
+  # Chartkick merges every series onto one shared axis -- the union of all their dates -- and
+  # pads each with nulls where it has no value there. So the training max, which has a point at
+  # each block opening and one for today, arrives as a five-point array that is null on the
+  # three session dates in between. Chart.js does not join a line across a null, and with
+  # `pointRadius: 0` the surviving points draw nothing at all: the legend showed "Training max"
+  # and the canvas showed no line.
+  #
+  # No assertion caught it. The series had the right points, the dataset was in the payload,
+  # Chart.js reported it visible, and it was not on the screen. A screenshot found it.
+  #
+  # `spanGaps: true` is also the truthful answer rather than a workaround. A training max of
+  # 277 in February and 314 in May was 277 for the whole of the time between -- the null on a
+  # session date is not a gap in the quantity, it is a date some other series put on the axis.
+  STYLES = {
+    ProgressChart::LIFTED => { showLine: false, pointRadius: 4 },
+    ProgressChart::ESTIMATED => { borderDash: [2, 3], pointRadius: 0, tension: 0, spanGaps: true },
+    ProgressChart::TRAINING_MAX => { stepped: 'after', pointRadius: 0, spanGaps: true },
+    ProgressChart::GOAL => { showLine: false, pointRadius: 7, pointStyle: 'rectRot' },
+    ProgressChart::PROJECTION => { stepped: 'after', borderDash: [6, 4], pointRadius: 0,
+                                   spanGaps: true, borderColor: '#9ca3af', borderWidth: 2 }
+  }.freeze
+
+  def progress_series
+    @progress.map { |name, points| { name:, data: points, dataset: STYLES.fetch(name, {}) } }
   end
 
   # A number as a chart table should print it. #337, and #256 underneath it.

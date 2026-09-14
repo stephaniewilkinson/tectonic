@@ -181,8 +181,22 @@ describe 'the chart on a movement page' do
     assert_includes last_response.body, 'Every set is listed below'
   end
 
-  it 'adds no second table of the same training' do
-    assert_equal 0, tables
+  # **This reverses in #434, and the reasoning that changed is worth keeping.** The old chart
+  # on this page drew one series -- the heaviest set each day -- and the full set list sits
+  # directly below it, so a table of its own would have been the same training said twice and
+  # a reader would have had to work out that the two agreed. #337 called that the easy case
+  # and it was right.
+  #
+  # The progress chart draws four more things, and **none of them appear anywhere else on the
+  # page**: what each block opened at, the estimated max per session, the goal, and the pace
+  # line. Without a table those are visible only to somebody who can see a canvas, which is
+  # the thing #337 exists to prevent.
+  it 'offers a table of what the set list below does not carry' do
+    assert_equal 1, tables
+  end
+
+  it 'gives that table the series the canvas draws' do
+    assert_includes last_response.body, 'Training max'
   end
 end
 

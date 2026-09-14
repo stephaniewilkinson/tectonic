@@ -1,7 +1,13 @@
 <%# A lift with nothing but warmups recorded draws no chart, and a page that draws no
     chart is not worth half a megabyte of charting library, so the layout takes its cue
     from here rather than loading them for everyone. %>
-<%- @charts = !@heaviest_by_day.empty? %>
+<%- @charts = !@progress.empty? %>
+<%# And this chart wants a real calendar, which costs another 215KB of date adapter (#434).
+    A goal sits at a date in the future and the pace line runs to it, so an axis made of the
+    days somebody happened to train cannot hold either. Its own flag rather than folding it
+    into @charts, so the volume page -- whose weeks are evenly spaced categories and which
+    parses no dates at all -- goes on not paying for it. %>
+<%- @calendar = @charts %>
 <div class="mx-auto max-w-md">
   <div class="flex items-center justify-between">
     <h1 class="text-3xl font-semibold text-gray-900"><%= @exercise[:name] %></h1>
@@ -187,25 +193,32 @@
   <%- else %>
     <%- if @charts %>
       <div class="mt-6">
-        <h2 class="text-sm font-semibold text-gray-900">Heaviest weight each day</h2>
-        <%# discrete: true spaces the recorded days evenly instead of by the calendar,
-            which is a deliberate trade and worth naming: a week between sessions and a
-            five-month layoff now look identical on the axis, and only the labels say
-            which happened. It is the right trade for this page, whose question is
-            whether the weight is going up, and against a real calendar a lift trained
-            in January and again in June draws two points either side of an empty plot.
-            min: nil lets the axis fit the weights instead of starting at zero, which
-            nobody lifts and which flattens a season of progress into the top inch. %>
-        <%# aria-hidden, and no table of its own. #337 calls this the easy one and it is: the
-            table of every set is directly below, so a second table of the heaviest per day
-            would be the same training said twice, and a reader would have to work out that
-            the two agreed. The canvas carries nothing the table does not, so it says nothing
-            rather than announcing an unlabelled graphic. %>
+        <h2 class="text-sm font-semibold text-gray-900">Progress</h2>
+        <%# The chart #434 asks for, and it replaces "heaviest weight each day" rather than
+            sitting beside it. That chart's line is this chart's first series, so keeping both
+            would be the same training drawn twice a few inches apart -- and a reader would
+            have to work out that the two agreed.
+
+            **It gives up `discrete: true`, which the old chart argued for and was right to.**
+            That argument was about a different question: whether the weight is going up, for
+            which evenly-spaced sessions read better and a five-month layoff collapsing to one
+            gap costs nothing. This chart's question is whether the weight is going up *fast
+            enough*, and that one is about elapsed time -- so a layoff has to look like a
+            layoff, and the goal has to sit at its own date rather than one column to the
+            right of the last session.
+
+            min: nil is kept, and for the reason the old note gives: nobody lifts zero, and an
+            axis starting there flattens a season of progress into the top inch. %>
         <div aria-hidden="true">
-          <%== line_chart(@heaviest_by_day, ytitle: 'Weight', curve: false, min: nil, discrete: true) %>
+          <%== line_chart(progress_series, ytitle: 'Weight', curve: false, min: nil, colors: Tectonic::CHART_COLORS) %>
         </div>
+        <%# Unlike the old chart, this one carries things the table below does not: what each
+            block opened at, the goal, and the pace line. So it gets a table of its own (#337)
+            rather than an aria-hidden canvas and a pointer at the set list. %>
+        <%== render('_chart_dates_table',
+                    locals: { series: @progress, caption: "#{@exercise[:name]} progress against the goal" }) %>
         <p class="mt-1 text-xs text-gray-500">
-          Every set is listed below, newest first.
+          Heaviest completed working set each session. Every set is listed below, newest first.
         </p>
       </div>
     <%- end %>
