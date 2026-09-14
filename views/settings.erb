@@ -89,6 +89,26 @@
     something this rack can actually load.
   </p>
 
+  <%# What changing the rack did to the sessions already written. #439.
+      Saving used to affect only the next generation, so a block already on the calendar kept
+      whatever the app had believed about the plates on the day it was generated -- which is
+      how the same movement came to be prescribed at 44 one week and 45 the next, 45 being a
+      dumbbell a 4 lb handle cannot build. Now it reaches them, and this says so: a lifter who
+      opens next Monday and finds a different number on it should have been told here rather
+      than left to notice.
+
+      Only when something actually moved. The count is of sessions whose weights changed, not
+      of sessions rewritten, so correcting a typo in a plate count does not announce that it
+      rewrote a fortnight of training when it changed nothing at all. %>
+  <%- if @rerounded.positive? %>
+    <p class="mt-3 rounded-lg border border-sky-800 bg-sky-50 px-4 py-3 text-sm text-gray-700">
+      Your rack changed, so
+      <strong><%= @rerounded %> upcoming <%= @rerounded == 1 ? 'session was' : 'sessions were' %></strong>
+      rewritten onto weights it can load. Sets you had already marked as done were left exactly
+      as they were.
+    </p>
+  <%- end %>
+
   <form method="post" action="/settings" class="mt-6 space-y-6">
     <%== csrf_tag('/settings') %>
 
