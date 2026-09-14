@@ -13,9 +13,12 @@ require 'securerandom'
 module PageAssets
   # In dependency order: Chart.js, then Chartkick, which adapts it.
   CHART_SCRIPTS = ['/js/chart.umd.js', '/js/chartkick.js'].freeze
-  # Vendored, and loaded by nothing. It exists to give Chart.js a time axis, and the one
-  # chart in the app spaces its days evenly rather than by the calendar, so no page has a
-  # date for it to parse. Asserted so that it cannot drift back into the layout unnoticed.
+  # Vendored, and loaded by exactly one page since #434. It gives Chart.js a time axis, and
+  # the progress chart on a movement page is the only one that wants a calendar -- a goal sits
+  # at a date in the future and a pace line runs to it, neither of which fits on an axis made
+  # of the days somebody trained. The volume charts still space their weeks evenly and parse
+  # no dates, so they still do not pay the 215KB, which is why the layout gates this behind a
+  # flag of its own rather than folding it into @charts.
   DATE_ADAPTER = '/js/chartjs-adapter-date-fns.bundle.js'
 
   def app
@@ -97,8 +100,37 @@ describe 'the exercise page with a chart on it' do
     assert_includes last_response.body, 'new Chartkick["LineChart"]'
   end
 
-  # The axis is categories, not a calendar, so there is no date for the adapter to read
-  # and 215KB of it stays on the shelf.
+  # **This reverses in #434 and is worth reading beside the old assertion.** The axis used to
+  # be categories, not a calendar, so there was no date for the adapter to read and 215KB of
+  # it stayed on the shelf. The progress chart puts the goal at its own date in the future and
+  # runs a pace line to it, neither of which fits on an axis made of the days somebody trained
+  # -- so the calendar is required and the adapter comes back with it.
+  #
+  # What is asserted instead is that the saving still exists everywhere it can: the adapter is
+  # behind its own flag, so a page with a chart that does not need a calendar goes on not
+  # paying for one. The volume page is that page.
+  it 'carries the date adapter its calendar needs' do
+    assert_includes last_response.body, PageAssets::DATE_ADAPTER
+  end
+end
+
+# The other half of the trade, and the reason the flag is separate from @charts. These charts
+# plot weeks as evenly spaced categories and parse no dates at all, so they go on loading
+# Chart.js and Chartkick and nothing else.
+describe 'the volume page, which charts without a calendar' do
+  include Rack::Test::Methods
+  include PageAssets
+
+  before do
+    sign_in_with_a_lift
+    log_set 135
+    get '/volume'
+  end
+
+  it 'still draws its charts' do
+    assert_includes last_response.body, 'new Chartkick'
+  end
+
   it 'carries no date adapter' do
     refute_includes last_response.body, PageAssets::DATE_ADAPTER
   end
