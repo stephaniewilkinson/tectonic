@@ -98,7 +98,176 @@ class Tectonic < Roda
         # anything this repository has to be told. Nil locally and in CI, which is today's
         # behaviour exactly.
         config.release = ENV.fetch('RENDER_GIT_COMMIT', nil)
+        # How long things take, as against what broke. #388.
+        #
+        # Sentry has two halves and only the error half was on. That left three numbers in
+        # this system resting on reasoning nobody had checked against a measurement: the
+        # twenty-second request timeout in config.ru, whose comment argues that nothing here
+        # is "within an order of magnitude" of it; the connection pool in config/puma.rb,
+        # sized from arithmetic that admits the database plan's ceiling "is not something
+        # this repo knows"; and the MCP endpoint, which says outright that nobody has watched
+        # its request pattern because an LLM drives it.
+        #
+        # All three are claims about a distribution nobody has. Tracing is what turns them
+        # into a p95 that can be watched crossing a line -- and the first of them only ever
+        # gets worse, silently, because Volume.weekly aggregates an account's *whole history*
+        # and that quantity only goes up.
+        config.traces_sample_rate = traces_sample_rate
+        # Query spans, which are the layer that actually answers "which part of the volume
+        # page is slow". Not on by default -- DEFAULT_PATCHES is redis, puma and http -- and
+        # guarded, because requiring it in a process with no Sequel raises.
+        config.enabled_patches += [:sequel] if load_query_instrumentation?
+        # And the reason that guard is not optional: every span description is scrubbed on the
+        # way out, because Sequel writes literals into its SQL. See scrub_sql.
+        config.before_send_transaction = ->(event, _hint) { scrub_spans(event) }
       end
+      instrument_open_databases!
+    end
+
+    # How much of the traffic is timed, as a fraction. #388.
+    #
+    # **Everything, by default, and that is the opposite of what #388 first suggested.** That
+    # issue proposed 10% as "a small number of transactions and enough for percentiles within
+    # a week", which is the right advice for a busy app. This one had a single active account
+    # and 123 sets logged in thirty days when the number was checked, so a tenth of that is
+    # not a sample, it is a rounding error -- months before the slowest 5% of anything could
+    # be said with a straight face. The only argument against recording everything is cost,
+    # and there is barely any traffic here to cost anything.
+    #
+    # **Read from the environment, which is the part that matters most.** #388 carries a
+    # caveat worth respecting: a transaction holds a reference to the Rack env for its
+    # lifetime, and a sibling app on the same kind of small Render instance saw that as RSS
+    # growth across a day. Turning the rate down therefore has to be something that can be
+    # done *now*, from a dashboard, by somebody watching a memory graph climb -- not a commit,
+    # a review and a deploy. Setting SENTRY_TRACES_SAMPLE_RATE to 0 switches tracing off
+    # entirely without touching the error reporting beside it.
+    #
+    # Clamped rather than trusted: a typo that set this to 100 meaning "100%" would be read by
+    # the SDK as an invalid rate and silently disable tracing, which is the failure that looks
+    # like it worked.
+    TRACES_SAMPLE_RATE = 'SENTRY_TRACES_SAMPLE_RATE'
+    DEFAULT_TRACES_SAMPLE_RATE = 1.0
+
+    def traces_sample_rate
+      ENV.fetch(TRACES_SAMPLE_RATE, DEFAULT_TRACES_SAMPLE_RATE).to_f.clamp(0.0, 1.0)
+    end
+
+    # Whether to instrument database queries, which needs the integration loaded first.
+    #
+    # Guarded on Sequel already being there rather than requiring it. `sentry/sequel` calls
+    # `Sequel::Database.register_extension` at load time, so requiring it in a process that
+    # has not loaded Sequel raises NameError -- and the Rakefile calls `setup!` at line 24,
+    # long before `migrator_db` requires the database at line 75. Unguarded, this would break
+    # every rake task in the app, including the two that run on every deploy.
+    #
+    # That is the third time this shape has bitten: the tzinfo gem reached the load path only
+    # through a development dependency, and Clock reached app.rb only through a file that was
+    # deleted. A require that works because something else happened to load first is a require
+    # that will stop working.
+    #
+    # False in a rake process is also the right answer on its own terms. Query spans hang off
+    # a request transaction, and a rake task has none for them to hang from.
+    def load_query_instrumentation?
+      return false unless defined?(::Sequel::Database)
+
+      require 'sentry/sequel'
+      true
+    rescue LoadError
+      false
+    end
+
+    # The database this app is already connected to, instrumented by hand.
+    #
+    # **Without this the whole thing is configured and does nothing**, which is worth spelling
+    # out because everything else says it is working. `enabled_patches` includes `:sequel`, the
+    # integration is loaded, the patch runs -- and no query span is ever produced.
+    #
+    # The gem's patch is `Sequel::Database.extension(:sentry)`, and that class-level call loads
+    # an extension into *future* Database objects only. This app's `DB` is created at require
+    # time in lib/tectonic/db.rb, which app.rb loads, which config.ru loads before it calls
+    # `setup!` -- so by the time Sentry initialises, the one database that matters already
+    # exists and the patch sails straight past it. Checked rather than assumed: extending the
+    # class leaves `DB.singleton_class.ancestors` without the module, and extending the
+    # instance puts it there.
+    #
+    # `Sequel::DATABASES` rather than this app's own `DB` constant, so this file keeps knowing
+    # nothing about the schema it reports on -- and so a second connection, if one ever exists,
+    # is covered by the same line.
+    #
+    # The class-level patch above is left on anyway. It is the right hook for anything
+    # connected after this point, and the two together mean the instrumentation does not
+    # depend on load order in either direction.
+    def instrument_open_databases!
+      return unless defined?(::Sequel::DATABASES)
+
+      ::Sequel::DATABASES.each { |db| db.extension(:sentry) }
+      nil
+    rescue StandardError => e
+      warn "Could not instrument database queries for Sentry: #{e.message}"
+      nil
+    end
+
+    # Every span description on its way out, with the data taken out of it. #388.
+    #
+    # **This is the reason the Sequel integration is safe to have on at all.** #388 recommends
+    # it in one line -- "worth enabling alongside" -- and enabling it as written would have
+    # shipped people's email addresses to a third party.
+    #
+    # Sequel does not use bound parameters by default; it builds SQL with the literals
+    # inlined. So the description the integration attaches to a query span is the whole
+    # statement, values and all:
+    #
+    #   SELECT * FROM "accounts" WHERE ("email" = 'someone@example.com')
+    #
+    # That is checked rather than assumed -- it is the literal output of Sequel for that
+    # query. And it would walk back, from a monitoring config file, a decision this app has
+    # made carefully and in several places: send_default_pii is deliberately off, the MCP
+    # audit hook sends argument *keys* and never values, and describe_request sends an account
+    # id rather than an email. A query span carrying the email in plain text undoes all three.
+    #
+    # **It also makes the traces better, not just safer.** Sentry groups spans by description,
+    # so `account_id = 407` and `account_id = 408` are two different spans of one query. With
+    # the literals out they are one, which is the aggregate the whole feature is for.
+    #
+    # Applied to every `db.` span rather than to Sequel's alone, so a database integration
+    # added later is covered by something that already exists rather than by somebody
+    # remembering. HTTP spans are left alone on purpose: their description is a method and a
+    # URL that the SDK already sanitises, and blanking the numbers in one would destroy the
+    # part worth reading.
+    #
+    # The spans arrive as plain hashes at this point rather than as Span objects, which is
+    # checked rather than assumed -- `before_send_transaction` runs after the event has been
+    # built and its spans flattened.
+    def scrub_spans(event)
+      event.spans&.each do |span|
+        span[:description] = scrub_sql(span[:description]) if span[:op].to_s.start_with?('db.')
+      end
+      event
+    rescue StandardError => e
+      # A scrubber that raised would drop the transaction, and a dropped transaction is the
+      # quiet half of this failing: no error, no event, and a performance page that is simply
+      # emptier than it should be. Better to lose the scrub than the trace -- except that
+      # losing the scrub is the one thing that is not acceptable here, so the event goes too.
+      warn "Could not scrub a span description: #{e.message}"
+      nil
+    end
+
+    # A SQL statement with its values replaced. Quoted strings first, then bare numbers.
+    #
+    # Single quotes are unambiguous in Sequel's output: it double-quotes identifiers, so
+    # anything in single quotes is a literal. `(?:[^']|\'\')*` keeps a doubled quote -- SQL's
+    # own escape for a quote inside a string -- from ending the match early and leaving the
+    # tail of somebody's text behind.
+    #
+    # Numbers are taken second and only where they stand alone. The lookarounds keep the
+    # digits inside an identifier ("account_plates" has none, but a future table may) and the
+    # index of a bound parameter ($1) from being blanked, which would turn a readable
+    # statement into a puzzle for no gain.
+    def scrub_sql(sql)
+      return sql if sql.nil?
+
+      sql.gsub(/'(?:[^']|'')*'/, "'?'")
+         .gsub(/(?<![\w."$])-?\d+(?:\.\d+)?(?![\w"])/, '?')
     end
 
     # A path with its ids taken out, for use as a Sentry tag. #385.

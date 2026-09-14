@@ -77,6 +77,18 @@ services:
       # start: losing error reporting is not worth an outage.
       - key: SENTRY_DSN
         sync: false
+      # How much of the traffic Sentry times, as a fraction. #388.
+      #
+      # Unset means all of it, which is the right default at this traffic -- a tenth of a
+      # single active account is not a sample. It is named here anyway, and that is the point:
+      # a transaction holds a reference to the Rack env for its lifetime, and on a starter
+      # instance that can show up as memory growth across a day. Turning it down has to be
+      # something somebody watching a graph climb can do from this dashboard in ten seconds,
+      # not a commit and a deploy.
+      #
+      # 0 switches tracing off and leaves error reporting exactly as it was.
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        sync: false
       # Resend's API key, which is the whole of the mail configuration -- lib/tectonic/mailer
       # posts to one endpoint and there is no SMTP anywhere. Absent, the app boots and the
       # reset flow still works end to end except for the send: the link is written to the log
