@@ -1863,6 +1863,33 @@ class Tectonic < Roda
     rated[:rpe] == rpe ? 'bg-gray-900 text-white' : 'bg-white text-gray-700'
   end
 
+  # Which part of the scale this set's buttons cover. #442.
+  #
+  # The screen offered 6 to 10 and the prescription side allows 1 to 10, which migration 019
+  # named as a gap at the time it opened it: *"speed work and deload weeks are written at 5
+  # and 6, and a column refusing a 5 would make a real prescription unwritable while sets.rpe
+  # cheerfully stored the answer to it."* The generator duly wrote them, and the screen had no
+  # button to answer with. On the reporting account 1 set of the 30 prescribed at RPE 4 to 6
+  # carries a rating, against 14 of the 36 prescribed at 7 and 8 -- the autoregulation loop
+  # going dark on exactly the weeks it was told to back off.
+  #
+  # **It always reaches 10, whatever was asked for.** A window centred on the target would be
+  # narrower and tidier, and it would refuse the most useful thing a lifter can say about a
+  # deload: that the light one was hard anyway. A prescription is a plan and the rating is
+  # what happened, so the answer may sit anywhere on the scale no matter where the question
+  # did.
+  #
+  # **And it widens only when the prescription asks it to.** Five buttons was a real decision
+  # about a thumb on a phone with chalk on, not an oversight, so a set at RPE 8 or one with no
+  # target draws exactly the row it always drew. Only a set actually written below 6 gets a
+  # sixth button, and the row wraps rather than shrinking, so the targets never narrow.
+  RPE_TOP = 10
+  RPE_USUAL_FLOOR = 6
+
+  def rpe_choices(set)
+    [set[:planned_rpe] || RPE_USUAL_FLOOR, RPE_USUAL_FLOOR].min..RPE_TOP
+  end
+
   # Fill for the button that completes a set or takes it back. The row tint already says
   # which state the set is in, so this says what tapping will do rather than repeating the
   # answer: filled for the action on offer, outlined for the one that reverses it.

@@ -297,18 +297,25 @@
           <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                 hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                 role="group" aria-labelledby="rpe-label-<%= set[:id] %>"
-                hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML" class="mt-2 flex items-center gap-2">
+                hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML" class="mt-2 flex flex-wrap items-center gap-2">
             <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
             <span id="rpe-label-<%= set[:id] %>" class="mr-1 text-xs uppercase tracking-wide text-gray-500">RPE</span>
             <%# Rated 45 times in a session, one-handed, with chalk on. flex-1 divides the
                 row rather than leaving dead space, so the targets are as wide as the
-                screen allows; min-h-12 is 48px, which clears the 44px minimum. %>
-            <%- (6..10).each do |rating| %>
+                screen allows; min-h-12 is 48px, which clears the 44px minimum.
+
+                min-w-11 is the other half of that minimum, and it is what makes the row safe
+                to widen for #442. flex-1 alone sets a basis of zero and will shrink a button
+                to whatever is left, so a set prescribed at RPE 4 would have drawn seven
+                buttons about 38px wide -- fixing the missing rating by making every rating
+                harder to hit. With a floor of 44px and flex-wrap, the extra buttons take a
+                second line instead and every target keeps its size. %>
+            <%- rpe_choices(set).each do |rating| %>
               <%# Named per button as well as grouped, because the complaint in #338 is a
                   screen reader's *list* of controls -- sixty entries reading "6, button",
                   "7, button" -- and a list is exactly where the group's label is lost. %>
               <button value="<%= rating %>" aria-label="RPE <%= rating %> for <%= accessible_name(set) %>"
-                      class="<%= rpe_style(set, rating) %> min-h-12 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
+                      class="<%= rpe_style(set, rating) %> min-h-12 min-w-11 flex-1 rounded-lg border border-gray-300 text-base font-semibold" type="submit" name="rpe">
                 <%= rating %>
               </button>
             <%- end %>
