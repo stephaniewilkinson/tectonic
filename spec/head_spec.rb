@@ -142,15 +142,31 @@ describe 'robots.txt' do
     Head::PRIVATE.each { |path| assert_includes @body, "Disallow: #{path}", "#{path} needs a login and is not named" }
   end
 
-  it 'lets the four public pages through' do
+  it 'lets the public pages through' do
     Head::PUBLIC.each { |path| assert_includes @body, "Allow: #{path}" }
   end
 
   # #254 called the sitemap optional at four pages, and worth deciding rather than
-  # forgetting. It was decided against, and this is where that is written down.
-  it 'names no sitemap, which is the decision and not an omission' do
-    refute_includes @body, 'Sitemap:'
-    assert_includes @body, 'No Sitemap line, deliberately'
+  # forgetting. It was decided against, and robots.txt held the line open for "the day there
+  # is a public page nothing links to -- documentation for the connector is the likely first
+  # one".
+  #
+  # #359 is that day, and the prediction was right about which page and wrong about the
+  # reason: /docs is linked, from the front page and from /about, because a page nobody can
+  # find from the site is a bad page whatever a crawler thinks. What changed instead is that
+  # /docs is the URL a directory submission points at and the one page here aimed at a search
+  # term this domain can plausibly win.
+  it 'names a sitemap, which is now the decision' do
+    assert_match(/^Sitemap: \S+sitemap\.xml$/, @body)
+  end
+
+  # A Sitemap line pointing at a 404 is worse than no line, because a crawler believes it and
+  # comes back for it. Asserted here rather than only where the sitemap is specced, because
+  # this is the file making the promise.
+  it 'names one that is actually served' do
+    get URI.parse(@body[/^Sitemap: (\S+)$/, 1]).path
+
+    assert_equal 200, last_response.status
   end
 end
 

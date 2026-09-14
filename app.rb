@@ -384,6 +384,18 @@ class Tectonic < Roda
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
+    # The connector's documentation, and the fifth public page. #359.
+    #
+    # Public and unauthenticated, because it is what a directory submission points at and what
+    # somebody reads before deciding whether to connect an app to their assistant at all --
+    # both of which happen before there is an account to sign in to.
+    r.get('docs') do
+      @page_title = 'Connect tectonic plates to Claude or ChatGPT'
+      @page_description = 'Add the tectonic plates connector to Claude or ChatGPT: plan a ' \
+                          'whole barbell block in conversation, have it written into real ' \
+                          'sessions, and log every set against it.'
+      view('docs')
+    end
     # The first thing an account with nothing logged sees. A calendar of an empty month
     # is a true answer to "what have I trained" and a useless one to "what do I do now",
     # which is the only question a new account has. It stays reachable at its own address
@@ -1102,6 +1114,29 @@ class Tectonic < Roda
     return '/workouts/new' unless mine.empty?
 
     '/start'
+  end
+
+  # Where the connector actually is, built from the two values the app is served under rather
+  # than written out. #359: a documentation page naming an endpoint by hand is a page that goes
+  # quietly wrong the day either moves, and the address is the one thing on it that has to be
+  # exactly right.
+  # `resource_url` rather than the two halves joined again: that is already the canonical
+  # address of this MCP resource -- the value an access token must carry in `aud` and the one
+  # the discovery document advertises -- so a page telling a reader where to point their client
+  # is naming the same thing, and joining the halves a second time is how the two come to
+  # differ. It falls back to the canonical origin where MCP_PUBLIC_BASE_URL is unset, which is
+  # every environment except production and none where anybody is reading this page.
+  def mcp_endpoint_url
+    MCP::Config.public_base_url ? MCP::Config.resource_url : "#{CANONICAL_ORIGIN}#{MCP::Config.endpoint_path}"
+  end
+
+  # The one-click add link, which until a directory listing exists is the whole of this app's
+  # distribution (#359). It opens Claude's add-connector dialog prefilled, needs no listing and
+  # no review, works on every plan including Free, and works signed out -- the reader signs in
+  # and lands back on the dialog.
+  def claude_connector_url
+    'https://claude.ai/customize/connectors?modal=add-custom-connector' \
+      "&connectorName=#{CGI.escape('tectonic plates')}&connectorUrl=#{CGI.escape(mcp_endpoint_url)}"
   end
 
   # This page's address on the canonical origin, which is what rel=canonical wants and

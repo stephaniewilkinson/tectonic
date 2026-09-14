@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The five public pages, and all of them. #359.
+
+  assets/robots.txt held a Sitemap line open for the day there was a public page nothing
+  linked to, and named the connector documentation as the likely first one. It was right about
+  which page and wrong about the reason: /docs is linked, from the front page and from /about,
+  because a page nobody can find from the site is a bad page whatever a crawler thinks.
+
+  This exists for the reason that did change. /docs is the URL a directory submission points
+  at, and the one page here aimed at a search term this domain can plausibly win -- so it is
+  worth being explicit about rather than left to a crawl finding its way down from the root.
+
+  No lastmod, changefreq or priority. Google has said for years that it ignores the last two
+  outright, and a lastmod written by hand is a date that is wrong the first time anybody edits
+  a page without remembering this file -- which is worse than an absent one, because a crawler
+  believes it. A list of URLs is the whole of what this can honestly assert.
+
+  Everything else in the app is behind a login and is Disallow-ed in robots.txt. A sitemap
+  listing any of it would be asking a crawler to fetch pages that answer 302.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://tectonicplates.app/welcome</loc></url>
+  <url><loc>https://tectonicplates.app/docs</loc></url>
+  <url><loc>https://tectonicplates.app/about</loc></url>
+  <url><loc>https://tectonicplates.app/login</loc></url>
+  <url><loc>https://tectonicplates.app/create-account</loc></url>
+</urlset>

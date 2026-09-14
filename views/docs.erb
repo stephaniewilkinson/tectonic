@@ -1,0 +1,137 @@
+<%# The connector's documentation. #359.
+
+    /docs returned 404, and both directory submissions require a public documentation URL
+    before they will accept anything, so this blocks the listing tickets as much as the tool
+    annotations do. #342 found it; assets/robots.txt predicted it in its own closing comment.
+
+    **Written for a lifter, not a maintainer.** It is mostly the second half of README.md said
+    again for somebody who wants to use the thing rather than run it: how to add it, what it
+    can do, what it cannot, and what is stored. The directory forms ask about data handling
+    too, so writing that honestly once answers the form as well as the reader.
+
+    The one-click link leads, because until a directory listing exists it is the entire
+    distribution mechanism: it opens Claude's add-connector dialog prefilled, needs no listing
+    and no review, and works for a signed-out reader -- they sign in and land back on the
+    dialog.
+
+    Prose rather than a table of tools. A generated list of thirty-odd tool names is a thing
+    this page could produce automatically and nobody would read; what a reader needs is
+    whether the connector can do the thing they are about to ask for, which is four sentences.
+    It would also go stale in the opposite direction from the truth -- a list that is right
+    about names and silent about what they mean. %>
+<div class="mx-auto max-w-2xl">
+  <h1 class="serif text-4xl font-semibold text-gray-900">Connect tectonic plates to Claude or ChatGPT</h1>
+
+  <p class="mt-4 text-lg text-gray-700">
+    tectonic plates has a connector, so you can plan and log training by asking for it.
+    Write a whole block in conversation, have it land in the app ready to lift, and tick sets
+    off on your phone at the rack.
+  </p>
+
+  <%# The link, at the top, because it is the thing this page is for. `connectorUrl` is built
+      from the same two constants the app serves itself under, so a change to either cannot
+      leave this pointing at an endpoint that moved. %>
+  <div class="mt-8 rounded-xl border border-sky-200 bg-sky-50 p-5">
+    <h2 class="text-lg font-semibold text-gray-900">Add it in one click</h2>
+    <p class="mt-2 text-sm text-gray-700">
+      Opens Claude&rsquo;s add-connector dialog with the address already filled in. If you are
+      not signed in to Claude it will ask you to, then bring you back here.
+    </p>
+    <a href="<%= claude_connector_url %>" rel="noopener"
+       class="<%= button_style %> mt-4 inline-flex min-h-11 items-center bg-sky-800 px-4 text-sm
+              font-semibold text-white hover:bg-sky-900">
+      Add to Claude
+    </a>
+    <p class="mt-3 text-sm text-gray-600">
+      Adding it by hand instead, in Claude or in ChatGPT? The address is
+      <code class="rounded bg-white px-1.5 py-0.5 font-mono text-xs"><%= mcp_endpoint_url %></code>.
+    </p>
+  </div>
+
+  <h2 class="mt-10 text-2xl font-semibold text-gray-900">What it can do</h2>
+  <p class="mt-3 text-gray-700">
+    It writes training, not just records it. You can ask for a whole block &mdash; weeks, the
+    days in each week, the lifts in each day, how each one progresses, which weeks deload
+    &mdash; and then ask for a week of it to be written into real sessions. The warmup ramps
+    are worked out for you, and every weight is rounded to something your own rack can
+    actually load, from the bar and plates you list on the settings page.
+  </p>
+  <p class="mt-3 text-gray-700">
+    It reads training too: what you lifted and when, what a movement&rsquo;s history implies
+    about your current max, how long you typically rest between sets, and how a block is
+    going against what it asked for. Asking &ldquo;how did Monday go&rdquo; or &ldquo;what
+    should bench open at next block&rdquo; is a question it can answer from your own numbers.
+  </p>
+  <p class="mt-3 text-gray-700">
+    And it logs: a set, a session, a correction to either. Sets you log in conversation and
+    sets you tap off on the session screen are the same rows, so a session started one way
+    can be finished the other.
+  </p>
+
+  <h2 class="mt-10 text-2xl font-semibold text-gray-900">What it will not do</h2>
+  <%# The honest half, and the more useful one. A reader deciding whether to connect an app to
+      an assistant is deciding what it might do without being asked, and a page that only
+      lists capabilities answers the wrong question. %>
+  <ul class="mt-3 list-disc space-y-2 pl-5 text-gray-700">
+    <li>
+      It never reaches another account. Every tool acts only on the account that authorised
+      it, and there is no tool that can name a different one.
+    </li>
+    <li>
+      It will not quietly overwrite training you have already logged. Changing the weight or
+      reps of a set you marked as lifted has to be confirmed, and changing which movement such
+      a set was is refused outright &mdash; that is a different set, not an edited one.
+    </li>
+    <li>
+      It does not decide anything for you. The app measures and reports; how long to rest,
+      what to open a block at, and whether a session was any good are judgements, and they
+      stay with you and whoever you are talking to.
+    </li>
+    <li>
+      It cannot read your email, your files, or anything else. It reaches this app and nothing
+      else, over one address.
+    </li>
+  </ul>
+
+  <h2 class="mt-10 text-2xl font-semibold text-gray-900">Turning it off</h2>
+  <p class="mt-3 text-gray-700">
+    Authorisation is per account and revocable at any time from
+    <a href="/connections" class="text-lime-700 underline hover:text-lime-800">your connections
+    page</a>. Revoking takes effect immediately: the token stops working on the next call, and
+    nothing you have already logged is touched.
+  </p>
+
+  <h2 class="mt-10 text-2xl font-semibold text-gray-900">What is stored</h2>
+  <p class="mt-3 text-gray-700">
+    Your email address, so you can sign in, and your training: workouts, sets, the movements
+    you do them on, the blocks you write, the plates you own, and your time zone. That is the
+    whole of it. There is no bodyweight, no measurements, no photographs and no health data of
+    any other kind.
+  </p>
+  <%# Written against the code rather than from memory, and corrected once while writing it: a
+      first draft here said the audit log records field names and never values, which is true
+      of the error reports and not of the log. McpAuditLog.record stores the whole argument
+      hash. That is the right design -- an audit trail that cannot say what was written is not
+      one -- and the page has to say which is which rather than claim the stricter of the two
+      about both. %>
+  <p class="mt-3 text-gray-700">
+    When an assistant writes a row, the row records that it did &mdash; so a set you can&rsquo;t
+    account for says where it came from. Every write through the connector is kept in your own
+    account&rsquo;s audit trail, with what was sent, so you can see exactly what was done on
+    your behalf. It stays in this app&rsquo;s database.
+  </p>
+  <p class="mt-3 text-gray-700">
+    If something breaks, the crash report that goes to our error monitoring carries the names
+    of the fields involved and never their values, and never your email address.
+  </p>
+  <%# Not "the full terms are on the about page", which the first draft of this said. #346
+      wrote them and deliberately did not publish them: they sit in legal/ with no route and no
+      link, because publishing is an act with legal consequence and section 6 is waiting on a
+      lawyer's read. A documentation page that links to terms that are not served would be a
+      404 on the one page a directory submission points at, and a page that says "the terms
+      are" about a draft would be worse than that. So this says what is true today. %>
+  <p class="mt-3 text-gray-700">
+    More about what this app is for is on the
+    <a href="/about" class="text-lime-700 underline hover:text-lime-800">about page</a>.
+  </p>
+</div>

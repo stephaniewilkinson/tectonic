@@ -146,6 +146,16 @@
       suite less specific about what it is clicking. %>
   <div class="mt-10 flex items-center gap-x-6">
     <a href="/create-account" class="<%= button_style %> bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">Create an account</a>
+    <%# The connector's documentation, linked rather than left for a sitemap to announce (#359).
+        The page exists because a directory submission needs a public URL, and it stayed
+        unlinked in the plan for that reason -- but this page has told a reader to connect the
+        app to their assistant since #269 and had nowhere to send them to find out how.
+
+        The link names no vendor, which is #326's rule and is enforced by a spec reading this
+        page. /docs itself names both, and that is the exception #326 already carved out: on
+        setup steps the name *is* the instruction, because "Settings, then Connectors" is a
+        different sequence in each client. %>
+    <a href="/docs" class="text-sm font-semibold leading-6 text-sky-800">How to connect it <span aria-hidden="true">&rarr;</span></a>
     <a href="/about" class="text-sm font-semibold leading-6 text-sky-800">About this app <span aria-hidden="true">&rarr;</span></a>
   </div>
 </section>

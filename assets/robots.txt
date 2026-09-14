@@ -6,11 +6,12 @@
 
 User-agent: *
 
-# The public surface, and all of it. Four pages and the root, which redirects to the
+# The public surface, and all of it. Five pages and the root, which redirects to the
 # first of them.
 Allow: /$
 Allow: /welcome
 Allow: /about
+Allow: /docs
 Allow: /login
 Allow: /create-account
 
@@ -35,7 +36,17 @@ Disallow: /oauth-
 # this file; it is listed because a search index is not what it is public for.
 Disallow: /.well-known/
 
-# No Sitemap line, deliberately. The public surface is the four pages above, they link
-# to each other, and a sitemap listing them would tell a crawler only what it already
-# has from following those links. Worth adding the day there is a public page nothing
-# links to -- documentation for the connector is the likely first one.
+# The Sitemap line this file has been holding open, and #359 is the day it predicted:
+# documentation for the connector is indeed the first page it was waiting for.
+#
+# The original argument was that the public pages link to each other, so a sitemap would
+# tell a crawler only what it already has. /docs is linked too -- from the front page and
+# from /about, because a page nobody can find from the site is a bad page whatever a
+# crawler thinks -- so that argument has not stopped being true, and this line is no longer
+# load-bearing for discovery.
+#
+# It goes in anyway, for the reason that has changed rather than the one that has not:
+# /docs is the URL a directory submission points at and the one page here that is aimed at
+# a search term this domain can win, so it is the one page whose indexing is worth being
+# explicit about rather than left to a crawl finding its way down from the root.
+Sitemap: https://tectonicplates.app/sitemap.xml
