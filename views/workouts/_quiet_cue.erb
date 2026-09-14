@@ -1,0 +1,29 @@
+<%# What the server tells the nudge, and nothing else. #410.
+
+    The same shape as _rest_cue and for the same reason: the nudge cannot live inside
+    #session-body, because that region is replaced on every Done tap and every fifteen-second
+    poll, and "how long have you been standing there" is state. So the bar sits outside and
+    this carries the one fact it cannot work out for itself.
+
+    Two facts, in fact, and they are different in kind. `last-at` is when the session last did
+    anything, which is what the quiet is measured from. `quiet-after` is how long that quiet
+    has to run before the question is worth asking, which comes off the rest prescribed for
+    the set that was ticked off -- three times it, floored and capped. A block writing eight
+    minutes between singles gets asked half an hour later rather than being interrupted while
+    the lifter is still resting.
+
+    **Unlike the rest cue, this one carries the session rather than the tap.** The rest cue is
+    deliberately empty when a tap did not finish a set, because a mis-tap corrected is not the
+    start of a rest. This is the opposite: it always says when the session last moved, whatever
+    the tap did, because an un-complete is still the session doing something and the quiet has
+    to restart from it. It is also filled in on first paint, so arriving at a session left open
+    this morning is asked about immediately rather than in another twenty minutes.
+
+    Empty only where nothing has been lifted at all. A session with no completed set has no
+    quiet to measure and nothing to close, and the script draws nothing.
+
+    `oob` is a local with a default so the two callers read the same way _rest_cue's do: the
+    session view renders this plainly on first paint, the complete route renders it with
+    oob: true. %>
+<span id="quiet-cue"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %> hidden
+      data-last-at="<%= last_at %>" data-quiet-after="<%= quiet_after %>"></span>
