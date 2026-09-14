@@ -1942,6 +1942,14 @@ class Tectonic < Roda
     @progress.map { |name, points| { name:, data: points, dataset: STYLES.fetch(name, {}) } }
   end
 
+  # How many completed working sets this movement has, for the page that has to tell "nothing
+  # logged" apart from "logged, and the estimate cannot read it".
+  #
+  # Off @sets, which the route has already loaded, so this costs no query.
+  def logged_working_sets
+    @sets.count { |set| set[:is_completed] && !set[:is_warmup] }
+  end
+
   # A number as a chart table should print it. #337, and #256 underneath it.
   #
   # Tonnage and every weight column are numeric(7,2), so Sequel hands back a BigDecimal and
