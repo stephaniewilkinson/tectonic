@@ -43,6 +43,19 @@ module UnreadableSets
     Tectonic::Exercise.create(account_id:, name: "Curl #{SecureRandom.hex(4)}")
   end
 
+  # The reported case, exactly: exercise 1 carries thirteen squat sets logged between 2023 and
+  # 2025, every one of them never ticked off. They are drawn in the table on the page while the
+  # paragraph above them said nothing had been lifted.
+  def a_movement_logged_but_never_ticked(account_id, sets: 13)
+    exercise = Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}", is_barbell: true)
+    workout_id = DB[:workouts].insert(account_id:, date: Date.today - 400)
+    sets.times do
+      DB[:sets].insert(workout_id:, exercise_id: exercise.id, weight: 45, reps: 5,
+                       is_warmup: false, is_completed: false)
+    end
+    exercise
+  end
+
   # Five reps at RPE 8 sits exactly on the end of the table, so this one reads.
   def a_movement_the_estimate_reads(account_id)
     exercise = Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}", is_barbell: true)
@@ -173,6 +186,64 @@ describe 'what the count counts' do
     get "/exercises/#{exercise.id}"
 
     assert_match(/2 completed working sets are logged here/, said)
+  end
+end
+
+# The state the original report was about, and the one the first two attempts at this sentence
+# both missed. Thirteen sets on the page, and a paragraph above them saying there were none.
+describe 'a movement whose sets were logged and never ticked off' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include UnreadableSets
+
+  before do
+    @account_id = login
+    @exercise = a_movement_logged_but_never_ticked(@account_id)
+    get "/exercises/#{@exercise.id}"
+  end
+
+  # The whole complaint, twice over: it said "nothing has been lifted here", and after the
+  # first fix "nothing has been logged here yet", which is the same untruth in new words.
+  it 'does not claim nothing is there' do
+    refute_match(/Nothing has been (lifted|logged)/i, said)
+  end
+
+  it 'says how many are there' do
+    assert_match(/13 sets are logged here/, said)
+  end
+
+  # Naming the reason is what makes it actionable rather than merely less wrong.
+  it 'says the reason is that they were never marked done' do
+    assert_includes said, 'none of them has been marked as done'
+  end
+
+  # And the action that actually works. "Log a completed set" was the old advice and it is the
+  # wrong instruction for somebody whose thirteen sets are already logged.
+  it 'tells the lifter to mark them done rather than to log more' do
+    assert_includes said, 'Mark them done'
+    refute_includes said, 'log a completed set'
+  end
+
+  # The app is not wrong to ignore them. A set never ticked is training that was planned rather
+  # than performed, and an estimate must not come from a set nobody has said happened.
+  it 'still refuses to estimate a max from them' do
+    assert_nil Tectonic::TrainingMax.for(account_id: @account_id, exercise: @exercise)
+  end
+end
+
+describe 'a movement with one set logged and not ticked' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include UnreadableSets
+
+  it 'says it in the singular throughout' do
+    account_id = login
+    exercise = a_movement_logged_but_never_ticked(account_id, sets: 1)
+
+    get "/exercises/#{exercise.id}"
+
+    assert_includes said, '1 set is logged here, but it has not been marked as done'
+    assert_includes said, 'Mark it done from the set page'
   end
 end
 
