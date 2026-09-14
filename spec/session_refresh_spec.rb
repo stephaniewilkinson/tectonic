@@ -107,6 +107,11 @@ end
 
 # The one case where "left alone" is still the whole answer: nothing in the session is
 # unfinished, so there is nothing to rewrite around.
+#
+# It is also what holds the other side of #441 down. That narrowed :lifted to refuse a session
+# something had been deleted from, and a narrowing that went too far would leave nothing
+# saying "left alone" at all -- so the assertion below is now load-bearing in both directions
+# rather than only describing the happy case.
 describe 'editing a lift whose session is entirely lifted' do
   include Rack::Test::Methods
   include SessionRefreshing
@@ -154,6 +159,36 @@ describe 'removing a lift from a session that has other work in it' do
 
     assert_equal 1, left.length, 'only the lifted set should remain'
     assert_equal other.id, left.first.exercise_id
+  end
+end
+
+# What it *says* about having done that, which is the half #441 was still getting wrong after
+# #407 fixed the half above.
+#
+# `written` and `kept` describe what the plan put into the session and neither can see what
+# came out, so a refresh that deleted seven planned sets and had nothing to write back scored
+# zero written, one kept -- indistinguishable from a session nobody touched, and reported as
+# "left alone" while seven sets were being deleted from it. A lifter told that goes looking
+# for the movement in the session it was just taken out of, which is how this was found.
+describe 'what it says about a session it has just emptied' do
+  include Rack::Test::Methods
+  include SessionRefreshing
+
+  it 'does not report a gutted session as one that was left alone' do
+    token = mint(scopes: %w[read write])
+    _program, day, lift = a_block(token.account_id)
+    workout = Tectonic::Workout.where(program_day_id: day.id).first
+    other = Tectonic::Exercise.create(account_id: token.account_id, name: "Hip Thrust #{SecureRandom.hex(4)}")
+    Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id: other.id, weight: 95, reps: 8,
+                                is_warmup: false, is_completed: true, completed_at: Time.now,
+                                is_barbell: true)
+
+    call_tool('delete_program_lift', raw: token.raw, arguments: { program_lift_id: lift.id })
+    said = tool_result['content'].first['text']
+
+    refute_includes said, 'left alone'
+    assert_includes said, '7 planned sets taken out'
+    assert_includes said, '1 set already lifted stays as it is'
   end
 end
 

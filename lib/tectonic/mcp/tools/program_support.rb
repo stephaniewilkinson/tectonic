@@ -37,13 +37,31 @@ class Tectonic < Roda
           named = Date::DAYNAMES[day.weekday]
           case refresh.outcome
           when :rewritten then " The planned session on #{named} was rewritten to match."
-          when :partly
-            " The #{named} session was rewritten around what had already been lifted: " \
-            "#{refresh.written} #{refresh.written == 1 ? 'set' : 'sets'} updated, " \
-            "#{refresh.kept} left because #{refresh.kept == 1 ? 'it was' : 'they were'} completed."
+          when :partly then partly(refresh, named)
+          when :emptied then emptied(refresh, named)
           when :lifted then " The #{named} session has lifted sets in it, so it was left alone."
           else ''
           end
+        end
+
+        def partly(refresh, named)
+          " The #{named} session was rewritten around what had already been lifted: " \
+            "#{refresh.written} #{refresh.written == 1 ? 'set' : 'sets'} updated, " \
+            "#{refresh.kept} left because #{refresh.kept == 1 ? 'it was' : 'they were'} completed."
+        end
+
+        # A session the plan no longer asks anything unfinished of. #441.
+        #
+        # It used to fall into :lifted and be reported as left alone, which was the opposite of
+        # what had happened to it -- the planned sets were deleted and nothing was written back
+        # because there was nothing left to write. Saying what came out is the whole point: the
+        # lifter's next question is where the movement went, and "left alone" sends them
+        # looking for it in the session it was just taken out of.
+        def emptied(refresh, named)
+          " The #{named} session had #{refresh.removed} planned " \
+            "#{refresh.removed == 1 ? 'set' : 'sets'} taken out and nothing left to put back. " \
+            "The #{refresh.kept} #{refresh.kept == 1 ? 'set' : 'sets'} already lifted " \
+            "#{refresh.kept == 1 ? 'stays' : 'stay'} as #{refresh.kept == 1 ? 'it is' : 'they are'}."
         end
       end
 
