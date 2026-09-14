@@ -66,10 +66,20 @@ end
 
 # The honesty the old refusal was carrying, kept as a property of the reading.
 #
-# The boundary is five, which is where the table used to stop, and that is the point rather
-# than a coincidence: it is what makes "no prescription moves" exactly true. Six was tried and
-# the production data refused it -- an index-six reading setting a max for the first time moves
-# five derived maxes on the reporting account, Front Squat from 105 to 123.
+# **The boundary is six.** #461.
+#
+# It shipped at five, and five had one real argument: it is where the table used to stop, so
+# nothing that could set a max before changed and nothing new started. That made the extension
+# provably free. It is not a reason on its own, though -- it makes the boundary an artefact of
+# how long the table used to be rather than a claim about how far from a single a set may sit
+# and still price a block.
+#
+# Six is the ordinary claim. A set of six at RPE 8 is two reps from failure, well inside the
+# range the chart was built from, and at five a lifter training fives at RPE 7 -- which
+# restates to six -- never got a derived max at all.
+#
+# Checked against production rather than argued: two derived maxes move, both on movements
+# with no stated max, Front Squat 105 to 123 and Decline Bench 126 to 130.
 describe 'which readings may set a number by themselves' do
   def reading(**set) = Tectonic::OneRepMax.reading_of(set)
 
@@ -78,16 +88,23 @@ describe 'which readings may set a number by themselves' do
     assert reading(weight: 155, reps: 3, rpe: 6)[:confident]
   end
 
+  # The set of fives at RPE 7 that six exists to admit: six restated reps, which is what a
+  # conservative lifter's ordinary working set comes out at.
+  it 'trusts a set of fives taken two reps from failure' do
+    assert reading(weight: 155, reps: 5, rpe: 7)[:confident]
+    assert reading(weight: 155, reps: 6, rpe: 8)[:confident]
+  end
+
   it 'does not trust one further out than that' do
-    refute reading(weight: 155, reps: 6, rpe: 8)[:confident]
+    refute reading(weight: 155, reps: 7, rpe: 8)[:confident]
     refute reading(weight: 44, reps: 8, rpe: 7)[:confident]
   end
 
-  # The property the boundary exists to guarantee: the set of readings allowed to set a max is
-  # exactly the set the old table could read at all, so no derived max anywhere moves.
-  it 'trusts exactly what the old table could reach, and nothing more' do
-    (1..5).each { |reps| assert reading(weight: 155, reps:, rpe: 8)[:confident] }
-    (6..10).each { |reps| refute reading(weight: 155, reps:, rpe: 8)[:confident] }
+  # The boundary said as a whole range, so moving it is a visible edit here rather than a
+  # silent change of behaviour somewhere else.
+  it 'trusts everything up to six restated reps and nothing past it' do
+    (1..6).each { |reps| assert reading(weight: 155, reps:, rpe: 8)[:confident] }
+    (7..10).each { |reps| refute reading(weight: 155, reps:, rpe: 8)[:confident] }
   end
 
   # The best reading and the best trustworthy reading are different questions, and both are

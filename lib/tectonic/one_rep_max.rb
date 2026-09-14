@@ -31,22 +31,35 @@ class Tectonic < Roda
     # above six restated reps it is reported, drawn on the chart, and **not allowed to become
     # a training max on its own**. See TrainingMax.derived.
     #
-    # **Five, which is where the table used to stop, and that is the whole reason.**
+    # **Six**, which is #448's number and #461's decision.
     #
-    # Six was the first choice and the data refused it. Setting the boundary at six lets an
-    # index-six reading start setting a max where it never could before, and on this account
-    # that moves five derived maxes -- Front Squat from 105 to 123, which is seventeen per cent
-    # of what every percentage of it would generate against. The goal of extending the row was
-    # correct estimates with *no change to any prescription*, and six quietly breaks it.
+    # It shipped at five first, and the argument for five was that five is where the table
+    # used to stop -- so every reading that could set a max still could, at the same number,
+    # and the extended row was visible only in what the app reports and draws. That is a real
+    # property and it was the right thing to hold while the question was open. It is not a
+    # reason on its own: it makes the boundary an artefact of the table's old length rather
+    # than a claim about how far from a single a set may sit and still price a block.
     #
-    # Five keeps that promise exactly: every reading that could set a max before still can, at
-    # the same number, and nothing that could not has started. The extension is therefore
-    # visible only where it was wanted -- in what the app can report and draw.
+    # Six is that claim, and it is the ordinary one. A set of six at RPE 8 is two reps from
+    # failure and sits well inside the range the RTS chart was built from; the accuracy
+    # argument against high-rep estimates bites past eight or nine rather than here. Holding
+    # at five meant a lifter training fives at RPE 7 -- a normal, conservative way to train,
+    # and restating to six -- never got a derived max at all, which is the population this was
+    # built for.
     #
-    # Six is defensible on its own terms and is one character away. It is a decision about
-    # whether a set six reps from a single should price a training block, which is a coaching
-    # question rather than an arithmetic one, so it is not one to make as a side effect.
-    CONFIDENT_REPS = 5
+    # **What it moved, checked against production rather than reasoned about.** Two derived
+    # maxes, both on movements with no stated max to protect them: Front Squat 105 to 123, and
+    # Decline Bench 126 to 130. Nothing with a stated max moves, because a stated max is not
+    # derived from a reading at all. An earlier note here said five maxes moved; that counted
+    # the stated ones, which do not.
+    #
+    # The Front Squat jump is the one to understand before trusting this. 105 came from the
+    # heaviest set within five restated reps and 123 from a set of five at RPE 7, which is
+    # six restated -- the same training, read one row further down a chart that reaches it.
+    # Seventeen per cent is a large correction, and it is large because the old boundary was
+    # excluding the best evidence the movement had rather than because the new one invents
+    # any.
+    CONFIDENT_REPS = 6
 
     module_function
 
