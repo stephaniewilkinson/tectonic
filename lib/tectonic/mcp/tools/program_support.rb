@@ -130,12 +130,18 @@ class Tectonic < Roda
             .merge(prescription_of(row)).merge(reference_of(row))
         end
 
-        # What the lift asks for, as against what it is. The load and the two instructions
+        # What the lift asks for, as against what it is. The load and the three instructions
         # that travel onto the rows the generator writes -- an effort to take the working
-        # sets at, and a rest to take between them.
+        # sets at, a rest to take between them, and whether they are done under commands.
+        #
+        # is_commanded is here rather than beside is_barbell in `lift` above, and the line is
+        # worth drawing: the flags there say what the lift *is* and this says what the block
+        # is *asking for*. Reading a plan back without it would hide the one instruction a
+        # meet-prep block is written around. #311.
         def prescription_of(row)
           { top_weight: Presenter.weight(row.top_weight), percent_of_max: row.percent_of_max,
-            target_rpe: row.target_rpe, rest_seconds: row.rest_seconds }
+            target_rpe: row.target_rpe, rest_seconds: row.rest_seconds,
+            is_commanded: row.is_commanded }
         end
       end
     end

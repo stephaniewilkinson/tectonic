@@ -33,7 +33,10 @@ class Tectonic < Roda
                     'null to clear it. rest_seconds, 5 to 1800, is the rest its working sets ' \
                     'are meant to take between them and what the session screen counts down ' \
                     'after one; it applies to any movement, and null clears it back to the ' \
-                    'median rest this lifter actually takes. Send only what changes. To swap ' \
+                    'median rest this lifter actually takes. is_commanded says its working ' \
+                    'sets are done under meet commands -- start, press, rack -- rather than ' \
+                    'at the lifter\'s own tempo, and belongs only on a lift counted in reps. ' \
+                    'Send only what changes. To swap ' \
                     'how the load is written, set one of top_weight/percent_of_max and null ' \
                     'the other. Returns what actually moved.'
         scope :write
@@ -45,7 +48,7 @@ class Tectonic < Roda
             top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
-            rest_seconds: NUMBER_OR_NULL,
+            rest_seconds: NUMBER_OR_NULL, is_commanded: { type: 'boolean' },
             percent_of: { type: %w[string null] }, is_weighted: { type: 'boolean' },
             is_per_side: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
             duration_seconds: { type: 'integer' }, note: { type: 'string' }
@@ -72,10 +75,14 @@ class Tectonic < Roda
         # The columns an edit may set. A substitution takes the new movement's barbell
         # flag with it unless the caller says otherwise, because plate math describing the
         # lift that was swapped out is worse than none -- the same rule the web UI follows.
+        # The columns taken straight from the arguments, as against the ones derived from
+        # them below. Named rather than inlined because the list is the API: a field missing
+        # from here is a field the schema accepts and the tool silently drops.
+        WRITABLE = %i[sets reps top_weight percent_of_max is_main is_barbell
+                      target_rpe rest_seconds is_commanded note].freeze
+
         def self.fields(context, lift, arguments)
-          written = arguments.slice(:sets, :reps, :top_weight, :percent_of_max,
-                                    :is_main, :is_barbell, :target_rpe, :rest_seconds, :note)
-          attributes = round_load(context, lift, written, arguments)
+          attributes = round_load(context, lift, arguments.slice(*WRITABLE), arguments)
                        .merge(reference(context, arguments))
                        .merge(reshaped(lift, arguments))
                        .merge(repriced(lift, arguments))
@@ -188,9 +195,15 @@ class Tectonic < Roda
         # to a lift that has already answered them and an unrelated change must not quietly
         # reset the answer to whatever the movement usually does.
         def self.merged(lift, attributes)
+          # is_commanded is here for a reason the three shape columns are not: it is what
+          # makes changing a commanded lift to `time` a named refusal rather than a check
+          # violation. Without it on the row as it will be, check_load asks about commands
+          # the edit did not mention, gets nil, and lets through a measure change that
+          # sets_commanded_reps_are_counted then refuses from the database. #311.
           { sets: lift.sets, reps: lift.reps, duration_seconds: lift.duration_seconds,
             top_weight: lift.top_weight, percent_of_max: lift.percent_of_max,
             is_weighted: lift.is_weighted, measure: lift.measure,
+            is_commanded: lift.is_commanded,
             is_per_side: lift.is_per_side }.merge(attributes)
         end
 

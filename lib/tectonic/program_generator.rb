@@ -460,6 +460,7 @@ class Tectonic < Roda
         # the symbol: this is a dataset insert, which does not typecast, and Sequel reads a
         # symbol here as the name of a column.
         measure: Measured.stored(lift.measure), is_per_side: lift.is_per_side,
+        is_commanded: commanded?(lift, is_warmup:),
         is_warmup:, is_completed: false, is_barbell: lift.is_barbell,
         created_by_oauth_application_id: @created_by }
     end
@@ -500,6 +501,21 @@ class Tectonic < Roda
     # measure clause and why nothing here has to check one.
     def rest_seconds(lift, is_warmup:)
       lift.rest_seconds unless is_warmup
+    end
+
+    # Whether this lift is prescribed under meet commands, copied onto the working sets and
+    # onto nothing else. #311.
+    #
+    # The warmup rule here is the generator's own choice rather than the database's, which
+    # is the one thing that differs from the three above it. 031 deliberately permits a
+    # commanded warmup, because practising the start command on the last heavy single is
+    # real meet preparation and is a warmup by every definition this app has. But a ramp is
+    # *computed* -- the rungs are fractions of the top set, chosen by Warmup rather than
+    # written by anybody -- so commands on one would be an instruction the block never gave.
+    # A lifter who did command that single can still say so by ticking the box on the row,
+    # which is why the constraint stays wider than this method.
+    def commanded?(lift, is_warmup:)
+      !is_warmup && lift.is_commanded
     end
   end
 end

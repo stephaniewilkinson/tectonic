@@ -88,6 +88,13 @@ class Tectonic < Roda
             # holds and press-ups have one -- so the only question is whether the number is a
             # plausible rest, which Bounds::REST answers on its own. #281.
             rest_seconds: attributes[:rest_seconds],
+            # Defaulted to false rather than to anything on the movement, unlike the three
+            # facts in shape_of. There is no exercise-level default to read: Bench Press is
+            # the same movement whether or not a referee is calling it, which is the whole
+            # argument in #311 for a flag on the set instead of a second exercise. A block
+            # that wants commanded work says so on the lift that wants it, usually the top
+            # single and not the back-offs.
+            is_commanded: attributes.fetch(:is_commanded, false),
             is_barbell: barbell?(attributes, exercise, shape) }.merge(shape)
         end
 
@@ -154,6 +161,7 @@ class Tectonic < Roda
           # broken, and the constraint stays as the backstop for anything that never comes
           # through this writer.
           Bounds.target_fits!(attributes[:target_rpe], measure: shape[:measure], weighted: shape[:is_weighted])
+          Bounds.commands_fit!(attributes[:is_commanded], measure: shape[:measure])
           Bounds.reference_fits!(attributes[:percent_of], percent: attributes[:percent_of_max])
           check_priced(attributes, shape)
         end

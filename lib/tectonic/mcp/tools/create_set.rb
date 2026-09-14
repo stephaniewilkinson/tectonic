@@ -20,7 +20,12 @@ class Tectonic < Roda
                     'no external load -- a plank, a band pull-apart, a bodyweight hip ' \
                     'thrust -- which is recorded as a rep count with no weight at all. ' \
                     'is_per_side says the rep count is per side; leave it out and the ' \
-                    "movement's own default decides, which is right for most callers."
+                    "movement's own default decides, which is right for most callers. " \
+                    'is_commanded says the set was done under meet commands -- start, ' \
+                    'press, rack -- rather than at the lifter\'s own tempo. It is a ' \
+                    'competition condition and not a tempo, so it is not the same thing as ' \
+                    'a paused rep; it defaults to false and should be sent only when the ' \
+                    'lifter says the set was commanded.'
         scope :write
         input_schema(
           type: 'object',
@@ -28,7 +33,7 @@ class Tectonic < Roda
             exercise: { type: 'string' }, date: { type: 'string' },
             weight: { type: 'number' }, reps: { type: 'integer' }, rpe: { type: 'integer' },
             is_warmup: { type: 'boolean' }, is_completed: { type: 'boolean' },
-            is_per_side: { type: 'boolean' }
+            is_per_side: { type: 'boolean' }, is_commanded: { type: 'boolean' }
           },
           required: %w[exercise reps], additionalProperties: false
         )
@@ -74,6 +79,12 @@ class Tectonic < Roda
             weight: Load.stored(arguments[:weight]), reps: arguments[:reps], rpe: arguments[:rpe],
             is_warmup: arguments.fetch(:is_warmup, false), is_barbell: exercise.barbell?,
             is_per_side: arguments.fetch(:is_per_side, exercise.default_is_per_side),
+            # False rather than the movement's own anything, because there is nothing on a
+            # movement to read: Bench Press is the same movement whether or not a referee is
+            # calling it, which is #311's argument for a flag here instead of a second
+            # exercise. Every set this tool writes is counted in reps, so
+            # sets_commanded_reps_are_counted cannot be reached from here.
+            is_commanded: arguments.fetch(:is_commanded, false),
             # A set logged as already done is stamped with when it was logged, which is the
             # best this path can say (#281). It is not when it was lifted -- a session typed
             # up in the evening stamps the evening -- so the turnarounds such a session

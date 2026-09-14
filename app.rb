@@ -754,8 +754,12 @@ class Tectonic < Roda
             # Every set this form makes is measured in reps, which is the column default.
             r.redirect "/workouts/#{workout_id}/sets/new" if r.params['reps'].to_s.strip.empty?
 
+            # No timed guard on is_commanded here, unlike the edit form: every set this form
+            # makes is counted in reps, which is the column default and is the same reason
+            # the comment above gives for not asking about a duration.
             set_id = WorkoutSet.insert(weight: r.params['weight'], reps: r.params['reps'],
                                        exercise_id: exercise.id, is_warmup: r.params['is_warmup'] || false,
+                                       is_commanded: !r.params['is_commanded'].nil?,
                                        is_completed: r.params['is_completed'] || false, workout_id:,
                                        is_barbell: exercise.barbell?)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
@@ -849,8 +853,14 @@ class Tectonic < Roda
               # cleared box that left completed_at behind would violate
               # sets_completed_at_needs_a_completion -- which reaches a person as a 500 and
               # a lost edit, which is the failure #213 was about.
+              # `commanded?` rather than the bare parameter the two flags above use,
+              # because sets_commanded_reps_are_counted refuses one on a set held for time.
+              # The form does not draw the box on a timed set, so the browser cannot send
+              # one -- but a post is a post, and a hand-made one landing here would violate
+              # the constraint and reach a person as a 500 and a lost edit, which is #213.
               set.update(weight: r.params['weight'],
                          is_warmup: r.params['is_warmup'] || false,
+                         is_commanded: commanded?(set, r.params),
                          **WorkoutSet.completion(!r.params['is_completed'].nil?),
                          **quantity,
                          **substitution(set, r.params['exercise_id']))
@@ -1414,6 +1424,19 @@ class Tectonic < Roda
     set.timed? ? { duration_seconds: typed, reps: nil } : { reps: typed, duration_seconds: nil }
   end
 
+  # Whether the set edit form is saying this set was done under meet commands. #311.
+  #
+  # The `timed?` half is the whole reason this is a method rather than the `params['x'] ||
+  # false` that is_warmup gets one line above. Commands bracket a rep -- start, press, rack
+  # -- so a movement held for time has no rep for them to bracket, and
+  # sets_commanded_reps_are_counted refuses the row outright. The form already declines to
+  # draw the box on a timed set, so no browser can produce this; a hand-made post can, and
+  # the violation would arrive as an unrescued exception, which is a 500 page and a lost
+  # edit. Refusing it here costs one `&&` and turns it into the box being ignored.
+  def commanded?(set, params)
+    !params['is_commanded'].nil? && !set.timed?
+  end
+
   # The rack the signed-in account lifts on, read once per request: the session view asks
   # for a plate breakdown per set, and every one of them wants the same inventory.
   def equipment
@@ -1491,9 +1514,16 @@ class Tectonic < Roda
   # nobody is being asked to lift, on the row a lifter reads at arm's length. 025 nulls the
   # zeros and `create_set` no longer writes one, so this guard is the belt to that braces:
   # a zero arriving from anywhere reads as the absence it means.
+  # "commanded" rides on the end of the phrase rather than sitting in a badge of its own,
+  # for the reason "per side" does: it is part of what the set *is*, and a lifter reading
+  # the row at arm's length is reading one line rather than scanning for markers. It is also
+  # what keeps the screen and the connector saying the same thing -- MCP's `load_phrase`
+  # builds the same sentence, and a session described one way by the app and another way by
+  # an assistant is the mismatch #306 and #320 were both about. #311.
   def load_label(set)
     "#{"#{weight_label(set[:weight])} lb × " if loaded?(set[:weight])}" \
-      "#{quantity_label(set)}#{' per side' if set[:is_per_side]}"
+      "#{quantity_label(set)}#{' per side' if set[:is_per_side]}" \
+      "#{' commanded' if set[:is_commanded]}"
   end
 
   # What the sheet said, in the same words as what was lifted. The two sit one line apart
