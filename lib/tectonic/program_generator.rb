@@ -67,7 +67,11 @@ class Tectonic < Roda
     #
     # `to_s` is the outcome, because the structured half of every tool response already
     # carried the old symbol under that name.
-    Refresh = Struct.new(:outcome, :written, :kept) do
+    # `removed` is the third count and it is what #441 turned on. The other two describe what
+    # the plan put into the session; only this one describes what came out, and a refresh that
+    # deletes seven planned sets and writes none back has done a great deal without writing
+    # anything. Without it `outcome_of` could not tell that case from a session nobody touched.
+    Refresh = Struct.new(:outcome, :written, :kept, :removed) do
       def to_s = outcome.to_s
     end
 
@@ -95,23 +99,40 @@ class Tectonic < Roda
     # matching row the plan would have written. See Standing.
     def refresh(day)
       workout = existing_workout(day)
-      return Refresh.new(:none, 0, 0) unless workout
+      return Refresh.new(:none, 0, 0, 0) unless workout
 
       kept = WorkoutSet.where(workout_id: workout.id, is_completed: true).count
+      removed = 0
       written = DB.transaction do
-        WorkoutSet.where(workout_id: workout.id, is_completed: false).delete
+        removed = WorkoutSet.where(workout_id: workout.id, is_completed: false).delete
         rewrite(day, workout, Standing.for(workout))
       end
-      Refresh.new(outcome_of(written, kept), written, kept)
+      Refresh.new(outcome_of(written, kept, removed), written, kept, removed)
     end
 
-    # Nothing written and something kept is a session that was entirely lifted, which is the
-    # one case where the old answer is still the whole answer.
-    def outcome_of(written, kept)
-      return :lifted if written.zero? && kept.positive?
-      return :partly if kept.positive?
+    # Nothing written and something kept used to be read as a session that was entirely
+    # lifted, and it is not the same thing. #441.
+    #
+    # The case it got wrong is the one the issue was filed from. Take a movement out of the
+    # programme on a day whose other work is already done: every unfinished set of it is
+    # deleted, the plan has nothing left to write in their place, so `written` is zero and
+    # `kept` is positive -- and the session reported as ":lifted", which SessionRefresh renders
+    # as *"has lifted sets in it, so it was left alone."* Seven sets had just been deleted from
+    # it. A lifter told their session was untouched goes looking for the movement, which is
+    # exactly what happened.
+    #
+    # `written` and `kept` both describe what the plan put in; neither can see what came out.
+    # So :lifted now requires that nothing was removed either, which is the literal claim the
+    # sentence makes, and a refresh that only deleted gets its own outcome rather than
+    # borrowing one that means the opposite.
+    # Read as: nothing kept is a plain rewrite; otherwise something was protected, and the
+    # question is only what happened around it. Asking about `kept` first is what keeps this
+    # to three branches rather than repeating `kept.positive?` in each of them.
+    def outcome_of(written, kept, removed)
+      return :rewritten if kept.zero?
+      return :partly if written.positive?
 
-      :rewritten
+      removed.positive? ? :emptied : :lifted
     end
 
     private
