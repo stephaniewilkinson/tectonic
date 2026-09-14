@@ -56,10 +56,38 @@ class Tectonic < Roda
           end
         end
 
+        # What a copied lift must not take with it: its own identity, the day it belonged to,
+        # the position the caller assigns from the order it hands them over, and the two
+        # columns the writer spells differently and is given below by name.
+        NOT_COPIED = %i[id program_day_id position exercise_id percent_of_exercise_id].freeze
+
+        # Everything about a lift except the above.
+        #
+        # **Read off the row rather than named**, which is #289's rule and which this method
+        # was breaking. It listed eight columns by hand, and a list of names is a list somebody
+        # has to remember to add to -- so it had already lost the four columns 009 added
+        # (measure, is_weighted, is_per_side, duration_seconds) and then target_rpe from #265
+        # and rest_seconds from #281 on top of them.
+        #
+        # That is the same bug #289 fixed in the web editor's copy, and it survived here
+        # because the two were separate implementations of one feature. It surfaced when #411
+        # deleted the editor: the good twin was about to go and the broken one to stay.
+        #
+        # It was not a quiet failure either. A week containing a timed lift, copied, came back
+        # "A lift counted in reps needs reps" and wrote nothing -- measure defaulted to reps,
+        # the duration went missing, and check_measure refused the result.
+        #
+        # `values` rather than the reader methods, deliberately: it is the row as the database
+        # holds it, so `measure` comes back as the text the column stores rather than as the
+        # symbol ProgramLift#measure casts it to, and that is what the writer wants.
+        #
+        # compact, so a lift that references nothing does not send percent_of: nil -- which
+        # reference_fits! would refuse for having no percentage beside it.
         def self.copied(lift)
-          { exercise: lift.exercise.name, sets: lift.sets, reps: lift.reps, top_weight: lift.top_weight,
-            percent_of_max: lift.percent_of_max, is_main: lift.is_main, is_barbell: lift.is_barbell,
-            note: lift.note }
+          lift.values.except(*NOT_COPIED)
+              .merge(exercise: lift.exercise.name,
+                     percent_of: Exercise[lift.percent_of_exercise_id]&.name)
+              .compact
         end
 
         def self.refuse_taken(context, program, number)

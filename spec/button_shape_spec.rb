@@ -107,7 +107,7 @@ describe 'the primary button on the pages an account sees' do
   end
 
   it 'is one shape on all of them' do
-    ['/', '/start', '/logout', '/settings', '/volume', '/programs', "/programs/#{@program.id}",
+    ['/', '/start', '/logout', '/settings', '/volume',
      '/workouts', '/workouts/new', "/workouts/#{@workout}",
      "/workouts/#{@workout}/sets", "/workouts/#{@workout}/sets/new",
      "/workouts/#{@workout}/sets/#{@set}/edit", "/workouts/#{@workout}/session",

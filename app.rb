@@ -19,7 +19,7 @@ require_relative 'lib/tectonic/equipment'
 require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/timing'
 require_relative 'lib/tectonic/calendar'
-require_relative 'lib/tectonic/program_editor'
+require_relative 'lib/tectonic/clock'
 require_relative 'lib/tectonic/program_schedule'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/training_max'
@@ -414,41 +414,19 @@ class Tectonic < Roda
     # common act is adjusting one lift between weeks, so that is a form on the block page
     # rather than a page of its own; authoring a block from nothing is rarer and is a
     # week copied and then edited, which is how a block actually gets written.
+    # /programs is gone. #411.
+    #
+    # The programme object exists so that something can generate sessions from it; the lifter
+    # experiences training as workouts. Those are different audiences and only one of them is
+    # human, and a full authoring interface -- create block, add week, add day, reorder lifts,
+    # edit percentages -- was a large surface for something that takes about thirty seconds
+    # conversationally, maintained as a second way to do a job the clicking one did worse.
+    #
+    # Kept rather than deleted outright, for a bookmark or a browser that remembers: the same
+    # treatment /equipment got when it became /settings. Workouts is where the training is.
     r.on 'programs' do
       rodauth.require_login
-      @account_id = rodauth.account_from_session[:id]
-      @editor = ProgramEditor.new(@account_id)
-
-      r.on String do |program_id|
-        @program = @editor.program(program_id)
-        r.redirect '/programs' unless @program
-
-        r.post('weeks') { program_action(r) { @editor.add_week(@program, copy_from: r.params['copy_from']) } }
-        r.post('days') { program_action(r) { add_program_day(r) } }
-        r.post('lifts') { program_action(r) { add_program_lift(r) } }
-        r.post('generate') { program_action(r) { generate_program_week(r) } }
-
-        r.on 'lifts', String do |lift_id|
-          @lift = @editor.lift(@program, lift_id)
-          r.redirect "/programs/#{@program.id}" unless @lift
-
-          r.post('delete') { program_action(r) { @editor.remove_lift(@lift) } }
-          r.post { program_action(r) { @editor.update_lift(@lift, r.params.slice(*LIFT_FIELDS)) } }
-        end
-
-        r.get { program_view }
-      end
-
-      r.post do
-        check_csrf!
-        program = @editor.create_program(name: r.params['name'], start_date: r.params['start_date'])
-        r.redirect "/programs/#{program.id}"
-      end
-
-      r.get do
-        @programs = @editor.programs
-        view('programs/index')
-      end
+      r.redirect '/workouts'
     end
 
     # The bar and plates this account lifts on. Everything the app calculates rounds to
@@ -720,6 +698,16 @@ class Tectonic < Roda
       end
       r.get do
         @exercises = Exercise.visible_to(@account_id).order(:id)
+        # The stated maxes, in one query rather than one per row. #411 keeps the training
+        # maxes visible when the programme screens go, on the grounds that "squat at 80%" is
+        # only meaningful beside "squat max 191, set 31 Aug" -- and this is the page every
+        # movement is already listed on.
+        #
+        # Stated only, not TrainingMax.for. That one falls back to a derived reading, which
+        # would be a query per movement across a library of fifty-odd, to print a number
+        # nobody typed for movements nobody has trained. The stated one is the standing
+        # instruction and the thing worth correcting by hand after a good session.
+        @stated_maxes = DB[:account_training_maxes].where(account_id: @account_id).to_hash(:exercise_id)
         view 'exercises/index'
       end
     end
@@ -1424,52 +1412,6 @@ class Tectonic < Roda
     return nil if typed.to_s.strip.empty?
 
     set.timed? ? { duration_seconds: typed, reps: nil } : { reps: typed, duration_seconds: nil }
-  end
-
-  # The fields a lift edit may set. Named rather than taken wholesale so a form cannot
-  # reach a column it has no business in, and so the pricing rule sees both prices when
-  # one is being swapped for the other.
-  LIFT_FIELDS = %w[sets reps top_weight percent_of_max target_rpe rest_seconds note].freeze
-
-  # Every programme write is the same shape: check the token, try it, and come back to the
-  # block with either nothing to say or the writer's own refusal to show. The refusal is
-  # stashed in the session because the answer is a redirect -- a lifter who reloads after
-  # a bad edit should not be asked to resubmit it.
-  def program_action(request, &)
-    check_csrf!
-    ok, message = @editor.attempt(&)
-    session['program.error'] = message unless ok
-    request.redirect "/programs/#{@program.id}"
-  end
-
-  def program_view
-    @error = session.delete('program.error')
-    @equipment = Equipment.for_account(@account_id)
-    @exercises = Exercise.visible_to(@account_id).order(:name)
-    view('programs/show')
-  end
-
-  def add_program_day(request)
-    week = @program.week(request.params['week'].to_i)
-    raise MCP::Tool::Refusal, 'That week is not part of this block.' unless week
-
-    @editor.add_day(week, weekday: request.params['weekday'], focus: request.params['focus'])
-  end
-
-  def add_program_lift(request)
-    day = ProgramDay.where(id: request.params['day_id'],
-                           program_week_id: @program.program_weeks_dataset.select(:id)).first
-    raise MCP::Tool::Refusal, 'That day is not part of this block.' unless day
-
-    @editor.add_lift(day, request.params.slice('exercise', *LIFT_FIELDS))
-  end
-
-  # Writing a week into real workouts is the point of a programme, and it is idempotent:
-  # running it twice reuses the sessions rather than doubling them.
-  def generate_program_week(request)
-    ProgramGenerator.new(@program).generate(request.params['week'].to_i)
-  rescue ArgumentError => e
-    raise MCP::Tool::Refusal, e.message
   end
 
   # The rack the signed-in account lifts on, read once per request: the session view asks

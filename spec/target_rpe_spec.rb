@@ -4,7 +4,6 @@ require_relative 'spec_helper'
 require_relative 'route_ownership_spec' # reuses its account/login/CSRF helpers; idempotent require
 require_relative 'mcp_spec'             # and its token minting and call_tool
 require_relative '../lib/tectonic/program_generator'
-require_relative '../lib/tectonic/program_editor'
 require_relative '../lib/tectonic/progression'
 
 # A prescription can ask for an effort, not only a load. #265.
@@ -150,13 +149,20 @@ end
 # added to `copied` is silently dropped by the copy rather than refused, which would make
 # "top set at RPE 8" hold for the first week of a block and quietly stop applying after it.
 describe 'copying a week that carries a target' do
+  include Rack::Test::Methods
   include TargetRpe
 
+  # Through add_program_week, which is the one path that copies a week since #411 took the
+  # block editor away. Worth knowing: this assertion only started passing when that tool was
+  # fixed -- it had the same hand-written column list #289 removed from the editor's copy, so
+  # a target survived the editor and was dropped by the tool.
   it 'takes the target with it' do
-    account_id = scratch_account
-    program, day = block_for(account_id)
-    prescribe(day, movement(account_id), target_rpe: 9)
-    week_two = Tectonic::ProgramEditor.new(account_id).add_week(program, copy_from: 1)
+    token = mint(scopes: %w[read write])
+    program, day = block_for(token.account_id)
+    prescribe(day, movement(token.account_id), target_rpe: 9)
+    call_tool('add_program_week', raw: token.raw,
+                                  arguments: { program_id: program.id, copy_from_week: 1 })
+    week_two = Tectonic::ProgramWeek.where(program_id: program.id, number: 2).first
     days = Tectonic::ProgramDay.where(program_week_id: week_two.id).select(:id)
 
     assert_equal [9], Tectonic::ProgramLift.where(program_day_id: days).select_map(:target_rpe)
@@ -206,45 +212,6 @@ describe 'the session fingerprint' do
     Tectonic::WorkoutSet.where(workout_id: workout.id).exclude(planned_rpe: nil).update(planned_rpe: 9)
 
     refute_equal before, workout.session_fingerprint
-  end
-end
-
-# The block editor row. The target is written and cleared the same way a price is: an empty
-# box is nil rather than zero, which is what makes clearing it the same gesture as never
-# having set one.
-describe 'the block editor' do
-  include Rack::Test::Methods
-  include RouteOwnership
-  include TargetRpe
-
-  before do
-    @account_id = login
-    @program, day = block_for(@account_id)
-    @lift = prescribe(day, movement(@account_id))
-  end
-
-  def edit(fields)
-    path = "/programs/#{@program.id}/lifts/#{@lift.id}"
-    post path, fields.merge('_csrf' => token_for_form("/programs/#{@program.id}", path))
-  end
-
-  it 'writes a target typed into the row' do
-    edit('sets' => '3', 'reps' => '5', 'top_weight' => '200', 'target_rpe' => '8')
-
-    assert_equal 8, @lift.refresh.target_rpe
-  end
-
-  it 'clears it when the box is emptied' do
-    @lift.update(target_rpe: 8)
-    edit('sets' => '3', 'reps' => '5', 'top_weight' => '200', 'target_rpe' => '')
-
-    assert_nil @lift.refresh.target_rpe
-  end
-
-  it 'offers a box for it on the page' do
-    get "/programs/#{@program.id}"
-
-    assert_includes last_response.body, 'name="target_rpe"'
   end
 end
 

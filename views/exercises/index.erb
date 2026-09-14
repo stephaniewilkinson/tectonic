@@ -15,6 +15,16 @@
           <thead>
             <tr>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Name</th>
+              <%# The training max, here because #411 takes the programme screens away and this
+                  is where every movement is already listed. Percentages drive every main lift,
+                  so "squat at 80%" is only meaningful beside the number it is 80% of.
+
+                  Blank where nothing has been stated, rather than showing the derived reading:
+                  a derived max is a reading off the sets and changes on its own, and a column
+                  of them for fifty library movements nobody has trained would be noise around
+                  the handful that are a standing instruction. The movement's own page still
+                  shows the derived one, where there is room to say which kind it is. %>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Training max</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Source</th>
             </tr>
           </thead>
@@ -26,6 +36,15 @@
                      class="font-medium text-lime-700 hover:text-lime-800"><%= exercise[:name] %></a>
                   <%- if provenance(exercise) %>
                     <div class="text-xs text-gray-500"><%= provenance(exercise) %></div>
+                  <%- end %>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                  <%- if (stated = @stated_maxes[exercise[:id]]) %>
+                    <span class="font-medium tabular-nums text-gray-900"><%= weight_label(stated[:pounds]) %></span>
+                    <span class="text-gray-500">lb</span>
+                    <div class="text-xs text-gray-500">set <%= stated[:stated_at].strftime('%-d %b') %></div>
+                  <%- else %>
+                    <span class="text-gray-400">&mdash;</span>
                   <%- end %>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
