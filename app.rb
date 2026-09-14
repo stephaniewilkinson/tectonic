@@ -20,6 +20,7 @@ require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/timing'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/program_editor'
+require_relative 'lib/tectonic/program_schedule'
 require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/goal'
@@ -396,6 +397,10 @@ class Tectonic < Roda
       # different sides of midnight -- which is the third failure that issue names: a Monday
       # evening session marked missed on the calendar while it was being lifted.
       today = Clock.today_for(@account_id)
+      # And here, because a session signed in once and left open for a fortnight would
+      # otherwise never pass the hook above again -- and this is the page somebody lands on to
+      # ask what they are doing this week.
+      ProgramSchedule.ensure_ahead(@account_id, today)
       @month = Calendar.month_of(r.params['month'], today)
       @previous = @month << 1
       @following = @month >> 1
@@ -1065,8 +1070,12 @@ class Tectonic < Roda
   # 8:30pm Monday is already on Tuesday, so this missed Monday's session and dropped them on
   # the new-workout stub instead of the session they had come back to finish.
   def login_destination(account_id)
-    mine = Workout.where(account_id:)
     on = Clock.today_for(account_id)
+    # Sessions exist without anybody asking (#411). Here because this runs on the way in, and
+    # "there is no session for today" is a thing to find out never rather than on a Monday
+    # morning. Idempotent and cheap once a week has been written, and it cannot raise.
+    ProgramSchedule.ensure_ahead(account_id, on)
+    mine = Workout.where(account_id:)
     today = mine.where(Sequel.cast(:date, :date) => on).order(:id).first
     return "/workouts/#{today.id}/session" if today
     return '/workouts/new' unless mine.empty?
