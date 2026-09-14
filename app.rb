@@ -533,8 +533,14 @@ class Tectonic < Roda
 
       r.post do
         check_csrf!
+        # Both racks in one post, because the form is one form and the rack is one fact --
+        # which is the argument Equipment.replace already made about the plates alone. #369
+        # separated them on the page rather than into two submissions: a lifter changing their
+        # bar and their dumbbell handle in one sitting should not have to save twice.
         Equipment.replace(@account_id, bar_weight: r.params['bar_weight'],
-                                       plates: r.params['plates'])
+                                       plates: r.params['plates'],
+                                       dumbbell_handle_weight: r.params['dumbbell_handle_weight'],
+                                       dumbbell_plates: r.params['dumbbell_plates'])
         r.redirect '/settings'
       end
 

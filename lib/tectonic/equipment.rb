@@ -25,18 +25,41 @@ class Tectonic < Roda
     # that make a 2 lb jump possible.
     OFFERED = [45, 35, 25, 20, 15, 10, 5, 2.5, 1.25, 1].freeze
 
-    attr_reader :bar_weight, :pairs
+    attr_reader :bar_weight, :pairs, :dumbbell_handle_weight, :dumbbell_pairs
 
     # `pairs` maps a denomination to how many pairs of it the account owns.
-    def initialize(bar_weight:, pairs:)
+    #
+    # The two dumbbell arguments are #369's second rack and default to nothing, which is what
+    # every account had before that issue and still has until somebody fills the form in.
+    # Nothing rather than a default pair of values, because a default would be a claim that
+    # every account owns adjustable dumbbells -- and the honest description of a fixed rack is
+    # the constant below, not an invented inventory.
+    def initialize(bar_weight:, pairs:, dumbbell_handle_weight: nil, dumbbell_pairs: {})
       @bar_weight = bar_weight
       @pairs = pairs
+      @dumbbell_handle_weight = dumbbell_handle_weight
+      @dumbbell_pairs = dumbbell_pairs
     end
 
     def self.for_account(account_id)
+      account = DB[:accounts].where(id: account_id).first || {}
+      new(bar_weight: account[:bar_weight] || DEFAULT_BAR,
+          pairs: barbell_pairs(account_id),
+          dumbbell_handle_weight: numeric(account[:dumbbell_handle_weight]),
+          dumbbell_pairs: numeric_keys(DB[:account_dumbbell_plates].where(account_id:)
+                                         .to_hash(:denomination, :pairs)))
+    end
+
+    # An account that has never said what it owns lifts on the default rack. The dumbbell
+    # inventory has no equivalent and must not gain one: an empty barbell rack is somebody who
+    # has not answered, and an empty dumbbell rack is somebody saying they have a fixed one.
+    def self.barbell_pairs(account_id)
       owned = DB[:account_plates].where(account_id:).to_hash(:denomination, :pairs)
-      bar = DB[:accounts].where(id: account_id).get(:bar_weight) || DEFAULT_BAR
-      new(bar_weight: bar, pairs: owned.empty? ? DEFAULT_PLATES : numeric_keys(owned))
+      owned.empty? ? DEFAULT_PLATES : numeric_keys(owned)
+    end
+
+    def self.numeric(value)
+      value && Plates.numeric(value.to_r)
     end
 
     # The nearest weight one account's rack can build, which is where a prescription should
@@ -85,12 +108,43 @@ class Tectonic < Roda
     # that wants a second inventory, which is a bigger thing than a rounding rule.
     DUMBBELL_INCREMENT = 5
 
-    # How far apart two loads of this kind sit. The bar answers from its plates; anything
-    # else answers from the rule above.
+    # Whether this account has described a second rack. #369.
+    #
+    # Both halves, because neither is any use alone: a handle weight with no plates loads
+    # nothing, and plates with no handle have nothing to go on. An account that has filled in
+    # one and not the other is describing a rack that does not exist, and the honest reading of
+    # it is the fixed rack everybody else has.
+    def adjustable_dumbbells?
+      !dumbbell_handle_weight.nil? && dumbbell_handle_weight.positive? && !dumbbell_pairs.empty?
+    end
+
+    # The smallest step the dumbbells make, from their own plates rather than from the bar's.
+    # #369: a pair of Powerblocks steps in 2.5 at the bottom, and the barbell's micro plates
+    # have nothing to do with it.
+    def dumbbell_increment
+      return DUMBBELL_INCREMENT unless adjustable_dumbbells?
+
+      Plates.numeric(dumbbell_pairs.keys.min.to_r * 2)
+    end
+
+    # Every weight the dumbbells can load, worked out once and kept.
+    #
+    # `Plates.totals` without knowing which rack it is looking at, which is the whole reason
+    # 033 gave the second inventory 007's shape: a dumbbell is loaded at both ends the way a
+    # bar is loaded at both sides, so the handle stands where the bar does and a pair of plates
+    # means the same thing on either.
+    def dumbbell_totals
+      return [] unless adjustable_dumbbells?
+
+      @dumbbell_totals ||= Plates.totals(bar_weight: dumbbell_handle_weight, inventory: dumbbell_pairs) || []
+    end
+
+    # How far apart two loads of this kind sit. The bar answers from its plates, and since
+    # #369 so do the dumbbells -- from their own.
     def increment_for(is_barbell:)
       return increment if is_barbell
 
-      [increment, DUMBBELL_INCREMENT].max
+      dumbbell_increment
     end
 
     # The nearest weight this rack can actually load.
@@ -119,12 +173,30 @@ class Tectonic < Roda
     # Anything not on the bar rounds to its own increment rather than to the bar's, which
     # is #259's dumbbell half: a rack that gains a pair of 1 lb plates takes `increment` to
     # 2, and 26 lb dumbbells are not a thing most gyms have.
+    # Since #369 the dumbbell branch enumerates too, where the account has said what its
+    # dumbbells are. It is the same question -- what can this rack build -- and the same
+    # argument against divisibility applies: a handle with 5s and 10s on the shelf cannot make
+    # 22.5, and an increment of 5 says it can.
+    #
+    # An account that has said nothing keeps exactly the rounding it had, against the constant
+    # #259 named as an assumption, because a fixed rack really does run in fives.
     def loadable(weight, is_barbell: true)
       return weight if weight.nil?
-      return Rounding.to_increment(weight, increment: increment_for(is_barbell:)) unless is_barbell
-      return Rounding.to_increment(weight, increment:) if loadable_totals.empty?
+      return nearest(weight, dumbbell_totals, dumbbell_increment) unless is_barbell
 
-      loadable_totals.min_by { |total| [(total - weight).abs, total] }
+      nearest(weight, loadable_totals, increment)
+    end
+
+    # The nearest of an enumerated set, or the nearest multiple where there is nothing
+    # enumerated to choose from.
+    #
+    # A tie goes to the lighter weight, following Plates.closest: overshooting a prescription
+    # adds work nobody asked for and can turn a planned single into a miss, where undershooting
+    # by the same amount costs a little stimulus and nothing else.
+    def nearest(weight, totals, step)
+      return Rounding.to_increment(weight, increment: step) if totals.empty?
+
+      totals.min_by { |total| [(total - weight).abs, total] }
     end
 
     # How this rack loads, for the modules that work a prescription out. Warmup and
@@ -173,18 +245,38 @@ class Tectonic < Roda
     #
     # `plates` maps a denomination to pairs, as strings from a form. A denomination with
     # no pairs is simply not owned, which is how a plate is taken away.
-    def self.replace(account_id, bar_weight:, plates:)
+    def self.replace(account_id, bar_weight:, plates:, dumbbell_handle_weight: nil, dumbbell_plates: nil)
       DB.transaction do
         # Float() rather than Integer(), which refused "33.07" outright and left the bar
         # at whatever it already was without saying so. Stored through the numeric column,
         # so the two decimal places are exact rather than the nearest binary fraction.
         bar = Float(bar_weight.to_s, exception: false)
         DB[:accounts].where(id: account_id).update(bar_weight: bar) if bar&.positive?
-        DB[:account_plates].where(account_id:).delete
-        owned(plates).each do |denomination, count|
-          DB[:account_plates].insert(account_id:, denomination:, pairs: count)
-        end
+        write_plates(:account_plates, account_id, plates)
+        write_handle(account_id, dumbbell_handle_weight)
+        write_plates(:account_dumbbell_plates, account_id, dumbbell_plates)
       end
+    end
+
+    # One rack's plates, replaced wholesale. Both inventories are written this way for the
+    # reason the barbell one always was: the rack is one fact, and a partial update would
+    # leave the increment reading off plates the lifter had just removed.
+    def self.write_plates(table, account_id, plates)
+      return if plates.nil?
+
+      DB[table].where(account_id:).delete
+      owned(plates).each { |denomination, count| DB[table].insert(account_id:, denomination:, pairs: count) }
+    end
+
+    # A blank handle is a real answer and means "a fixed rack", which is what every account had
+    # before #369 -- so it is written as null rather than ignored. That is the one way back from
+    # having described adjustable dumbbells, and without it the answer would be unsayable once
+    # it had been said.
+    def self.write_handle(account_id, weight)
+      return if weight.nil?
+
+      given = Float(weight.to_s, exception: false)
+      DB[:accounts].where(id: account_id).update(dumbbell_handle_weight: given&.positive? ? given : nil)
     end
 
     # The rows worth keeping from a submitted form: a positive denomination with at least
