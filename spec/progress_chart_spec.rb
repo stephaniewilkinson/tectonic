@@ -130,23 +130,24 @@ describe 'the estimated max each session' do
     assert_operator estimated, :>, 118, 'the whole point is that this can exceed the stated max'
   end
 
-  # **#434's own example is a set this app declines to read**, and that is worth a spec rather
-  # than a surprise. The issue offers "a bench at 97x5 @RPE 7 against a max still set at 118"
-  # as the case this series exists to catch. `OneRepMax` restates a rated set as the RPE-8 set
-  # of equal difficulty -- five reps at 7 is six reps at 8 -- and `SetScheme::RPE8_PERCENTS`
-  # stops at five, because "an estimate off work that light is a guess dressed as a number".
+  # **This spec recorded a gap and now records its absence.** It was written to document that
+  # #434's own example -- "a bench at 97x5 @RPE 7 against a max still set at 118" -- produced
+  # no point, because the chart stopped at five reps and five at RPE 7 restates to six.
   #
-  # So that session contributes no point and the line has a gap there. That is the honest
-  # behaviour and it is not something this chart should quietly work around: extending the
-  # chart is a change to the coaching model, not to a graph. Recorded here so the next person
-  # reading #434 finds out from a test rather than from an empty stretch of line.
-  it 'declines to read a set too easy for the chart to cover, leaving a gap' do
+  # The row runs to ten now, so the case the issue named as the one this series exists to catch
+  # is actually caught: 97x5 at RPE 7 reads at 78.6% and the line has a point there. The
+  # honesty that the old refusal was carrying moved onto the reading itself, where
+  # TrainingMax.derived acts on it, rather than being expressed as an absence on a graph.
+  it 'reads the set #434 named, which used to leave a gap' do
     account_id = an_account
     lift = a_lift(account_id)
     log(account_id, lift, weight: 135, on: Date.new(2026, 3, 2), reps: 5, rpe: 8)
     log(account_id, lift, weight: 97, on: Date.new(2026, 3, 9), reps: 5, rpe: 7)
 
-    assert_equal [Date.new(2026, 3, 2)], series(account_id, lift)[Tectonic::ProgressChart::ESTIMATED].keys
+    found = series(account_id, lift)[Tectonic::ProgressChart::ESTIMATED]
+
+    assert_equal [Date.new(2026, 3, 2), Date.new(2026, 3, 9)], found.keys
+    assert_equal 123, found[Date.new(2026, 3, 9)], '97 at 78.6%'
   end
 
   # A ramp rung is submaximal by definition, so an estimate taken from one is not an estimate

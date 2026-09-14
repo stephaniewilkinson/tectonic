@@ -83,6 +83,25 @@
       &mdash; your best ever, with no cutoff, so it does not fade with time off. Set one below
       to override it, which is worth doing coming back from a layoff, when that estimate reads
       work you did before the break.
+    <%- elsif @estimate %>
+      <%# The state this page most recently got wrong, in its third telling.
+          It first said "nothing has been lifted here that the chart can read" to somebody with
+          two completed sets on the movement -- untrue, and followed by advice they had already
+          taken. That was corrected to say the sets were there and the estimate could not read
+          them, which was true at the time.
+          It is no longer true. The chart reads to ten reps now, so those sets do produce a
+          number; what they do not produce is a number the app will hang a block off without
+          being asked, because everything generated as a percentage of it inherits an error
+          made nine reps from a single and compounds it week to week.
+          So the number is shown. Withholding it was the dead end, and showing it while
+          pretending it is a training max would be the opposite mistake. %>
+      <%= logged_working_sets %> completed working
+      <%= logged_working_sets == 1 ? 'set is' : 'sets are' %> logged here, and they estimate a
+      one-rep max of about <strong><%= weight_label(@estimate[:pounds]) %> lb</strong>
+      &mdash; read from a set as hard as <%= @estimate[:from_reps] %> reps taken to two in
+      reserve. That is far enough from a single that the app will not make it the number your
+      percentages come off, because everything written against it would inherit the guess. Set
+      a max below to use one, or log a heavier set of five or fewer.
     <%- elsif logged_working_sets.positive? %>
       <%# Four states, not three. This branch used to share the one below and said "nothing has
           been lifted here that the chart can read" -- which a lifter reads as "nothing has been

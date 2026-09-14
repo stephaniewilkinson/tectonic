@@ -8,9 +8,36 @@ class Tectonic < Roda
   # are preferences rather than laws, so a program carries its own settings for
   # them and this module only applies what it is handed.
   module SetScheme
-    # Percentage of 1RM a set at this rep count represents when taken at RPE 8,
-    # from the standard RPE chart.
-    RPE8_PERCENTS = { 5 => 81.1, 4 => 83.8, 3 => 86.3, 2 => 88.7, 1 => 92.4 }.freeze
+    # Percentage of 1RM a set at this rep count represents when taken at RPE 8, from the
+    # standard RPE chart.
+    #
+    # **One row is the whole chart.** The RTS chart is constructed as a single shifted
+    # sequence: RPE 8 at three reps, RPE 9 at four and RPE 10 at five are all the same number.
+    # So storing this row and shifting by `reps + 8 - rating` -- which is what OneRepMax does
+    # to read a set at any rating -- is exactly equivalent to storing the full grid, and
+    # nothing is lost by keeping one line instead of thirty.
+    #
+    # It ran to five reps and now runs to ten. That extension is only for the *estimate*: see
+    # CONVERTIBLE below, which is what keeps it from changing a single prescription.
+    RPE8_PERCENTS = {
+      10 => 68.0, 9 => 70.7, 8 => 73.9, 7 => 76.2, 6 => 78.6,
+      5 => 81.1, 4 => 83.8, 3 => 86.3, 2 => 88.7, 1 => 92.4
+    }.freeze
+    # The rep counts a *prescription* may be converted between, as against the ones an
+    # estimate may be read from. Deliberately narrower than the table above, and this is the
+    # whole of why extending that table changes no generated weight.
+    #
+    # `target_reps` used to refuse a conversion by asking whether the chart covered the rep
+    # count, so a lift written at eight reps was exempt from rep conversion because eight
+    # happened to be off the end. Extending the chart would have quietly removed that
+    # exemption and started rewriting every high-rep accessory in a block with a preferred
+    # rep count -- which is a change to somebody's programme, arrived at as a side effect of
+    # fixing an estimate.
+    #
+    # So the exemption is now a rule rather than an accident of where the table stopped. It
+    # is also the only thing enforcing that rep schemes vary by lift rather than being driven
+    # globally from one setting, which is a decision worth having in one named place.
+    CONVERTIBLE = (1..5)
     # How far below the top weight each earlier set sits, per set.
     ASCENDING_STEP = 0.03
 
@@ -76,18 +103,28 @@ class Tectonic < Roda
     # The same intensity expressed at a different rep count: fewer reps means more
     # weight for the same effort. 4×5 @ 155 becomes 4×3 @ 165.
     def convert_weight(top_weight, from_reps:, to_reps:, loading: Rounding::Loading.by_increment)
-      from = RPE8_PERCENTS[from_reps]
-      to = RPE8_PERCENTS[to_reps]
-      return loading.call(top_weight) unless from && to && from_reps != to_reps
+      return loading.call(top_weight) unless convertible?(from_reps) && convertible?(to_reps)
+      return loading.call(top_weight) if from_reps == to_reps
 
-      loading.call(top_weight * (to / from))
+      loading.call(top_weight * (RPE8_PERCENTS[to_reps] / RPE8_PERCENTS[from_reps]))
     end
 
-    # Converts down to the preferred rep count, never up, and only between rep
-    # counts the chart actually covers -- a prescribed set of 8 stays a set of 8.
+    # Asked of CONVERTIBLE rather than of the chart, which is the distinction that lets the
+    # chart grow without any prescription moving. `nil` is not convertible, which is what the
+    # old `from && to` guard was really testing.
+    def convertible?(reps)
+      !reps.nil? && CONVERTIBLE.cover?(reps)
+    end
+
+    # Converts down to the preferred rep count, never up, and only between rep counts
+    # CONVERTIBLE covers -- a prescribed set of 8 stays a set of 8.
+    #
+    # That last clause used to read "only between rep counts the chart actually covers", and
+    # the chart stopping at five was the only thing making it true. It now asks the rule
+    # directly, so a set of 8 goes on staying a set of 8 while the estimate reads up to ten.
     def target_reps(reps, preferred_reps)
       return reps unless preferred_reps && preferred_reps < reps
-      return reps unless RPE8_PERCENTS.key?(reps) && RPE8_PERCENTS.key?(preferred_reps)
+      return reps unless convertible?(reps) && convertible?(preferred_reps)
 
       preferred_reps
     end

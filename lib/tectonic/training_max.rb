@@ -134,8 +134,17 @@ class Tectonic < Roda
         .order(Sequel.desc(:stated_at), Sequel.desc(:id)).first
     end
 
+    # **Only from a reading the chart is sure enough of.** The estimate now runs to ten reps,
+    # so a movement trained in eights has a number where it used to have none -- but a number
+    # read nine reps from a single is not one to hang a block off without being asked, because
+    # everything generated as a percentage of it inherits the error and the error compounds
+    # week to week.
+    #
+    # So the estimate is made, reported and drawn, and it does not become the denominator by
+    # itself. Stating a max still does exactly what it always did, and on such a movement it is
+    # the thing the page asks for.
     def self.derived(account_id:, exercise:, on:)
-      reading = exercise.estimated_reading(account_id:, on:)
+      reading = exercise.confident_reading(account_id:, on:)
       reading && new(pounds: reading[:pounds], source: DERIVED, as_of: reading[:on])
     end
 

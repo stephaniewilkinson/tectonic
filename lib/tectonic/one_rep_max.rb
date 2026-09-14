@@ -17,6 +17,36 @@ class Tectonic < Roda
     ANCHOR_RPE = 8
     # The rating at which a set was taken to the point of no further reps.
     FAILURE_RPE = 10
+    # The restated rep count at or below which an estimate is trusted to set a number by
+    # itself.
+    #
+    # The chart reads to ten reps, and it should: silently having no number is worse than a
+    # number that says how sure it is, and the dead end that produced -- a movement trained in
+    # eights with no max and a page claiming nothing had been lifted -- was the worse failure
+    # of the two.
+    #
+    # But the instinct behind the old refusal was right. Accuracy genuinely degrades the
+    # further a set sits from failure, and it degrades faster in a lifter without the
+    # experience to rate honestly. So the estimate is made and marked rather than withheld:
+    # above six restated reps it is reported, drawn on the chart, and **not allowed to become
+    # a training max on its own**. See TrainingMax.derived.
+    #
+    # **Five, which is where the table used to stop, and that is the whole reason.**
+    #
+    # Six was the first choice and the data refused it. Setting the boundary at six lets an
+    # index-six reading start setting a max where it never could before, and on this account
+    # that moves five derived maxes -- Front Squat from 105 to 123, which is seventeen per cent
+    # of what every percentage of it would generate against. The goal of extending the row was
+    # correct estimates with *no change to any prescription*, and six quietly breaks it.
+    #
+    # Five keeps that promise exactly: every reading that could set a max before still can, at
+    # the same number, and nothing that could not has started. The extension is therefore
+    # visible only where it was wanted -- in what the app can report and draw.
+    #
+    # Six is defensible on its own terms and is one character away. It is a decision about
+    # whether a set six reps from a single should price a training block, which is a coaching
+    # question rather than an arithmetic one, so it is not one to make as a side effect.
+    CONFIDENT_REPS = 5
 
     module_function
 
@@ -81,7 +111,23 @@ class Tectonic < Roda
     # Nil rather than a zero-ish reading when no set can be read, so every caller keeps the
     # "nothing to go on" branch it already had.
     def best_reading(sets)
-      sets.filter_map { |set| reading_of(set) }.max_by { |reading| reading[:pounds] }
+      readings(sets).max_by { |reading| reading[:pounds] }
+    end
+
+    # The best reading the chart is sure enough of to let stand on its own. Nil where every
+    # set it can read is further from a single than CONFIDENT_REPS.
+    #
+    # A separate method rather than a flag on the one above, because the two answer different
+    # questions and both are wanted at once: the chart draws the best estimate there is, and
+    # the training max takes the best one that may set a number by itself. A movement trained
+    # in eights has the first and not the second, and that is the state the page now describes
+    # rather than the one it used to deny.
+    def best_confident_reading(sets)
+      readings(sets).select { |reading| reading[:confident] }.max_by { |reading| reading[:pounds] }
+    end
+
+    def readings(sets)
+      sets.filter_map { |set| reading_of(set) }
     end
 
     # One set as an estimate and the day it was lifted, or nil where the chart declines.
@@ -89,7 +135,18 @@ class Tectonic < Roda
     # reads as "no date" rather than raising.
     def reading_of(set)
       pounds = estimate(weight: set[:weight], reps: set[:reps], rpe: set[:rpe], planned_rpe: set[:planned_rpe])
-      pounds && { pounds:, on: set[:date] }
+      return nil unless pounds
+
+      restated = restated_reps(set)
+      { pounds:, on: set[:date], from_reps: restated, confident: restated <= CONFIDENT_REPS }
+    end
+
+    # The rep count this set restates to at RPE 8, which is the row of the chart it was
+    # actually read from and therefore the thing confidence is a property of. A set of eight
+    # at RPE 7 is read as nine reps, and it is the nine that makes it a guess rather than the
+    # eight.
+    def restated_reps(set)
+      set[:reps] + ANCHOR_RPE - rating_for(set[:rpe], set[:planned_rpe])
     end
   end
 end
