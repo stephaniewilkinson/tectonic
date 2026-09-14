@@ -21,6 +21,7 @@ require_relative 'lib/tectonic/timing'
 require_relative 'lib/tectonic/session_length'
 require_relative 'lib/tectonic/session_diagnosis'
 require_relative 'lib/tectonic/session_close'
+require_relative 'lib/tectonic/session_summary'
 require_relative 'lib/tectonic/turnarounds'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/clock'
@@ -1290,6 +1291,20 @@ class Tectonic < Roda
 
     rows = WorkoutSet.where(workout_id:).select(:is_completed, :completed_at).all.map(&:values)
     SessionClose.ends_at(rows) || Time.now
+  end
+
+  # What went well in this session, named specifically. #410, the second half.
+  #
+  # Only on a finished session, which is what the first half of that issue exists to produce:
+  # "on finish, lead with what went well" is a sentence about a moment, and until something
+  # closed a session there was no moment to lead with.
+  #
+  # Memoised like the diagnosis above it, and for a sharper reason: this asks the database once
+  # per movement in the session, which is worth doing once and not twice.
+  def session_summary
+    return [] unless @workout.finished?
+
+    @session_summary ||= SessionSummary.of(@workout, @sets.map(&:values), @timing)
   end
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named
