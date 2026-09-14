@@ -33,7 +33,9 @@ class Tectonic < Roda
         title 'Edit a training block'
         description "Change a training block's own settings: its name, block number, " \
                     'notes, start date, whether working sets ascend to the top weight, ' \
-                    'and the rep count main work is converted to. Send only what changes. ' \
+                    'the rep count main work is converted to, and time_budget_minutes -- ' \
+                    'how long its sessions are meant to take, which generate_program_week ' \
+                    'then warns against. Send only what changes. ' \
                     'is_ascending and preferred_reps take effect on weeks generated after ' \
                     'this; weeks already generated are not rewritten.'
         scope :write
@@ -43,7 +45,7 @@ class Tectonic < Roda
             program_id: { type: 'integer' }, name: { type: 'string' },
             block: NUMBER_OR_NULL, notes: { type: %w[string null] },
             start_date: { type: 'string' }, is_ascending: { type: 'boolean' },
-            preferred_reps: NUMBER_OR_NULL
+            preferred_reps: NUMBER_OR_NULL, time_budget_minutes: NUMBER_OR_NULL
           },
           required: ['program_id'], additionalProperties: false
         )
@@ -69,7 +71,8 @@ class Tectonic < Roda
         end
 
         def self.fields(arguments)
-          attributes = arguments.slice(:name, :block, :notes, :is_ascending, :preferred_reps)
+          attributes = arguments.slice(:name, :block, :notes, :is_ascending, :preferred_reps,
+                                       :time_budget_minutes)
           check(attributes)
           return attributes unless arguments.key?(:start_date)
 
@@ -84,6 +87,8 @@ class Tectonic < Roda
           raise Tool::Refusal, 'A block needs a name.' if attributes.key?(:name) && attributes[:name].to_s.strip.empty?
 
           Bounds.check(Bounds::REPS, attributes[:preferred_reps], 'preferred_reps')
+          Bounds.check(Bounds::BUDGET_MINUTES, attributes[:time_budget_minutes], 'time_budget_minutes',
+                       unit: ' minutes')
         end
       end
     end

@@ -2,6 +2,8 @@
 
 require_relative '../tool'
 require_relative 'program_support'
+require_relative '../../session_length'
+require_relative '../../turnarounds'
 
 class Tectonic < Roda
   module MCP
@@ -19,7 +21,9 @@ class Tectonic < Roda
         title 'Write a week of sessions'
         description 'Write one week of a block into real workouts: a session per training ' \
                     'day, warmups included, dated from the block. Defaults to the week ' \
-                    'today falls in. Running it again for the same week changes nothing.'
+                    'today falls in. Running it again for the same week changes nothing. ' \
+                    'Reports about how long each session will take, and says so when one ' \
+                    "runs past the block's time budget if it has one."
         scope :write
         input_schema(
           type: 'object',
@@ -31,9 +35,58 @@ class Tectonic < Roda
           program = ProgramFinder.program(context, arguments[:program_id])
           week = week_for(context, program, arguments[:week])
           workouts = generate(context, program, week)
-          ok("Week #{week.number} of #{program.name} is scheduled: #{summary(workouts)}.",
-             structured: { program_id: program.id, week: week.number,
-                           workouts: workouts.map { |workout| Presenter.view_workout(workout) } })
+          lengths = estimate_each(context, program, workouts)
+          ok("Week #{week.number} of #{program.name} is scheduled: #{summary(workouts)}." \
+             "#{budget_sentence(program, lengths)}",
+             structured: payload(program, week, workouts, lengths))
+        end
+
+        def self.payload(program, week, workouts, lengths)
+          { program_id: program.id, week: week.number,
+            time_budget_minutes: program.time_budget_minutes,
+            workouts: workouts.map { |workout| Presenter.view_workout(workout) },
+            estimated_minutes: lengths.transform_values(&:minutes) }
+        end
+
+        # How long each session this call just wrote will take, keyed by workout id. #408.
+        #
+        # Estimated after generating rather than off the prescription, because the session is
+        # what the lifter actually does: the generator adds a warmup ramp the block never
+        # wrote, and a ramp is four or five sets with rests between them. Pricing the
+        # prescription alone would under-report every barbell day by ten minutes or so, which
+        # is exactly the margin a budget is about.
+        #
+        # Reported whether or not a budget exists, since "Monday is about 92 minutes" is worth
+        # knowing on its own and is the number a caller needs to argue with.
+        def self.estimate_each(context, program, workouts)
+          turnaround = Turnarounds.lookup(program.account_id || context.account_id)
+          workouts.to_h do |workout|
+            [workout.id, SessionLength.estimate(workout.sets.map(&:values), turnaround:)]
+          end
+        end
+
+        # The warning #408 asks for, and only when there is a budget to warn against. A block
+        # written with no clock in mind must not acquire an opinion about one.
+        #
+        # It names the overshoot rather than saying a session is too long, and it does not
+        # refuse to generate. Whether ninety minutes is wrong is a coaching question -- cut a
+        # movement, cut a set, or accept the ninety -- and the app's job is to make the
+        # arithmetic visible before the lifter finds it out by running out of time.
+        def self.budget_sentence(program, lengths)
+          return '' unless program.time_budget_minutes
+
+          over = lengths.values.select { |estimate| estimate.minutes > program.time_budget_minutes }
+          return '' if over.empty?
+
+          " #{overshoot(program, over)}"
+        end
+
+        def self.overshoot(program, over)
+          worst = over.max_by(&:minutes)
+          days = over.length == 1 ? 'One session' : "#{over.length} sessions"
+          "#{days} in this week #{over.length == 1 ? 'runs' : 'run'} past the " \
+            "#{program.time_budget_minutes} minute budget -- the longest is about " \
+            "#{worst.minutes} minutes, #{worst.minutes - program.time_budget_minutes} over."
         end
 
         # Without a week number this means "the week we are in", which is what a lifter

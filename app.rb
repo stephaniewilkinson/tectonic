@@ -18,6 +18,8 @@ require_relative 'lib/tectonic/connection'
 require_relative 'lib/tectonic/equipment'
 require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/timing'
+require_relative 'lib/tectonic/session_length'
+require_relative 'lib/tectonic/turnarounds'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/clock'
 require_relative 'lib/tectonic/program_schedule'
@@ -1183,38 +1185,36 @@ class Tectonic < Roda
     render('workouts/_lift_panel', locals: { lift: session_lifts[position], position: })
   end
 
-  # How many of a movement's own turnarounds to read before taking the middle one. #281.
+  # What this lifter usually takes between sets of one movement, asked once per movement per
+  # request. #281, and the query itself moved to Tectonic::Turnarounds by #408 when the
+  # generation-time budget check -- which is outside the web app entirely -- became its second
+  # caller.
   #
-  # A bound rather than the whole history, because this runs inside a Done tap and a lifter
-  # three years in has thousands of squat sets -- and the median of the last sixty is the
-  # number wanted anyway. What somebody took between sets in 2023 is not what they take now,
-  # and letting it vote would make the suggestion drift towards a lifter who no longer
-  # exists. Sixty is roughly the last ten sessions of a movement trained in sixes.
-  TURNAROUND_SAMPLE = 60
-
-  # What this lifter usually takes between sets of one movement, or nil where there is not
-  # enough of their own history to say. #281.
-  #
-  # The whole of the suggestion, and deliberately the whole of it: the timer offers this
-  # number and a row of plain durations, and nothing anywhere picks a rest for somebody. A
-  # median off their own sets is a measurement; "rest 3 minutes before a heavy single" is a
-  # coaching opinion, and #263 already settled that those belong to the assistant rather
-  # than to the app.
-  #
-  # Scoped through the account's own workouts rather than by exercise alone, since the
-  # library movements are shared -- without it a first squat session would be offered the
-  # median turnaround of every lifter on the instance.
+  # The rest timer needs this for the one set a tap just finished; the session estimate needs
+  # it for every unlifted set on the page, which on a five-movement day is the same query five
+  # times over and once more on every Done. The cache belongs to the lambda, so it is per
+  # request, and it is cleared with the rest of the session in load_session.
   def usual_turnaround(exercise_id)
-    return nil unless exercise_id
+    @turnarounds ||= Turnarounds.lookup(@account_id)
+    @turnarounds.call(exercise_id)
+  end
 
-    rows = WorkoutSet.where(exercise_id:, is_completed: true)
-                     .exclude(completed_at: nil)
-                     .where(workout_id: Workout.where(account_id: @account_id).select(:id))
-                     .order(Sequel.desc(:id))
-                     .limit(TURNAROUND_SAMPLE)
-                     .select(:workout_id, :completed_at)
-                     .all.map(&:values)
-    Timing.between_sets_of(rows)
+  # How long the rest of this session should take, or nil when there is none of it left.
+  # #408.
+  #
+  # What remains rather than the whole session, which is the number a lifter mid-session
+  # actually wants: the elapsed clock beside it already says how long they have been here,
+  # and the two together answer "am I going to make it". At the start of a session nothing
+  # is completed, so this is the whole day's estimate, which is what the issue asks for.
+  #
+  # Nil on a finished session, where an estimate of nothing left would be a zero on the line
+  # rather than the absence of a question.
+  def remaining_estimate
+    @remaining_estimate ||= begin
+      pending = @sets.reject { |set| set[:is_completed] }
+      pending.empty? ? :none : SessionLength.estimate(pending.map(&:values), turnaround: method(:usual_turnaround))
+    end
+    @remaining_estimate == :none ? nil : @remaining_estimate
   end
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named
@@ -1345,6 +1345,11 @@ class Tectonic < Roda
   def load_session(workout_id)
     @sets = WorkoutSet.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+    # Both memos below are answers *about* @sets, so they are wrong the moment it is
+    # reloaded. A tap loads the session again after applying itself, and an estimate left
+    # over from before would still be counting the set that was just ticked off (#408).
+    @remaining_estimate = nil
+    @turnarounds = nil
     # How long this has been going, worked out from rows already in hand (#281). Set here
     # rather than in the session route because all three render paths go through this one --
     # the first paint, the panel a tap sends back, and the poll -- and the progress header

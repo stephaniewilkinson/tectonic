@@ -37,6 +37,14 @@ class Tectonic < Roda
         # short rests of rest-pause and drop-set work while refusing a zero, which would arm
         # a timer that fires the instant it starts.
         REST = (5..1800)
+        # How long a block says its sessions should take, in minutes. #408.
+        #
+        # Minutes rather than seconds because this is typed in by a person saying "about an
+        # hour", and the range is 032's: ten minutes is two warmup sets, and five hours is
+        # past the point where a budget is doing anything. Refused by name here rather than
+        # left to programs_time_budget_in_range, so a client gets a sentence instead of a
+        # database error.
+        BUDGET_MINUTES = (10..300)
 
         module_function
 
