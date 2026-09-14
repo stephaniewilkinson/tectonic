@@ -27,6 +27,7 @@ require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/clock'
 require_relative 'lib/tectonic/program_schedule'
 require_relative 'lib/tectonic/program_generator'
+require_relative 'lib/tectonic/rack_change'
 require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/goal'
 require_relative 'lib/tectonic/progress_chart'
@@ -542,10 +543,25 @@ class Tectonic < Roda
                                        plates: r.params['plates'],
                                        dumbbell_handle_weight: r.params['dumbbell_handle_weight'],
                                        dumbbell_plates: r.params['dumbbell_plates'])
-        r.redirect '/settings'
+        # And the sessions the old rack wrote are brought up to date with the new one. #439.
+        #
+        # Saving the rack used to change only what the *next* generation would do, so a block
+        # already written kept whatever the app had believed about the plates on the day it was
+        # generated. That is how the reporting account ended up prescribing the same movement
+        # at 44 in one week and 45 in the next, 45 being a dumbbell a 4 lb handle cannot build.
+        #
+        # Completed sets are safe because refresh never touches them, so this cannot rewrite
+        # training that has already happened -- see RackChange.
+        moved = RackChange.reround(@account_id, today: Clock.today(Clock.zone_of(@account_id)))
+        r.redirect(moved.positive? ? "/settings?rerounded=#{moved}" : '/settings')
       end
 
       r.get do
+        # How many upcoming sessions the save just moved, carried in the query string rather
+        # than a flash because this app has no flash of its own -- the only one in it belongs
+        # to Rodauth. `to_i` floors anything else to zero, so a hand-typed value can say
+        # nothing worse than nothing.
+        @rerounded = r.params['rerounded'].to_i
         @week_starts_on = week_starts_on(@account_id)
         @equipment = Equipment.for_account(@account_id)
         @time_zone = Clock.zone_of(@account_id)
