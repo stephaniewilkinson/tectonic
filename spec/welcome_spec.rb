@@ -38,6 +38,12 @@ module Welcome
     assert_equal 200, last_response.status
     last_response.body
   end
+
+  # The page as a reader sees it, with the head cut off. #326's rule is about what somebody is
+  # *told* this app is, and since #359 the title and description are a different surface with a
+  # different job -- one aimed at a search index, which has no opinion about vendor neutrality
+  # and does have opinions about which words are in it.
+  def visible = @body.sub(%r{\A.*</head>}m, '')
 end
 
 describe 'what the front page leads with' do
@@ -58,7 +64,7 @@ describe 'what the front page leads with' do
   end
 
   it 'gets to the connector before it gets to the log' do
-    assert_operator @body.index('AI'), :<, @body.index('lifting log')
+    assert_operator visible.index('AI'), :<, visible.index('lifting log')
   end
 
   # "MCP" was on this page with nothing explaining it, which asks a reader to already know
@@ -66,14 +72,31 @@ describe 'what the front page leads with' do
   # it is searching for exactly that word -- but after the plain-language version, not
   # instead of it.
   it 'names the assistants before it names the protocol' do
-    assert_operator @body.index('AI'), :<, @body.index('MCP')
+    assert_operator visible.index('AI'), :<, visible.index('MCP')
   end
 
   # The whole of #326: no vendor is named anywhere a reader is being told what this is. The
   # per-client setup steps on /connections are the exception and are asserted there.
+  #
+  # Read off the visible page rather than the whole document since #359, which put both
+  # assistants into the title and description. That is not the thing #326 refused. It refused
+  # this app reading as built for one client, and a title naming Claude *and* ChatGPT is the
+  # opposite claim -- while the two search terms #342 found unowned are "Claude workout
+  # connector" and "ChatGPT barbell program", so a head that names neither gives up the only
+  # terms this domain can win. What a reader is told, which is what the issue is about, is
+  # unchanged and still asserted.
   it 'names no vendor at all' do
-    refute_match(/\bClaude\b/, @body)
-    refute_match(/\bChatGPT\b/, @body)
+    refute_match(/\bClaude\b/, visible)
+    refute_match(/\bChatGPT\b/, visible)
+  end
+
+  # And the head does, deliberately, which is the half #359 asked for. Asserted here beside
+  # the rule it is an exception to, so the two are read together.
+  it 'names both of them in the metadata, and never only one' do
+    head = @body[%r{<head\b.*?</head>}m]
+
+    assert_includes head, 'Claude'
+    assert_includes head, 'ChatGPT'
   end
 end
 

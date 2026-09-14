@@ -28,9 +28,46 @@
         deciding whether the CSP can be tightened. %>
     <script src="https://cdn.usefathom.com/script.js" data-site="VXQDPBHH" defer></script>
 
+    <%# The title and the description, and what they are competing for. #359.
+
+        They were `tectonic plates, a lifting app` and `Lift heavier with tectonic plates.
+        Track your workouts and progress.` -- neither containing Claude, ChatGPT, MCP,
+        connector or AI, while the visible headline has said "Ask Claude what to lift" since
+        #269. #342 found that search returns no organic results for the literal string
+        tectonicplates.app, and that "tectonic" belongs to a Minecraft mod. The metadata was
+        pointing at the one term this domain cannot win.
+
+        So it points at the terms nobody owns instead. It does not claim to be the first
+        strength app an assistant can write to -- that line is taken, timestamped two months
+        earlier, on a competitor that is free (#358), and claiming it invites the comparison on
+        the one axis where the answer is "and theirs is free". What is defensible and unclaimed
+        is the programme: weeks, days, progressions and warmup ramps, not a workout.
+
+        **Both assistants, never one**, which is how this sits with #326. That issue decided no
+        vendor is named anywhere a reader is being told what this app is, on the grounds that
+        an app speaking an open protocol should not read as built for one client -- and it is
+        right, which is why the headline still says "Ask your AI what to lift" and a spec holds
+        it there. Naming Claude *and* ChatGPT is not the thing #326 refused: it is the opposite
+        claim, that this works with whichever one you use. The two searchable terms #342 found
+        unowned are "Claude workout connector" and "ChatGPT barbell program", and naming one of
+        them without the other would be exactly the single-vendor reading #326 exists to
+        prevent.
+
+        The name being close to unsearchable is a larger problem than a meta tag and #342 flags
+        a rename as a real option nobody has costed. This does not fix that.
+
+        A page may override both; every page that does not gets these. The default is a
+        statement about the app rather than about whichever page is being rendered, which is
+        what makes it the right fallback for forty pages behind a login that no crawler will
+        ever see. %>
+    <%- @page_title ||= 'tectonic plates — a barbell tracker Claude and ChatGPT can plan' %>
+    <%- @page_description ||= 'A barbell strength tracker with an MCP connector. Ask Claude or ' \
+                              'ChatGPT to write a whole training block - weeks, days, ' \
+                              'progressions, warmup ramps, plate maths for your own rack - ' \
+                              'then log every set against it.' %>
     <!-- HTML Meta Tags -->
-    <title>tectonic plates, a lifting app</title>
-    <meta name="description" content="Lift heavier with tectonic plates. Track your workouts and progress.">
+    <title><%= @page_title %></title>
+    <meta name="description" content="<%= @page_description %>">
     <%# One domain. render.yaml serves this app at tectonicplates.app and still allows
         tectonic.onrender.com, so without this the same page is two pages. %>
     <link rel="canonical" href="<%= canonical_url %>">
@@ -60,8 +97,8 @@
     <meta property="og:url" content="<%= canonical_url %>">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="tectonic plates">
-    <meta property="og:title" content="tectonic plates, a lifting app">
-    <meta property="og:description" content="Lift heavier with tectonic plates. Track your workouts and progress.">
+    <meta property="og:title" content="<%= @page_title %>">
+    <meta property="og:description" content="<%= @page_description %>">
     <meta property="og:image" content="<%= Tectonic::CANONICAL_ORIGIN %>/img/screenshot.jpeg">
     <meta property="og:image:alt" content="A tectonic plates workout, with each set's weight and the plates that make it.">
 
@@ -71,8 +108,8 @@
     <meta property="twitter:url" content="<%= canonical_url %>">
     <%# There is no separate product account, so the site and its author are one handle. %>
     <meta name="twitter:site" content="@stephanieblack">
-    <meta name="twitter:title" content="tectonic plates, a lifting app">
-    <meta name="twitter:description" content="Lift heavier with tectonic plates. Track your workouts and progress.">
+    <meta name="twitter:title" content="<%= @page_title %>">
+    <meta name="twitter:description" content="<%= @page_description %>">
     <meta name="twitter:image" content="<%= Tectonic::CANONICAL_ORIGIN %>/img/screenshot.jpeg">
     <meta name="twitter:image:alt" content="A tectonic plates workout, with each set's weight and the plates that make it.">
 

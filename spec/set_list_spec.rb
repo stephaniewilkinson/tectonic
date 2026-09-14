@@ -137,10 +137,15 @@ describe 'how the set list answers Warmup and Done' do
 
   # The words these replaced were the bug: an em dash in a column reads as "not
   # applicable" rather than as no, and it stood for no in both columns at once.
+  #
+  # Read off the two cells rather than off the whole document, which is what it used to do.
+  # That was over-broad in a way nothing revealed until #359 put an em dash in the page
+  # description: the assertion is about what these two columns contain, and it was quietly
+  # also asserting that no em dash appears anywhere in the layout, the nav or the head.
   it 'answers with a box rather than a word or a dash' do
     body = list
 
-    refute_includes body, '—'
+    %w[Warmup Done].each { |column| refute_includes cell_body(body, column), '—' }
     assert_equal [SetList::EMPTY, SetList::EMPTY], boxes(body)
   end
 
