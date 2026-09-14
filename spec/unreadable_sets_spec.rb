@@ -4,20 +4,23 @@ require_relative 'spec_helper'
 require_relative 'route_ownership_spec' # reuses its account/login helpers; idempotent require
 require 'securerandom'
 
-# The movement page tells "nothing logged" apart from "logged, and the estimate cannot read it".
+# What the movement page says when it has no training max, which has now been wrong twice and
+# is worth pinning properly.
 #
 # Reported against a Bulgarian Split Squat carrying two completed working sets of 44x8 at RPE 7.
 # The page said **"Nothing has been lifted here that the chart can read"** and then told the
 # lifter to log a completed set -- which they had done twice.
 #
-# The app was right that it had no number and wrong about why. `OneRepMax` restates a rated set
-# as the RPE-8 set of equal difficulty -- eight reps at 7 is nine at 8 -- and
-# `SetScheme::RPE8_PERCENTS` stops at five, so neither set could be read. That is a real limit
-# and this does not change it; what it changes is an app claiming nothing was logged while the
-# set list sits further down the same page.
+# The first fix said the sets were there and the estimate could not read them. True then: the
+# chart stopped at five reps and eight at RPE 7 restates to nine.
+#
+# The chart reads to ten now, so it is not true any more. Those sets *do* estimate a max -- 44
+# at 70.7% is about 62 lb -- and what they do not do is produce a number the app will let set
+# the denominator by itself. So the page shows the number and says why it is not being used,
+# which is the third and hopefully last shape of this sentence.
 module UnreadableSets
-  # The reported set, exactly: eight reps at RPE 7 restates to nine at RPE 8, which is off the
-  # end of the table.
+  # The reported set, exactly: eight reps at RPE 7 restates to nine at RPE 8 -- readable since
+  # the row was extended, and further from a single than CONFIDENT_REPS allows to set a max.
   def a_movement_trained_in_eights(account_id)
     exercise = Tectonic::Exercise.create(account_id:, name: "Split Squat #{SecureRandom.hex(4)}")
     workout_id = DB[:workouts].insert(account_id:, date: Date.today)
@@ -50,7 +53,7 @@ module UnreadableSets
   end
 end
 
-describe 'a movement whose sets the estimate cannot read' do
+describe 'a movement whose estimate is too far from a single to trust with a max' do
   include Rack::Test::Methods
   include RouteOwnership
   include UnreadableSets
@@ -73,14 +76,42 @@ describe 'a movement whose sets the estimate cannot read' do
     assert_match(/2 completed working sets are logged here/, said)
   end
 
-  it 'says why they cannot be read rather than only that they cannot' do
-    assert_includes said, 'five reps or fewer'
+  # The number exists and is shown. Withholding it was the dead end; the honesty moved onto
+  # saying what it is rather than onto pretending there is nothing.
+  it 'reports the estimate rather than withholding it' do
+    assert_match(%r{estimate a one-rep max of about <strong>62 lb</strong>}, said)
   end
 
-  # The advice was the other half of the bug: "log a completed set", to somebody who had logged
-  # two, and logging a third of the same would not have helped.
+  it 'says how far from a single the set it read was' do
+    assert_includes said, 'as hard as 9 reps'
+  end
+
+  # And the rule that makes showing it safe.
+  it 'says why it is not the number percentages come off' do
+    assert_includes said, 'will not make it the number your percentages come off'
+  end
+end
+
+describe 'what that page tells a lifter to do about it' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include UnreadableSets
+
+  before do
+    @account_id = login
+    @exercise = a_movement_trained_in_eights(@account_id)
+    get "/exercises/#{@exercise.id}"
+  end
+
+  # The advice was the other half of the original bug: "log a completed set", to somebody who
+  # had logged two, and a third of the same would not have helped.
   it 'points at the box on this page rather than at logging more of the same' do
     assert_includes said, 'Set a max below'
+  end
+
+  # The whole reason this state exists rather than resolving to a derived max.
+  it 'still refuses to generate a percentage lift against it' do
+    assert_nil Tectonic::TrainingMax.for(account_id: @account_id, exercise: @exercise)
   end
 end
 

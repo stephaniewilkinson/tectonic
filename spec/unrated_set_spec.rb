@@ -59,12 +59,19 @@ describe 'estimating from a set the block priced easy' do
     refute_equal Tectonic::OneRepMax.estimate(weight: 200, reps: 3, planned_rpe: 6), rated
   end
 
-  # The chart runs 1 to 5 reps, and a rating below the anchor restates a set to *more* reps
-  # than it was taken for. Five at RPE 6 restates to a seven-rep set, which the chart does
-  # not cover -- so it declines rather than inventing a row, which is the same refusal
-  # `estimate` already made for a set of 8.
-  it 'declines where the target restates the set off the end of the chart' do
-    assert_nil Tectonic::OneRepMax.estimate(weight: 200, reps: 5, planned_rpe: 6)
+  # A rating below the anchor restates a set to *more* reps than it was taken for: five at
+  # RPE 6 is as hard as seven at RPE 8. The chart ran to five and declined that; it runs to ten
+  # now and reads it, at 76.2%.
+  #
+  # The refusal has not gone, it has moved: the reading is marked as further from a single than
+  # the app will let set a training max on its own, which is the honest version of what the
+  # decline was trying to say.
+  it 'reads a target that restates the set past the anchor, and says it is a long way out' do
+    reading = Tectonic::OneRepMax.reading_of({ weight: 200, reps: 5, planned_rpe: 6 })
+
+    assert_equal 262, reading[:pounds]
+    assert_equal 7, reading[:from_reps]
+    refute reading[:confident]
   end
 end
 

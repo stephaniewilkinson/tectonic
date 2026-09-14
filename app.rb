@@ -713,6 +713,12 @@ class Tectonic < Roda
           # page has to say something about: it is the one that makes a percentage lift
           # refuse to generate.
           @training_max = TrainingMax.for(account_id: @account_id, exercise: @exercise)
+          # The best estimate there is, which is not always one that may set a max. Since the
+          # chart was extended to ten reps a movement trained in eights has a number, and that
+          # number is still too far from a single to become the denominator on its own -- so
+          # the page reports it and says why it is not being used, rather than behaving as
+          # though it did not exist.
+          @estimate = @exercise.estimated_reading(account_id: @account_id)
           # What this movement is aiming at, if anything (#308). Nil is a state the page has
           # to say something different about rather than a number to default.
           @goal = Goal.for(account_id: @account_id, exercise_id: @exercise.id)

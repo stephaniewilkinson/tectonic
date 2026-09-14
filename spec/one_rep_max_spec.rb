@@ -25,10 +25,43 @@ describe 'OneRepMax.estimate' do
     assert_equal 225, Tectonic::OneRepMax.estimate(weight: 225, reps: 1, rpe: 10)
   end
 
-  it 'declines to estimate from work the chart cannot read' do
-    assert_nil Tectonic::OneRepMax.estimate(weight: 135, reps: 8, rpe: 8)
-    assert_nil Tectonic::OneRepMax.estimate(weight: 135, reps: 5, rpe: 6)
+  # **This used to be a refusal and is now a number, which is the change and not a slip.**
+  #
+  # The chart ran to five reps and declined anything restating past it -- on the reasoning that
+  # "an estimate off work that light is a guess dressed as a number". The instinct was right
+  # and the refusal was the wrong expression of it: silently having no number is worse than a
+  # number that says how sure it is, and it produced a real dead end, where a movement trained
+  # in eights had no max and the page claimed nothing had been lifted.
+  #
+  # The row runs to ten now. It is one row and an index shift, which the RTS chart is
+  # constructed to allow -- RPE 8 at three reps, RPE 9 at four and RPE 10 at five are the same
+  # number -- so extending the row is exactly equivalent to storing the full grid and nothing
+  # is approximated by doing it.
+  it 'reads work the chart used to decline, now that the row reaches it' do
+    # Eight reps at the anchor: 73.9%.
+    assert_equal 183, Tectonic::OneRepMax.estimate(weight: 135, reps: 8, rpe: 8)
+    # Five at a 6 restates to seven: 76.2%.
+    assert_equal 177, Tectonic::OneRepMax.estimate(weight: 135, reps: 5, rpe: 6)
+  end
+
+  # What it still declines, and these are refusals about the set rather than about the chart:
+  # there is no load to take a fraction of, and eleven restated reps is past the row's end.
+  it 'declines where there is nothing to read' do
     assert_nil Tectonic::OneRepMax.estimate(weight: 0, reps: 5, rpe: 8)
+    assert_nil Tectonic::OneRepMax.estimate(weight: 135, reps: 12, rpe: 8)
+  end
+end
+
+# The honesty the old refusal was reaching for, kept as a property of the reading rather than as
+# an absence. TrainingMax.derived is what acts on it.
+describe 'OneRepMax.reading_of' do
+  it 'marks how far from a single the set it read was' do
+    close = Tectonic::OneRepMax.reading_of({ weight: 155, reps: 5, rpe: 8 })
+    far = Tectonic::OneRepMax.reading_of({ weight: 44, reps: 8, rpe: 7 })
+
+    assert close[:confident]
+    refute far[:confident]
+    assert_equal 9, far[:from_reps], 'eight reps at RPE 7 is as hard as nine at RPE 8'
   end
 end
 

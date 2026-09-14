@@ -102,6 +102,16 @@ class Tectonic < Roda
       OneRepMax.best_reading(lifted_sets(account_id, on))
     end
 
+    # The same, restricted to readings the chart is sure enough of to let stand on their own.
+    #
+    # This is what a training max derives from, and the pair is the point: `estimated_reading`
+    # above is the best estimate there is and gets drawn, this is the best one allowed to
+    # become a number the app then prescribes against. A movement trained in eights has the
+    # first and not the second.
+    def confident_reading(account_id:, on: Date.today)
+      OneRepMax.best_confident_reading(lifted_sets(account_id, on))
+    end
+
     # What recent training implies, as against what has ever been demonstrated. #307, and
     # the windowed companion #293 named and deliberately left unbuilt.
     #
