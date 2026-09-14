@@ -19,6 +19,7 @@ require_relative 'lib/tectonic/equipment'
 require_relative 'lib/tectonic/volume'
 require_relative 'lib/tectonic/timing'
 require_relative 'lib/tectonic/session_length'
+require_relative 'lib/tectonic/session_diagnosis'
 require_relative 'lib/tectonic/turnarounds'
 require_relative 'lib/tectonic/calendar'
 require_relative 'lib/tectonic/clock'
@@ -1215,6 +1216,22 @@ class Tectonic < Roda
       pending.empty? ? :none : SessionLength.estimate(pending.map(&:values), turnaround: method(:usual_turnaround))
     end
     @remaining_estimate == :none ? nil : @remaining_estimate
+  end
+
+  # Why this session ran the way it did, or nil on one with nothing to explain. #409.
+  #
+  # Memoised for the same reason the estimate above is: the record page asks once, but asking
+  # is a handful of turnaround lookups and there is no reason to do them twice if the template
+  # grows a second reader.
+  #
+  # The active span comes from @timing rather than being worked out again here, so the line
+  # that says why a session ran long and the line above it that says how long it ran cannot
+  # come to different conclusions about the same session.
+  def session_diagnosis
+    return nil unless @timing && @timing[:overall]
+
+    @session_diagnosis ||= SessionDiagnosis.of(@sets.map(&:values), turnaround: method(:usual_turnaround),
+                                                                    active_seconds: @timing[:active])
   end
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named

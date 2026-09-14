@@ -103,6 +103,24 @@
       <%== render('workouts/_clock_time', locals: { at: @timing[:ended_at] }) %>
     </p>
   <%- end %>
+  <%# Why it ran the way it did. #409.
+
+      Three causes look identical in a log -- the rests ran long, more was written than the
+      time allowed, or the lifter started late -- and two of them are already distinguishable
+      from what is stored. The third is not modelled and never will be: only the lifter knows
+      what late means, and a wrong guess about it reads as an accusation.
+
+      **Below the fold, which #409 is explicit about.** A session that ran long and still
+      moved a training max is a good session, and the ordering has to say so -- so this sits
+      under how long it took and under when it was, in the same grey as both, rather than at
+      the top where it would be the first thing read about a session that went well.
+
+      Silent where there is nothing to explain. A session lifted exactly as written gets no
+      line at all, rather than a line saying that everything was fine in three clauses --
+      which is the difference between a diagnosis and a scolding. %>
+  <%- if session_diagnosis&.anything? %>
+    <p class="mt-1 text-sm text-gray-500"><%= Tectonic::SessionDiagnosis.sentence(session_diagnosis) %></p>
+  <%- end %>
 <%- end %>
 
 <%# The clock times above, put into the reader's own timezone. #397.
