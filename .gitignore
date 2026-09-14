@@ -3,3 +3,14 @@
 .DS_Store
 .claude/
 node_modules/
+
+# The Ed25519 private key that proves this domain owns its MCP registry namespace
+# (#358). The public half is a TXT record on tectonicplates.app and is meant to be
+# read by anybody; this half signs the login and is the whole of the proof, so a
+# commit of it hands the namespace to whoever reads the repo -- which is everybody,
+# because this repo is public.
+#
+# Named rather than covered by a *.pem glob, so that a future certificate or a test
+# fixture ending in .pem is a decision somebody makes rather than a file that silently
+# vanishes from a diff.
+key.pem
