@@ -42,7 +42,9 @@ class Tectonic < Roda
 
         title 'Correct a set'
         description 'Correct a set: weight, reps, rpe, whether it is a warmup, whether ' \
-                    'its reps are per side, or the exercise it is. Send only what ' \
+                    'its reps are per side, whether it was done under meet commands ' \
+                    '(is_commanded -- start, press, rack, rather than the lifter\'s own ' \
+                    'tempo), or the exercise it is. Send only what ' \
                     'changes. Returns what actually moved. ' \
                     'Changing the weight or reps of a completed set needs confirm true, ' \
                     'which you should only send if the user asked for the correction; ' \
@@ -53,7 +55,8 @@ class Tectonic < Roda
           properties: { set_id: { type: 'integer' }, weight: { type: 'number' },
                         reps: { type: 'integer' }, rpe: { type: 'integer' },
                         is_warmup: { type: 'boolean' }, exercise: { type: 'string' },
-                        is_per_side: { type: 'boolean' }, confirm: { type: 'boolean' } },
+                        is_per_side: { type: 'boolean' }, is_commanded: { type: 'boolean' },
+                        confirm: { type: 'boolean' } },
           required: ['set_id'], additionalProperties: false
         )
 
@@ -115,17 +118,28 @@ class Tectonic < Roda
         # that was swapped out is worse than none, and so is a planned weight.
         def self.attributes(context, set, arguments)
           fields = written(arguments)
-          # The shape the set will be left in, not the one it is in: this is the one tool
-          # that can set is_warmup and rpe in a single call, so asking the row as it stands
-          # would let a rating through onto a set about to become a warmup.
-          Bounds.rating_fits!(fields.fetch(:rpe, set.rpe),
-                              warmup: fields.fetch(:is_warmup, set.is_warmup), timed: set.timed?)
+          check_placement(set, fields)
           return fields unless arguments[:exercise]
 
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           return fields if exercise.id == set.exercise_id
 
           WorkoutSet.moved_to(exercise).merge(fields)
+        end
+
+        # The two fields that need somewhere to sit rather than only a range, checked
+        # together because they are the same kind of rule and refused by name because the
+        # alternative is a check violation reaching a client as a database error.
+        def self.check_placement(set, fields)
+          # The shape the set will be left in, not the one it is in: this is the one tool
+          # that can set is_warmup and rpe in a single call, so asking the row as it stands
+          # would let a rating through onto a set about to become a warmup.
+          Bounds.rating_fits!(fields.fetch(:rpe, set.rpe),
+                              warmup: fields.fetch(:is_warmup, set.is_warmup), timed: set.timed?)
+          # Asked of the row's own measure, unlike the rating above, because this tool cannot
+          # change a set's measure -- there is no `measure` in its schema, and a plank stays a
+          # plank through every correction it accepts. #311.
+          Bounds.commands_fit!(fields[:is_commanded], measure: set.measure)
         end
 
         # The columns as they will be stored: range-checked, and a weight of zero read as
@@ -141,7 +155,11 @@ class Tectonic < Roda
         # precisely the case of a set logged bilaterally that was not. A guard would put
         # confirm in front of the fix for the bug that made the flag necessary.
         def self.written(arguments)
-          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup, :is_per_side)
+          # is_commanded joins is_per_side outside LIFTED for the same reason and not behind
+          # confirm: it says how the set was performed rather than overwriting what was
+          # measured, and remembering after the session that the top single was commanded is
+          # the ordinary way round. #311.
+          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup, :is_per_side, :is_commanded)
           check(fields)
           fields[:weight] = Load.stored(fields[:weight]) if fields.key?(:weight)
           fields

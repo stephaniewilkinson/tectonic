@@ -140,9 +140,13 @@ class Tectonic < Roda
         # the session screen has used since #280 and the one `load_phrase` now confirms a
         # write with. A bare "x10" is what a nil weight interpolated straight produces, and
         # it reads as a missing number rather than as an absent load.
+        # "commanded" joins it on the same argument (#311): the flag is the only thing on the
+        # row saying the set was done to a referee's timing rather than the lifter's, and a
+        # session read back without it cannot answer "how many commanded reps did this block
+        # contain" -- which is the question the column was added for.
         def self.quantity(set)
           count = Load.carried?(set[:weight]) ? "#{set[:weight]}x#{set[:reps]}" : "#{set[:reps]} reps"
-          "#{count}#{' per side' if set[:is_per_side]}"
+          "#{count}#{' per side' if set[:is_per_side]}#{' commanded' if set[:is_commanded]}"
         end
 
         # Only worth printing where the prescription and the performance disagree; on a

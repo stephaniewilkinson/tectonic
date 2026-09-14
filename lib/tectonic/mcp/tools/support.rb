@@ -105,6 +105,27 @@ class Tectonic < Roda
           raise Tool::Refusal, 'A target RPE is reps in reserve, so it belongs only on a loaded lift ' \
                                'counted in reps. Drop target_rpe, or prescribe this lift in reps with a load.'
         end
+
+        # Where commands may sit. #311, and the third rule of this shape.
+        #
+        # Narrower than target_fits! by one clause and wider by another, which is worth
+        # saying because the difference is not an oversight. There is no weighted clause: a
+        # command is a rule imposed by a referee rather than a rating the screen has to
+        # collect, so there is no equivalent of #278's silently-swallowed instruction here,
+        # and the argument in 031 for keeping load out of the constraint applies to the tool
+        # for the same reason -- a lift whose is_weighted flag is flipped later should not
+        # start failing on save.
+        #
+        # Refused by name rather than left to the check constraint, which is check_load's
+        # rule for all three: a constraint violation reaches a client as a database error and
+        # reads as the tool being broken, where this names the field and says what to do.
+        def commands_fit!(commanded, measure:)
+          return unless commanded
+          return if measure == Measured::REPS
+
+          raise Tool::Refusal, 'Commands bracket a rep -- start, press, rack -- so is_commanded belongs ' \
+                               'only on a lift counted in reps, not one held for time.'
+        end
       end
 
       # How a load arrives and how it is stored, which are not the same thing for work that
@@ -300,10 +321,23 @@ class Tectonic < Roda
         # this said `40x8` about sixteen reps of work. Two numbers from one app differing by
         # exactly 2x, with nothing on the row to explain which was which.
         def view_set(set)
-          { id: set.id, exercise: set.exercise.name, weight: weight(set.weight), reps: set.reps,
-            rpe: set.rpe, is_warmup: set.is_warmup, is_completed: set.is_completed,
-            is_per_side: set.is_per_side, completed_at: set.completed_at&.iso8601 }
-            .merge(prescribed(set)).merge(provenance(set))
+          { id: set.id, exercise: set.exercise.name }
+            .merge(lifted(set)).merge(performed(set)).merge(prescribed(set)).merge(provenance(set))
+        end
+
+        # What was in the set: the load, the count, and how hard it turned out to be.
+        def lifted(set)
+          { weight: weight(set.weight), reps: set.reps, rpe: set.rpe }
+        end
+
+        # How the set was done, as against what was in it. Split out when is_commanded made
+        # the fifth (#311), on the same grounds `prescribed` was split out when planned_rpe
+        # made the third: a hash literal naming every dimension of a set is a method doing
+        # four jobs, and rubocop counted it before a reader would have.
+        def performed(set)
+          { is_warmup: set.is_warmup, is_completed: set.is_completed,
+            is_per_side: set.is_per_side, is_commanded: set.is_commanded,
+            completed_at: set.completed_at&.iso8601 }
         end
 
         # The three columns saying what was asked for, split out from what was done. They
@@ -335,16 +369,24 @@ class Tectonic < Roda
         # the doubling only surfaces later in a volume figure, which is the hardest place to
         # trace a mismatch back from -- the same complaint #306 fixed on the read side, in
         # the one line that had been left saying it the old way.
+        # "commanded" is appended on the same argument as "per side" and #311 adds it in both
+        # places at once: the session screen's `load_label` builds the identical phrase, so a
+        # set described by the app and by an assistant reading it back says the same thing.
         def load_phrase(set)
-          return "#{set.reps} reps#{per_side(set)}" unless Load.carried?(set.weight)
+          return "#{set.reps} reps#{per_side(set)}#{commanded(set)}" unless Load.carried?(set.weight)
 
-          "#{weight(set.weight)}x#{set.reps}#{per_side(set)}"
+          "#{weight(set.weight)}x#{set.reps}#{per_side(set)}#{commanded(set)}"
         end
 
         # The words get_workout's quantity_label already uses, so one session cannot be
         # described two ways by two tools.
         def per_side(set)
           set.is_per_side ? ' per side' : ''
+        end
+
+        # And the words get_workout's own row builder uses, for the same reason. #311.
+        def commanded(set)
+          set.is_commanded ? ' commanded' : ''
         end
 
         # A workout with its sets in the order they are meant to be lifted, and where it

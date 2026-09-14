@@ -30,6 +30,11 @@ class Tectonic < Roda
                     'rest this lifter actually takes between sets of the movement, so give ' \
                     'it when the programme genuinely prescribes one and leave it out rather ' \
                     'than inventing a number. ' \
+                    'is_commanded says the working sets are done under meet commands -- ' \
+                    'start, press, rack -- rather than at the lifter\'s own tempo. It is a ' \
+                    'competition condition, not a tempo: a paused bench in training is not ' \
+                    'a commanded one, and the library already has Paused Bench Press as its ' \
+                    'own movement for that. It belongs only on a lift counted in reps. ' \
                     'percent_of names a different movement whose max the percentage is of: ' \
                     'a deficit deadlift written at 70% of the competition deadlift, or ' \
                     'supplemental work off the main lift. It defaults to the lift itself. ' \
@@ -45,7 +50,7 @@ class Tectonic < Roda
             is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: { type: 'integer' },
-            rest_seconds: { type: 'integer' },
+            rest_seconds: { type: 'integer' }, is_commanded: { type: 'boolean' },
             percent_of: { type: 'string' }, note: { type: 'string' }
           },
           required: %w[program_day_id exercise sets], additionalProperties: false

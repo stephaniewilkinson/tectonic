@@ -85,6 +85,29 @@
           <label for="is_warmup" class="font-medium text-gray-900">Warmup set?</label>
         </div>
       </div>
+      <%# Drawn only where it can mean something, which is the same rule the Reps and
+          Seconds boxes above follow. Commands bracket a rep -- start, press, rack -- so a
+          movement held for time has no rep for them to bracket, and the database refuses
+          the row outright. A box that could only ever produce a 500 is worse than no box.
+
+          The description says what "commanded" means, because it is the one word on this
+          form that is not self-evident and because getting it wrong is quiet: a lifter who
+          reads it as "paused" ticks it on tempo work, and the count of commanded reps in a
+          block -- which is the whole reason the column exists -- quietly stops being true.
+          #311. %>
+      <%- unless @set&.timed? %>
+        <div class="relative flex items-start">
+          <div class="flex h-6 items-center">
+            <input id="is_commanded" aria-describedby="is_commanded-description" name="is_commanded" type="checkbox"
+              <%= 'checked' if @set && @set[:is_commanded] %>
+              class="h-4 w-4 rounded border-gray-300 text-lime-500 accent-lime-500 focus:ring-lime-500">
+          </div>
+          <div class="ml-3 text-sm leading-6">
+            <label for="is_commanded" class="font-medium text-gray-900">Commanded?</label>
+            <p id="is_commanded-description" class="text-gray-500">Done under meet commands &mdash; start, press, rack &mdash; rather than at your own tempo.</p>
+          </div>
+        </div>
+      <%- end %>
     </div>
     <%# Shape from button_style, which is #173's: one radius, one shadow and one focus ring
         for every primary button in the app. The rounded-lg both copies carried was one of

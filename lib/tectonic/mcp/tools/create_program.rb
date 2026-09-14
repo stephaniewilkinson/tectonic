@@ -30,6 +30,7 @@ class Tectonic < Roda
             is_per_side: { type: 'boolean' }, duration_seconds: { type: 'integer' },
             is_main: { type: 'boolean' }, is_barbell: { type: 'boolean' },
             target_rpe: { type: 'integer' }, rest_seconds: { type: 'integer' },
+            is_commanded: { type: 'boolean' },
             percent_of: { type: 'string' },
             note: { type: 'string' }
           },

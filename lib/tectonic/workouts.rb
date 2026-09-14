@@ -151,8 +151,12 @@ class Tectonic < Roda
     # it, but the rest timer is armed from it, so an assistant that represcribes a lift's rest
     # and regenerates the day has changed what the screen will do -- and a poll answering 204
     # would leave the next Done tap offering the rest the block asked for yesterday.
+    # is_commanded joins it with #311 for the plainest reason on the list: it is printed on
+    # the row. A block represcribed under commands and regenerated changes what the session
+    # screen says, and a poll answering 204 would leave the phrase on the page disagreeing
+    # with the row behind it.
     SESSION_COLUMNS = %i[id exercise_id weight reps rpe is_warmup is_completed
-                         measure duration_seconds is_per_side
+                         measure duration_seconds is_per_side is_commanded
                          planned_weight planned_reps planned_rpe planned_rest_seconds
                          completed_at].freeze
 
