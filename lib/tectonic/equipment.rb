@@ -67,10 +67,10 @@ class Tectonic < Roda
     # rack, and because three write paths ask it -- a lift inside a new block, a lift added
     # to a day, and an edit to one. Rounding on two of those and not the third is the shape
     # of the bug rather than a fix for it.
-    def self.loadable_for(account_id, weight, is_barbell:)
+    def self.loadable_for(account_id, weight, is_barbell:, dumbbells: DEFAULT_DUMBBELLS)
       return weight if weight.nil?
 
-      for_account(account_id).loadable(weight.to_f, is_barbell:)
+      for_account(account_id).loadable(weight.to_f, is_barbell:, dumbbells:)
     end
 
     # An account that has never said what it owns lifts on the default rack rather than on
@@ -108,6 +108,19 @@ class Tectonic < Roda
     # that wants a second inventory, which is a bigger thing than a rounding rule.
     DUMBBELL_INCREMENT = 5
 
+    # How many dumbbells a movement is done with when nobody has said. #439.
+    #
+    # Here rather than on Exercise, where it conceptually belongs, because this class is the
+    # one that needs it as a parameter default and must not require the model to get it --
+    # exercises.rb already reaches this way round.
+    #
+    # Two, and the tie is broken on which failure is worse rather than on which is likelier.
+    # Every weight loadable on a pair is loadable on a single, so assuming two can only ever
+    # prescribe something buildable; assuming one prescribes weights that do not exist for
+    # every two-handed movement. #439 states the preference outright -- a weight the lifter
+    # cannot load is "a worse failure than one that is slightly light".
+    DEFAULT_DUMBBELLS = 2
+
     # Whether this account has described a second rack. #369.
     #
     # Both halves, because neither is any use alone: a handle weight with no plates loads
@@ -133,10 +146,32 @@ class Tectonic < Roda
     # 033 gave the second inventory 007's shape: a dumbbell is loaded at both ends the way a
     # bar is loaded at both sides, so the handle stands where the bar does and a pair of plates
     # means the same thing on either.
-    def dumbbell_totals
+    # `dumbbells` is how many are in use, which decides how far the shelf goes round. #439.
+    #
+    # 033 counts `pairs` per dumbbell, so a size spends one pair on a single and two pairs on a
+    # matched pair -- each handle needs it on both ends, and a dumbbell bench with a ten on one
+    # side of one hand is not a dumbbell bench. Dividing the inventory is therefore the whole
+    # of the difference, and integer division is doing real work: three pairs of 2.5 make one
+    # usable pair across two dumbbells, not one and a half.
+    #
+    # Memoised per count rather than in one slot, because a session mixes the two -- a
+    # single-arm row and a dumbbell press in the same day are two different lists -- and a
+    # single memo would hand the second movement the first one's answer.
+    def dumbbell_totals(dumbbells = DEFAULT_DUMBBELLS)
       return [] unless adjustable_dumbbells?
 
-      @dumbbell_totals ||= Plates.totals(bar_weight: dumbbell_handle_weight, inventory: dumbbell_pairs) || []
+      @dumbbell_totals ||= {}
+      @dumbbell_totals[dumbbells] ||=
+        Plates.totals(bar_weight: dumbbell_handle_weight, inventory: shared_out(dumbbells)) || []
+    end
+
+    # The plates one dumbbell may count on when `dumbbells` of them are being loaded alike.
+    # Sizes that do not go round at all drop out rather than appearing with a count of zero,
+    # which `Plates.totals` would otherwise enumerate as a choice of none.
+    def shared_out(dumbbells)
+      return dumbbell_pairs if dumbbells <= 1
+
+      dumbbell_pairs.transform_values { |count| count / dumbbells }.reject { |_, count| count.zero? }
     end
 
     # How far apart two loads of this kind sit. The bar answers from its plates, and since
@@ -180,9 +215,13 @@ class Tectonic < Roda
     #
     # An account that has said nothing keeps exactly the rounding it had, against the constant
     # #259 named as an assumption, because a fixed rack really does run in fives.
-    def loadable(weight, is_barbell: true)
+    #
+    # `dumbbells` says how many are in hand, and is ignored on the bar. #439: a size has to go
+    # on both ends of every handle in use, so a pair of dumbbells reaches half as far up the
+    # shelf as one does, and the two were being answered from the same list.
+    def loadable(weight, is_barbell: true, dumbbells: DEFAULT_DUMBBELLS)
       return weight if weight.nil?
-      return nearest(weight, dumbbell_totals, dumbbell_increment) unless is_barbell
+      return nearest(weight, dumbbell_totals(dumbbells), dumbbell_increment) unless is_barbell
 
       nearest(weight, loadable_totals, increment)
     end
@@ -204,9 +243,9 @@ class Tectonic < Roda
     # of a top weight has to land somewhere loadable and neither of them can be asked to
     # know what this rack holds. The increment rides along because a ramp still has to know
     # how far apart to space its rungs, which is a question the increment answers correctly.
-    def loading(is_barbell: true)
+    def loading(is_barbell: true, dumbbells: DEFAULT_DUMBBELLS)
       Rounding::Loading.new(increment: increment_for(is_barbell:),
-                            round: ->(weight) { loadable(weight, is_barbell:) })
+                            round: ->(weight) { loadable(weight, is_barbell:, dumbbells:) })
     end
 
     # Every weight this rack can load, worked out once and kept. A week's generation asks

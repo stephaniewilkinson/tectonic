@@ -21,7 +21,11 @@ require 'date'
 module RackChanging
   # A dumbbell movement prescribed at a weight no 4 lb handle can build.
   def a_block_of_dumbbells(account_id, top_weight: 45, on: Date.today + 7)
-    exercise = Tectonic::Exercise.create(account_id:, name: "DB Row #{SecureRandom.hex(4)}", is_barbell: false)
+    # dumbbell_count 1, because this is modelling the Single-Arm DB Row the production numbers
+    # came from, and since #439 that is a thing a movement has to say: a pair of dumbbells
+    # reaches half as far up the same shelf, so the 44/45 story below is only true of a single.
+    exercise = Tectonic::Exercise.create(account_id:, name: "DB Row #{SecureRandom.hex(4)}",
+                                         is_barbell: false, dumbbell_count: 1)
     program = Tectonic::Program.create(account_id:, name: 'Block', start_date: on, is_ascending: true)
     week = Tectonic::ProgramWeek.create(program_id: program.id, number: 1)
     day = Tectonic::ProgramDay.create(program_week_id: week.id, weekday: on.wday)
@@ -60,12 +64,12 @@ describe 'what a four pound handle can actually build' do
   # "Every loadable dumbbell weight ends in 4 or 9 -- never 0 or 5", which is the issue's own
   # observation and the reason 35, 40 and 45 were all impossible.
   it 'never lands on a zero or a five' do
-    refute_empty @rack.dumbbell_totals
-    @rack.dumbbell_totals.each { |total| assert_includes [4, 9], total % 10, "#{total} is not loadable" }
+    refute_empty @rack.dumbbell_totals(1)
+    @rack.dumbbell_totals(1).each { |total| assert_includes [4, 9], total % 10, "#{total} is not loadable" }
   end
 
   it 'answers a prescription of 45 with the 44 underneath it' do
-    assert_equal 44, @rack.loadable(45, is_barbell: false)
+    assert_equal 44, @rack.loadable(45, is_barbell: false, dumbbells: 1)
   end
 end
 

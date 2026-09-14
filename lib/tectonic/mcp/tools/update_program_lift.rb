@@ -149,7 +149,12 @@ class Tectonic < Roda
           return attributes unless attributes[:top_weight] && arguments.fetch(:is_weighted, lift.is_weighted)
 
           is_barbell = attributes.fetch(:is_barbell, lift.is_barbell)
-          attributes.merge(top_weight: Equipment.loadable_for(context.account_id, attributes[:top_weight], is_barbell:))
+          # And how many dumbbells, off the movement. #439: a pair reaches half as far up the
+          # shelf as a single, so the prescription has to be rounded against the right list.
+          attributes.merge(top_weight: Equipment.loadable_for(context.account_id, attributes[:top_weight],
+                                                              is_barbell:,
+                                                              dumbbells: lift.exercise&.dumbbells ||
+                                                                Equipment::DEFAULT_DUMBBELLS))
         end
 
         # The arguments that change how a lift progresses. The first two are the price, and

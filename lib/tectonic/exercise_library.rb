@@ -114,6 +114,28 @@ class Tectonic < Roda
       is_barbell
     end
 
+    # How many dumbbells this movement is done with, for the plate math. #439.
+    #
+    # Null means nobody has answered, and `Equipment::DEFAULT_DUMBBELLS` is where that becomes
+    # a number -- two, because every weight loadable on a pair is loadable on a single, so the
+    # unanswered case comes out a little light rather than impossible.
+    #
+    # The column keeps the difference between "unanswered" and "deliberately two", which is
+    # what `unanswered_dumbbells?` below is for. Reading it through here rather than at the
+    # call sites is the same argument `barbell?` makes one comment up: three write paths
+    # forgot that flag when each of them had to remember it.
+    def dumbbells
+      dumbbell_count || Equipment::DEFAULT_DUMBBELLS
+    end
+
+    # A dumbbell movement nobody has said the count for, which is worth surfacing rather than
+    # defaulting silently: the default is deliberately the cautious answer, and on a
+    # single-arm movement the cautious answer is measurably light -- 39 lb where the shelf
+    # would make 44.
+    def unanswered_dumbbells?
+      !is_barbell && dumbbell_count.nil?
+    end
+
     # What to draw beside this movement: a src, and the alt that goes with it. An icon_url
     # of the account's own wins. Nothing in the UI sets one any more -- #199 took the field
     # off the form, because #171 gave every movement a shipped icon and so turned the field

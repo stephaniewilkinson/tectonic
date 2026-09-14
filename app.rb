@@ -642,6 +642,10 @@ class Tectonic < Roda
         # become a null rather than an empty string; clean_note is where that is decided
         # for every write path, this one and the MCP tools alike.
         note = Exercise.clean_note(r.params['note'])
+        # And how many dumbbells it is done with, which decides which weights exist for it at
+        # all (#439). Blank stays null so "not said" remains distinguishable from a deliberate
+        # two -- see Exercise.clean_dumbbell_count.
+        dumbbell_count = Exercise.clean_dumbbell_count(r.params['dumbbell_count'])
         # icon_url is deliberately not read here. #199 took the field off the form -- every
         # library movement draws a shipped icon since #171, so the field was a way to point
         # every visitor's browser at a third party to override a working default. The column
@@ -651,7 +655,7 @@ class Tectonic < Roda
         # browser to fix a typo in the name.
         if r.params['id'].empty?
           exercise_id = Exercise.insert(name: r.params['name'], account_id: @account_id,
-                                        is_barbell:, default_is_per_side:, note:)
+                                        is_barbell:, default_is_per_side:, note:, dumbbell_count:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
@@ -664,13 +668,25 @@ class Tectonic < Roda
           # Read before the update, because it is the *change* that has to reach the sets and
           # afterwards there is nothing left to compare against. #392.
           was_per_side = @exercise.default_is_per_side
-          @exercise.update(name: r.params['name'], is_barbell:, default_is_per_side:, note:)
+          was_dumbbells = @exercise.dumbbells
+          @exercise.update(name: r.params['name'], is_barbell:, default_is_per_side:, note:,
+                           dumbbell_count:)
           # Saying a movement is counted per side is a statement about the movement, not about
           # today, so the sets that were following the old answer follow the new one. Silently
           # would be wrong -- this rewrites logged training -- so the page says how many moved.
           if default_is_per_side != was_per_side
             moved = Exercise.align_sets_per_side(@exercise, @account_id, was: was_per_side)
             session['exercise.notice'] = per_side_notice(moved, default_is_per_side) if moved.positive?
+          end
+          # Saying how many dumbbells changes which weights exist for this movement, so the
+          # sessions already written against the old answer are brought onto the new one --
+          # the same reround a rack change does, for the same reason, since the pair of facts
+          # decides one list between them. Compared on `dumbbells` rather than on the column
+          # so that filling in a blank as two, which is what the app was already assuming,
+          # correctly counts as no change and reports nothing. #439.
+          if @exercise.dumbbells != was_dumbbells
+            rerounded = RackChange.reround(@account_id, today: Clock.today(Clock.zone_of(@account_id)))
+            session['exercise.notice'] = dumbbell_notice(rerounded, @exercise.dumbbells) if rerounded.positive?
           end
           r.redirect "/exercises/#{@exercise.id}/"
         end
@@ -2059,6 +2075,17 @@ class Tectonic < Roda
   def per_side_notice(moved, per_side)
     sets = moved == 1 ? '1 logged set' : "#{moved} logged sets"
     "#{sets} of this movement now count #{per_side ? 'per side' : 'both sides together'}."
+  end
+
+  # What saying how many dumbbells did to the sessions already written. #439.
+  #
+  # Two dumbbells need each plate size twice over, so the answer decides which weights exist
+  # for this movement at all -- and the upcoming sessions were written against whichever
+  # answer was in force when they were generated. Moving them silently would leave a lifter
+  # to discover a different number on Monday, which is the failure #441 was about.
+  def dumbbell_notice(rerounded, dumbbells)
+    sessions = rerounded == 1 ? '1 upcoming session was' : "#{rerounded} upcoming sessions were"
+    "#{sessions} rewritten onto weights #{dumbbells == 1 ? 'one dumbbell' : 'a pair'} can load."
   end
 
   # A set lifted differently from the way it was written. Sets entered by hand

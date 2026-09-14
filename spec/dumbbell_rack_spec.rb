@@ -69,10 +69,16 @@ describe 'an account with adjustable dumbbells' do
   end
 
   # The half of the assumption that was rounding real weights away.
+  #
+  # `dumbbells: 1` is explicit since #439, and these three say it because they are about the
+  # rack's arithmetic rather than about any movement: a shelf is described by what one handle
+  # can take, which is 033's rule for what `pairs` counts. The default is two, so leaving it
+  # off here would quietly be asking a different question -- how far the same shelf goes when
+  # it has to furnish two handles at once -- and the answers below are the one-handle ones.
   it 'can load a weight the assumption refused' do
     equipment = with_dumbbells(an_account, handle: 5, plates: { 1.25 => 2, 2.5 => 2, 5 => 2 })
 
-    assert_equal 27.5, equipment.loadable(27.5, is_barbell: false)
+    assert_equal 27.5, equipment.loadable(27.5, is_barbell: false, dumbbells: 1)
   end
 
   # And the half that was prescribing weights nobody could make: a handle with only 5s and
@@ -80,8 +86,8 @@ describe 'an account with adjustable dumbbells' do
   it 'refuses a weight its own plates cannot build' do
     equipment = with_dumbbells(an_account, handle: 5, plates: { 5 => 2, 10 => 2 })
 
-    refute_equal 22.5, equipment.loadable(22.5, is_barbell: false)
-    assert_includes equipment.dumbbell_totals, equipment.loadable(22.5, is_barbell: false)
+    refute_equal 22.5, equipment.loadable(22.5, is_barbell: false, dumbbells: 1)
+    assert_includes equipment.dumbbell_totals(1), equipment.loadable(22.5, is_barbell: false, dumbbells: 1)
   end
 
   # Plates go on both ends, so a pair adds twice its denomination -- the same arithmetic a
@@ -89,7 +95,7 @@ describe 'an account with adjustable dumbbells' do
   it 'counts a pair as one plate on each end' do
     equipment = with_dumbbells(an_account, handle: 10, plates: { 5 => 1 })
 
-    assert_equal [10, 20], equipment.dumbbell_totals.sort
+    assert_equal [10, 20], equipment.dumbbell_totals(1).sort
   end
 
   # The barbell rack is untouched by any of this. Two inventories that could reach into one
