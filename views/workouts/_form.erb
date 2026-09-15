@@ -20,7 +20,19 @@
             ring never reached it and it was left the only lime one in the app. Named here
             rather than moved onto the helper because the rest of this input is Flowbite's
             own shape, and matching only the ring is the smaller claim. %>
-        <input autocomplete="on" value="<%= Date.today.strftime('%m/%d/%Y') %>" name="date" id="date" required datepicker datepicker-autohide datepicker-buttons type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-sky-800 focus:border-sky-800 block w-full pl-10 p-2.5">
+        <%# The session's own date, not today's. #440.
+
+            This form is shared by new and edit, and the value was Date.today unconditionally
+            -- so the edit page opened with the wrong date in the box every time, and since
+            the field is required and always posted, saving *any* edit moved the session to
+            today. Renaming a session from three weeks ago dragged it and its twelve completed
+            sets onto the current day, silently. That is the whole of "a workout's date can't
+            be corrected": it could not be set to a past date at all, and touching anything
+            else destroyed the date it had.
+
+            `@workout` is nil on the new page and set for every nested workout route, so the
+            fallback is what makes one template serve both. %>
+        <input autocomplete="on" value="<%= (@workout&.date || Date.today).strftime('%m/%d/%Y') %>" name="date" id="date" required datepicker datepicker-autohide datepicker-buttons type="text" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-sky-800 focus:border-sky-800 block w-full pl-10 p-2.5">
       </div>
       <input type="hidden" name="id" id="id" value="<%= @workout&.id || nil %>">
     </div>
