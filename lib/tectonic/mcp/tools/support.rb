@@ -28,9 +28,16 @@ class Tectonic < Roda
         RPE = (1..10)
         SETS = (1..20)
         PERCENT = (1..200)
-        # A held position measured in seconds, up to an hour, which covers a plank at one
-        # end and a walk or a bike interval at the other.
-        SECONDS = (1..3600)
+        # Work measured in seconds: a plank at one end and a walk or a bike interval at the
+        # other.
+        #
+        # Four hours rather than the one this used to allow. An hour was described as
+        # covering "a walk or a bike interval", and #471 is the report that it does not: a
+        # 1h 7m ride on 2026-09-14 is 4020 seconds, and the only way to record it was 67 in
+        # the reps column. Widening the bound is half of making that set loggable at all,
+        # and the cap is still doing work -- it refuses a duration that is really a mistyped
+        # millisecond count, which is the error it exists to catch.
+        SECONDS = (1..14_400)
         # A prescribed rest between sets, in seconds. #281.
         #
         # Narrower than SECONDS at both ends and for reasons that are about rest rather than
