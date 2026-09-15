@@ -109,11 +109,37 @@ class Tectonic < Roda
 
     # Every workout in the grid in one query, keyed by the day it falls on. The
     # performance flag rides along so no cell asks the database whether it was lifted.
+    #
+    # **Keyed by the day it was trained, not the day it was written for.** #479.
+    #
+    # `workouts.date` is a plan. For a generated block it is made weeks ahead, and training
+    # does not keep to it -- on the reporting account five sessions were trained up to three
+    # days from the date they carry, and every one was drawn on the planned day. A session
+    # lifted on Monday appeared on Thursday, and Monday looked like a rest day. A calendar
+    # that reports the plan is a calendar that cannot answer "when did I actually train",
+    # which is the only question a diary is for.
+    #
+    # `on_calendar` is where that decision lives; this just groups by it.
     def by_day(account_id, from, to)
-      Workout.where(account_id:)
-             .where(Sequel.cast(:date, :date) => from..to)
-             .with_performance.order(:date, :id).all
-             .group_by { |workout| workout.date.to_date }
+      Workout.where(account_id:).where(within(from, to))
+             .with_performed_on.order(:date, :id).all
+             .group_by(&:on_calendar)
+    end
+
+    # A session belongs in this grid if *either* of its dates falls in it, and both halves
+    # are load-bearing.
+    #
+    # Fetching by the stored date alone loses a session written for the 1st of next month and
+    # trained on the 30th of this one -- it would be drawn on neither page. Fetching by the
+    # performed date alone loses every session that has not been trained yet, which is the
+    # whole forward half of a plan.
+    #
+    # A correlated subquery rather than a widened window, because the drift has no bound: it
+    # is however far a lifter moved a session, and a margin chosen here would be a guess that
+    # silently drops anything past it.
+    def within(from, to)
+      Sequel.|({ Sequel.cast(:date, :date) => from..to },
+               { Sequel.cast(Workout.first_completion, :date) => from..to })
     end
 
     # How a session is written in a cell. The words differ from the status names in one
