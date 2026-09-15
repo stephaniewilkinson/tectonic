@@ -29,6 +29,15 @@ module Swap
     [workout, exercise]
   end
 
+  # A movement to swap *into*, created up front. Since #478 a tool that resolves a name will
+  # not quietly invent a movement the account may already have under another name, and
+  # "Barbell Overhead Press" contains every word of the library's "Overhead Press" -- so
+  # swapping onto a name that does not exist yet is now refused and pointed at
+  # create_exercise. Swapping onto a movement you have is the ordinary case anyway.
+  def a_movement(account_id, name)
+    Tectonic::Exercise.create(account_id:, name:, is_barbell: false)
+  end
+
   def sets_on(workout) = workout.sets_dataset.order(:id).all
 
   # The call under test, named once. Every case here differs only in the two movements and
@@ -46,14 +55,15 @@ describe 'swapping a movement across a written session' do
   before do
     @token = mint(scopes: %w[read write])
     @workout, @from = session_of(@token.account_id, 'Dumbbell Overhead Press')
+    @into = a_movement(@token.account_id, "Barbell Overhead Press #{SecureRandom.hex(4)}")
   end
 
   it 'moves every set in one call' do
-    swap(@token.raw, @workout, @from.name, 'Barbell Overhead Press')
+    swap(@token.raw, @workout, @from.name, @into.name)
 
     refute tool_result['isError']
     assert_equal 3, tool_result['structuredContent']['moved']
-    assert_equal ['Barbell Overhead Press'], sets_on(@workout).map { |set| set.exercise.name }.uniq
+    assert_equal [@into.name], sets_on(@workout).map { |set| set.exercise.name }.uniq
   end
 
   # The rule update_set and the web editor both follow: plate math describing the movement
@@ -65,7 +75,7 @@ describe 'swapping a movement across a written session' do
   end
 
   it 'leaves the loads and reps exactly as they were' do
-    swap(@token.raw, @workout, @from.name, 'Barbell Overhead Press')
+    swap(@token.raw, @workout, @from.name, @into.name)
 
     assert_equal([65, 65, 65], sets_on(@workout).map { |set| Tectonic::Plates.numeric(set.weight) })
     assert_equal [5, 5, 5], sets_on(@workout).map(&:reps)
@@ -80,16 +90,17 @@ describe 'swapping a session that has already been part lifted' do
   before do
     @token = mint(scopes: %w[read write])
     @workout, @from = session_of(@token.account_id, 'Dumbbell Overhead Press', count: 3, completed: 2)
+    @into = a_movement(@token.account_id, "Barbell Overhead Press #{SecureRandom.hex(4)}")
   end
 
   it 'moves the sets still standing as prescription' do
-    swap(@token.raw, @workout, @from.name, 'Barbell Overhead Press')
+    swap(@token.raw, @workout, @from.name, @into.name)
 
     assert_equal 1, tool_result['structuredContent']['moved']
   end
 
   it 'leaves the lifted ones on the movement they record' do
-    swap(@token.raw, @workout, @from.name, 'Barbell Overhead Press')
+    swap(@token.raw, @workout, @from.name, @into.name)
 
     assert_equal 2, tool_result['structuredContent']['left_lifted']
     lifted = sets_on(@workout).select(&:is_completed)
@@ -100,7 +111,7 @@ describe 'swapping a session that has already been part lifted' do
   # Silently moving three and mentioning nothing would be the same failure #364 is about,
   # one level up: the count has to be said or the caller cannot tell what it got.
   it 'says what it left behind and why' do
-    swap(@token.raw, @workout, @from.name, 'Barbell Overhead Press')
+    swap(@token.raw, @workout, @from.name, @into.name)
     text = tool_result.dig('content', 0, 'text')
 
     assert_includes text, 'Left 2 set(s) already marked as lifted'
