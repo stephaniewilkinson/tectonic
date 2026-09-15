@@ -322,7 +322,8 @@ class Tectonic < Roda
       max = TrainingMax.for(account_id: @program.account_id, exercise:, on: @program.start_date)
       raise ArgumentError, no_max_message(exercise, lift) unless max
 
-      @equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell)
+      @equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell,
+                                                                    dumbbells: dumbbells_for(lift))
     end
 
     # Whose max this lift is a percentage of: another movement where the prescription names
@@ -454,7 +455,19 @@ class Tectonic < Roda
     # than by luck -- and the ramp and the working sets are handed the same one, so the two
     # halves of a lift cannot round differently.
     def loading(lift)
-      @equipment.loading(is_barbell: lift.is_barbell)
+      @equipment.loading(is_barbell: lift.is_barbell, dumbbells: dumbbells_for(lift))
+    end
+
+    # How many dumbbells this lift is done with, off the movement rather than the
+    # prescription. #439: a size has to go on both ends of every handle in use, so a pair
+    # reaches half as far up the shelf as a single, and the two were rounding from one list.
+    #
+    # `lift.is_barbell` is read above and this is not folded into it, because they answer
+    # different questions and a barbell lift has no dumbbell count to give. Equipment ignores
+    # the argument on the bar, so passing it unconditionally costs a lookup and keeps the two
+    # facts separate.
+    def dumbbells_for(lift)
+      lift.exercise&.dumbbells || Equipment::DEFAULT_DUMBBELLS
     end
 
     # Weight and reps start out equal to the planned values. Lifting the set as

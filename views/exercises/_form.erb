@@ -51,6 +51,41 @@
              class="h-4 w-4 rounded border-gray-300 text-lime-500 accent-lime-500 focus:ring-lime-500">
       <label for="default_is_per_side" class="text-sm font-medium leading-6 text-gray-900">Counted per side</label>
     </div>
+    <%# The third thing the app cannot work out from a name, and the one that decides which
+        weights exist. #439.
+
+        Plates go on both ends of every handle in use, so one dumbbell spends a pair of a size
+        and two spend two pairs. On a 4 lb handle with pairs of 10, 5 and 2.5 that is the
+        difference between reaching 79 and reaching 39 -- a single-arm row at 44 is ordinary
+        and a dumbbell bench at 44 cannot be built at all. Both used to round against the
+        single's list.
+
+        Three options rather than a checkbox, because "not said" is a real answer and has to
+        stay sayable. The app reads it as two, which is the cautious reading rather than the
+        likely one -- every weight loadable on a pair is loadable on a single, so an
+        unanswered movement comes out a little light instead of impossible -- but a schema
+        default would make it indistinguishable from a deliberate two, and then nothing could
+        tell a lifter which of their movements still wants an answer.
+
+        Shown whatever the movement is, rather than hidden behind the barbell checkbox: the
+        two controls are independent, and a field that appears and disappears as another is
+        ticked is worse to use than one line of text that does not apply. The label says which
+        movements it is about. %>
+    <div class="mt-4">
+      <label for="dumbbell_count" class="block text-sm font-medium leading-6 text-gray-900">Dumbbells</label>
+      <p class="mt-1 text-sm text-gray-500">
+        How many are in your hands at once, for movements not loaded on a bar. Two dumbbells
+        need each plate size twice over, so fewer weights are possible than with one.
+      </p>
+      <select name="dumbbell_count" id="dumbbell_count"
+              class="<%= field_style %> mt-2 min-h-11 w-full px-2 text-base text-gray-900">
+        <%- [['', 'Not said'], ['1', 'One'], ['2', 'Two']].each do |value, label| %>
+          <option value="<%= value %>" <%= 'selected' if @exercise&.dumbbell_count.to_s == value %>>
+            <%= label %>
+          </option>
+        <%- end %>
+      </select>
+    </div>
   </div>
   <input type="hidden" name="id" id="id" value="<%= @exercise&.id || nil %>">
   <input type="submit" value="Save" class="<%= button_style %> mt-4 block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-gray-900 hover:bg-lime-600">

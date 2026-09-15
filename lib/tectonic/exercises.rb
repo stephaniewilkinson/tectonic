@@ -84,6 +84,18 @@ class Tectonic < Roda
       text.empty? ? nil : text
     end
 
+    # How many dumbbells, off a form. #439.
+    #
+    # Blank stays null, because "not said" is a real answer and the column exists to keep it
+    # distinguishable from a deliberate two -- that difference is what makes it possible to
+    # ask which movements still want one. Anything that is not 1 or 2 becomes null as well:
+    # the check constraint would otherwise refuse the write and surface as a 500 on a Save
+    # button, and there is no third answer a lifter could have meant.
+    def self.clean_dumbbell_count(raw)
+      count = raw.to_s.strip.to_i
+      [1, 2].include?(count) ? count : nil
+    end
+
     # The best estimated max an account's completed sets of this movement support as of a
     # date, or nil while nothing has been lifted that the chart can read. Answering as of
     # a date rather than only for today is the point: asked at the end of each week, it is

@@ -42,7 +42,7 @@ class Tectonic < Roda
           ProgramLift.create(program_day_id: day_row.id, exercise_id: exercise.id,
                              position: position || next_position(day_row),
                              **reference(context, attributes),
-                             **rounded(load(attributes, exercise), context))
+                             **rounded(load(attributes, exercise), context, exercise))
         end
 
         # The movement whose max a percentage is taken of, when the prescription names one
@@ -65,11 +65,16 @@ class Tectonic < Roda
         # to the generator's own refresh. What was unrounded was the prescription above
         # them, so a block asking for 152 on a rack whose smallest jump is 5 generated
         # 135/140/145/150, all loadable and all correct, and went on displaying 152.
-        def rounded(attributes, context)
+        # `exercise` is here for the dumbbell count (#439): a size has to go on both ends of
+        # every handle in use, so a pair of dumbbells reaches half as far up the shelf as one
+        # does, and rounding both against the single's list prescribed weights that cannot be
+        # built for any two-handed movement.
+        def rounded(attributes, context, exercise)
           return attributes unless attributes[:top_weight] && attributes[:is_weighted]
 
           attributes.merge(top_weight: Equipment.loadable_for(context.account_id, attributes[:top_weight],
-                                                              is_barbell: attributes[:is_barbell]))
+                                                              is_barbell: attributes[:is_barbell],
+                                                              dumbbells: exercise.dumbbells))
         end
 
         # The columns a lift carries, checked here rather than in the schema so an
