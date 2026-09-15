@@ -1,0 +1,59 @@
+<%# How the session went, written from the gym floor. #452.
+
+    `workouts.note` has existed since #310 and the only way to write one was the workout edit
+    form, which is a different page reached by leaving the session. So the note this column
+    exists for -- "bar felt slow today, slept badly" -- had to survive the walk to another
+    screen and a lifter remembering to take it. It is the context that explains an RPE three
+    weeks later, and it is worth nothing if it is not written within a minute of the set that
+    prompted it.
+
+    Collapsed by default, and that is the whole of why it can sit on this screen at all. The
+    session view is read at arm's length between sets and every pixel above the lift panels is
+    a pixel of training pushed off the phone. A summary is one line; a textarea is six.
+
+    Open when there is already a note, because a note you cannot see is a note you will write
+    twice -- and because the second visit is usually to add to it rather than to start one.
+
+    Its own htmx target, so saving swaps this block and nothing else. Posting through the
+    session body instead would re-render every lift panel, which closes any <details> the
+    lifter had open and scrolls the horizontal lift strip back to the start -- and they are
+    standing in front of a rack with a bar loaded. %>
+<div id="session-note" class="mt-4">
+  <details class="group" <%= 'open' if @workout.note %>>
+    <summary class="flex min-h-11 cursor-pointer items-center text-sm text-gray-500">
+      <%== render('_chevron') %>
+      <%# The word changes with the state because the control is doing two different jobs:
+          offering to capture something, or showing what was captured. "Add a note" over an
+          existing note reads as though the one below it is not there. %>
+      <%= @workout.note ? 'Session note' : 'Add a note' %>
+    </summary>
+    <form action="/workouts/<%= @workout.id %>/session/note" method="post"
+          hx-post="/workouts/<%= @workout.id %>/session/note"
+          hx-target="#session-note" hx-swap="outerHTML" class="mt-2">
+      <%== csrf_tag("/workouts/#{@workout.id}/session/note") %>
+      <label for="session-note-text" class="sr-only">How this session went</label>
+      <%# The closing tag butts against the value for the reason views/exercises/_form.erb
+          gives about its own: a textarea renders every character between the tags, so a
+          newline before </textarea> is a newline in the note, and it compounds on every save.
+
+          rows="3" rather than more: three lines is a sentence or two, which is what this is
+          for. A note long enough to need scrolling belongs on the record page, where there is
+          room to read it back. %>
+      <textarea name="note" id="session-note-text" rows="3"
+                class="<%= field_style %> block min-h-11 w-full py-1.5 text-base text-gray-900 placeholder:text-gray-400"
+                placeholder="Bar felt slow today, slept badly."><%= @workout.note %></textarea>
+      <div class="mt-2 flex items-center gap-3">
+        <button type="submit"
+                class="<%= button_style %> min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">
+          Save note
+        </button>
+        <%# Said only after a save, and only when something is stored. A blank textarea with
+            "Saved" under it would be reporting on a note that was just cleared, which is
+            true and reads as a failure. %>
+        <%- if @saved && @workout.note %>
+          <span class="text-sm text-gray-500">Saved.</span>
+        <%- end %>
+      </div>
+    </form>
+  </details>
+</div>

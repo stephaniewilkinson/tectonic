@@ -994,6 +994,29 @@ class Tectonic < Roda
             Workout.where(id: workout_id).update(finished_at: finish_stamp(workout_id, r.params['at']))
             r.redirect "/workouts/#{workout_id}"
           end
+          # How it went, written where it happened. #452.
+          #
+          # `workouts.note` has existed since #310 and the only way to write one was the
+          # workout edit form -- a different page, reached by leaving the session. So the note
+          # this column exists for, *"bar felt slow today, slept badly"*, had to survive the
+          # walk to another screen and a lifter remembering to take it. It is the context that
+          # explains an RPE three weeks later, and it is worth nothing if it is not written
+          # within about a minute of the set that prompted it.
+          #
+          # Its own route rather than a field on one of the set forms, because it is about the
+          # session and not about any set in it, and because those forms post on every tap.
+          #
+          # Answers with the note block alone rather than the whole session body: nothing else
+          # on the screen changed, and re-rendering the panels would close a <details> the
+          # lifter had open and scroll the horizontal lift strip back to the start.
+          r.post 'note' do
+            check_csrf!
+            @workout.update(note: Workout.clean_note(r.params['note']))
+            next r.redirect("/workouts/#{workout_id}/session") unless r.env['HTTP_HX_REQUEST']
+
+            @saved = true
+            render('workouts/_session_note')
+          end
           # Swapping the movement a whole lift is on, in one tap. #365.
           #
           # The decision this serves is made standing at the rack: the sheet says dumbbell

@@ -42,6 +42,18 @@
   <div id="session-body">
     <%== render('workouts/_session_body') %>
   </div>
+
+  <%# Below the session rather than above it, and outside #session-body. #452.
+
+      Outside because #session-body is replaced on every Done tap and every fifteen-second
+      poll, and a textarea inside it would lose what was being typed each time -- which on
+      this screen is every few seconds. This is the same argument the RPE footer below makes
+      about its <details>, and it bites harder here because the state at risk is words
+      somebody is in the middle of writing.
+
+      Below because the lift panels are what the screen is for. A note is written once, at
+      the end or after a bad set; the panels are read between every set. %>
+  <%== render('workouts/_session_note') %>
 </div>
 
 <%# The rating scale, once, pinned to the foot of the screen. #277.

@@ -2,148 +2,168 @@
 
 require_relative 'spec_helper'
 require_relative 'route_ownership_spec' # reuses its account/login/CSRF helpers; idempotent require
-require_relative 'mcp_spec'             # and its token minting and call_tool
 require 'securerandom'
+require 'date'
 
-# Somewhere to say why a session went the way it did. #310.
+# How the session went, written where it happened. #452.
 #
-# program_lifts.note and exercises.note both exist and a session had nowhere to put anything.
-# It matters most beside what the app has only just started recording: an RPE of 9 on a set
-# prescribed at 8 (#265) and a long turnaround (#281) are both kept now and neither says why.
-# "Slept badly" is the answer to both, and it is available on the day and gone by the
-# following week.
+# `workouts.note` has existed since #310, and the only way to write one was the workout edit
+# form -- a different page, reached by leaving the session. So the note this column exists
+# for, "bar felt slow today, slept badly", had to survive the walk to another screen and a
+# lifter remembering to take it.
+#
+# It is the context that explains an RPE three weeks later, and it is worth nothing if it is
+# not written within about a minute of the set that prompted it.
 module SessionNote
-  def a_session(account_id, note: nil)
-    exercise_id = DB[:exercises].insert(name: "Lift #{SecureRandom.hex(4)}", account_id:)
-    workout_id = DB[:workouts].insert(account_id:, date: Time.now, note:)
-    DB[:sets].insert(workout_id:, exercise_id:, weight: 155, reps: 5,
-                     is_warmup: false, is_completed: true, is_barbell: true)
-    workout_id
+  def a_session(account_id)
+    workout = Tectonic::Workout.create(account_id:, date: Date.today)
+    exercise_id = DB[:exercises].insert(name: "Squat #{SecureRandom.hex(4)}", account_id:)
+    DB[:sets].insert(workout_id: workout.id, exercise_id:, weight: 155, reps: 5,
+                     is_warmup: false, is_completed: false, is_barbell: true)
+    workout
+  end
+
+  def session_page(workout)
+    get "/workouts/#{workout.id}/session"
+    last_response.body
+  end
+
+  def write(workout, note, headers = {})
+    action = "/workouts/#{workout.id}/session/note"
+    post action, { 'note' => note, '_csrf' => token_for_form("/workouts/#{workout.id}/session", action) },
+         headers
   end
 end
 
-describe 'writing a note on a session' do
+describe 'writing a note from the session screen' do
   include Rack::Test::Methods
   include RouteOwnership
   include SessionNote
 
-  before { @account_id = login }
-
-  def save(workout_id, fields)
-    post '/workouts', fields.merge('id' => workout_id.to_s, 'date' => Date.today.strftime('%m/%d/%Y'),
-                                   '_csrf' => token_for_form("/workouts/#{workout_id}/edit", '/workouts'))
+  before do
+    @account_id = login
+    @workout = a_session(@account_id)
   end
 
-  it 'stores what was typed' do
-    workout_id = a_session(@account_id)
-    save(workout_id, 'note' => 'Bar felt slow today, slept badly')
-
-    assert_equal 'Bar felt slow today, slept badly', DB[:workouts].where(id: workout_id).get(:note)
+  it 'offers somewhere to write one' do
+    assert_includes session_page(@workout), 'name="note"'
   end
 
-  # Blank clears rather than storing an empty string, which is Workout.clean_text's rule --
-  # '' is truthy, so a blank note kept as itself would draw its own empty paragraph under
-  # every session forever.
+  it 'saves it' do
+    write(@workout, 'Bar felt slow today, slept badly.')
+
+    assert_equal 'Bar felt slow today, slept badly.', @workout.refresh.note
+  end
+
+  # Blank clears, on the same terms as every other note in this app (#310): a note written
+  # after a bad day can be taken back off without leaving an empty paragraph behind.
   it 'clears it when the box is emptied' do
-    workout_id = a_session(@account_id, note: 'slept badly')
-    save(workout_id, 'note' => '   ')
+    write(@workout, 'Slept badly.')
+    write(@workout, '   ')
 
-    assert_nil DB[:workouts].where(id: workout_id).get(:note)
+    assert_nil @workout.refresh.note
+  end
+
+  it 'reads back what was written' do
+    write(@workout, 'Left knee grumbling.')
+
+    assert_includes session_page(@workout), 'Left knee grumbling.'
   end
 end
 
-# The record is where a note is read back, above the numbers rather than under them: an RPE
-# of 9 and a long turnaround both read differently once "slept badly" is on the page.
-describe 'a note on the record' do
+# The screen is read at arm's length between sets, so a textarea cannot sit open above the
+# lift panels. Open only when there is something to see.
+describe 'how much room the note takes' do
   include Rack::Test::Methods
   include RouteOwnership
   include SessionNote
 
-  before { @account_id = login }
-
-  it 'is shown' do
-    workout_id = a_session(@account_id, note: 'Bar felt slow today')
-    get "/workouts/#{workout_id}/"
-
-    assert_includes last_response.body, 'Bar felt slow today'
+  before do
+    @account_id = login
+    @workout = a_session(@account_id)
   end
 
-  it 'draws nothing at all for a session with none' do
-    workout_id = a_session(@account_id)
-    get "/workouts/#{workout_id}/"
-
-    refute_includes last_response.body, 'whitespace-pre-line'
-  end
-end
-
-# The main consumer: an assistant reading a session back is the one that would otherwise
-# reason about a bad week without knowing there was a reason for it.
-describe 'reading a session note over MCP' do
-  include Rack::Test::Methods
-  include SessionNote
-
-  it 'is in the prose above the sets, and in the payload' do
-    minted = mint(scopes: %w[read write])
-    workout_id = a_session(minted.account_id, note: 'slept badly')
-
-    call_tool('get_workout', raw: minted.raw, arguments: { workout_id: })
-
-    assert_includes tool_result.dig('content', 0, 'text'), 'note: slept badly'
-    assert_equal 'slept badly', tool_result.dig('structuredContent', 'note')
+  it 'is collapsed while there is no note' do
+    refute_match(/<details[^>]*\sopen/, session_page(@workout))
   end
 
-  # Above the sets rather than after them, because an assistant reading the sets first has
-  # already drawn its conclusion by the time it reaches the reason.
-  it 'comes before the first set rather than after the last' do
-    minted = mint(scopes: %w[read write])
-    workout_id = a_session(minted.account_id, note: 'slept badly')
+  # A note you cannot see is a note you write twice, and the second visit is usually to add
+  # to it rather than to start one.
+  it 'is open once there is' do
+    write(@workout, 'Slept badly.')
 
-    call_tool('get_workout', raw: minted.raw, arguments: { workout_id: })
-    text = tool_result.dig('content', 0, 'text')
-
-    assert_operator text.index('note:'), :<, text.index('155x5')
+    assert_match(/<details[^>]*\sopen/, session_page(@workout))
   end
 
-  it 'contributes no line at all for a session with none' do
-    minted = mint(scopes: %w[read write])
-    workout_id = a_session(minted.account_id)
+  it 'says which job it is doing' do
+    assert_includes session_page(@workout), 'Add a note'
+    write(@workout, 'Slept badly.')
 
-    call_tool('get_workout', raw: minted.raw, arguments: { workout_id: })
-
-    refute_includes tool_result.dig('content', 0, 'text'), 'note:'
-    assert_nil tool_result.dig('structuredContent', 'note')
+    assert_includes session_page(@workout), 'Session note'
   end
 end
 
-# create_workout carries it on the same terms as the name: absent leaves it, an empty string
-# clears it. A note usually arrives after the fact, once there is something to say, and this
-# tool is idempotent on the day so the second call is the one that carries it.
-describe 'writing a note through create_workout' do
+# The htmx answer is the note block alone. Sending back the session body would re-render every
+# lift panel, closing any disclosure the lifter had open and scrolling the horizontal lift
+# strip back to the start -- while they stand in front of a loaded bar.
+describe 'what saving a note sends back' do
   include Rack::Test::Methods
+  include RouteOwnership
   include SessionNote
 
-  it 'sets it on a session that already exists' do
-    minted = mint(scopes: %w[read write])
-    call_tool('create_workout', raw: minted.raw, arguments: { date: 'today' })
-    call_tool('create_workout', raw: minted.raw, arguments: { date: 'today', note: 'slept badly' })
-
-    assert_equal 'slept badly', tool_result.dig('structuredContent', 'note')
+  before do
+    @account_id = login
+    @workout = a_session(@account_id)
+    write(@workout, 'Slept badly.', { 'HTTP_HX_REQUEST' => 'true' })
+    @body = last_response.body
   end
 
-  it 'leaves an existing note alone when none is sent' do
-    minted = mint(scopes: %w[read write])
-    call_tool('create_workout', raw: minted.raw, arguments: { date: 'today', note: 'slept badly' })
-    call_tool('create_workout', raw: minted.raw, arguments: { date: 'today', name: 'Evening' })
-
-    assert_equal 'slept badly', tool_result.dig('structuredContent', 'note')
+  it 'is the note block and not the whole session' do
+    assert_includes @body, 'id="session-note"'
+    refute_includes @body, 'id="lift-panels"'
   end
 
-  it 'clears it when sent empty' do
-    minted = mint(scopes: %w[read write])
-    call_tool('create_workout', raw: minted.raw, arguments: { date: 'today', note: 'slept badly' })
-    call_tool('create_workout', raw: minted.raw, arguments: { date: 'today', note: '' })
+  it 'says it saved' do
+    assert_includes @body, 'Saved.'
+  end
 
-    assert_nil tool_result.dig('structuredContent', 'note')
+  # "Saved" under an empty box would be reporting on a note that was just cleared, which is
+  # true and reads as a failure.
+  it 'does not say so when the note was cleared' do
+    write(@workout, '', { 'HTTP_HX_REQUEST' => 'true' })
+
+    refute_includes last_response.body, 'Saved.'
+  end
+end
+
+# The route sits inside the nested workout gate, which resolves `@workout` scoped to the
+# account and redirects before any of the session routes run.
+#
+# Tested through the gate rather than by posting with a borrowed token: Roda binds a CSRF
+# token to the path it was issued for, so a token from my own session would be refused for
+# being the wrong token and the assertion would pass without the ownership check ever running.
+# A test that passes for the wrong reason is worse here than no test.
+describe 'another account session' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionNote
+
+  before do
+    login
+    @theirs = a_session(DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x'))
+  end
+
+  it 'does not open, so its note form is unreachable' do
+    get "/workouts/#{@theirs.id}/session"
+
+    assert_equal 302, last_response.status
+    assert_includes last_response.headers['Location'], '/workouts'
+  end
+
+  it 'is not writable through the note route either' do
+    post "/workouts/#{@theirs.id}/session/note", { 'note' => 'nope' }
+
+    assert_nil @theirs.refresh.note
   end
 end
 
