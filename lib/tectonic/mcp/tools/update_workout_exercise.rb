@@ -31,21 +31,42 @@ class Tectonic < Roda
         title 'Swap a movement in a session'
         description 'Swap every set of one movement in a session for another, in one ' \
                     'call, instead of one call per set. Sets already marked as lifted ' \
-                    'are left alone, since those record what was actually performed.'
+                    'are left alone, since those record what was actually performed. Send ' \
+                    'relabel true only when those sets are right and their name is wrong -- ' \
+                    'the work was done, and logged under the wrong movement -- which moves ' \
+                    'them too.'
         scope :write
         input_schema(
           type: 'object',
           properties: { workout_id: { type: 'integer' }, from_exercise: { type: 'string' },
-                        to_exercise: { type: 'string' } },
+                        to_exercise: { type: 'string' }, relabel: { type: 'boolean' } },
           required: %w[workout_id from_exercise to_exercise], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)
           workout = find_workout(context, arguments[:workout_id])
+          plan = planned(context, workout, arguments)
+          return unchanged(plan.from, plan.into) if plan.into.id == plan.from.id
+
+          move(context, workout, plan)
+        end
+
+        def self.planned(context, workout, arguments)
           from = named_in(workout, arguments[:from_exercise])
           sets = workout.sets_dataset.where(exercise_id: from.id).order(:id).all
-          refuse_all_lifted(from, sets)
-          move(context, workout, from, sets, arguments[:to_exercise])
+          relabel = arguments[:relabel] || false
+          refuse_all_lifted(from, sets) unless relabel
+          Move.of(from, Resolver.exercise(context, name: arguments[:to_exercise]), sets, relabel)
+        end
+
+        # What one call is about to do, gathered so the methods below take one argument
+        # rather than six. `moving` and `left` are the whole of the #463 difference: a swap
+        # leaves the lifted sets where they are, and a relabel takes them along.
+        Move = Struct.new(:from, :into, :moving, :left, :relabel) do
+          def self.of(from, into, sets, relabel)
+            lifted, pending = sets.partition(&:is_completed)
+            new(from, into, relabel ? sets : pending, relabel ? [] : lifted, relabel)
+          end
         end
 
         # The session by id, on this account only. Refused rather than nil: an id belonging
@@ -81,8 +102,9 @@ class Tectonic < Roda
 
           raise Tool::Refusal,
                 "Every set of #{from.name} in this session is marked as lifted, so they record what " \
-                'was actually performed. A different movement is a different set: delete those and ' \
-                'create the ones that happened.'
+                'was actually performed. If a different movement was performed, delete those and ' \
+                'create the ones that happened. If they are right and only the name is wrong, send ' \
+                'relabel: true.'
         end
 
         # The move itself, through WorkoutSet.moved_to so that this and update_set and the
@@ -90,14 +112,16 @@ class Tectonic < Roda
         # the new movement's barbell flag travels with it, and the old movement's
         # prescription does not. Plate math describing the movement that was swapped out is
         # worse than none at all, and so is a planned weight.
-        def self.move(context, workout, from, sets, to_name)
-          into = Resolver.exercise(context, name: to_name)
-          lifted, pending = sets.partition(&:is_completed)
-          return unchanged(from, into) if into.id == from.id
-
-          WorkoutSet.where(id: pending.map(&:id)).update(**WorkoutSet.moved_to(into))
-          ok(moved_phrase(workout, from, into, pending, lifted),
-             structured: { moved: pending.length, left_lifted: lifted.length,
+        # `relabel` is #463: the sets are right and their name is wrong, so the lifted ones
+        # move with the rest instead of being left behind. It is a different claim from a
+        # swap, not a louder version of one -- a swap says other work was done, and a relabel
+        # says this work was misfiled -- which is why it is its own flag rather than a
+        # confirm on the refusal above.
+        def self.move(context, workout, plan)
+          WorkoutSet.where(id: plan.moving.map(&:id)).update(**WorkoutSet.moved_to(plan.into))
+          ok(moved_phrase(workout, plan),
+             structured: { moved: plan.moving.length, left_lifted: plan.left.length,
+                           relabelled: plan.relabel,
                            workout: Presenter.view_workout_detail(workout.refresh, on: context.today) })
         end
 
@@ -109,13 +133,15 @@ class Tectonic < Roda
              structured: { moved: 0, left_lifted: 0, unchanged: from.name })
         end
 
-        def self.moved_phrase(workout, from, into, pending, lifted)
+        def self.moved_phrase(workout, plan)
           date = workout.date.strftime('%Y-%m-%d')
-          moved = "Swapped #{pending.length} set(s) of #{from.name} for #{into.name} on #{date}."
-          return moved if lifted.empty?
+          verb = plan.relabel ? 'Relabelled' : 'Swapped'
+          moved = "#{verb} #{plan.moving.length} set(s) of #{plan.from.name} as #{plan.into.name} on #{date}."
+          return moved if plan.left.empty?
 
-          "#{moved} Left #{lifted.length} set(s) already marked as lifted on #{from.name}: " \
-            'those record what was performed, so delete and re-create them if they are wrong.'
+          "#{moved} Left #{plan.left.length} set(s) already marked as lifted on #{plan.from.name}: " \
+            'those record what was performed, so delete and re-create them if they are wrong, or ' \
+            'send relabel: true if they are right and only the name is wrong.'
         end
       end
     end

@@ -164,13 +164,16 @@ describe 'update_set moving a lifted set onto another movement' do
     @set = written_set(@token.account_id, is_completed: true)
   end
 
-  # No confirm on this one. A swap says a different movement was performed, so there is no
-  # reading under which the recorded load and reps are still true.
+  # Not behind `confirm`, and since #463 not behind nothing either. A swap says a different
+  # movement was performed, so there is no reading under which the recorded load and reps are
+  # still true -- that stays refused. What it now also does is name the other thing the caller
+  # might have meant, because "logged under the wrong movement" is a different claim and had
+  # no way to be made.
   it 'refuses to move a lifted set onto a different movement' do
     call_tool('update_set', raw: @token.raw, arguments: { set_id: @set.id, exercise: 'Band Tricep Pushdown' })
 
     assert tool_result['isError']
-    assert_includes tool_result.dig('content', 0, 'text'), 'a different set'
+    assert_includes tool_result.dig('content', 0, 'text'), 'If a different movement was performed'
     assert_equal 155, Tectonic::Plates.numeric(@set.refresh.weight)
   end
 
@@ -179,6 +182,8 @@ describe 'update_set moving a lifted set onto another movement' do
 
     assert_includes tool_result.dig('content', 0, 'text'), "delete set #{@set.id}"
     assert_includes tool_result.dig('content', 0, 'text'), 'create the Band Tricep Pushdown set'
+    # And the other thing the caller might have meant, which had no way to be said. #463.
+    assert_includes tool_result.dig('content', 0, 'text'), 'relabel: true'
   end
 
   # The refusal is about a *different* movement. Re-sending the name the set already carries
