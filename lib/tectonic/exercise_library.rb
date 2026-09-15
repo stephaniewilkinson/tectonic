@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative 'exercise_names'
 require_relative 'exercises'
 
 class Tectonic < Roda
@@ -175,6 +176,36 @@ class Tectonic < Roda
       missing = LIBRARY.select { |name| where(account_id: nil, name:).empty? }
       missing.each { |name| insert(account_id: nil, name:, is_barbell: true) }
       [missing.length, LIBRARY.length - missing.length]
+    end
+
+    # Accounts that already had their own movement under a name this run just added. #477.
+    #
+    # This is how every duplicate on the reporting account was actually made -- not the
+    # resolver, which has never produced one. `load_library` asks whether a name exists *as a
+    # library row* and never looks at private rows, and it runs on every deploy. So when the
+    # library gained Bench Press, Overhead Press, Bent Over Row, Deadlift and Back Squat, five
+    # collisions appeared at once against training going back to 2023, silently.
+    #
+    # **Reporting rather than preventing, and that is not a shortcut.** A library row is
+    # global -- one row, `account_id IS NULL`, shared by every account -- so skipping the
+    # insert because one account holds a private row of that name would deny the movement to
+    # everybody else. The loader is acting on a global fact and the collision is a per-account
+    # one, so it genuinely cannot decide this. What makes the collision harmless is #474:
+    # a folded match that prefers the account's own row, so those accounts go on resolving to
+    # their own and the library's sits unused by them.
+    #
+    # What is left for this to do is say so. The deploy that creates a collision is the only
+    # moment anybody could know, and it said nothing.
+    def self.library_collisions(names)
+      wanted = names.to_h { |name| [ExerciseNames.fold(name), name] }
+      return {} if wanted.empty?
+
+      found = Hash.new { |hash, key| hash[key] = [] }
+      exclude(account_id: nil).each do |row|
+        name = wanted[ExerciseNames.fold(row.name)]
+        found[name] << row.account_id if name
+      end
+      found.transform_values(&:uniq)
     end
   end
 end
