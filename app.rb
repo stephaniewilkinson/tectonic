@@ -1733,6 +1733,36 @@ class Tectonic < Roda
     weight && Plates.numeric(weight)
   end
 
+  # What a rack actually builds, said back to the lifter. #439.
+  #
+  # The issue asks for "the entered value echoed back as a sentence the lifter can check",
+  # because every number on that form is ambiguous in the same way -- a handle weight could be
+  # one or the pair, and "four 2.5 lb plates" could be four plates or four pairs. The two
+  # readings differ by a factor of two, which is enough to make every generated weight wrong,
+  # and nothing on the page would have looked any different.
+  #
+  # A range rather than a restatement of what was typed, which is the stronger check: it is
+  # derived through the same enumeration the generator prescribes from, so a lifter who
+  # misread "pairs" sees a top end twice what their rack can do. Restating the input would
+  # only prove the app can echo.
+  def loadable_range(totals)
+    return nil if totals.empty?
+
+    "#{weight_label(totals.min)} lb to #{weight_label(totals.max)} lb"
+  end
+
+  # The same for the dumbbells, which have to say it twice since #439 gave a movement a
+  # count: one handle reaches up the whole shelf and a matched pair reaches half as far,
+  # because every plate size has to go on both ends of both handles. Seeing the two numbers
+  # side by side is the quickest way to understand why a dumbbell bench is prescribed lighter
+  # than a single-arm row off the same plates.
+  def dumbbell_ranges(equipment)
+    return nil unless equipment.adjustable_dumbbells?
+
+    { one: loadable_range(equipment.dumbbell_totals(1)),
+      pair: loadable_range(equipment.dumbbell_totals(2)) }
+  end
+
   # What a set counts. Seconds read as a duration rather than as a rep count, because
   # "60 reps" of a plank is not what anybody held.
   def quantity_label(set)
