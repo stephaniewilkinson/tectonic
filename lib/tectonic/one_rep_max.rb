@@ -90,7 +90,18 @@ class Tectonic < Roda
     # `linear` lift, whose top weight is stepped to land there. **It is false of a `percent`
     # lift**, whose intensity is authored on the lift row: a top set written at 70% of max is
     # nowhere near an 8, and reading it as one estimates a max off a set that was deliberately
-    # easy. The inflated max then prices the next week's percentages, which is a loop.
+    # easy.
+    #
+    # **That reads the max low, not high**, and this comment said the opposite until #486
+    # worked the arithmetic. Calling an easy set an 8 claims it was two reps from failure when
+    # five were left, which is a claim that the lifter is weaker than they are. A 140 lb set of
+    # five -- 70% of a 200 lb max -- restates to 5 reps at 81.1% and gives 173; read at the 5
+    # it actually was, it restates to 8 reps at 73.9% and gives 189.
+    #
+    # It is still a loop and that is still the reason to fix it, just a descending one: a
+    # deflated max prices the next week's percentages lower, the sets get easier, and the
+    # estimate has no way back up. Worth naming the direction, because the two spiral in
+    # opposite directions and the fix only looks obvious once you know which way this goes.
     #
     # Since #265 the generator copies the prescription's own answer onto the row, so the
     # better assumption is now sitting there. A set the lifter rated is still read at what

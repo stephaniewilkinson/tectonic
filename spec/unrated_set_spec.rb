@@ -13,6 +13,10 @@ require 'securerandom'
 # the row -- a top set at 70% of max is nowhere near an 8, and reading it as one estimates a
 # max off a set that was deliberately easy.
 #
+# **Which reads the max low, not high.** The comment on `rating_for` said the opposite until
+# #486 worked the arithmetic, and the direction matters enough to pin: the two spiral opposite
+# ways, and the fix only looks obvious once you know which way this one goes.
+#
 # Since #265 the generator copies the prescription's own answer onto the set, so the better
 # assumption is sitting on the row. The precedence under test is: what the lifter said, else
 # what the block asked, else the anchor.
@@ -36,6 +40,32 @@ describe 'the rating a set is read at' do
   # getting the precedence backwards would be invisible, so it is worth pinning.
   it 'is unchanged when the two agree' do
     assert_equal 8, Tectonic::OneRepMax.rating_for(8, 8)
+  end
+end
+
+# Which way the assumption is wrong when it is wrong, pinned so the comment beside it cannot
+# drift from the arithmetic again.
+#
+# Calling a deliberately easy set an 8 claims two reps were left when five were -- a claim
+# that the lifter is weaker than they are. It is a descending loop: a deflated max prices next
+# week's percentages lower, the sets get easier, and nothing brings the estimate back up.
+describe 'the direction the anchor is wrong in' do
+  # 140 lb is 70% of a 200 lb max, taken for five, which is an RPE 5 rather than an 8.
+  def read_at(rating) = Tectonic::OneRepMax.estimate(weight: 140, reps: 5, rpe: rating)
+
+  it 'reads an easy set as a smaller max than it was' do
+    assert_operator read_at(8), :<, read_at(5)
+  end
+
+  it 'is low against the real max rather than high' do
+    assert_operator read_at(8), :<, 200
+  end
+
+  # The numbers themselves, because "lower" is the kind of claim that stays true while both
+  # sides drift.
+  it 'is 173 against the 189 its own rating gives' do
+    assert_equal 173, read_at(8)
+    assert_equal 189, read_at(5)
   end
 end
 
