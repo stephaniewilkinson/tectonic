@@ -237,14 +237,58 @@ class Tectonic < Roda
         # when the caller says so and otherwise when its name is one the library knows:
         # there is no user at the other end of this to ask, and a set that arrives without
         # the flag loses the plate math this app is named for.
-        def exercise(context, name:, icon_url: nil, is_barbell: nil)
+        #
+        # **Matched on the folded name since #474**, not on the exact string. `Bench Press`,
+        # `bench press` and `Benchpress` are one movement, and an exact match is how the
+        # reporting account came to have training on two rows it could not tell apart. The
+        # account's own row wins over the library's, by stated rule rather than by the id
+        # ordering that used to decide it by accident.
+        #
+        # **And it refuses rather than creating where the name might already be here under
+        # another one** (#478). Fifteen movements on that account have "squat" in the name, and
+        # `Squat` folds to none of them -- so a model writing a block against a slightly-off
+        # name would quietly open a sixteenth row and scatter the training. That is exactly how
+        # the bare `Squat` in #445 happened.
+        #
+        # `create_exercise` is the one door that can say yes, and every other tool points at
+        # it. That keeps the decision in one place and keeps it deliberate: a model that meant
+        # a new movement says so once, rather than every set-writing tool carrying a flag that
+        # waves the check through.
+        def exercise(context, name:, icon_url: nil, is_barbell: nil, new_exercise: false)
           clean = name.to_s.strip
           raise Tool::Refusal, 'An exercise needs a non-empty name.' if clean.empty?
 
-          context.exercises.where(name: clean).order(:id).first ||
-            Exercise.create(name: clean, icon_url:, account_id: context.account_id,
-                            is_barbell: is_barbell.nil? ? Exercise.barbell_by_name?(clean) : is_barbell,
-                            created_by_oauth_application_id: context.application_id, created_at: Time.now)
+          found = Exercise.matching(context.account_id, clean)
+          return found if found
+
+          refuse_if_it_might_exist(context, clean) unless new_exercise
+          Exercise.create(name: clean, icon_url:, account_id: context.account_id,
+                          is_barbell: is_barbell.nil? ? Exercise.barbell_by_name?(clean) : is_barbell,
+                          created_by_oauth_application_id: context.application_id, created_at: Time.now)
+        end
+
+        # The question #478 asks, put as a refusal because a refusal is the only thing in this
+        # protocol a model reliably reads and acts on. Silence would create the row.
+        #
+        # Named in full, and capped, because a list of forty is not a question anybody answers
+        # -- it is a wall somebody scrolls past. Eight is enough to recognise the one meant and
+        # the count says how many more there are.
+        def refuse_if_it_might_exist(context, name)
+          near = Exercise.similar_to(context.account_id, name)
+          return if near.empty?
+
+          raise Tool::Refusal,
+                "#{name.inspect} is new, and this account already has #{near.length} " \
+                "#{near.length == 1 ? 'movement' : 'movements'} it could be: #{listed(near)}. " \
+                'Use one of those names, or call create_exercise with new_exercise: true to ' \
+                "add #{name.inspect} as a movement of its own."
+        end
+
+        def listed(near)
+          shown = near.first(8).map(&:name)
+          return shown.join(', ') if near.length <= 8
+
+          "#{shown.join(', ')} and #{near.length - 8} more"
         end
 
         # The account's workout on a calendar date, or a new one stamped with the

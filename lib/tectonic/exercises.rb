@@ -2,6 +2,7 @@
 
 require 'date'
 require_relative 'db'
+require_relative 'exercise_names'
 require_relative 'measured'
 require_relative 'oauth_application'
 require_relative 'one_rep_max'
@@ -44,6 +45,45 @@ class Tectonic < Roda
     # other value is a single account's own.
     def library?
       account_id.nil?
+    end
+
+    # The one movement this account means by a name, or nothing. #474.
+    #
+    # Replaces an exact string match, which is how `Benchpress` came to sit beside
+    # `Bench Press` with training on both: the two are the same movement written differently,
+    # and an exact match cannot see it.
+    #
+    # **The account's own row wins over the library's**, and saying so is the point. Both are
+    # visible, so a name can match two rows -- this account has a private `Deadlift` carrying
+    # 64 sets, a training max and seven program lifts, and a library `Deadlift` with nothing on
+    # it. The old ordering was by id, which picked the private row because it happened to be
+    # older, and would have started filing training onto the empty one the moment that stopped
+    # being true. The rule is now the reason rather than the accident: a lifter's own row is
+    # where their training is.
+    #
+    # Folding in Ruby rather than in SQL keeps this agreeing with `near?` and with the browser
+    # form, at the cost of reading the account's movements -- a few dozen rows, already loaded
+    # on most of the pages that ask.
+    def self.matching(account_id, name)
+      wanted = ExerciseNames.fold(name)
+      return nil if wanted.empty?
+
+      visible_to(account_id).all
+                            .select { |row| ExerciseNames.fold(row.name) == wanted }
+                            .min_by { |row| [row.library? ? 1 : 0, row.id] }
+    end
+
+    # Movements already here that a new name might have meant. #478.
+    #
+    # Nothing is decided from this -- it is the list somebody is asked about. Anything folding
+    # to the same name is left out, because that is `matching`'s answer and a settled one: a
+    # caller offered `Bench Press` when they typed `Benchpress` has not been asked a question,
+    # they have been told the movement already exists.
+    def self.similar_to(account_id, name)
+      wanted = ExerciseNames.fold(name)
+      visible_to(account_id).order(:name).all
+                            .reject { |row| ExerciseNames.fold(row.name) == wanted }
+                            .select { |row| ExerciseNames.near?(name, row.name) }
     end
 
     # Sets already logged, brought into line when the movement's own answer changes. #392.

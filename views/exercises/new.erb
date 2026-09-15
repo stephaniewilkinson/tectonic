@@ -1,3 +1,67 @@
 <h1 class="mb-6 text-3xl font-semibold text-gray-900">New exercise</h1>
 
+<%# The movements this name might already be. #478.
+
+    Folding (#474) settles whether two names *are* the same name, and it cannot settle this:
+    "Squat" is not "Back Squat" by any spelling rule, and fifteen movements on the reporting
+    account have "squat" in the name. A sixteenth was one submit away, with nothing said, and
+    that is exactly how the legacy bare "Squat" in #445 came to exist.
+
+    Asked rather than refused, because there is a person at this end who can answer. Each
+    candidate is a link to the movement itself, so "did you mean this one" can be checked
+    rather than guessed at -- the page it goes to shows the training already on it, which is
+    the thing that actually answers the question.
+
+    The confirm button carries new_exercise and posts the same fields back, so nothing typed
+    is lost by being asked. The form below is re-rendered with its values intact for the same
+    reason: a question that costs you your note is a question you learn to avoid. %>
+<%- if @similar&.any? %>
+  <div class="mb-6 rounded-lg border border-sky-800 bg-sky-50 px-4 py-3">
+    <p class="text-sm text-gray-700">
+      <%- if @similar.length == 1 %>
+        You already have a movement this could be. Open it to check, or say yours is a
+        different one.
+      <%- else %>
+        You already have <%= @similar.length %> movements this could be. Open one to check, or
+        say yours is a different one.
+      <%- end %>
+    </p>
+    <ul class="mt-2 space-y-1">
+      <%- @similar.each do |movement| %>
+        <li>
+          <a href="/exercises/<%= movement.id %>/"
+             class="text-sm font-semibold text-sky-800 underline hover:text-sky-900">
+            <%= movement.name %>
+          </a>
+          <%- if movement.library? %>
+            <span class="text-xs text-gray-500">from the shared library</span>
+          <%- end %>
+        </li>
+      <%- end %>
+    </ul>
+    <%# A form of its own rather than a button inside the one below, because the fields it
+        needs are the ones already typed and re-posting them is the whole point. Hidden inputs
+        rather than a submit button added to the main form, so the ordinary Save keeps meaning
+        "ask me again if it is still ambiguous" and only this one waves the question through. %>
+    <form method="post" action="/exercises" class="mt-3">
+      <%== csrf_tag('/exercises') %>
+      <input type="hidden" name="name" value="<%= @exercise&.name %>">
+      <input type="hidden" name="note" value="<%= @exercise&.note %>">
+      <input type="hidden" name="dumbbell_count" value="<%= @exercise&.dumbbell_count %>">
+      <%- if @exercise&.is_barbell %>
+        <input type="hidden" name="is_barbell" value="1">
+      <%- end %>
+      <%- if @exercise&.default_is_per_side %>
+        <input type="hidden" name="default_is_per_side" value="1">
+      <%- end %>
+      <input type="hidden" name="id" value="">
+      <input type="hidden" name="new_exercise" value="1">
+      <button type="submit"
+              class="<%= button_style %> min-h-11 border border-sky-800 bg-sky-800 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-900">
+        No, <%= @exercise&.name %> is a different movement
+      </button>
+    </form>
+  </div>
+<%- end %>
+
 <%== render('exercises/_form') %>

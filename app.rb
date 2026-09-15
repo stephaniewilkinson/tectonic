@@ -654,6 +654,22 @@ class Tectonic < Roda
         # and quietly erase an icon an assistant had chosen every time somebody used the
         # browser to fix a typo in the name.
         if r.params['id'].empty?
+          # The movement this name already is, if it is one. #474: matched on the folded name,
+          # so "Benchpress" finds "Bench Press" instead of making a second row beside it.
+          existing = Exercise.matching(@account_id, r.params['name'])
+          next r.redirect "/exercises/#{existing.id}/" if existing
+
+          # And the ones it might be under another name. #478: fifteen movements here have
+          # "squat" in the name and none of them folds to "Squat", so nothing above catches a
+          # sixteenth being written. Asked rather than refused, because there is a person at
+          # this end who can answer -- the form comes back with the candidates on it, and
+          # confirming posts the same fields again with the question answered.
+          @similar = Exercise.similar_to(@account_id, r.params['name'])
+          if @similar.any? && r.params['new_exercise'].nil?
+            @exercise = Exercise.new(name: r.params['name'], is_barbell:, default_is_per_side:,
+                                     note:, dumbbell_count:)
+            next view('exercises/new')
+          end
           exercise_id = Exercise.insert(name: r.params['name'], account_id: @account_id,
                                         is_barbell:, default_is_per_side:, note:, dumbbell_count:)
           r.redirect "/exercises/#{exercise_id}/"

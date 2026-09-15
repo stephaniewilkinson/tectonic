@@ -8,8 +8,13 @@ require 'securerandom'
 # A movement whose name the library has never heard of, which is the whole point: while
 # the flag was derived from the name, a variation somebody invented could not be a barbell
 # lift however it was written down.
+# A movement the library has never heard of, and -- since #478 -- one whose name contains no
+# library movement's name either. "Front Squat Variation" was both plausible and, it turns
+# out, a superset of the library's "Front Squat", so the form now asks whether that is what
+# was meant instead of saving. Rightly: the question here is the barbell flag, and a name that
+# trips the duplicate check tests the check rather than the flag.
 def invented_name
-  "Front Squat Variation #{SecureRandom.hex(4)}"
+  "Hatfield Variation #{SecureRandom.hex(4)}"
 end
 
 describe 'creating a movement through the form' do
