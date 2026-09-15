@@ -56,6 +56,9 @@ class Tectonic < Roda
                         reps: { type: 'integer' }, rpe: { type: 'integer' },
                         is_warmup: { type: 'boolean' }, exercise: { type: 'string' },
                         is_per_side: { type: 'boolean' }, is_commanded: { type: 'boolean' },
+                        duration_seconds: { type: 'integer' },
+                        bench_angle_degrees: { type: 'integer' }, rack_hole: { type: 'integer' },
+                        safety_hole: { type: 'integer' },
                         confirm: { type: 'boolean' } },
           required: ['set_id'], additionalProperties: false
         )
@@ -63,6 +66,7 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           set = Resolver.find_set(context, arguments[:set_id])
           refuse_swap(set, arguments)
+          counted_as!(set, arguments)
           refuse_overwrite(set, arguments)
           changed = Changes.apply(set, attributes(context, set, arguments))
           ok("#{set.exercise.name} #{Presenter.load_phrase(set)}: #{Changes.describe(changed)}.",
@@ -159,7 +163,8 @@ class Tectonic < Roda
           # confirm: it says how the set was performed rather than overwriting what was
           # measured, and remembering after the session that the top single was commanded is
           # the ordinary way round. #311.
-          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup, :is_per_side, :is_commanded)
+          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup, :is_per_side, :is_commanded,
+                                   :duration_seconds, :bench_angle_degrees, :rack_hole, :safety_hole)
           check(fields)
           fields[:weight] = Load.stored(fields[:weight]) if fields.key?(:weight)
           fields
@@ -169,6 +174,32 @@ class Tectonic < Roda
           Bounds.check(Bounds::WEIGHT, fields[:weight], 'Weight', unit: ' lb')
           Bounds.check(Bounds::REPS, fields[:reps], 'Reps')
           Bounds.check(Bounds::RPE, fields[:rpe], 'RPE')
+          Bounds.check(Bounds::SECONDS, fields[:duration_seconds], 'Duration', unit: ' seconds')
+          Bounds.setup_fits!(fields)
+        end
+
+        # A correction has to be counted the way the set already is. #471.
+        #
+        # `sets_measures_one_way` holds reps XOR duration_seconds, matched to measure, and
+        # this tool takes no measure on purpose -- a plank stays a plank. So sending reps to
+        # a timed set, or a duration to a counted one, asks the column for a row it refuses,
+        # and until now that surfaced as "The tool failed unexpectedly and made no change":
+        # a check violation reaching a model as a shrug. #213's shape exactly.
+        #
+        # Said as a refusal naming the set's own measure, because the caller's mistake is
+        # almost always that they do not know which kind of set they are holding.
+        def self.counted_as!(set, fields)
+          timed = set.measure == Measured::TIME
+          raise Tool::Refusal, wrong_count(set, 'reps', 'duration_seconds') if timed && fields.key?(:reps)
+          return unless !timed && fields.key?(:duration_seconds)
+
+          raise Tool::Refusal, wrong_count(set, 'a duration', 'reps')
+        end
+
+        def self.wrong_count(set, sent, wanted)
+          "Set #{set.id} is counted in #{set.measure == Measured::TIME ? 'seconds' : 'reps'}, " \
+            "so it cannot take #{sent}. Send #{wanted} instead, or delete it and log the set " \
+            'the way it was actually done.'
         end
       end
     end
