@@ -491,12 +491,35 @@ end
 # Exact name, and exactly one of it. A partial match would be convenient and is how the
 # wrong movement's history gets moved: "Squat" is a prefix of four rows here, and the
 # whole point of this task is that those four are worth telling apart.
-def sole_exercise(name)
-  found = Tectonic::Exercise.where(name: name.to_s.strip).all
-  abort "No movement named #{name.to_s.strip.inspect}." if found.empty?
-  abort "#{found.length} movements are named #{name.inspect} (ids #{found.map(&:id).join(', ')})." if found.length > 1
+# The movement a merge argument names: an exact name, or `id:N` where a name cannot say it.
+#
+# The id form is not a convenience. #475 has to fold a library `Deadlift` into a private
+# `Deadlift` -- the private row carries 64 sets, a training max and seven program lifts, and
+# the library one is empty -- and both are called `Deadlift`. By name that is ambiguous in
+# both arguments and identical in the pair, so the two guards below refuse it twice over and
+# the merge cannot be expressed at all. Exactly the merge most worth doing, since the whole
+# reason the duplicate is dangerous is that a name cannot tell the two apart.
+#
+# `id:` rather than a bare number, so a movement somebody has named "12" is still reachable by
+# its name and the two forms can never be confused for one another.
+def sole_exercise(reference)
+  given = reference.to_s.strip
+  return exercise_by_id(given.delete_prefix('id:')) if given.start_with?('id:')
+
+  found = Tectonic::Exercise.where(name: given).all
+  abort "No movement named #{given.inspect}." if found.empty?
+  abort ambiguous(given, found) if found.length > 1
 
   found.first
+end
+
+def ambiguous(given, found)
+  "#{found.length} movements are named #{given.inspect} (ids #{found.map(&:id).join(', ')}). " \
+    "Name one by id instead: rake 'exercises:merge[id:#{found.first.id},...]'."
+end
+
+def exercise_by_id(id)
+  Tectonic::Exercise[id.to_i] || abort("No movement with id #{id.inspect}.")
 end
 
 # What would move, counted per table. A movement nothing points at says so outright rather
