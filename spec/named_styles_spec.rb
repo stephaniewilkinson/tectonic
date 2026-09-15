@@ -94,10 +94,14 @@ describe 'the disclosure chevron' do
     assert_equal 1, drawn, 'the disclosure chevron should live in views/_chevron.erb and nowhere else'
   end
 
+  # A hardcoded count, which means every new disclosure edits this line. That is the point:
+  # the number is a tripwire for a fourth copy of the markup being pasted in instead of the
+  # partial being rendered, and a count that moved on its own would catch nothing.
   it 'is still rendered where a disclosure needs one' do
     users = templates.count { |path| File.read(path).include?("render('_chevron')") }
 
-    assert_equal 2, users, 'the rating scale and the two revision disclosures use it'
+    assert_equal 3, users,
+                 'the rating scale, the two revision disclosures, and the session note use it'
   end
 end
 
