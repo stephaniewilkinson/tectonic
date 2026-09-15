@@ -519,8 +519,13 @@ namespace :library do
   desc 'Load the built-in barbell exercise library (idempotent on name)'
   task :exercises do
     require_relative 'lib/tectonic/exercise_library'
+    # Which names are new is read before the insert, because afterwards they are library rows
+    # like any other and there is nothing left to tell them apart from the fifty-three that
+    # were already here.
+    added = Tectonic::Exercise::LIBRARY.reject { |name| Tectonic::Exercise.where(account_id: nil, name:).any? }
     created, skipped = Tectonic::Exercise.load_library
     puts "Library exercises: #{created} created, #{skipped} already present"
+    report_library_collisions(added)
   end
 end
 
@@ -589,5 +594,26 @@ def account_id_from(model)
   abort "Several accounts exist (#{ids.join(', ')}). Pass ACCOUNT_ID." if ids.length > 1
 
   ids.first
+end
+
+# Accounts that already had their own movement under a name this run just added. #477.
+#
+# This is how every duplicate on the reporting account was made: the library landed on top of
+# training going back to 2023, five collisions in one deploy, and nothing said so. It cannot
+# be prevented here -- a library row is global and the collision is per-account, so skipping
+# the insert would deny the movement to everybody else -- and #474 is what makes it harmless.
+# This is the part that was missing: the deploy is the only moment anybody could know.
+#
+# On stdout because that is the deploy log, and through the error reporter as a message rather
+# than an exception, because a collision is not a failed deploy and must not read as one.
+def report_library_collisions(added)
+  collisions = Tectonic::Exercise.library_collisions(added)
+  return if collisions.empty?
+
+  collisions.each do |name, account_ids|
+    puts "  #{name.inspect} collides with a movement #{account_ids.length} " \
+         "#{account_ids.length == 1 ? 'account already has' : 'accounts already have'} of their own"
+  end
+  puts '  each of those keeps its own movement; the library row is there for everyone else'
 end
 

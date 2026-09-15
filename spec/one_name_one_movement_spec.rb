@@ -292,3 +292,44 @@ describe 'adding a movement whose name is plainly its own' do
   end
 end
 
+# The loader that actually made all five duplicates. #477.
+#
+# `load_library` asks whether a name exists *as a library row* and never looks at private
+# rows, and it runs on every deploy. When the library gained Bench Press, Overhead Press,
+# Bent Over Row, Deadlift and Back Squat, five collisions appeared at once against training
+# going back to 2023, and nothing said so.
+#
+# It cannot be prevented here, which is worth pinning rather than just asserting: a library
+# row is global, so skipping the insert because one account holds a private row of that name
+# would deny the movement to every other account. The loader acts on a global fact and the
+# collision is a per-account one.
+describe 'adding a library movement an account already has its own of' do
+  include OneName
+
+  it 'names the accounts it collided with' do
+    account_id = scratch
+    a_movement(account_id, 'Bench press')
+
+    collisions = Tectonic::Exercise.library_collisions(['Bench Press'])
+
+    assert_equal [account_id], collisions['Bench Press']
+  end
+
+  # Folded, so it catches the spelling differences that produced the real ones -- the account
+  # row was "Benchpress" and the library's is "Bench Press".
+  it 'sees a collision through a difference in spelling' do
+    account_id = scratch
+    a_movement(account_id, 'Benchpress')
+
+    assert_includes Tectonic::Exercise.library_collisions(['Bench Press']).fetch('Bench Press', []), account_id
+  end
+
+  it 'says nothing about a name nobody has their own of' do
+    assert_empty Tectonic::Exercise.library_collisions(["Jefferson Curl #{SecureRandom.hex(4)}"])
+  end
+
+  it 'says nothing when no names were added at all' do
+    assert_empty Tectonic::Exercise.library_collisions([])
+  end
+end
+
