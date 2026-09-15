@@ -29,7 +29,12 @@ class Tectonic < Roda
                     'counted, loaded or not. Left out, the timer falls back to the median ' \
                     'rest this lifter actually takes between sets of the movement, so give ' \
                     'it when the programme genuinely prescribes one and leave it out rather ' \
-                    'than inventing a number. ' \
+                    'than inventing a number. When it does prescribe one, the usual ranges ' \
+                    'are 180 to 240 seconds for a heavy main lift and 60 to 120 for ' \
+                    'accessory work -- longer rest supports maximal strength on compound ' \
+                    'lifts, shorter suits accessories. Worth setting deliberately on the ' \
+                    'main lifts of a strength block, because without one the gaps become ' \
+                    'whatever happens, and what happens is uneven. ' \
                     'is_commanded says the working sets are done under meet commands -- ' \
                     'start, press, rack -- rather than at the lifter\'s own tempo. It is a ' \
                     'competition condition, not a tempo: a paused bench in training is not ' \
