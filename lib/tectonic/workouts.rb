@@ -28,6 +28,14 @@ class Tectonic < Roda
     many_to_one :created_by_oauth_application, class: 'Tectonic::OAuthApplication',
                                                key: :created_by_oauth_application_id
 
+    # When the first set of a workout was ticked off, as a correlated subquery for the two
+    # callers that need it in SQL: the calendar's fetch window and its select. Written once
+    # because a subquery duplicated is a subquery that drifts.
+    def self.first_completion
+      DB[:sets].where(workout_id: Sequel[:workouts][:id], is_completed: true)
+               .select { min(:completed_at) }
+    end
+
     dataset_module do
       # Answers "has anything been lifted here" for every row of a list in the one
       # query that fetches it, as a correlated EXISTS rather than a join, so a page of
@@ -35,6 +43,24 @@ class Tectonic < Roda
       def with_performance
         lifted = db[:sets].where(workout_id: Sequel[:workouts][:id], is_completed: true)
         select_all(:workouts).select_append(lifted.exists.as(:is_performed))
+      end
+
+      # The day this session was actually trained, alongside whether it was. #479.
+      #
+      # `workouts.date` is when a session was *written for*. For a generated block that is a
+      # plan made weeks ahead, and training does not keep to it: five sessions on the
+      # reporting account were trained up to three days away from the date they carry, and
+      # the calendar drew every one of them on the planned day. A session lifted on Monday
+      # appeared on Thursday, and Monday looked like a rest day.
+      #
+      # The earliest completion rather than the latest, because a session spanning midnight
+      # belongs to the day it started -- which is also the only reading `completed_at` can
+      # give that a stored date cannot.
+      # `select { min(...) }` rather than `.min(...)`, which is Sequel's aggregate *call* and
+      # runs the query there and then -- producing a value where an expression was wanted, and
+      # a correlated subquery that cannot see its outer table.
+      def with_performed_on
+        with_performance.select_append(Workout.first_completion.as(:performed_on))
       end
 
       # How many sets are on each row, answered the same way and for the same reason. The
@@ -207,6 +233,27 @@ class Tectonic < Roda
     # program_day_id no longer appears here, which is the tell that the rule got simpler
     # rather than gaining a case: whether a program wrote a session was only ever a proxy
     # for whether it was a plan, and the date answers that directly.
+    # The day a calendar should draw this session on. #479.
+    #
+    # What happened, where it happened: a trained session belongs on the day it was trained,
+    # and a plan belongs on the day it is written for. Those are the same date most of the
+    # time and the calendar is only interesting when they are not.
+    #
+    # Falls back to the stored date whenever there is no stamp to read -- a session performed
+    # before #281 gave sets a `completed_at`, or one whose completions predate it. Those rows
+    # are not wrong, they simply cannot say, and the planned date is the best available answer
+    # rather than a guess.
+    def on_calendar
+      performed_on&.to_date || date.to_date
+    end
+
+    # When the first set of this was ticked off, or nil. Taken from the row where the query
+    # asked (with_performed_on) and otherwise fetched, the same shape as `performed?` above so
+    # a caller that has not opted into the wider select gets an answer rather than an error.
+    def performed_on
+      values.fetch(:performed_on) { sets_dataset.where(is_completed: true).min(:completed_at) }
+    end
+
     def status(today = Date.today)
       return :performed if performed?
       return :planned if date.to_date >= today
