@@ -56,7 +56,7 @@ class Tectonic < Roda
                         reps: { type: 'integer' }, rpe: { type: 'integer' },
                         is_warmup: { type: 'boolean' }, exercise: { type: 'string' },
                         is_per_side: { type: 'boolean' }, is_commanded: { type: 'boolean' },
-                        duration_seconds: { type: 'integer' },
+                        duration_seconds: { type: 'integer' }, relabel: { type: 'boolean' },
                         bench_angle_degrees: { type: 'integer' }, rack_hole: { type: 'integer' },
                         safety_hole: { type: 'integer' },
                         confirm: { type: 'boolean' } },
@@ -73,23 +73,46 @@ class Tectonic < Roda
              structured: Presenter.view_set(set.refresh).merge(changed:))
         end
 
-        # A completed set never becomes a different movement. Compared by name rather than
-        # through Resolver.exercise on purpose: resolving find-or-creates, so asking it here
-        # would leave a brand new movement behind on the way to refusing the call.
+        # A completed set never becomes a different movement *by accident*. #364, and #463
+        # is the exception it turned out to need.
+        #
+        # The rule is right about a swap. A swap says a different movement was performed, and
+        # the load and reps on the row are then describing something that did not happen --
+        # there is no reading under which they survive, so the honest answer is a new set.
+        #
+        # It is wrong about a **mis-record**, which is a different claim wearing the same
+        # shape. On 2026-09-01 three sets went into the log as Dumbbell Overhead Press at
+        # 45/65/65 because changing the movement mid-session cost more than living with it.
+        # The barbell is what was lifted. The load and reps are *true*; only the label is
+        # wrong, applied by somebody who could not change it at the moment they needed to.
+        # Refusing that is not protecting history, it is preserving a known error in it -- and
+        # the route out, delete and re-create, costs twice the calls the friction did.
+        #
+        # So the two are told apart by the caller saying which they mean. `relabel` and not
+        # the existing `confirm`, deliberately: confirm answers "yes, overwrite what this
+        # completed set measured", and these are different questions about the same row. One
+        # flag answering both would let a caller confirming a weight correction silently
+        # authorise a change of movement as well.
+        #
+        # Compared by name rather than through Resolver.exercise on purpose: resolving
+        # find-or-creates, so asking it here would leave a brand new movement behind on the
+        # way to refusing the call.
         #
         # Naming the movement the set is already on is not a swap and is left alone, so an
         # assistant re-sending the whole row it just read is not refused for a field it did
         # not change.
         def self.refuse_swap(set, arguments)
           return unless set.is_completed && arguments[:exercise]
+          return if arguments[:relabel]
 
           named = arguments[:exercise].to_s.strip
           return if named.empty? || named == set.exercise.name
 
           raise Tool::Refusal,
                 "Set #{set.id} is marked as lifted, so it records #{set.exercise.name} that was " \
-                "actually performed. A different movement is a different set: delete set #{set.id} " \
-                "if it did not happen, and create the #{named} set that did."
+                "actually performed. If a different movement was performed, delete set #{set.id} " \
+                "and create the #{named} set that did happen. If this set is right and only its " \
+                'name is wrong -- it was logged under the wrong movement -- send relabel: true.'
         end
 
         # The weight and reps of a completed set, behind the same confirm delete_set uses.
