@@ -2,6 +2,7 @@
 
 require_relative 'spec_helper'
 require 'rack/test'
+require 'json'
 
 # What the document head tells the rest of the internet about this app: which domain it
 # lives at, what a share card should fetch, and what a browser should draw in the tab.
@@ -167,6 +168,79 @@ describe 'robots.txt' do
     get URI.parse(@body[/^Sitemap: (\S+)$/, 1]).path
 
     assert_equal 200, last_response.status
+  end
+end
+
+# Installable on a phone, which is the cheap half of #494's cheapest route.
+#
+# That issue asks for a rest timer in the Dynamic Island, and a web page cannot have one: the
+# Island is drawn by a Live Activity, which is ActivityKit plus a widget extension inside a
+# compiled bundle. What a web page *can* have is a home-screen icon that opens without the
+# browser's chrome, which is worth having on its own terms and is the prerequisite for iOS
+# Web Push -- the only way this app reaches a phone without a native wrapper.
+describe 'adding the app to a home screen' do
+  include Rack::Test::Methods
+  include Head
+
+  # iOS installs from the apple- tags and not from the manifest, so the two platforms need
+  # different answers to the same question and both have to be present.
+  it 'tells iOS it can run without the browser chrome' do
+    head = head_of('/welcome')
+
+    assert_includes head, '<meta name="apple-mobile-web-app-capable" content="yes">'
+    assert_includes head, '<meta name="apple-mobile-web-app-title" content="tectonic">'
+  end
+
+  # The apple spelling is the deprecated one and the only one iOS honours, so dropping either
+  # of these loses a platform.
+  it 'tells everybody else the same thing in their own spelling' do
+    head = head_of('/welcome')
+
+    assert_includes head, '<meta name="mobile-web-app-capable" content="yes">'
+    assert_includes head, '<link rel="manifest" href="/manifest.json">'
+  end
+
+  # `default` rather than black-translucent: translucent puts the page under the clock, which
+  # wants a top safe-area inset this layout does not have.
+  it 'leaves the status bar alone rather than drawing under it' do
+    assert_includes head_of('/welcome'), 'content="default"'
+  end
+end
+
+# Linked and actually served, the same check the icons get. A manifest that 404s is an install
+# prompt that never appears, and nothing else on the page would say so.
+describe 'the manifest an install reads' do
+  include Rack::Test::Methods
+  include Head
+
+  it 'serves the manifest it names' do
+    get '/manifest.json'
+
+    assert_equal 200, last_response.status
+    assert_predicate last_response.body.bytesize, :positive?
+  end
+
+  # The fields an install actually reads. A manifest that parses but says `display: browser`
+  # installs a bookmark rather than an app.
+  it 'describes an app rather than a bookmark' do
+    get '/manifest.json'
+    manifest = JSON.parse(last_response.body)
+
+    assert_equal 'standalone', manifest['display']
+    assert_equal '/', manifest['start_url']
+    assert_equal '#075985', manifest['theme_color']
+  end
+
+  # Every icon it names has to be one this app serves, which is the failure the icons spec
+  # above exists for and is just as silent here.
+  it 'names only icons that exist' do
+    get '/manifest.json'
+
+    JSON.parse(last_response.body)['icons'].each do |icon|
+      get icon['src']
+
+      assert_equal 200, last_response.status, "the manifest names #{icon['src']} and nothing serves it"
+    end
   end
 end
 

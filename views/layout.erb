@@ -94,6 +94,43 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <meta name="theme-color" content="#075985">
 
+    <%# Installable on a phone. #494.
+
+        That issue asks for a rest timer in the Dynamic Island, which a web page cannot have:
+        the Island is drawn by a Live Activity, and a Live Activity is ActivityKit plus a
+        widget extension inside a compiled app bundle. There is no JavaScript binding for it
+        and Safari vends no push-to-start token. The plan on the issue sets out the three
+        routes and what each costs.
+
+        This is the cheap half of the cheapest of them, and it is worth having on its own
+        terms: an app on the home screen, opening without the browser's chrome, rather than a
+        tab somebody has to find. It is also the prerequisite for iOS Web Push, which is the
+        only way this app will ever interrupt a phone without a native wrapper -- though push
+        needs a service worker and a subscription store, and neither is here.
+
+        **iOS reads the apple- tags and not the manifest for this.** The manifest is what
+        Chrome and Android install from, and modern Safari reads some of it, but standalone
+        display and the name under the icon come from the two meta tags below. Both are
+        present because the two platforms disagree about which to believe.
+
+        `mobile-web-app-capable` alongside the apple one because the apple spelling is the
+        deprecated form and the only one iOS honours -- dropping either loses a platform.
+
+        status-bar-style `default` rather than black-translucent, deliberately: translucent
+        puts the page under the clock, which wants a safe-area inset at the top that this
+        layout does not have. Only the foot of the screen is padded for a notch today, in the
+        RPE footer, and a heading sliding under the carrier name is a worse first impression
+        than an ordinary status bar.
+
+        The one real cost, worth naming: a standalone window has no Safari back button. Every
+        screen here is reachable from the nav, so there is nowhere to strand somebody -- but
+        that is a property to keep true rather than one to assume. %>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="tectonic">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
     <%# Both cards fetch their image from this origin. They asked tectonic.onrender.com for
         it until #251, which is the sort of thing that keeps working until the day the old
         subdomain is retired and then breaks everywhere at once, silently, in somebody
