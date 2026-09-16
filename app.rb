@@ -1015,6 +1015,32 @@ class Tectonic < Roda
           # Answers with the note block alone rather than the whole session body: nothing else
           # on the screen changed, and re-rendering the panels would close a <details> the
           # lifter had open and scroll the horizontal lift strip back to the start.
+          # One more set of a movement already in this session. #496.
+          #
+          # The screenshot on that issue is the last lift of a session with both sets done and
+          # nowhere to put a third. "Add a set" has existed since the beginning on the workout
+          # record and the set list -- two pages away from the one a lifter is holding -- so
+          # deciding to do another set of skull crushers meant leaving the session, adding it,
+          # and coming back. That is the same shape of friction as #365's swap, and it is worse
+          # here because the decision is made between two sets rather than before them.
+          #
+          # **Copied from the last set of that movement rather than blank.** A third set is
+          # almost always like the second: same weight, same reps, same per-side and barbell
+          # flags. A blank form on a phone mid-session is five fields to fill in with chalk on,
+          # and the numbers are already on the screen above it. Anything actually different is
+          # then corrected with the revision box the panel already carries, which is one edit
+          # rather than five.
+          #
+          # Not completed. The set is a plan until somebody taps Done, which is what every
+          # other set on this screen means by being there, and a set that arrived already
+          # ticked would make "11 of 16" a count of things nobody did.
+          r.post 'add' do
+            check_csrf!
+            added = add_set_to_session(r.params['exercise_id'])
+            next r.redirect("/workouts/#{workout_id}/session") unless added && r.env['HTTP_HX_REQUEST']
+
+            session_changes(workout_id, @workout.session_fingerprint)
+          end
           r.post 'note' do
             check_csrf!
             @workout.update(note: Workout.clean_note(r.params['note']))
@@ -1581,6 +1607,31 @@ class Tectonic < Roda
     # a lift this row is no longer is worse than no prescription at all.
     WorkoutSet.where(workout_id: @workout.id, exercise_id: from, is_completed: false)
               .update(**WorkoutSet.moved_to(into))
+  end
+
+  # One more set of a movement already in this session, copied from the last one of it. #496.
+  #
+  # Scoped to sets already in this workout rather than to any movement the account can see.
+  # This is "another set of *that*", reached from a panel that is already on the screen, and a
+  # set of something not in the session is what the movement swap and the record page are for.
+  # It also means the row being copied always exists.
+  #
+  # The last one rather than the heaviest or the first: a lifter adding a set is continuing
+  # from where they are, and the numbers they are looking at are the ones just tapped.
+  #
+  # Nil where there is nothing to copy, which the route reads as "do nothing and reload" --
+  # an exercise_id that is not in this session is a stale panel or a hand-made request, and
+  # neither should be answered with a set.
+  def add_set_to_session(exercise_id)
+    last = WorkoutSet.where(workout_id: @workout.id, exercise_id:, is_warmup: false)
+                     .order(:id).last
+    return nil unless last
+
+    WorkoutSet.create(workout_id: @workout.id, exercise_id: last.exercise_id,
+                      weight: last.weight, reps: last.reps, measure: last.values[:measure],
+                      duration_seconds: last.duration_seconds, is_warmup: false,
+                      is_barbell: last.is_barbell, is_per_side: last.is_per_side,
+                      is_commanded: last.is_commanded, is_completed: false)
   end
 
   def load_session(workout_id)
