@@ -646,6 +646,11 @@ class Tectonic < Roda
         # all (#439). Blank stays null so "not said" remains distinguishable from a deliberate
         # two -- see Exercise.clean_dumbbell_count.
         dumbbell_count = Exercise.clean_dumbbell_count(r.params['dumbbell_count'])
+        # And how long it is rested, which is the one field here that makes a noise (#456).
+        # Named by the lifter, which is what lets the session timer ring on it: a countdown
+        # that rings unasked is the app interrupting a session, and #263 settled that the app
+        # does not decide how long anybody rests.
+        default_rest_seconds = Exercise.clean_rest_seconds(r.params['default_rest_seconds'])
         # icon_url is deliberately not read here. #199 took the field off the form -- every
         # library movement draws a shipped icon since #171, so the field was a way to point
         # every visitor's browser at a third party to override a working default. The column
@@ -667,11 +672,12 @@ class Tectonic < Roda
           @similar = Exercise.similar_to(@account_id, r.params['name'])
           if @similar.any? && r.params['new_exercise'].nil?
             @exercise = Exercise.new(name: r.params['name'], is_barbell:, default_is_per_side:,
-                                     note:, dumbbell_count:)
+                                     note:, dumbbell_count:, default_rest_seconds:)
             next view('exercises/new')
           end
           exercise_id = Exercise.insert(name: r.params['name'], account_id: @account_id,
-                                        is_barbell:, default_is_per_side:, note:, dumbbell_count:)
+                                        is_barbell:, default_is_per_side:, note:, dumbbell_count:,
+                                        default_rest_seconds:)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
@@ -686,7 +692,7 @@ class Tectonic < Roda
           was_per_side = @exercise.default_is_per_side
           was_dumbbells = @exercise.dumbbells
           @exercise.update(name: r.params['name'], is_barbell:, default_is_per_side:, note:,
-                           dumbbell_count:)
+                           dumbbell_count:, default_rest_seconds:)
           # Saying a movement is counted per side is a statement about the movement, not about
           # today, so the sets that were following the old answer follow the new one. Silently
           # would be wrong -- this rewrites logged training -- so the page says how many moved.
@@ -1448,14 +1454,34 @@ class Tectonic < Roda
   # the other's name would be the app passing its own measurement off as the programme's
   # instruction, or the reverse.
   #
-  # Nil for both is a real answer: a hand-logged session of a movement never trained before
-  # has no prescription and no history, and the bar offers the plain durations alone.
+  # Nil for all three is a real answer: a hand-logged session of a movement never trained
+  # before has no prescription and no history, and the bar offers the plain durations alone.
+  #
+  # **The movement's own rest sits between them** (#456), and counts as prescribed rather than
+  # as a third kind. The timer's rule for what may ring is "a length somebody named", and this
+  # one is named by the lifter on the movement's own page -- "I take three minutes on squats"
+  # is a statement about their training, made by them, in a form they filled in. That is the
+  # same kind of claim as a block writing five minutes between singles, and a different kind
+  # from a median the app worked out, which is the line the word is actually drawing.
+  #
+  # Below the block's own rest because a block is more specific than a movement: a week of
+  # heavy singles may want five minutes on the squat a lifter usually rests three for, and the
+  # session being run is the better answer to what this set wants.
+  #
+  # Read here rather than copied onto sets at generation, which is what makes it reach the
+  # sessions already written instead of only the ones written next.
   def rest_suggestion(set)
-    prescribed = set[:planned_rest_seconds]
+    prescribed = set[:planned_rest_seconds] || movement_rest(set[:exercise_id])
     return [prescribed, 'prescribed'] if prescribed
 
     measured = usual_turnaround(set[:exercise_id])
     measured ? [measured, 'usual'] : [nil, nil]
+  end
+
+  # The rest this movement is usually taken with, as its own page says. Off @exercises, which
+  # the session screen already loads keyed by id, so this asks the database nothing.
+  def movement_rest(exercise_id)
+    @exercises[exercise_id]&.default_rest_seconds
   end
 
   # The out-of-band element that tells the rest timer a set was just finished. Rendered on
