@@ -19,16 +19,21 @@
 
     **A prescribed rest is a length somebody named.** A block writing five minutes between
     singles counts down and rings without a second tap, because that number was written into
-    the programme by a person. The measured median never does: it sits on the bar as an offer
-    and takes a tap, because the app worked it out and #263 settled that the app does not
-    decide how long anybody rests.
+    the programme by a person -- and since #456 so does a rest the lifter set on the movement
+    itself, for the same reason. #263 settled that the app does not decide how long anybody
+    rests, and a length typed into a form is not the app deciding.
 
-    **The suggestion is the lifter's own median turnaround for that movement**, from
-    usual_turnaround in app.rb, and it is the only number here that claims anything. The
-    four beside it are plain durations wearing no advice -- they are not "for a heavy
+    **The suggestion is that rest and nothing else.** It used to fall back to the lifter's own
+    median turnaround, labelled "your usual", and that is gone. It was standing in for a
+    prescription in an app with no way to write one; #456 gave movements their own rest, and
+    once a lifter can say "three minutes on squats" the app describing their habit back to
+    them is a worse answer to the same question -- especially since the habit includes the
+    sessions they rushed.
+
+    The four beside it are plain durations wearing no advice -- they are not "for a heavy
     single" or "for accessories", because the app cannot see which this is and inventing the
-    distinction is exactly the guess #263 threw out. A movement with no history shows the
-    four alone rather than a made-up usual.
+    distinction is exactly the guess #263 threw out. A movement with no rest set shows the
+    four alone, which is now the honest state rather than a gap waiting for a median.
 
     Outside #session-body, with the RPE footer and for the same reason: a Done tap swaps a
     lift panel and the poll swaps every panel, so anything inside that region is replaced
@@ -76,14 +81,18 @@
         that is already reaching for it. %>
     <div data-rest-offer class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
       <%# The suggestion, filled in and unhidden by the script when the cue carries one. It
-          leads because it is the only number here that claims anything: either the rest the
-          programme wrote for this lift, or -- for a lift prescribing none -- the median of
-          this lifter's own turnarounds on the movement. The four beside it are just numbers.
+          leads because it is the only number here that claims anything: the rest somebody
+          named for this lift, from the block or from the movement. The four beside it are
+          just numbers.
 
-          Two labels and one button, because which one shows is a fact about the number and
-          not about the layout. Saying "your usual" over the programme's prescription, or
-          "prescribed" over a median the app worked out, would each be a claim the app is not
-          entitled to make.
+          Hidden entirely where there is no such rest. It used to fall back to the median of
+          this lifter's turnarounds, and #456 removed that -- so a movement with no rest set
+          shows the four plain durations and nothing claiming anything, which is the honest
+          state rather than a gap the app fills with a measurement.
+
+          A labelled lookup rather than a bare word, still, with one label where there were
+          two. Which label shows is a fact about the number and not about the layout, and the
+          spare kind is a span rather than a rewrite if a second one ever earns its place.
 
           Through button_style like every other button in the app, which is what #333 put
           there: the focus ring is sky-800 because a ring the colour of the button it sits on
@@ -99,8 +108,14 @@
               class="<%= button_style %> min-h-11 shrink-0 border border-sky-800 bg-sky-800
                      px-3 text-sm font-medium text-white hover:bg-sky-900">
         <span data-rest-suggested class="tabular-nums"></span>
+        <%# One label, where there were two. "your usual" went with the measured median when
+            #456 removed it: the app describing a lifter's habit back to them was standing in
+            for a prescription in an app that had no way to write one, and now there is one.
+
+            The label stays a lookup by kind rather than becoming a bare word, because the
+            script matches on it and the pair is what keeps the button and the countdown
+            agreeing about what may ring. A second kind would be a span, not a rewrite. %>
         <span data-rest-label="prescribed" hidden class="font-normal text-sky-100">prescribed</span>
-        <span data-rest-label="usual" hidden class="font-normal text-sky-100">your usual</span>
       </button>
       <%- [[60, '1:00'], [120, '2:00'], [180, '3:00'], [300, '5:00']].each do |seconds, label| %>
         <button type="button" data-rest-start="<%= seconds %>"

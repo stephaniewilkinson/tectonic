@@ -215,10 +215,19 @@ describe 'what the timer suggests' do
   end
 end
 
-# The fallback, for a lift prescribing nothing: a measurement, and labelled as one. It was the
-# whole of the suggestion before the prescription existed, and is still the right answer for a
-# hand-logged session and for the warmup rungs a block never prescribes a rest for.
-describe 'what the timer falls back to' do
+# There is no fallback any more, and that is the change #456 made.
+#
+# The timer used to offer the median of this lifter's own turnarounds where nothing was
+# prescribed, labelled "your usual". It was standing in for a prescription in an app that had
+# no way to write one -- and once a movement can carry its own rest, the app describing
+# somebody's habit back to them is a worse answer to the same question. The habit includes the
+# sessions they rushed: 632s, 9s and 343s between working bench sets average to a number
+# nobody should train to.
+#
+# `usual_turnaround` itself is untouched. The session time estimate (#408) still reads it for
+# every unlifted set, and how long a session will take is a question about the habit, which is
+# what a median is actually good for.
+describe 'what the timer no longer falls back to' do
   include Rack::Test::Methods
   include RouteOwnership
   include SessionTiming
@@ -230,19 +239,21 @@ describe 'what the timer falls back to' do
     @set_id = written_set(@workout_id, @exercise_id)
   end
 
-  it 'is the median of this lifter where nothing is prescribed' do
+  it 'suggests nothing from a history of turnarounds alone' do
     history(@account_id, @exercise_id, gaps: [120, 120])
     tap_done(@workout_id, @set_id)
 
-    assert_equal '120', cue[:suggested]
-    assert_equal 'usual', cue[:kind]
+    assert_empty cue[:suggested].to_s
+    assert_empty cue[:kind].to_s
   end
 
-  it 'takes the middle gap rather than the average, so one long break cannot move it' do
+  # The bar is not empty -- the four plain durations are still there, wearing no advice. What
+  # is gone is the app putting a number of its own at the front of them.
+  it 'still offers the plain durations to start from' do
     history(@account_id, @exercise_id, gaps: [60, 90, 600])
-    tap_done(@workout_id, @set_id)
+    get "/workouts/#{@workout_id}/session"
 
-    assert_equal '90', cue[:suggested]
+    assert_includes last_response.body, 'data-rest-start="180"'
   end
 end
 
@@ -266,11 +277,37 @@ describe 'saying where the number came from' do
     assert_equal 'prescribed', cue[:kind]
   end
 
-  it 'offers the usual label to a timer counting a median' do
+  # A rest the lifter set on the movement is prescribed too, and that is #456's whole
+  # argument: what earns the bell is that somebody named the length, and this one is named on
+  # a form by the person who has to rest for it.
+  it 'offers the prescribed label to a rest set on the movement' do
+    Tectonic::Exercise[@exercise_id].update(default_rest_seconds: 150)
+    tap_done(@workout_id, written_set(@workout_id, @exercise_id))
+
+    assert_equal 'prescribed', cue[:kind]
+    assert_equal '150', cue[:suggested]
+  end
+end
+
+# What it now declines to claim, which after #456 is everything it has not been told.
+describe 'what the bar says nothing about' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionTiming
+  include RestTimer
+
+  before do
+    @account_id = login
+    @workout_id, @exercise_id = scratch_workout(@account_id)
+  end
+
+  # A history of turnarounds no longer produces a label, because it no longer produces a
+  # number.
+  it 'claims nothing from a measured history' do
     history(@account_id, @exercise_id, gaps: [90, 90])
     tap_done(@workout_id, written_set(@workout_id, @exercise_id))
 
-    assert_equal 'usual', cue[:kind]
+    assert_empty cue[:kind].to_s
   end
 
   it 'claims neither where it has nothing to suggest' do
@@ -281,21 +318,28 @@ describe 'saying where the number came from' do
   end
 end
 
-# Both labels are rendered and the script shows whichever the cue names, so both have to be
-# on the page for either to appear.
-describe 'the two words the bar can say' do
+# One word now, where there were two. The script looks the label up by the kind the cue names,
+# so the label has to be on the page for it to appear -- and "your usual" went with the median
+# it described.
+describe 'the word the bar can say' do
   include Rack::Test::Methods
   include RouteOwnership
   include SessionTiming
   include RestTimer
 
-  it 'carries both for the script to choose between' do
+  before do
     account_id = login
     workout_id, = scratch_workout(account_id)
     get "/workouts/#{workout_id}/session"
+  end
 
+  it 'carries the one the script chooses' do
     assert_includes last_response.body, 'data-rest-label="prescribed"'
-    assert_includes last_response.body, 'data-rest-label="usual"'
+  end
+
+  it 'no longer carries the one for a number the app worked out' do
+    refute_includes last_response.body, 'data-rest-label="usual"'
+    refute_includes last_response.body, 'your usual'
   end
 end
 

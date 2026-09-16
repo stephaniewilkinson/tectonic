@@ -1444,25 +1444,28 @@ class Tectonic < Roda
 
   # What the timer should count, and where the number came from. #281.
   #
-  # The prescription wins. A block writing five singles at 90% means five minutes between
-  # them, and defaulting that to whatever this lifter happened to average -- including the
-  # sessions where they rushed it -- makes the timer describe the habit rather than the
-  # instruction. The measured median is the fallback, not the default.
+  # **A rest somebody named, or nothing.** The block's own rest wins, then the movement's; a
+  # set with neither offers the plain durations and no suggestion at all.
   #
-  # The kind travels with the number because the button has to say which it is. "5:00
-  # prescribed" and "3:10 your usual" are different claims, and a timer showing one under
-  # the other's name would be the app passing its own measurement off as the programme's
-  # instruction, or the reverse.
+  # The measured median used to sit underneath as a third answer, labelled "your usual", and
+  # it is gone. It was standing in for a prescription in an app that had no way to write one
+  # -- #456 gave movements their own rest, and once a lifter can say "three minutes on squats"
+  # the app describing their habit back to them is a worse answer to the same question. It also
+  # described the habit including the sessions where they rushed it: the 632s, 9s and 343s
+  # between working bench sets on 2026-09-01 average to a number nobody should train to.
   #
-  # Nil for all three is a real answer: a hand-logged session of a movement never trained
-  # before has no prescription and no history, and the bar offers the plain durations alone.
+  # `usual_turnaround` is untouched, because the timer was never its only caller: the session
+  # time estimate (#408) reads it for every unlifted set on the page, and how long a session
+  # will take is a question about the habit, which is exactly what a median is good for.
   #
-  # **The movement's own rest sits between them** (#456), and counts as prescribed rather than
-  # as a third kind. The timer's rule for what may ring is "a length somebody named", and this
-  # one is named by the lifter on the movement's own page -- "I take three minutes on squats"
-  # is a statement about their training, made by them, in a form they filled in. That is the
-  # same kind of claim as a block writing five minutes between singles, and a different kind
-  # from a median the app worked out, which is the line the word is actually drawing.
+  # The kind still travels with the number, because a suggestion that ring itself has to say
+  # it came from the programme rather than from the app. There is only one kind now, and
+  # keeping the pair means the button and the timer go on agreeing about what may ring.
+  #
+  # **The movement's rest counts as prescribed** (#456) rather than as a kind of its own. The
+  # rule for what may ring is "a length somebody named", and this one is named by the lifter on
+  # the movement's own page. That is the same sort of claim as a block writing five minutes
+  # between singles, and it was the median that was the different sort.
   #
   # Below the block's own rest because a block is more specific than a movement: a week of
   # heavy singles may want five minutes on the squat a lifter usually rests three for, and the
@@ -1472,10 +1475,7 @@ class Tectonic < Roda
   # sessions already written instead of only the ones written next.
   def rest_suggestion(set)
     prescribed = set[:planned_rest_seconds] || movement_rest(set[:exercise_id])
-    return [prescribed, 'prescribed'] if prescribed
-
-    measured = usual_turnaround(set[:exercise_id])
-    measured ? [measured, 'usual'] : [nil, nil]
+    prescribed ? [prescribed, 'prescribed'] : [nil, nil]
   end
 
   # The rest this movement is usually taken with, as its own page says. Off @exercises, which
