@@ -267,14 +267,18 @@ describe 'the home page' do
   end
 end
 
-describe 'an entry with only its colour showing' do
+describe 'what an entry says' do
   include Rack::Test::Methods
   include CalendarData
 
-  # Seven columns at phone width leave no room for the word, so below sm the tint is the
-  # whole of what is drawn. The word has to survive somewhere a screen reader still finds
-  # it: the title attribute this replaced was never reachable by a thumb, and deleting the
-  # word outright would leave the link with nothing to be announced as but its href.
+  # It used to say nothing at all below sm, on the reasoning that seven columns at phone
+  # width leave no room for the word. #492 is the screenshot of what that produces: five rows
+  # of empty coloured boxes, which reads as a page that failed to render rather than as a
+  # deliberate minimum. The text is drawn at every width now and truncates where it must.
+  #
+  # The word has to survive somewhere a screen reader still finds it either way: the title
+  # attribute this replaced was never reachable by a thumb, and deleting the word outright
+  # would leave the link with nothing to be announced as but its href.
   #
   # Two spans rather than one since #143. The chip shows a session's name where it has one,
   # so what is read and what is drawn are no longer the same string, and the visible half is
@@ -296,8 +300,25 @@ describe 'an entry with only its colour showing' do
 
     get '/'
 
-    assert_includes last_response.body,
-                    '<span class="hidden truncate sm:inline" aria-hidden="true">trained</span>'
+    assert_includes last_response.body, '<span class="truncate" aria-hidden="true">trained</span>'
+  end
+
+  # The bug itself, as a property rather than as a class list: nothing on this chip may be
+  # hidden at a width somebody actually holds. #492.
+  it 'draws it on a phone and not only on a desktop' do
+    sign_in
+    a_workout(on: Date.today, lifted: true)
+
+    get '/'
+
+    # The visible span's own classes, split into utilities. Matching on the chip as a string
+    # is not enough: `aria-hidden="true"` contains the word, so a substring check passes for
+    # the wrong reason and would go on passing if `hidden` came back.
+    chip = last_response.body[%r{<a href="/workouts/\d+".*?</a>}m]
+    drawn = chip[/<span class="([^"]*)" aria-hidden/, 1].to_s.split
+
+    refute_includes drawn, 'hidden'
+    refute_includes drawn, 'sm:inline'
   end
 end
 

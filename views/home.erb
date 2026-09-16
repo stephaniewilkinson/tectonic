@@ -88,14 +88,27 @@
               with. Skipped is the one a list cannot show: a missed session is simply
               absent there, and seeing the hole is the point of a calendar.
 
-              "planned" is forty-six pixels of text at text-xs, and a seventh of a phone
-              screen does not leave that much inside a cell -- at 375px it leaves about
-              thirty -- so below sm the tint is the whole of what is drawn and the legend
-              underneath is the key to it. The word stays in the markup rather than being
-              dropped: sr-only keeps it in the accessibility tree at every width, which
-              the title attribute it replaces could not do, because a title has no way of
-              being reached by a thumb. Nothing else is inside the link on a phone, so
-              min-h-11 is what holds it open to a thumb. %>
+              This used to draw nothing but the tint below sm, on the reasoning that
+              "planned" is forty-six pixels at text-xs and a seventh of a phone leaves about
+              thirty. #492 is the screenshot of what that produces: five rows of empty
+              coloured boxes, which reads as a page that failed to render rather than as a
+              deliberate minimum. The legend underneath is a key to a code nobody can tell
+              is a code.
+
+              The measurement was also pessimistic. A 390px phone gives a column of about
+              fifty-five and roughly forty-seven inside the padding, and the text drawn here
+              is the session's own label rather than the status word -- "Squat", "Bench",
+              "Ride", "Deadlift" -- which is four to eight characters and the more useful
+              half besides. The tint already says trained or planned or missed; what a cell
+              could not say is *which session*, and that is the thing worth the pixels.
+
+              Truncate rather than hide, so "Accessories" becomes a word ending in an
+              ellipsis instead of nothing at all. A truncated word is still a word somebody
+              can recognise; an empty box is not.
+
+              sr-only keeps the full "trained, Squat" in the accessibility tree at every
+              width, which the title attribute it replaces could not do -- a title has no
+              way of being reached by a thumb. min-h-11 holds the link open to one. %>
           <%# A cell holding two sessions drew the same word twice with nothing between
               them, which is #143: the morning lift and the evening walk both read
               "performed". Where a session has a name, or a program day whose focus can
@@ -108,7 +121,7 @@
                class="mt-1 flex min-h-11 items-center justify-center rounded px-1 text-xs
                       font-medium sm:min-h-6 <%= entry[:style] %>">
               <span class="sr-only"><%= [entry[:word], entry[:label]].compact.join(', ') %></span>
-              <span class="hidden truncate sm:inline" aria-hidden="true"><%= entry[:label] || entry[:word] %></span>
+              <span class="truncate" aria-hidden="true"><%= entry[:label] || entry[:word] %></span>
             </a>
           <%- end %>
         </td>
