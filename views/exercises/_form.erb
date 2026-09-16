@@ -71,6 +71,48 @@
         two controls are independent, and a field that appears and disappears as another is
         ticked is worse to use than one line of text that does not apply. The label says which
         movements it is about. %>
+    <%# The rest this movement is taken with, and the one thing on this form that makes a
+        noise. #456.
+
+        The session screen has been able to count a rest down and ring since #281 and #395,
+        and it has never done it for anybody: it rings on a rest the programme prescribes, and
+        nothing had ever prescribed one -- 126 program lifts, not one rest. The block editor
+        that could have set them was removed in #411, so the only way to ask for a bell was to
+        ask an assistant, lift by lift.
+
+        Named by the lifter here, which is what earns the bell. A countdown that rings unasked
+        is the app interrupting a session, and #263 settled that the app does not decide how
+        long anybody rests -- so a number the app picked could not ring, and this one can,
+        because somebody typed it.
+
+        Blank is the ordinary answer and stays the default: most movements want no bell, and
+        the timer goes on offering the lifter's own median with a tap, exactly as before. %>
+    <div class="mt-4">
+      <label for="default_rest_seconds" class="block text-sm font-medium leading-6 text-gray-900">
+        Rest between sets
+      </label>
+      <p class="mt-1 text-sm text-gray-500">
+        The session screen counts this down after you tick a set off, and rings when it is up.
+        Leave it blank for no bell &mdash; the timer still offers however long you usually take.
+      </p>
+      <div class="mt-2 flex items-center gap-2">
+        <input type="number" id="default_rest_seconds" name="default_rest_seconds"
+               min="5" max="1800" step="5" autocomplete="off"
+               value="<%= @exercise&.default_rest_seconds %>"
+               class="<%= field_style %> w-28 py-1.5 text-gray-900">
+        <span class="text-sm text-gray-500">seconds</span>
+      </div>
+      <%# Said back in the units a person thinks in, through the same phrasing the session
+          screen and the turnaround readings use -- "180 seconds" and "3m" are the same fact,
+          and two spellings of it in one app is one too many. %>
+      <%- if @exercise&.default_rest_seconds %>
+        <p class="mt-1 text-sm text-gray-500">
+          That is
+          <span class="font-semibold text-gray-900"><%= Tectonic::Timing.phrase(@exercise.default_rest_seconds) %></span>
+          between sets.
+        </p>
+      <%- end %>
+    </div>
     <div class="mt-4">
       <label for="dumbbell_count" class="block text-sm font-medium leading-6 text-gray-900">Dumbbells</label>
       <p class="mt-1 text-sm text-gray-500">
