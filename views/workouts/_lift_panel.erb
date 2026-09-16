@@ -396,6 +396,37 @@
 
         The target is #lift-panels rather than this panel: a swap can merge two panels into
         one, and every position after it shifts. %>
+    <%# One more set of this movement. #496.
+
+        The screenshot on that issue is the last lift of a session with both sets done and
+        nowhere to put a third. "Add a set" has existed since the beginning on the workout
+        record and the set list, which are two pages away from the one a lifter is holding --
+        so deciding to do another set meant leaving the session, adding it, and coming back.
+
+        A plain button rather than a form of fields, because the numbers are already on the
+        screen: the new set copies the last one of this movement, and anything different is
+        corrected with the revision box the panel already carries. One tap, then one edit if
+        it was not the same, instead of five fields with chalk on.
+
+        Always offered, unlike the swap above it, which hides once every set is lifted. A
+        finished lift is exactly when a lifter decides to do one more, and #364's argument for
+        hiding the swap -- that lifted sets record what happened and must not move -- says
+        nothing about adding a new one beside them.
+
+        Targets #lift-panels rather than this panel: the progress header counts every set in
+        the session, and adding one changes the count and the estimate above it. %>
+    <form action="/workouts/<%= @workout[:id] %>/session/add" method="post"
+          hx-post="/workouts/<%= @workout[:id] %>/session/add"
+          hx-target="#lift-panels" hx-swap="innerHTML" class="mt-2">
+      <%== csrf_tag("/workouts/#{@workout[:id]}/session/add") %>
+      <input type="hidden" name="exercise_id" value="<%= lift.first[:exercise_id] %>">
+      <button type="submit"
+              aria-label="Add another set of <%= @exercises[lift.first[:exercise_id]]&.name %>"
+              class="<%= button_style %> min-h-11 w-full border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+        Add a set
+      </button>
+    </form>
+
     <%- unless unlifted(lift).empty? %>
       <details class="group mt-2">
         <summary class="flex min-h-11 cursor-pointer items-center text-xs text-gray-500"><%== render('_chevron') %>Lifted a different movement</summary>
