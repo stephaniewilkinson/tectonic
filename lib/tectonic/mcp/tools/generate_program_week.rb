@@ -43,7 +43,10 @@ class Tectonic < Roda
 
         def self.payload(program, week, workouts, lengths)
           { program_id: program.id, week: week.number,
-            time_budget_minutes: program.time_budget_minutes,
+            # The budget in force, which is the block's where it has one and otherwise the
+            # lifter's own (#446). A reader comparing estimated_minutes against this wants the
+            # number the warning was judged by, not the column it happened to come from.
+            time_budget_minutes: program.budget_minutes,
             workouts: workouts.map { |workout| Presenter.view_workout(workout) },
             estimated_minutes: lengths.transform_values(&:minutes) }
         end
@@ -73,20 +76,21 @@ class Tectonic < Roda
         # movement, cut a set, or accept the ninety -- and the app's job is to make the
         # arithmetic visible before the lifter finds it out by running out of time.
         def self.budget_sentence(program, lengths)
-          return '' unless program.time_budget_minutes
+          budget = program.budget_minutes
+          return '' unless budget
 
-          over = lengths.values.select { |estimate| estimate.minutes > program.time_budget_minutes }
+          over = lengths.values.select { |estimate| estimate.minutes > budget }
           return '' if over.empty?
 
-          " #{overshoot(program, over)}"
+          " #{overshoot(budget, over)}"
         end
 
-        def self.overshoot(program, over)
+        def self.overshoot(budget, over)
           worst = over.max_by(&:minutes)
           days = over.length == 1 ? 'One session' : "#{over.length} sessions"
           "#{days} in this week #{over.length == 1 ? 'runs' : 'run'} past the " \
-            "#{program.time_budget_minutes} minute budget -- the longest is about " \
-            "#{worst.minutes} minutes, #{worst.minutes - program.time_budget_minutes} over."
+            "#{budget} minute budget -- the longest is about " \
+            "#{worst.minutes} minutes, #{worst.minutes - budget} over."
         end
 
         # Without a week number this means "the week we are in", which is what a lifter

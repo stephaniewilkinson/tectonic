@@ -490,6 +490,28 @@ class Tectonic < Roda
         r.redirect '/settings'
       end
 
+      # How long a session should take. #446.
+      #
+      # The column has lived on `programs` since 032 and no block ever carried one, so the
+      # warning at generation and the comparison in SessionLength were built and never ran.
+      # #458 is why that is a wrong-object problem rather than a missing screen: it asks for no
+      # CRUD interface and names the exception -- "one number per movement and one editable
+      # field" -- which is exactly this.
+      #
+      # "I have an hour to train" is a fact about a lifter's week rather than about a block. It
+      # is the same next block and the one after, and asking it again on every block written is
+      # how it comes to be asked never. The block keeps its own column and still wins where it
+      # says something, because a peaking block really can be longer.
+      #
+      # Refused by name rather than clamped, the same way the zone below is: a check constraint
+      # refusing the write raises, and an unrescued Sequel exception reaches a person as a 500
+      # rather than as a refusal. Blank clears it, which is how the warning is turned off.
+      r.post 'budget' do
+        check_csrf!
+        DB[:accounts].where(id: @account_id).update(time_budget_minutes: clean_budget(r.params['minutes']))
+        r.redirect '/settings'
+      end
+
       # Where this account is, which decides what day it is for them (#349). Refused by name
       # rather than written and ignored: a zone nothing can resolve would be stored happily
       # and then read as UTC by every caller, which is the failure this exists to end.
@@ -562,6 +584,7 @@ class Tectonic < Roda
         # to Rodauth. `to_i` floors anything else to zero, so a hand-typed value can say
         # nothing worse than nothing.
         @rerounded = r.params['rerounded'].to_i
+        @time_budget_minutes = DB[:accounts].where(id: @account_id).get(:time_budget_minutes)
         @week_starts_on = week_starts_on(@account_id)
         @equipment = Equipment.for_account(@account_id)
         @time_zone = Clock.zone_of(@account_id)
@@ -1847,6 +1870,22 @@ class Tectonic < Roda
   # the denominator, which BigDecimal, Float, Integer and Rational all answer.
   def weight_label(weight)
     weight && Plates.numeric(weight)
+  end
+
+  # A session-length budget off a form, or nothing. #446.
+  #
+  # The range is Bounds::BUDGET_MINUTES, which the MCP tools already hold this to -- the two
+  # describe the same quantity and a bound that differed between them is a bound somebody
+  # eventually crosses.
+  #
+  # Out of range becomes nil rather than being clamped, on the same terms as the per-movement
+  # rest: clamping 600 to 300 would store a number nobody typed and then judge every session
+  # against it. Blank is how the warning is turned off and stays sayable.
+  def clean_budget(raw)
+    minutes = raw.to_s.strip
+    return nil if minutes.empty?
+
+    MCP::Tools::Bounds::BUDGET_MINUTES.cover?(minutes.to_i) ? minutes.to_i : nil
   end
 
   # What a rack actually builds, said back to the lifter. #439.
