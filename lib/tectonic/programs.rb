@@ -19,6 +19,30 @@ class Tectonic < Roda
       program_weeks_dataset.count
     end
 
+    # How long a session of this block should take: what the block says, else what the lifter
+    # said once on their settings page. #446.
+    #
+    # The column on `programs` has existed since 032 and no block has ever carried one, so the
+    # whole budget feature -- the warning at generation, the comparison in SessionLength --
+    # was built and never ran. #458 is why that is a wrong-object problem rather than a missing
+    # screen: it asks for no CRUD interface and names the exception, "one number per movement
+    # and one editable field".
+    #
+    # Everything else on this row is a decision belonging to its block and changing between
+    # blocks -- preferred_reps, is_ascending, start_date. A time budget is not. "I have an hour
+    # to train" is a fact about a lifter's week, the same next block and the one after, and
+    # asking it again on every block written is how it comes to be asked never.
+    #
+    # The block still wins where it says something, because a peaking block really can be
+    # longer than an ordinary week and that *is* a fact about that block. What changes is that
+    # a block saying nothing inherits an answer rather than disabling the check.
+    #
+    # Read here rather than at the call sites, so the two readers -- the warning and the
+    # session estimate -- cannot come to different conclusions about whose hour it is.
+    def budget_minutes
+      time_budget_minutes || DB[:accounts].where(id: account_id).get(:time_budget_minutes)
+    end
+
     def week(number)
       program_weeks_dataset.where(number:).first
     end

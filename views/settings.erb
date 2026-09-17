@@ -82,6 +82,41 @@
     <button type="submit" class="<%= button_style %> mt-3 bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Save</button>
   </form>
 
+  <%# How long you have to train. #446.
+
+      The column has lived on `programs` since 032 and no block ever carried one, so the
+      warning at generation and the comparison in SessionLength were built and never ran. The
+      first reading was that the block editor removed in #411 took the only way to set it, and
+      that is not quite right: #458 asks for no *CRUD* interface and names the exception, "one
+      number per movement and one editable field". This is that.
+
+      It sits here rather than on a block because it is a fact about a week rather than about a
+      programme. It will be the same next block and the one after, and asking again on every
+      block written is how it comes to be asked never -- which is exactly what happened.
+
+      A block can still say otherwise and wins where it does, because a peaking week really can
+      be longer. What changes is that a block saying nothing inherits an answer instead of
+      switching the check off. %>
+  <h2 class="mt-8 text-xl font-semibold text-gray-900">Session length</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    How long you have for a session. When a week is generated, any day estimated to run past
+    this is named along with how far over it is. Leave it blank for no warning.
+  </p>
+
+  <form method="post" action="/settings/budget" class="mt-4">
+    <%== csrf_tag('/settings/budget') %>
+    <label for="minutes" class="block text-sm font-medium text-gray-900">Time for a session</label>
+    <div class="mt-1 flex items-center gap-2">
+      <input type="number" id="minutes" name="minutes" min="10" max="300" step="5" autocomplete="off"
+             value="<%= @time_budget_minutes %>"
+             class="<%= field_style %> w-28 py-1.5 text-gray-900">
+      <span class="text-sm text-gray-500">minutes</span>
+    </div>
+    <button type="submit"
+            class="<%= button_style %> mt-4 min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold
+                   text-gray-900 hover:bg-lime-600">Save</button>
+  </form>
+
   <h2 class="mt-10 text-xl font-semibold text-gray-900">Equipment</h2>
   <p class="mt-2 text-sm text-gray-600">
     What you lift with. Every weight the app works out &mdash; warmups, working sets, the
