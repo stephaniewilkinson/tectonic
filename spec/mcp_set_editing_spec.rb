@@ -332,11 +332,15 @@ describe 'per side, overridden and confirmed' do
     refute tool_result['structuredContent']['is_per_side']
   end
 
+  # "95x10 reps per side" since #502. A confirmation a model can read 2x out is not a
+  # confirmation: with nothing between the count and the qualifier, "per side" postmodifies
+  # the whole phrase and leaves the 95 open to the same reading -- which on a pair of
+  # dumbbells is half true, the stored weight being one dumbbell's.
   it 'says so in the sentence it confirms with, not only in the payload' do
     call_tool('create_set', raw: @token.raw,
                             arguments: { exercise: 'Single-Leg Hip Thrust', reps: 10, weight: 95, is_per_side: true })
 
-    assert_includes tool_result.dig('content', 0, 'text'), '95x10 per side'
+    assert_includes tool_result.dig('content', 0, 'text'), '95x10 reps per side'
   end
 end
 

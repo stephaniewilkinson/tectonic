@@ -453,10 +453,21 @@ class Tectonic < Roda
         # "commanded" is appended on the same argument as "per side" and #311 adds it in both
         # places at once: the session screen's `load_label` builds the identical phrase, so a
         # set described by the app and by an assistant reading it back says the same thing.
+        # The count names its unit where "per side" follows it, which is #502 and which the
+        # session screen does in the same breath. "40x8 per side" leaves the qualifier
+        # postmodifying the whole phrase, so a model reading it back has no way to tell
+        # whether the 40 is per side too -- and on a pair of dumbbells it half is, the stored
+        # weight being one dumbbell's. Confirming a write in a phrase that can be read 2x out
+        # is the mismatch this method exists to prevent.
         def load_phrase(set)
           return "#{set.reps} reps#{per_side(set)}#{commanded(set)}" unless Load.carried?(set.weight)
 
-          "#{weight(set.weight)}x#{set.reps}#{per_side(set)}#{commanded(set)}"
+          "#{weight(set.weight)}x#{counted(set)}#{per_side(set)}#{commanded(set)}"
+        end
+
+        # The count as it reads with a qualifier behind it. #502.
+        def counted(set)
+          set.is_per_side ? "#{set.reps} reps" : set.reps.to_s
         end
 
         # The words get_workout's quantity_label already uses, so one session cannot be

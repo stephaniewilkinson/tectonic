@@ -73,6 +73,17 @@
                   <%= plate_label(set) %>
                 </span>
               <%- end %>
+              <%# What the load on a dumbbell row is the weight of. #502. The same slot and
+                  the same register as the plate math beside it, because it answers the same
+                  question -- what do I pick up -- for the rack the plate math cannot speak
+                  for. Silent unless the movement has said how many it is done with; see
+                  dumbbell_label. %>
+              <%- if (dumbbells = dumbbell_label(set)) %>
+                <span class="ml-2 text-xs text-gray-500">
+                  <span class="uppercase tracking-wide">Dumbbells</span>
+                  <%= dumbbells %>
+                </span>
+              <%- end %>
               <%# How the room is set up for this lift. #412.
 
                   Its own line under the load rather than another clause on it, which is where
@@ -194,6 +205,15 @@
                 <div class="text-xs text-gray-500">
                   <span class="uppercase tracking-wide">Plate math</span>
                   <%= plate_label(set) %>
+                </div>
+              <%- end %>
+              <%# And the same on a working set as on the warmups above, for the reason the
+                  plate math is: the two are loaded off one rack and the line that says how
+                  is not allowed to be a different thing in the two places. #502. %>
+              <%- if (dumbbells = dumbbell_label(set)) %>
+                <div class="text-xs text-gray-500">
+                  <span class="uppercase tracking-wide">Dumbbells</span>
+                  <%= dumbbells %>
                 </div>
               <%- end %>
               <%# What the block asked this set to feel like (#265), under the load and above

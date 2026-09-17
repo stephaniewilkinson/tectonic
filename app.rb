@@ -1786,6 +1786,33 @@ class Tectonic < Roda
     "lighter than your #{weight_label(equipment.bar_weight)} lb bar"
   end
 
+  # What the number on a dumbbell row is the weight *of*. #502.
+  #
+  # A stored dumbbell weight is one dumbbell: `dumbbell_totals` stands the handle where a bar
+  # stands and loads both its ends, so a movement done with a pair is two of that number in
+  # hand. The row never said so, which left "39 lb × 8 per side" to be read as the pair, as
+  # one hand, or as a total divided between the legs -- three readings, two of them wrong by
+  # exactly 2x, and nothing on the screen to settle it.
+  #
+  # Only where the movement has been *told* how many. `is_barbell` being false is not the
+  # same claim as "this is a dumbbell" -- a cable stack, a machine and a weighted pull-up are
+  # all on that side of the line -- and "two dumbbells" on a lat pulldown would be a new wrong
+  # answer in place of a silence. An unanswered movement is assumed to be a pair for the plate
+  # math (Equipment::DEFAULT_DUMBBELLS) and stays quiet here, because an assumption made to
+  # keep a prescription loadable is not a fact to read back to the lifter at the rack.
+  #
+  # Said on a single too, though "one at 39 lb" looks like it adds nothing: it is the answer
+  # to the same question, and a line that appears only on pairs would leave every single-arm
+  # row ambiguous in precisely the way this is here to fix.
+  def dumbbell_label(set)
+    return nil if set[:is_barbell] || !loaded?(set[:weight])
+
+    count = @exercises[set[:exercise_id]]&.dumbbell_count
+    return nil unless count
+
+    "#{count == 1 ? 'one' : 'two'} at #{weight_label(set[:weight])} lb"
+  end
+
   # A yes-or-no fact about a set, as a box that is ticked or left empty. Three screens
   # show the same two facts -- the workout record and the set list in a pair of columns,
   # the set detail in a definition list -- and each had answered in a vocabulary of its
@@ -1920,10 +1947,18 @@ class Tectonic < Roda
 
   # What a set counts. Seconds read as a duration rather than as a rep count, because
   # "60 reps" of a plank is not what anybody held.
+  #
+  # The count says "reps" out loud where something follows it, which is #502. "per side" at
+  # the end of "39 lb × 8" postmodifies the whole phrase, so it reads as the weight being
+  # per side as well as the count -- and on a pair of dumbbells that misreading is *nearly*
+  # right, which is what makes it hard to catch: 39 lb really is what one hand holds, and
+  # the pair is 78. Naming the unit binds the qualifier to the number it belongs to, and
+  # every number in the phrase then wears one: lb on the load, reps on the count.
   def quantity_label(set)
     return "#{set[:duration_seconds]}s" if set[:duration_seconds]
+    return "#{set[:reps]} reps" if set[:is_per_side] || !loaded?(set[:weight])
 
-    loaded?(set[:weight]) ? set[:reps].to_s : "#{set[:reps]} reps"
+    set[:reps].to_s
   end
 
   # The heaviest a lift was taken on each day it was recorded, oldest day first, which
