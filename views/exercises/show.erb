@@ -241,6 +241,28 @@
                                   text-gray-900 hover:bg-lime-600">Save</button>
   </form>
 
+  <%# Sets that count their reps the other way from the movement itself. #392.
+
+      Amber, which is the colour this app warns in and nothing else (#214), and this has
+      earned it: every set here is contributing half the work it did to every volume figure
+      on the site, silently, and has been since it was written.
+
+      Not a button. The repair that runs when a movement's answer *changes* can tell a stale
+      set from a deliberate one, because it has the old answer to compare against. A standing
+      one has no such discriminator, and somebody who really did both legs at once on a
+      machine is entitled to have said so. So this says what is true and leaves the correction
+      a decision -- the set editor and update_set both make it, one set at a time. %>
+  <%- if (adrift = per_side_disagreement(@exercise)).positive? %>
+    <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+      <strong><%= adrift %> completed <%= adrift == 1 ? 'set counts' : 'sets count' %></strong>
+      <%= @exercise.default_is_per_side ? 'both sides together' : 'per side' %>, where this
+      movement says <%= @exercise.default_is_per_side ? 'per side' : 'both sides together' %>.
+      Volume reads <%= @exercise.default_is_per_side ? 'half' : 'twice' %> the work for
+      <%= adrift == 1 ? 'it' : 'them' %> until <%= adrift == 1 ? 'it is' : 'they are' %>
+      corrected, which is done a set at a time from the set page.
+    </p>
+  <%- end %>
+
   <%# How long you rest on this movement. #456.
       Here rather than only on the edit form, and for the training max's reason: the edit form
       is owner-only and has to be, because a name or a note written to a library row is one
