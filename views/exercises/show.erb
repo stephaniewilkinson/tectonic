@@ -52,6 +52,37 @@
     <p class="mt-4 whitespace-pre-line text-sm text-gray-700"><%= @exercise.note %></p>
   <%- end %>
 
+  <%# What the app is assuming about this movement, and what the assumption costs. #439.
+
+      Here rather than on the session row, and the difference is who is being interrupted. The
+      row is read one-handed between sets and must carry what this set is; this is a setup
+      question, read once, and the page it is answered on is one tap away.
+
+      Not amber. Nothing has gone wrong and nothing has been rewritten -- the default is the
+      cautious one and every weight it has prescribed is loadable. What is worth saying is that
+      the cautious answer has a ceiling, and that a movement sitting on that ceiling looks
+      exactly like a movement that has stopped progressing.
+
+      Both ranges, because the gap between them is the whole argument and neither number means
+      much alone. %>
+  <%- if (assumed = unanswered_dumbbells(@exercise)) %>
+    <p class="mt-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+      Nothing has said how many dumbbells this movement is done with, so the app assumes
+      <strong>two</strong> &mdash; the cautious answer, since anything a pair can load a single
+      can load too. On your rack a pair reaches <strong><%= assumed[:pair] %></strong> and one
+      reaches <strong><%= assumed[:one] %></strong>, so nothing above
+      <strong><%= assumed[:ceiling] %> lb</strong> can be prescribed here until you say.
+      <%# The link only where it would work. A library movement belongs to everybody, so the
+          edit route refuses it -- and a page that says "say how many" to somebody who cannot
+          is worse than one that reports the ceiling and stops. The fact is true either way,
+          which is why the sentence above is not also gated. %>
+      <%- if @exercise.account_id == @account_id %>
+        <a href="/exercises/<%= @exercise[:id] %>/edit" class="font-semibold text-sky-800 underline">Say how many</a>
+        if that is not right.
+      <%- end %>
+    </p>
+  <%- end %>
+
   <%# The number a percentage of this movement resolves against, and a box to state it.
       #264.
 

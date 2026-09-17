@@ -1945,6 +1945,49 @@ class Tectonic < Roda
       pair: loadable_range(equipment.dumbbell_totals(2)) }
   end
 
+  # What assuming a pair costs a movement nobody has said the count for. #439.
+  #
+  # `dumbbell_count` shipped with a deliberate default -- two, because every weight loadable
+  # on a pair is loadable on a single, so an unanswered movement comes out a little light
+  # rather than impossible. That is still the right way to break the tie, and it is also
+  # silent, and on a real rack the silence has a ceiling: a 4 lb handle with pairs of 10, 5
+  # and 2.5 reaches 79 lb as a single and stops at 39 as a pair, every size having to go on
+  # both ends of both handles.
+  #
+  # So a movement parked at the top of that shelf is not necessarily at the lifter's limit.
+  # It may be at the top of a range that exists only because a question went unanswered --
+  # which is invisible from the session screen, where the prescription simply stops moving.
+  #
+  # Reported rather than guessed at. Which hand the dumbbell is in is a fact only the lifter
+  # has, and the app's job is to make the cost of not saying visible, not to pick (#263).
+  #
+  # Nothing to say for a fixed rack: `dumbbell_totals` is empty there, both counts fall back
+  # to the same assumed increment, and answering would move no weight at all.
+  #
+  # And nothing to say until the ceiling is actually reached, which is what keeps this from
+  # being a prompt on every movement that is not on a bar. `is_barbell` being false is not the
+  # same claim as "this is a dumbbell" -- a cable stack, a machine and a weighted pull-up are
+  # all on that side of the line, and there are 29 such movements on one account here. Asking
+  # a lat pulldown how many dumbbells it takes is the same kind of wrong answer the session row
+  # refuses to give, and it would bury the one page where the question matters.
+  #
+  # Reaching the top of the pair's shelf is the signal, because it is the moment the assumption
+  # starts costing something. Below it both answers prescribe the same weights and the question
+  # is idle; at it, the number stops moving and looks from the session screen exactly like a
+  # movement that has stopped progressing.
+  #
+  # Off @sets, which the route has already loaded, so this costs no query.
+  def unanswered_dumbbells(exercise)
+    return nil unless exercise.unanswered_dumbbells?
+    return nil unless (ranges = dumbbell_ranges(equipment))
+
+    ceiling = equipment.dumbbell_totals(2).max
+    heaviest = @sets.filter_map { |set| set[:weight] }.max
+    return nil unless heaviest && heaviest >= ceiling
+
+    ranges.merge(ceiling: weight_label(ceiling))
+  end
+
   # What a set counts. Seconds read as a duration rather than as a rep count, because
   # "60 reps" of a plank is not what anybody held.
   #
