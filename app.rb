@@ -30,6 +30,7 @@ require_relative 'lib/tectonic/program_generator'
 require_relative 'lib/tectonic/rack_change'
 require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/goal'
+require_relative 'lib/tectonic/rests'
 require_relative 'lib/tectonic/progress_chart'
 require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
@@ -673,7 +674,11 @@ class Tectonic < Roda
         # Named by the lifter, which is what lets the session timer ring on it: a countdown
         # that rings unasked is the app interrupting a session, and #263 settled that the app
         # does not decide how long anybody rests.
-        default_rest_seconds = Exercise.clean_rest_seconds(r.params['default_rest_seconds'])
+        #
+        # Written after the row rather than with it since 039, because it no longer lives on
+        # the row: a rest is a fact about the lifter and the movement together, so a library
+        # Back Squat can carry one per account instead of none at all.
+        rest = r.params['default_rest_seconds']
         # icon_url is deliberately not read here. #199 took the field off the form -- every
         # library movement draws a shipped icon since #171, so the field was a way to point
         # every visitor's browser at a third party to override a working default. The column
@@ -695,12 +700,16 @@ class Tectonic < Roda
           @similar = Exercise.similar_to(@account_id, r.params['name'])
           if @similar.any? && r.params['new_exercise'].nil?
             @exercise = Exercise.new(name: r.params['name'], is_barbell:, default_is_per_side:,
-                                     note:, dumbbell_count:, default_rest_seconds:)
+                                     note:, dumbbell_count:)
+            # The typed rest survives the round trip through the confirmation, which the row
+            # above no longer carries it for. Losing it would make confirming a near-duplicate
+            # silently drop the one field on this form that makes a noise.
+            @rest = Rest.clean(rest)
             next view('exercises/new')
           end
           exercise_id = Exercise.insert(name: r.params['name'], account_id: @account_id,
-                                        is_barbell:, default_is_per_side:, note:, dumbbell_count:,
-                                        default_rest_seconds:)
+                                        is_barbell:, default_is_per_side:, note:, dumbbell_count:)
+          Rest.replace(@account_id, exercise_id, rest)
           r.redirect "/exercises/#{exercise_id}/"
         else
           # Only the owner may update; library rows (nil account) and other
@@ -715,7 +724,8 @@ class Tectonic < Roda
           was_per_side = @exercise.default_is_per_side
           was_dumbbells = @exercise.dumbbells
           @exercise.update(name: r.params['name'], is_barbell:, default_is_per_side:, note:,
-                           dumbbell_count:, default_rest_seconds:)
+                           dumbbell_count:)
+          Rest.replace(@account_id, @exercise.id, rest)
           # Saying a movement is counted per side is a statement about the movement, not about
           # today, so the sets that were following the old answer follow the new one. Silently
           # would be wrong -- this rewrites logged training -- so the page says how many moved.
@@ -744,6 +754,10 @@ class Tectonic < Roda
         r.get('edit') do
           # Editing is owner-only; library and others' rows fall back to show.
           r.redirect "/exercises/#{@exercise.id}/" unless @exercise.account_id == @account_id
+          # The rest is no longer on the row, so the form has to be handed it (039). Owner-only
+          # here, which is fine: a library movement has no edit page and answers the same
+          # question through its own page's field instead.
+          @rest = Rest.for(account_id: @account_id, exercise_id: @exercise.id)
           view('exercises/edit')
         end
         # The max this account takes percentages of, stated rather than derived. #264.
@@ -761,6 +775,25 @@ class Tectonic < Roda
           check_csrf!
           TrainingMax.replace(@account_id, @exercise.id, r.params['pounds'],
                               train_at: r.params['train_at_percent'])
+          r.redirect "/exercises/#{@exercise.id}/"
+        end
+        # How long you rest on this movement. #456, and here for the training max's reason
+        # rather than on the edit form.
+        #
+        # The edit form is `Exercise.owned_by` and has to be: a name, a note and a barbell flag
+        # written to a library row are one account's answers on everybody's page. A rest is not
+        # that kind of fact. It is a fact about the lifter *and* the movement, so 039 keyed it
+        # on the pair the way 020 keyed the training max, and it is private by construction.
+        #
+        # Which is what makes this route the whole of the fix. Nine of the movements the
+        # reporting account trains are library rows -- Back Squat and Bench Press among them --
+        # and the owner-only form meant the bell could be switched on for accessories and never
+        # for the lifts where three minutes matters.
+        #
+        # Blank clears, which is the way back from having named a rest. See Rest.replace.
+        r.post 'rest' do
+          check_csrf!
+          Rest.replace(@account_id, @exercise.id, r.params['seconds'])
           r.redirect "/exercises/#{@exercise.id}/"
         end
         # What you are aiming at on this movement, and when by. #308.
@@ -799,6 +832,9 @@ class Tectonic < Roda
           # What this movement is aiming at, if anything (#308). Nil is a state the page has
           # to say something different about rather than a number to default.
           @goal = Goal.for(account_id: @account_id, exercise_id: @exercise.id)
+          # And how long this lifter rests on it, which since 039 is a fact about the pair
+          # rather than about the movement -- so a library Back Squat can carry one. #456.
+          @rest = Rest.for(account_id: @account_id, exercise_id: @exercise.id)
           # Everything that belongs on one axis for this lift: what was lifted, what each
           # block opened at, what the sessions imply, the goal, and the even-pace line to it
           # (#434). Built here rather than in the template because it asks the database
@@ -824,6 +860,8 @@ class Tectonic < Roda
         # nobody typed for movements nobody has trained. The stated one is the standing
         # instruction and the thing worth correcting by hand after a good session.
         @stated_maxes = DB[:account_training_maxes].where(account_id: @account_id).to_hash(:exercise_id)
+        # And the rests, on the same terms and in the same one query. #456.
+        @rests = Rest.all_for(@account_id)
         view 'exercises/index'
       end
     end
@@ -1527,10 +1565,14 @@ class Tectonic < Roda
     prescribed ? [prescribed, 'prescribed'] : [nil, nil]
   end
 
-  # The rest this movement is usually taken with, as its own page says. Off @exercises, which
-  # the session screen already loads keyed by id, so this asks the database nothing.
+  # The rest this lifter takes on this movement, as its own page says.
+  #
+  # Off @rests since 039, which the session route loads in one query beside @exercises, so a
+  # dozen set rows still ask the database nothing. It moved off the movement because a library
+  # Back Squat sits on every account's page and could therefore hold nobody's rest -- see
+  # lib/tectonic/rests.rb.
   def movement_rest(exercise_id)
-    @exercises[exercise_id]&.default_rest_seconds
+    @rests[exercise_id]
   end
 
   # The out-of-band element that tells the rest timer a set was just finished. Rendered on
@@ -1660,6 +1702,10 @@ class Tectonic < Roda
   def load_session(workout_id)
     @sets = WorkoutSet.where(workout_id:).order(:id).all
     @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+    # The rests this lifter has named, in one query beside the movements, on the same argument
+    # #234 makes for loading those once: a set row asks for its rest and a session has a dozen
+    # of them. Keyed by movement, which is what movement_rest reads (#456, 039).
+    @rests = Rest.all_for(@account_id)
     # Both memos below are answers *about* @sets, so they are wrong the moment it is
     # reloaded. A tap loads the session again after applying itself, and an estimate left
     # over from before would still be counting the set that was just ticked off (#408).

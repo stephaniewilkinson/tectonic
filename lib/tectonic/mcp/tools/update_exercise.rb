@@ -3,6 +3,7 @@
 require_relative '../tool'
 require_relative 'support'
 require_relative '../../rack_change'
+require_relative '../../rests'
 
 class Tectonic < Roda
   module MCP
@@ -32,10 +33,14 @@ class Tectonic < Roda
                     'dumbbell_count is 1 or 2 and decides which weights exist for the ' \
                     'movement at all, since every plate size has to go on both ends of ' \
                     'every handle in use; null means nobody has said, and the app then ' \
-                    'assumes two. Send only what changes; send note as null or an empty ' \
-                    'string to clear it. Movements from the shared library belong to no ' \
-                    'account and cannot be edited here. Returns what actually moved, and ' \
-                    'says so when a change rewrote logged sets or upcoming sessions.'
+                    'assumes two. default_rest_seconds is what the session timer counts down ' \
+                    'and rings at after a set of this movement is ticked off; it is yours ' \
+                    'alone, so it can be set on a shared library movement as well as your ' \
+                    'own. Send only what changes; send note as null or an empty string to ' \
+                    'clear it. Everything other than the rest belongs to the movement itself, ' \
+                    'so on a shared library movement only the rest can be set. Returns what ' \
+                    'actually moved, and says so when a change rewrote logged sets or ' \
+                    'upcoming sessions.'
         scope :write
         input_schema(
           type: 'object',
@@ -49,12 +54,43 @@ class Tectonic < Roda
         )
 
         def self.perform(context:, arguments:)
-          exercise = own(context, arguments[:exercise_id])
-          was = { per_side: exercise.default_is_per_side, dumbbells: exercise.dumbbells }
-          changed = Changes.apply(exercise, fields(arguments))
-          reached = reached(context, exercise.refresh, was)
+          exercise = visible(context, arguments[:exercise_id])
+          changed, reached = apply(context, exercise, arguments)
           ok("#{exercise.name}: #{Changes.describe(changed)}.#{reach_sentence(reached)}",
              structured: Presenter.view_exercise(exercise).merge(note: exercise.note, changed:, **reached))
+        end
+
+        # The edit itself: the columns on the row, then the rest beside it, then whatever the
+        # pair of them reached. Read `was` before the columns move, because it is the *change*
+        # that has to reach the sets and afterwards there is nothing left to compare against.
+        def self.apply(context, exercise, arguments)
+          attributes = fields(arguments)
+          refuse_unless_owned(context, exercise) unless attributes.empty?
+          was = { per_side: exercise.default_is_per_side, dumbbells: exercise.dumbbells }
+          changed = Changes.apply(exercise, attributes).merge(rest_change(context, exercise, arguments))
+          [changed, reached(context, exercise.refresh, was)]
+        end
+
+        # The rest, which is not a column on this row and has not been since 039.
+        #
+        # It is keyed on (account, movement) the way the training max is, for the reason 020
+        # gives: a library movement sits on every account's page, so a rest stored on the row
+        # would be one lifter's bell ringing at everybody. Keyed on the pair it is private by
+        # construction -- which is why this one field is settable on a library movement while
+        # the name, the note and the shape beside it are not.
+        #
+        # Shaped like a Changes record so the sentence and the payload read the same for it as
+        # for every other field, and silent where the value did not move, on Changes.apply's
+        # own rule: a field set to what it already held is not a change.
+        def self.rest_change(context, exercise, arguments)
+          return {} unless arguments.key?(:default_rest_seconds)
+
+          from = Rest.for(account_id: context.account_id, exercise_id: exercise.id)
+          to = Rest.clean(arguments[:default_rest_seconds])
+          return {} if from == to
+
+          Rest.replace(context.account_id, exercise.id, arguments[:default_rest_seconds])
+          { default_rest_seconds: { from:, to: } }
         end
 
         # What an edit here reaches beyond the row it edits, which is what makes two of these
@@ -105,24 +141,34 @@ class Tectonic < Roda
           said.empty? ? '' : " #{said.join(', ')}."
         end
 
-        # The row, scoped to what the account owns rather than to what it can see. The
-        # two differ by exactly the shared library, and that difference is the whole
-        # ownership question: a library movement is on every account's page, so an edit
-        # to one is an edit to what every other account reads.
-        def self.own(context, id)
-          Exercise.owned_by(context.account_id).where(id:).first || (raise Tool::Refusal, why(context, id))
+        # The row, scoped to what the account can see, which since 039 is where this has to
+        # start. The rest is keyed on (account, movement) and so is settable on a library
+        # movement; everything else on the row is not. Resolving by ownership first would
+        # refuse the whole call before the difference could be drawn.
+        #
+        # Refusing rather than returning nil, because a model handed a silent nil reports a
+        # successful edit that touched nothing.
+        def self.visible(context, id)
+          context.exercises.where(id:).first ||
+            (raise Tool::Refusal, "No exercise with id #{id.inspect} on this account.")
         end
 
-        # Refusing rather than returning nil, because a model handed a silent nil reports
-        # a successful edit that touched nothing. Which kind of no it was is worth saying:
-        # an assistant told "no such exercise" about a library movement it can plainly see
-        # in list_exercises will conclude the id was wrong and try the same thing again.
-        def self.why(context, id)
-          shared = context.exercises.where(id:).first
-          return "No exercise with id #{id.inspect} on this account." unless shared&.library?
+        # The columns on the row are owner-only and have to be: a library movement is on every
+        # account's page, so a name or a note written to one is what every other account then
+        # reads. The rest is exempt because it is not stored there.
+        #
+        # The refusal says what *is* possible, which is the difference between a model trying
+        # something else and a model trying the same call again. An assistant told only "cannot
+        # be edited" about Back Squat will not discover that the bell it was asked to set is
+        # the one field it could have set.
+        def self.refuse_unless_owned(context, exercise)
+          return if exercise.account_id == context.account_id
 
-          "'#{shared.name}' comes from the shared library, so it belongs to no account and cannot be " \
-            'edited. Create a movement of your own under a name of its own and edit that instead.'
+          raise Tool::Refusal,
+                "'#{exercise.name}' comes from the shared library, so it belongs to no account and its " \
+                'name, note, icon and shape cannot be edited -- they would be one account\'s answers on ' \
+                "everybody's page. Its rest is yours alone and can be set here on its own. For anything " \
+                'else, create a movement of your own under a name of its own and edit that instead.'
         end
 
         # The columns an edit may set, and only the ones the caller actually sent. A
@@ -139,10 +185,11 @@ class Tectonic < Roda
         # And the four that go through a cleaner, which is the same cleaner the browser form
         # posts into -- so a value set by a person and one set by an assistant are cleaned by
         # one rule rather than by two that can drift.
+        # default_rest_seconds is deliberately absent: since 039 it is not a column on this row
+        # but a row of its own keyed on (account, movement), written by rest_change above.
         CLEANED = { name: ->(raw) { clean_name(raw) },
                     note: ->(raw) { Exercise.clean_note(raw) },
-                    dumbbell_count: ->(raw) { Exercise.clean_dumbbell_count(raw) },
-                    default_rest_seconds: ->(raw) { Exercise.clean_rest_seconds(raw) } }.freeze
+                    dumbbell_count: ->(raw) { Exercise.clean_dumbbell_count(raw) } }.freeze
 
         def self.fields(arguments)
           cleaned = CLEANED.filter_map do |field, clean|

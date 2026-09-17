@@ -48,6 +48,11 @@
       <input type="hidden" name="name" value="<%= @exercise&.name %>">
       <input type="hidden" name="note" value="<%= @exercise&.note %>">
       <input type="hidden" name="dumbbell_count" value="<%= @exercise&.dumbbell_count %>">
+      <%# The rest travels too, which it did not before 039 -- it was read off @exercise and
+          the unsaved row here never carried it, so confirming a near-duplicate silently
+          dropped the one field on this form that makes a noise. @rest is what the route kept
+          from the post that raised the question. %>
+      <input type="hidden" name="default_rest_seconds" value="<%= @rest %>">
       <%- if @exercise&.is_barbell %>
         <input type="hidden" name="is_barbell" value="1">
       <%- end %>

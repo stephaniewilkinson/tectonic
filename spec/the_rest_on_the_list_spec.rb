@@ -16,9 +16,12 @@ require 'securerandom'
 # on any list showed the question was there to answer, which is the same argument #411 made for
 # putting the training max on this page.
 module RestColumn
+  # Beside the movement rather than on it since 039, where a rest is keyed on the pair so a
+  # library Back Squat can carry one.
   def an_exercise(account_id, rest: nil)
-    Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}",
-                              is_barbell: true, default_rest_seconds: rest)
+    exercise = Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}", is_barbell: true)
+    Tectonic::Rest.replace(account_id, exercise.id, rest) if rest
+    exercise
   end
 
   def index

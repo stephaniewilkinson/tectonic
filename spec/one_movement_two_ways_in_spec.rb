@@ -58,11 +58,13 @@ describe 'the three fields the form had and the tool did not' do
     assert stored(exercise, :default_is_per_side)
   end
 
+  # Read through Rest rather than off the row: 039 moved it onto (account, movement), so a
+  # library Back Squat can carry one. See the_bell_belongs_to_the_lifter_spec.
   it 'sets how long the movement is rested' do
     exercise = a_movement(@token.account_id)
     edit(@token.raw, exercise, default_rest_seconds: 180)
 
-    assert_equal 180, stored(exercise, :default_rest_seconds)
+    assert_equal 180, Tectonic::Rest.for(account_id: @token.account_id, exercise_id: exercise.id)
   end
 end
 
@@ -80,17 +82,18 @@ describe 'a value the column would refuse' do
     exercise = a_movement(@token.account_id)
     edit(@token.raw, exercise, default_rest_seconds: 9000)
 
-    assert_nil stored(exercise, :default_rest_seconds)
+    assert_nil Tectonic::Rest.for(account_id: @token.account_id, exercise_id: exercise.id)
   end
 
   # A missing key means "leave it" where a key holding null means "clear it". Renaming a
   # movement must not wipe the three fields the caller said nothing about.
   it 'leaves a field the caller did not mention' do
-    exercise = a_movement(@token.account_id, dumbbell_count: 1, default_rest_seconds: 120)
+    exercise = a_movement(@token.account_id, dumbbell_count: 1)
+    Tectonic::Rest.replace(@token.account_id, exercise.id, 120)
     edit(@token.raw, exercise, name: "Renamed #{SecureRandom.hex(4)}")
 
     assert_equal 1, stored(exercise, :dumbbell_count)
-    assert_equal 120, stored(exercise, :default_rest_seconds)
+    assert_equal 120, Tectonic::Rest.for(account_id: @token.account_id, exercise_id: exercise.id)
   end
 end
 
