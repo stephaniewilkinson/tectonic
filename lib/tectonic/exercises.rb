@@ -136,23 +136,11 @@ class Tectonic < Roda
       [1, 2].include?(count) ? count : nil
     end
 
-    # How long this movement is rested, off a form. #456.
-    #
-    # Blank stays null, because null is the ordinary answer: most movements want no bell, and
-    # the timer goes on offering the lifter's own median with a tap.
-    #
-    # Out of range becomes null too rather than being clamped. The check constraint would
-    # refuse the write and surface as a 500 on a Save button, and clamping 9000 to 1800 would
-    # store a number nobody typed and then ring at them for half an hour of it. Refusing to
-    # record a nonsense rest is the smaller lie than inventing a sensible one.
-    REST = (5..1800)
-
-    def self.clean_rest_seconds(raw)
-      seconds = raw.to_s.strip
-      return nil if seconds.empty?
-
-      REST.cover?(seconds.to_i) ? seconds.to_i : nil
-    end
+    # `clean_rest_seconds` was here and is now `Rest.clean` (039). A rest stopped being a
+    # column on this row when it turned out a library movement -- which is every barbell lift
+    # the reporting account trains -- could not carry one, so the cleaner moved to where the
+    # value lives. Left as a note rather than deleted silently, because a stray caller finding
+    # nothing here should find out where it went.
 
     # The best estimated max an account's completed sets of this movement support as of a
     # date, or nil while nothing has been lifted that the chart can read. Answering as of

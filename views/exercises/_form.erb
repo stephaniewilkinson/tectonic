@@ -96,19 +96,22 @@
         Leave it blank for no bell &mdash; the timer still offers however long you usually take.
       </p>
       <div class="mt-2 flex items-center gap-2">
+        <%# @rest rather than a column on the movement since 039: a rest is a fact about the
+            lifter and the movement together, keyed on the pair the way the training max is, so
+            that a library Back Squat can carry one per account instead of none at all. %>
         <input type="number" id="default_rest_seconds" name="default_rest_seconds"
                min="5" max="1800" step="5" autocomplete="off"
-               value="<%= @exercise&.default_rest_seconds %>"
+               value="<%= @rest %>"
                class="<%= field_style %> w-28 py-1.5 text-gray-900">
         <span class="text-sm text-gray-500">seconds</span>
       </div>
       <%# Said back in the units a person thinks in, through the same phrasing the session
           screen and the turnaround readings use -- "180 seconds" and "3m" are the same fact,
           and two spellings of it in one app is one too many. %>
-      <%- if @exercise&.default_rest_seconds %>
+      <%- if @rest %>
         <p class="mt-1 text-sm text-gray-500">
           That is
-          <span class="font-semibold text-gray-900"><%= Tectonic::Timing.phrase(@exercise.default_rest_seconds) %></span>
+          <span class="font-semibold text-gray-900"><%= Tectonic::Timing.phrase(@rest) %></span>
           between sets.
         </p>
       <%- end %>

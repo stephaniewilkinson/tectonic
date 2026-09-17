@@ -22,9 +22,13 @@ require 'date'
 # decide how long anybody rests -- so a constant picked in the code could not ring, and a
 # number the lifter typed on the movement's page can.
 module RingingRest
+  # The rest is written beside the movement rather than onto it since 039: it is keyed on
+  # (account, movement) so a library Back Squat can carry one, which is the whole of why the
+  # bell could be switched on for accessories and never for the lifts that need it.
   def a_movement(account_id, rest: nil)
-    Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}",
-                              is_barbell: true, default_rest_seconds: rest)
+    exercise = Tectonic::Exercise.create(account_id:, name: "Squat #{SecureRandom.hex(4)}", is_barbell: true)
+    Tectonic::Rest.replace(account_id, exercise.id, rest) if rest
+    exercise
   end
 
   # A session with one working set, *not* ticked off -- because the thing under test is the
@@ -107,7 +111,7 @@ describe 'setting a rest on the movement page' do
   it 'records it' do
     save('180')
 
-    assert_equal 180, @exercise.refresh.default_rest_seconds
+    assert_equal 180, Tectonic::Rest.for(account_id: @account_id, exercise_id: @exercise.id)
   end
 
   # Blank is the ordinary answer and has to stay sayable: it is how a bell is turned off.
@@ -115,7 +119,7 @@ describe 'setting a rest on the movement page' do
     save('180')
     save('')
 
-    assert_nil @exercise.refresh.default_rest_seconds
+    assert_nil Tectonic::Rest.for(account_id: @account_id, exercise_id: @exercise.id)
   end
 end
 
@@ -141,13 +145,13 @@ describe 'a rest nobody takes' do
   it 'is refused rather than clamped when it is too long' do
     save('9000')
 
-    assert_nil @exercise.refresh.default_rest_seconds
+    assert_nil Tectonic::Rest.for(account_id: @account_id, exercise_id: @exercise.id)
   end
 
   it 'is refused when it is too short to be a rest' do
     save('2')
 
-    assert_nil @exercise.refresh.default_rest_seconds
+    assert_nil Tectonic::Rest.for(account_id: @account_id, exercise_id: @exercise.id)
   end
 end
 

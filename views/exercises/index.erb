@@ -60,9 +60,9 @@
                     movement's own page both say it -- "180 seconds" and "3m" are the same
                     fact, and two spellings of it in one app is one too many. %>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
-                  <%- if exercise.default_rest_seconds %>
+                  <%- if (rest = @rests[exercise[:id]]) %>
                     <span class="font-medium tabular-nums text-gray-900">
-                      <%= Tectonic::Timing.phrase(exercise.default_rest_seconds) %>
+                      <%= Tectonic::Timing.phrase(rest) %>
                     </span>
                   <%- else %>
                     <span class="text-gray-400">&mdash;</span>

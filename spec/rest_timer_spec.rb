@@ -281,7 +281,7 @@ describe 'saying where the number came from' do
   # argument: what earns the bell is that somebody named the length, and this one is named on
   # a form by the person who has to rest for it.
   it 'offers the prescribed label to a rest set on the movement' do
-    Tectonic::Exercise[@exercise_id].update(default_rest_seconds: 150)
+    Tectonic::Rest.replace(@account_id, @exercise_id, 150)
     tap_done(@workout_id, written_set(@workout_id, @exercise_id))
 
     assert_equal 'prescribed', cue[:kind]

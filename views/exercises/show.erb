@@ -241,6 +241,41 @@
                                   text-gray-900 hover:bg-lime-600">Save</button>
   </form>
 
+  <%# How long you rest on this movement. #456.
+      Here rather than only on the edit form, and for the training max's reason: the edit form
+      is owner-only and has to be, because a name or a note written to a library row is one
+      account's answer on everybody's page. A rest is not that kind of fact -- 039 keys it on
+      (account, movement) the way 020 keys the max -- so it belongs on the page every movement
+      has rather than on the one only your own movements have.
+
+      That is the whole of the fix rather than a convenience. Nine of the movements in this
+      block are library rows, Back Squat and Bench Press among them, and while this field lived
+      on the edit form the bell could be switched on for accessories and never for the lifts
+      where three minutes actually matters. %>
+  <h2 class="mt-8 text-xl font-semibold text-gray-900">Rest between sets</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    <%- if @rest %>
+      The session screen counts <strong><%= Tectonic::Timing.phrase(@rest) %></strong> down after
+      you tick a set of this off, and rings when it is up. Clear the box for no bell.
+    <%- else %>
+      Nothing set, so no bell rings after a set of this. Name a length and the session screen
+      counts it down from the moment you tick a set off &mdash; the app will not pick one for
+      you, because a countdown that rings unasked is it deciding how long you rest.
+    <%- end %>
+  </p>
+
+  <form method="post" action="/exercises/<%= @exercise[:id] %>/rest" class="mt-3 flex items-end gap-2">
+    <%== csrf_tag("/exercises/#{@exercise[:id]}/rest") %>
+    <label class="text-xs text-gray-500" for="rest-seconds">
+      Seconds
+      <input type="number" name="seconds" id="rest-seconds" min="5" max="1800" step="5" autocomplete="off"
+             value="<%= @rest %>" placeholder="s"
+             class="<%= field_style %> mt-1 block min-h-11 w-28 px-2 text-base text-gray-900">
+    </label>
+    <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                  text-gray-900 hover:bg-lime-600">Save</button>
+  </form>
+
   <%# What you are aiming at, and when by. #308.
 
       One paragraph below the training max, because the goal is a target for that number and
