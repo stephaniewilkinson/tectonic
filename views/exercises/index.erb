@@ -25,6 +25,15 @@
                   the handful that are a standing instruction. The movement's own page still
                   shows the derived one, where there is room to say which kind it is. %>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Training max</th>
+              <%# The rest, on the same argument as the training max beside it. #456.
+                  The bell, the countdown and the column it counts to have all existed since
+                  #281 and #395, and the bell has never rung for anybody: not one movement and
+                  not one of 126 program lifts carries a rest. The app deliberately will not
+                  invent one -- a countdown that rings unasked is the app deciding how long
+                  somebody rests -- so the only way it ever rings is if a lifter names a
+                  length, and nothing on any list showed that the question was there to answer.
+                  A column of dashes is what makes an unanswered question look unanswered. %>
+              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Rest</th>
               <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Source</th>
             </tr>
           </thead>
@@ -43,6 +52,18 @@
                     <span class="font-medium tabular-nums text-gray-900"><%= weight_label(stated[:pounds]) %></span>
                     <span class="text-gray-500">lb</span>
                     <div class="text-xs text-gray-500">set <%= stated[:stated_at].strftime('%-d %b') %></div>
+                  <%- else %>
+                    <span class="text-gray-400">&mdash;</span>
+                  <%- end %>
+                </td>
+                <%# Said through Timing.phrase, which is how the session screen and the
+                    movement's own page both say it -- "180 seconds" and "3m" are the same
+                    fact, and two spellings of it in one app is one too many. %>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                  <%- if exercise.default_rest_seconds %>
+                    <span class="font-medium tabular-nums text-gray-900">
+                      <%= Tectonic::Timing.phrase(exercise.default_rest_seconds) %>
+                    </span>
                   <%- else %>
                     <span class="text-gray-400">&mdash;</span>
                   <%- end %>
