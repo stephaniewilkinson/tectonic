@@ -33,16 +33,35 @@ module CeilingNobodyAskedFor
   # keeps -- a nil account is how the seeded library is spelled, so the cleaner cannot tell a
   # spec's stray from the real thing. It is recorded here and taken out again in an after hook
   # rather than left to accumulate until test_isolation_spec notices.
-  def a_movement(account_id, weight:, is_barbell: false, dumbbell_count: nil, owned: true)
-    exercise_id = DB[:exercises].insert(name: "Single-Leg DB RDL #{SecureRandom.hex(4)}",
-                                        account_id: (account_id if owned),
-                                        is_barbell:, dumbbell_count:)
-    (@library_rows ||= []) << exercise_id unless owned
-    workout_id = own_workout(account_id)
-    DB[:sets].insert(workout_id:, exercise_id:, weight:, reps: 8, is_barbell:,
-                     is_warmup: false, is_completed: true)
+  # `planned_weight` is what decides it, not `weight`: it is the generator's own handwriting,
+  # set on a row this app wrote and nil on one a person typed. `prescribed: false` is the
+  # hand-logged movement, which must stay silent however heavy it is.
+  def a_movement(account_id, weight:, prescribed: true, **movement)
+    shown(account_id, weight:, prescribed:, movement: { owned: true, is_barbell: false, **movement })
+  end
+
+  # Its own helper rather than another keyword at the call site, and the one case it serves is
+  # the whole of why the note is gated on `is_barbell`: a bar is not loaded off that shelf.
+  def a_barbell_movement(account_id, weight:)
+    a_movement(account_id, weight:, is_barbell: true)
+  end
+
+  def shown(account_id, weight:, prescribed:, movement:)
+    exercise_id = a_row(account_id, movement)
+    DB[:sets].insert(workout_id: own_workout(account_id), exercise_id:, weight:, reps: 8,
+                     is_barbell: movement[:is_barbell], planned_weight: (weight if prescribed),
+                     planned_reps: (8 if prescribed), is_warmup: false, is_completed: true)
     get "/exercises/#{exercise_id}/"
     last_response.body.dup.force_encoding(Encoding::UTF_8)
+  end
+
+  def a_row(account_id, movement)
+    exercise_id = DB[:exercises].insert(name: "Single-Leg DB RDL #{SecureRandom.hex(4)}",
+                                        account_id: (account_id if movement[:owned]),
+                                        is_barbell: movement[:is_barbell],
+                                        dumbbell_count: movement[:dumbbell_count])
+    (@library_rows ||= []) << exercise_id unless movement[:owned]
+    exercise_id
   end
 
   def remove_library_rows
@@ -109,7 +128,18 @@ describe 'a movement the assumption is not costing anything' do
   end
 
   it 'is quiet about a barbell, which is not loaded off that shelf at all' do
-    refute_includes a_movement(@account_id, weight: 225, is_barbell: true), 'assumes'
+    refute_includes a_barbell_movement(@account_id, weight: 225), 'assumes'
+  end
+
+  # The lat pulldown, which is what this predicate was first got wrong. A machine is on the
+  # wrong side of `is_barbell` like every cable, and the reporting account has one carrying 85
+  # lb across twelve hand-logged sets -- no generated set, no program lift anywhere. Telling it
+  # nothing above 39 lb can be prescribed is true only in the sense that nothing is prescribed
+  # for it at all, which makes it noise on a page where the question cannot arise.
+  it 'is quiet about a movement nothing has ever prescribed, however heavy' do
+    body = a_movement(@account_id, weight: 85, prescribed: false)
+
+    refute_includes body, 'assumes'
   end
 end
 
