@@ -111,7 +111,7 @@
       <%- if @rest %>
         <p class="mt-1 text-sm text-gray-500">
           That is
-          <span class="font-semibold text-gray-900"><%= Tectonic::Timing.phrase(@rest) %></span>
+          <span class="font-semibold text-gray-900"><%= Tectonic::Timing.named(@rest) %></span>
           between sets.
         </p>
       <%- end %>

@@ -56,13 +56,18 @@
                     <span class="text-gray-400">&mdash;</span>
                   <%- end %>
                 </td>
-                <%# Said through Timing.phrase, which is how the session screen and the
-                    movement's own page both say it -- "180 seconds" and "3m" are the same
-                    fact, and two spellings of it in one app is one too many. %>
+                <%# Said through Timing.named, which is how the movement's own page and its
+                    edit form both say it -- "180 seconds" and "3m" are the same fact, and two
+                    spellings of it in one app is one too many.
+
+                    `named` rather than `phrase`: this is a length a lifter typed, and phrase
+                    drops the seconds above two minutes, so a rest of 150 read back as "2m" --
+                    which is what 120 reads as too. Right for a measured turnaround, wrong for
+                    somebody's own words. %>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
                   <%- if (rest = @rests[exercise[:id]]) %>
                     <span class="font-medium tabular-nums text-gray-900">
-                      <%= Tectonic::Timing.phrase(rest) %>
+                      <%= Tectonic::Timing.named(rest) %>
                     </span>
                   <%- else %>
                     <span class="text-gray-400">&mdash;</span>
