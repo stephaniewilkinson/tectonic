@@ -229,3 +229,41 @@ describe 'spelling a duration' do
   end
 end
 
+# A duration somebody named, which is a different question from one the app measured.
+#
+# `phrase` drops the seconds above two minutes and is right to: nobody reads a turnaround of
+# 2930 seconds as anything but "48m". A named rest is not that number. 150 is something a
+# lifter typed meaning two and a half minutes, and "2m" is both not what they said and exactly
+# what 120 says -- which they could equally have typed and did not.
+#
+# The timer has always counted the stored value, so nothing ever rang at the wrong moment. Only
+# the label was coarse, in the one place the number is a person's own words.
+describe 'spelling a duration somebody named' do
+  it 'keeps the seconds a round minute would lose' do
+    assert_equal '2m 30s', Tectonic::Timing.named(150)
+    assert_equal '4m 45s', Tectonic::Timing.named(285)
+  end
+
+  # The case that prompted it: two rests a lifter can tell apart must not read the same.
+  it 'tells two rests apart that phrase collapsed into one' do
+    refute_equal Tectonic::Timing.named(120), Tectonic::Timing.named(150)
+  end
+
+  # A whole number of minutes reads exactly as it did, which is most rests.
+  it 'says a whole minute as a whole minute' do
+    assert_equal '3m', Tectonic::Timing.named(180)
+    assert_equal '1h 12m', Tectonic::Timing.named(4320)
+  end
+
+  # And under two minutes it agrees with phrase outright, for phrase's own reason: minutes
+  # there would round away the whole of the difference.
+  it 'gives seconds under two minutes, as phrase does' do
+    assert_equal '90s', Tectonic::Timing.named(90)
+    assert_equal Tectonic::Timing.phrase(119), Tectonic::Timing.named(119)
+  end
+
+  it 'says nothing about nothing' do
+    assert_nil Tectonic::Timing.named(nil)
+  end
+end
+

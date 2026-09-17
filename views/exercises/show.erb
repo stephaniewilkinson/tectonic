@@ -255,7 +255,7 @@
   <h2 class="mt-8 text-xl font-semibold text-gray-900">Rest between sets</h2>
   <p class="mt-2 text-sm text-gray-600">
     <%- if @rest %>
-      The session screen counts <strong><%= Tectonic::Timing.phrase(@rest) %></strong> down after
+      The session screen counts <strong><%= Tectonic::Timing.named(@rest) %></strong> down after
       you tick a set of this off, and rings when it is up. Clear the box for no bell.
     <%- else %>
       Nothing set, so no bell rings after a set of this. Name a length and the session screen

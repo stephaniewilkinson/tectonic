@@ -220,6 +220,30 @@ class Tectonic < Roda
       "#{minutes / 60}h #{minutes % 60}m"
     end
 
+    # A duration somebody *named*, which is a different question from one the app measured.
+    #
+    # `phrase` above drops the seconds over two minutes and is right to. A turnaround of 2930
+    # seconds reads as "48m" because nobody cares whether it was 48 or 49, and a seconds figure
+    # ticking on a session header is a distraction from the sets.
+    #
+    # A named rest is not that number. 150 is something a lifter typed, meaning two and a half
+    # minutes, and rendering it "2m" says something they did not say -- worse, it says exactly
+    # what 120 says, which they could equally have typed and did not. The timer has always
+    # counted the stored value, so nothing rang wrongly; only the label was coarse, and it was
+    # coarse in the one place the number is a person's own words rather than a measurement.
+    #
+    # Under two minutes it agrees with `phrase` outright: a named 90 is "90s" for the reason a
+    # measured one is, since minutes there would round away the whole of the difference.
+    def named(seconds)
+      return nil if seconds.nil?
+      return "#{seconds}s" if seconds < 120
+
+      remainder = seconds % 60
+      return phrase(seconds) if remainder.zero?
+
+      "#{phrase(seconds - remainder)} #{remainder}s"
+    end
+
     # finished_at off a model or a plain row, since the readers here are handed both.
     def finished_at(workout)
       workout.is_a?(Hash) ? workout[:finished_at] : workout.finished_at
