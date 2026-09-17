@@ -1976,14 +1976,26 @@ class Tectonic < Roda
   # is idle; at it, the number stops moving and looks from the session screen exactly like a
   # movement that has stopped progressing.
   #
+  # **Measured on what was prescribed rather than on what was lifted**, which is the correction
+  # this needed. Read off `weight` it fired on a lat pulldown carrying 85 lb -- a machine, on
+  # the wrong side of `is_barbell` like every cable, with twelve hand-logged sets, *no* generated
+  # sets and no program lift anywhere. Telling it nothing above 39 lb can be prescribed is true
+  # only in the sense that nothing is prescribed for it at all, which makes it noise on a page
+  # where the question cannot arise.
+  #
+  # `planned_weight` is the generator's own handwriting: it is set on a row this app wrote and
+  # nil on one a person typed. So the note now appears exactly where the ceiling is binding on
+  # something the app is actually choosing a number for, and stays quiet on the movements a
+  # lifter only records.
+  #
   # Off @sets, which the route has already loaded, so this costs no query.
   def unanswered_dumbbells(exercise)
     return nil unless exercise.unanswered_dumbbells?
     return nil unless (ranges = dumbbell_ranges(equipment))
 
     ceiling = equipment.dumbbell_totals(2).max
-    heaviest = @sets.filter_map { |set| set[:weight] }.max
-    return nil unless heaviest && heaviest >= ceiling
+    prescribed = @sets.filter_map { |set| set[:planned_weight] }.max
+    return nil unless prescribed && prescribed >= ceiling
 
     ranges.merge(ceiling: weight_label(ceiling))
   end
