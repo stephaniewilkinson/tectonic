@@ -35,13 +35,16 @@ describe 'get_workout on a per-side set' do
   include Rack::Test::Methods
   include PerSideReads
 
+  # "40x8 reps per side" since #502, in the same words `load_phrase` confirms a write with
+  # and the same words the session screen draws. The unit on the count is what stops "per
+  # side" reading as a claim about the 40 as well.
   it 'says per side in the prose' do
     minted = mint(scopes: %w[read write])
     workout_id, = a_split_squat(minted.account_id)
 
     call_tool('get_workout', raw: minted.raw, arguments: { workout_id: })
 
-    assert_includes tool_result.dig('content', 0, 'text'), '40x8 per side'
+    assert_includes tool_result.dig('content', 0, 'text'), '40x8 reps per side'
   end
 
   it 'carries the flag in the payload' do

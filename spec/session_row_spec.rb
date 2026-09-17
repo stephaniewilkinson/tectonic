@@ -222,10 +222,13 @@ describe 'the other per side' do
   # ProgramLift and Volume all double the work on the strength of it. Renaming the first
   # is one find-and-replace away from silently halving somebody's unilateral volume, so
   # the surviving one is pinned here rather than left to be noticed later.
+  # "5 reps per side" rather than "5 per side" since #502: the count names its unit so that
+  # the qualifier binds to it rather than to the whole phrase. The point being pinned is
+  # unchanged -- a rep count that is per side still says so, on the row.
   it 'still says per side of a rep count that is per side' do
     body = session(is_per_side: true)
 
-    assert_includes body, '5 per side'
+    assert_includes body, '5 reps per side'
     assert_includes body, 'Plate math'
   end
 end

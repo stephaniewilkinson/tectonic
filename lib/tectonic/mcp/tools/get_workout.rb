@@ -164,8 +164,16 @@ class Tectonic < Roda
         # row saying the set was done to a referee's timing rather than the lifter's, and a
         # session read back without it cannot answer "how many commanded reps did this block
         # contain" -- which is the question the column was added for.
+        # The count names its unit where "per side" follows it (#502), as the session screen
+        # and `load_phrase` both do. A trailing qualifier on "40x8" postmodifies the whole
+        # phrase, and a reader cannot tell from it whether the 40 is per side as well -- which
+        # on a pair of dumbbells it half is, the stored weight being one dumbbell's.
         def self.quantity(set)
-          count = Load.carried?(set[:weight]) ? "#{set[:weight]}x#{set[:reps]}" : "#{set[:reps]} reps"
+          count = if Load.carried?(set[:weight])
+                    "#{set[:weight]}x#{set[:reps]}#{' reps' if set[:is_per_side]}"
+                  else
+                    "#{set[:reps]} reps"
+                  end
           "#{count}#{' per side' if set[:is_per_side]}#{' commanded' if set[:is_commanded]}"
         end
 
