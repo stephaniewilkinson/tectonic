@@ -162,7 +162,16 @@ class Tectonic < Roda
       return nil unless pounds
 
       restated = restated_reps(set)
-      { pounds:, on: set[:date], from_reps: restated, confident: restated <= CONFIDENT_REPS }
+      # The set itself rides along with the number it produced. #449: a proposal of 127 means
+      # nothing on its own, and "100 lb x 5 at RPE 7, which is 6 reps from a single" can be
+      # argued with -- which is the difference between a tool that reports and one that is
+      # merely believed. The date has travelled here since #293 for the same reason.
+      #
+      # `rating` rather than the raw rpe, because the rating is what was actually read: an
+      # unrated set is read at its planned effort, else at the anchor, and a reader shown the
+      # nil would have no idea which of the three produced the number.
+      { pounds:, on: set[:date], from_reps: restated, confident: restated <= CONFIDENT_REPS,
+        weight: set[:weight], reps: set[:reps], rating: rating_for(set[:rpe], set[:planned_rpe]) }
     end
 
     # The rep count this set restates to at RPE 8, which is the row of the chart it was
