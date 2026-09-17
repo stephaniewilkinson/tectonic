@@ -213,6 +213,32 @@ class Tectonic < Roda
       windows.map { |weeks| window_reading(rows, weeks, on) }
     end
 
+    # The best reading in a window that is allowed to set a number by itself. #449.
+    #
+    # `recent_readings` above reads through `best_reading`, which is right for reporting what
+    # a window supports: a reader wants the most recent training implies, and a set nine reps
+    # from a single implies something even if it implies it loosely.
+    #
+    # This is the other question, and it is the one a proposal has to ask. A number that would
+    # become the denominator of every percentage in the next block has to clear the bar
+    # `TrainingMax.derived` already holds -- `CONFIDENT_REPS`, six restated reps -- or the
+    # block is priced off a reading the app itself declines to trust. Those are different
+    # thresholds for different jobs and collapsing them would quietly lower one of them.
+    #
+    # The window is the whole point of proposing from it rather than from the lifetime best:
+    # a max is the most ever demonstrated, and what a block should open at is what training
+    # has been supporting lately. #307 makes that argument at length and refuses to choose
+    # between them; this does not choose either, it just answers the recent half.
+    # Both answers come back from one read of the window, and they have to: a count taken from
+    # a second query with its own idea of "the last eight weeks" could say a movement was
+    # trained nine times and that nothing in it was readable, having looked at two different
+    # nine. The window is defined once, here, by the rows.
+    def window_of(account_id:, weeks:, on: Date.today)
+      rows = lifted_sets(account_id, on, since: on - (weeks * 7))
+      { sets: rows.count { |row| !row[:is_warmup] },
+        reading: OneRepMax.best_confident_reading(rows) }
+    end
+
     # One window's worth of those rows. Nil pounds rather than an absent entry where the
     # window holds nothing readable, so a caller gets the same three windows every time and
     # "nothing in the last twelve weeks" is itself an answer -- which on a movement somebody
@@ -244,9 +270,17 @@ class Tectonic < Roda
 
     # Qualified because `date` is on workouts while the rest are on sets, and unqualified it
     # is ambiguous the moment the two tables meet.
+    #
+    # `is_warmup` joined the list for #449, which needs to count the working sets a window
+    # holds -- "trained nine times and nothing readable in it" is a useful answer and "trained
+    # nine times" counting ramp rungs is a misleading one.
+    #
+    # Selecting it changes nothing about what these rows mean. `lifted_sets` filters on
+    # `is_completed` and has never filtered on this, so every caller gets the same rows it
+    # always got with one more column on them; the readers take what they need by key.
     READ_COLUMNS = [
       Sequel[:sets][:weight], Sequel[:sets][:reps], Sequel[:sets][:rpe],
-      Sequel[:sets][:planned_rpe], Sequel[:workouts][:date]
+      Sequel[:sets][:planned_rpe], Sequel[:sets][:is_warmup], Sequel[:workouts][:date]
     ].freeze
   end
 end
