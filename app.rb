@@ -2328,6 +2328,35 @@ class Tectonic < Roda
     @progress.map { |name, points| { name:, data: points, dataset: STYLES.fetch(name, {}) } }
   end
 
+  # Completed sets of this movement that count their reps the other way from the movement
+  # itself. #392, the half that was never surfaced.
+  #
+  # `align_sets_per_side` brings the logged sets into line when the movement's answer
+  # *changes*, and that is the only moment anything checks. A movement whose answer was right
+  # all along, with sets written before it was given, has nothing to trigger the repair and
+  # nothing to report the drift -- so it sits there halving a number quietly.
+  #
+  # It is not a small number when it happens. On the reporting account the clamshell carried
+  # four completed sets counting one leg where the movement says two, the split squat carried
+  # two, and the hip thrust's own default contradicted its own note -- 87 reps of work counted
+  # as half, found only by going looking.
+  #
+  # **Completed sets only**, which is what makes this worth showing rather than noise. Volume
+  # counts nothing else (see Volume::COMPLETED), so a written-and-never-lifted set disagreeing
+  # is a disagreement about a plan and cannot be miscounting anything. The same movement's
+  # fourteen unperformed rows would otherwise shout about a number nothing reads.
+  #
+  # **Reported and not offered as a one-tap fix**, deliberately. The change-triggered repair can
+  # tell a stale set from a deliberate one because it has the old answer to compare against; a
+  # standing repair has no such discriminator, and a lifter who really did both legs at once on
+  # a machine is entitled to have said so. So the app says what it sees and the correction is a
+  # decision, which is #263's line.
+  #
+  # Off @sets, which the route has already loaded and scopes to this account, so no query.
+  def per_side_disagreement(exercise)
+    @sets.count { |set| set[:is_completed] && set[:is_per_side] != exercise.default_is_per_side }
+  end
+
   # How many completed working sets this movement has, for the page that has to tell "nothing
   # logged" apart from "logged, and the estimate cannot read it".
   #
