@@ -274,6 +274,35 @@ class Tectonic < Roda
                           created_by_oauth_application_id: context.application_id, created_at: Time.now)
         end
 
+        # A movement this account already has, by name, without the power to make one.
+        #
+        # `exercise` above is find-or-create and is right for the tools that write training.
+        # The three that only read a movement -- exercise_history, block_progress and
+        # set_working_weight -- must not be able to conjure one, since creating a row to report
+        # emptily on it is worse than saying the name is unknown. Each carried its own
+        # `where(name: name.strip).order(:id).first` instead, and that differed from the rest of
+        # the app in two ways that both bite.
+        #
+        # **It did not fold the name.** `bench press` resolves for create_set and was refused
+        # here, so the same string worked in one tool and failed in the next. #474 settled that
+        # `Bench Press`, `bench press` and `Benchpress` are one movement.
+        #
+        # **And it broke the tie by id, which `matching` exists to stop deciding by accident.**
+        # A name can match two visible rows -- the reporting account has a private `Deadlift`
+        # with 64 sets and seven program lifts, and a library `Deadlift` with nothing on it.
+        # `order(:id)` picks the private one there only because it happens to be older. Library
+        # ids run 7 to 88 on production, so for any account created after the seed *every* own
+        # row outranks them and the library row wins every time: a new lifter asking how their
+        # deadlift has gone would be told nothing was logged, off the empty row.
+        #
+        # So this is `Exercise.matching` -- folded, and the account's own row over the library's
+        # by stated rule -- with the refusal the three already raised.
+        def existing_exercise(context, name)
+          clean = name.to_s.strip
+          Exercise.matching(context.account_id, clean) ||
+            raise(Tool::Refusal, "No exercise named #{clean.inspect} for this account.")
+        end
+
         # The question #478 asks, put as a refusal because a refusal is the only thing in this
         # protocol a model reliably reads and acts on. Silence would create the row.
         #
