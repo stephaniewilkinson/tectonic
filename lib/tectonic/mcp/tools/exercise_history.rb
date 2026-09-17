@@ -56,9 +56,13 @@ class Tectonic < Roda
         # The movement by name among the ones this account can see, without creating it:
         # a history question about a movement that has never been logged is answered
         # "nothing", and inventing the movement to say so would leave a row behind.
+        #
+        # Through Resolver.existing_exercise since #454. This is the tool the old lookup hurt
+        # most: picking the library row over the account's own means reporting on a row with
+        # no sets on it, so "how has my deadlift gone" comes back "nothing logged" to somebody
+        # with 64 sets of it. `matching` prefers the lifter's own row by stated rule.
         def self.find(context, name)
-          context.exercises.where(name: name.to_s.strip).order(:id).first ||
-            (raise Tool::Refusal, "No exercise named #{name.to_s.strip.inspect} for this account.")
+          Resolver.existing_exercise(context, name)
         end
 
         def self.history(context, exercise, arguments)

@@ -84,9 +84,14 @@ class Tectonic < Roda
         # edit naming a movement that is not in the session is a mistake worth refusing --
         # creating the movement to write nothing to it would leave a row behind and report
         # success.
+        #
+        # Through Resolver.existing_exercise since #454, so the name is folded and the tie
+        # between an account's own row and the library's is broken by the rule rather than by
+        # id. This tool's exposure was the milder one -- it filters on workout_id too, so the
+        # wrong row updates nothing and reports "0 working sets" -- but a wrong answer given
+        # confidently is what the caller then acts on.
         def self.movement(context, name)
-          context.exercises.where(name: name.to_s.strip).order(:id).first ||
-            (raise Tool::Refusal, "No exercise named #{name.to_s.strip.inspect} for this account.")
+          Resolver.existing_exercise(context, name)
         end
 
         # Says what moved and what did not, because "0 sets" and "0 sets, 4 already done" are

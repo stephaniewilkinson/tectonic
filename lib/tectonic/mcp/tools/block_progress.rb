@@ -87,9 +87,12 @@ class Tectonic < Roda
           context.program_lifts.where(program_day_id: days.select(:id)).distinct.select_map(:exercise_id)
         end
 
+        # Through Resolver.existing_exercise since #454, on the same argument exercise_history
+        # makes: this reports a movement's training maxes and block openers, and reading those
+        # off an empty library row rather than the lifter's own is a confident wrong answer
+        # about whether a block moved anything.
         def self.one(context, name)
-          context.exercises.where(name: name.to_s.strip).order(:id).first ||
-            (raise Tool::Refusal, "No exercise named #{name.to_s.strip.inspect} for this account.")
+          Resolver.existing_exercise(context, name)
         end
 
         # One movement: what it is worked out from today, what it is aiming at, and what each
