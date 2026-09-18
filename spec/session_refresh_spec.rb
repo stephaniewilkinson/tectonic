@@ -17,9 +17,13 @@ module SessionRefreshing
     program = Tectonic::Program.create(account_id:, name: 'Block', start_date: Date.today, is_ascending: true)
     week = Tectonic::ProgramWeek.create(program_id: program.id, number: 1)
     day = Tectonic::ProgramDay.create(program_week_id: week.id, weekday: Date.today.wday)
+    # warmup_sets pins the ramp at the count #451's ratio default would give this weight, so
+    # that a test about *refresh* is not also a test about the ramp growing. Raising a top
+    # weight legitimately lengthens a ramp now -- 155 is three times the bar and 225 is five --
+    # and a session covered by what was already lifted would otherwise gain the extra rungs.
     lift = Tectonic::ProgramLift.create(program_day_id: day.id, exercise_id: exercise.id, position: 0,
                                         sets: 3, reps: 5, top_weight: weight, progression: 'linear',
-                                        is_main: true, is_barbell: true)
+                                        is_main: true, is_barbell: true, warmup_sets: 3)
     Tectonic::ProgramGenerator.new(program).generate(1)
     [program, day, lift]
   end
@@ -187,7 +191,9 @@ describe 'what it says about a session it has just emptied' do
     said = tool_result['content'].first['text']
 
     refute_includes said, 'left alone'
-    assert_includes said, '7 planned sets taken out'
+    # Six rather than seven since #451 shortened the ramp by a rung on a lift three times
+    # the bar.
+    assert_includes said, '6 planned sets taken out'
     assert_includes said, '1 set already lifted stays as it is'
   end
 end

@@ -94,6 +94,11 @@ class Tectonic < Roda
             # holds and press-ups have one -- so the only question is whether the number is a
             # plausible rest, which Bounds::REST answers on its own. #281.
             rest_seconds: attributes[:rest_seconds],
+            # How many rungs the ramp gets, or nil to work it out from how far the top weight
+            # is above the bar. Zero is a real answer and means no ramp -- #451 asks for the
+            # opt-out outright, for "an accessory late in a session following the same pattern"
+            # -- which is why nothing here defaults it or tests it for truthiness. #451.
+            warmup_sets: attributes[:warmup_sets],
             # Defaulted to false rather than to anything on the movement, unlike the three
             # facts in shape_of. There is no exercise-level default to read: Bench Press is
             # the same movement whether or not a referee is calling it, which is the whole
@@ -180,6 +185,7 @@ class Tectonic < Roda
           Bounds.check(Bounds::WEIGHT, attributes[:top_weight], 'Top weight', unit: ' lb')
           Bounds.check(Bounds::PERCENT, attributes[:percent_of_max], 'Percent of max', unit: '%')
           Bounds.check(Bounds::REST, attributes[:rest_seconds], 'Rest', unit: ' seconds')
+          Bounds.check(Bounds::WARMUP_SETS, attributes[:warmup_sets], 'Warmup sets')
         end
 
         # A lift is counted one way or the other, and the way it is counted decides which

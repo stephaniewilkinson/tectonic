@@ -33,7 +33,10 @@ class Tectonic < Roda
                     'null to clear it. rest_seconds, 5 to 1800, is the rest its working sets ' \
                     'are meant to take between them and what the session screen counts down ' \
                     'after one; it applies to any movement, and null clears it back to the ' \
-                    'median rest this lifter actually takes. bench_angle_degrees, ' \
+                    'median rest this lifter actually takes. warmup_sets, 0 to 6, is how many ' \
+                    'rungs the warmup ramp gets including the empty bar; 0 is no ramp at all, ' \
+                    'and null goes back to working it out from how far the top weight is ' \
+                    'above the bar. bench_angle_degrees, ' \
                     'rack_hole and safety_hole say how the room is set up for this ' \
                     'lift; null clears any of them. is_commanded says its working ' \
                     'sets are done under meet commands -- start, press, rack -- rather than ' \
@@ -51,6 +54,7 @@ class Tectonic < Roda
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
             rest_seconds: NUMBER_OR_NULL, is_commanded: { type: 'boolean' },
+            warmup_sets: NUMBER_OR_NULL,
             percent_of: { type: %w[string null] }, is_weighted: { type: 'boolean' },
             is_per_side: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
             duration_seconds: { type: 'integer' }, note: { type: 'string' }
@@ -81,7 +85,7 @@ class Tectonic < Roda
         # them below. Named rather than inlined because the list is the API: a field missing
         # from here is a field the schema accepts and the tool silently drops.
         WRITABLE = %i[sets reps top_weight percent_of_max is_main is_barbell
-                      target_rpe rest_seconds is_commanded note].freeze
+                      target_rpe rest_seconds is_commanded warmup_sets note].freeze
 
         def self.fields(context, lift, arguments)
           attributes = round_load(context, lift, arguments.slice(*WRITABLE), arguments)
@@ -194,6 +198,10 @@ class Tectonic < Roda
         # that sets a percentage without clearing the pounds is refused rather than
         # written into a state the generator would have to guess its way out of.
         def self.check(lift, attributes)
+          # Refused by name rather than left to program_lifts_warmup_sets_in_range, so a
+          # client gets a sentence instead of a database error -- the same courtesy the rest
+          # and the target RPE get on the way in. #451.
+          Bounds.check(Bounds::WARMUP_SETS, attributes[:warmup_sets], 'Warmup sets')
           ProgramWriter.check_load(merged(lift, attributes), shape(lift, attributes))
         end
 

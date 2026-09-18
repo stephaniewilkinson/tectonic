@@ -55,6 +55,14 @@ class Tectonic < Roda
         # left to programs_time_budget_in_range, so a client gets a sentence instead of a
         # database error.
         BUDGET_MINUTES = (10..300)
+        # How many rungs a warmup ramp gets, the bar included. #451, and the range is 040's.
+        #
+        # Zero is admitted and means no ramp, which is the opt-out #451 asks for outright. Six
+        # is more than any ratio produces and more than anybody ramps through, and the ceiling
+        # is what stops a typo writing a session of nothing but warmups. Refused by name here
+        # rather than left to program_lifts_warmup_sets_in_range, so a client gets a sentence
+        # instead of a database error.
+        WARMUP_SETS = (0..6)
         # How the room is set up. #412, and the ranges are 034's.
         #
         # A decline bench goes to about -30 and a fully upright one is 90; past either is not a

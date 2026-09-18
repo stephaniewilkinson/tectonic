@@ -30,7 +30,9 @@ describe 'ProgramGenerator' do
     workout = Tectonic::ProgramGenerator.new(program).generate(1).first
     sets = Tectonic::WorkoutSet.where(workout_id: workout.id).all
     assert_equal Date.new(2026, 8, 17), workout.date.to_date # weekday 1 lands on the Monday
-    assert_equal [4, 4], [sets.count(&:is_warmup), sets.reject(&:is_warmup).count]
+    # Three warmups since #451, not four: the ramp is spaced by how far the top weight is
+    # above the bar, and this one is about three times it.
+    assert_equal [3, 4], [sets.count(&:is_warmup), sets.reject(&:is_warmup).count]
     assert(sets.none?(&:is_completed))
     assert(sets.all? { |set| set.planned_weight == set.weight && set.planned_reps == set.reps })
   end
