@@ -15,11 +15,28 @@
 # linking adopts it rather than creating a second one, which for a database would be a second
 # empty database and a very bad afternoon.
 #
-# `plan: starter` is not a suggestion here, it is the backup policy. Render Postgres backups
-# go by tier: free has none at all, and starter and above get point-in-time recovery over a
-# three-day window plus logical backups retained seven days after they are taken. Dropping
-# this instance to free would silently remove every backup this app has, which is exactly the
-# failure #348 is about and exactly the one nothing would announce.
+# The plan is not a suggestion here, it is the backup policy. **Free Postgres has no backups
+# at all**, so dropping this instance to free would silently remove every backup this app has
+# -- which is exactly the failure #348 is about and exactly the one nothing would announce.
+# The paid tiers carry point-in-time recovery and retained logical backups; the current
+# windows are worth reading off the dashboard rather than trusting a number written here,
+# because they have changed once already.
+#
+# `0.1c-256mb` rather than `starter`, and the rename is Render's rather than a resize: the
+# legacy plan names are refused outright for a Blueprint -- *"Legacy Postgres plans, including
+# 'starter', are no longer supported for new databases"* -- and 0.1c-256mb is the same 256 MB
+# this instance has always had. It is the like-for-like name, not a smaller box.
+#
+# `render blueprints validate` does check this against the running instance, and is worth
+# running before touching the dashboard. It refuses the catastrophic case by name --
+# `plan: free` comes back *"cannot downgrade database from Starter to Free"* rather than
+# validating and then quietly destroying every backup -- and it reports this plan as one
+# action rather than none, which is the honest answer: 256 MB to 256 MB is still a move off a
+# legacy plan, and a move is a thing that happens to a live database.
+#
+# What it does not do is tell you what that action costs or how long it takes. The dashboard's
+# confirmation screen is the only place that says, and it is also the check that caught the
+# legacy name in the first place.
 #
 # ipAllowList is deliberately absent rather than set: the current instance allows 0.0.0.0/0,
 # and narrowing it from a blueprint that is not yet linked would either do nothing or, once
@@ -28,7 +45,7 @@
 databases:
   - name: tectonic_production
     databaseName: tectonic_production_7oho
-    plan: starter
+    plan: 0.1c-256mb
     region: oregon
     postgresMajorVersion: "15"
 
