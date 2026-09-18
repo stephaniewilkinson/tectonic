@@ -31,6 +31,8 @@ require_relative 'lib/tectonic/rack_change'
 require_relative 'lib/tectonic/training_max'
 require_relative 'lib/tectonic/goal'
 require_relative 'lib/tectonic/rests'
+require_relative 'lib/tectonic/withings'
+require_relative 'lib/tectonic/withings_connection'
 require_relative 'lib/tectonic/progress_chart'
 require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
@@ -513,6 +515,33 @@ class Tectonic < Roda
         r.redirect '/settings'
       end
 
+      # Handing Withings permission to be read. #472.
+      #
+      # Under /settings because that is where the other facts about this lifter live, and
+      # because connecting is a preference rather than a thing you do to a workout.
+      #
+      # `state` is stored in the session and compared on the way back. It is the only thing
+      # tying the callback to the browser that began the flow: without it, anyone can send a
+      # logged-in lifter to the callback with a code of their own and attach *their* Withings
+      # account to this one. Deleted on use, so a code cannot be replayed against it.
+      r.post 'withings/connect' do
+        check_csrf!
+        r.redirect '/settings' unless Withings.configured?
+
+        state = Withings.new_state
+        session['withings.state'] = state
+        r.redirect Withings.authorize_url(withings_redirect_uri, state)
+      end
+
+      # Disconnecting forgets the tokens and keeps the measurements: they are a record of what
+      # the lifter weighed, which stays true whether or not the app may still ask for more.
+      r.post 'withings/disconnect' do
+        check_csrf!
+        WithingsConnection.forget(@account_id)
+        session['settings.notice'] = 'Withings disconnected. Your measurements are still here.'
+        r.redirect '/settings'
+      end
+
       # Where this account is, which decides what day it is for them (#349). Refused by name
       # rather than written and ignored: a zone nothing can resolve would be stored happily
       # and then read as UTC by every caller, which is the failure this exists to end.
@@ -590,8 +619,50 @@ class Tectonic < Roda
         @equipment = Equipment.for_account(@account_id)
         @time_zone = Clock.zone_of(@account_id)
         @today = Clock.today(@time_zone)
+        # Whether Withings is connected, and whether the connection still works -- three
+        # states rather than two, because a grant revoked from Withings' own app leaves a row
+        # here that no longer buys anything. #472.
+        @withings = WithingsConnection.status(@account_id)
+        @withings_configured = Withings.configured?
+        # Read once and taken out of the session, the same shape the exercise page uses, so a
+        # reload does not re-announce a connection made ten minutes ago.
+        @notice = session.delete('settings.notice')
         view('settings')
       end
+    end
+
+    # Where Withings sends the lifter back. #472.
+    #
+    # Outside the /settings block on purpose: Withings redirects a browser here with query
+    # parameters and no CSRF token of ours, so it cannot sit behind check_csrf! -- and the
+    # `state` comparison below is what does that job instead, which is the whole reason OAuth
+    # specifies it.
+    #
+    # A GET that writes, which is unusual here and is not a choice: the authorization-code
+    # flow is defined as a redirect, and a redirect is a GET. It is made safe by the state
+    # being single-use.
+    r.on 'withings' do
+      rodauth.require_login
+      @account_id = rodauth.account_from_session[:id]
+
+      r.get 'callback' do
+        expected = session.delete('withings.state')
+        # Three ways this is not a real callback, and none of them should say the same thing
+        # as success. A mismatched state is the attack; a missing code is Withings refusing
+        # or the lifter pressing cancel.
+        next settings_with('That Withings link did not match this browser. Try connecting again.') \
+          if expected.nil? || r.params['state'].to_s.empty? || r.params['state'] != expected
+
+        next settings_with('Withings did not grant access. Nothing has changed.') if r.params['code'].to_s.empty?
+
+        tokens = Withings.exchange(r.params['code'], withings_redirect_uri)
+        next settings_with('Withings could not be reached just now. Nothing has changed.') unless tokens
+
+        WithingsConnection.store(@account_id, tokens)
+        settings_with('Withings connected.')
+      end
+
+      r.redirect '/settings'
     end
 
     # What the training actually contained, folded into weeks. Every other view lists
@@ -1943,6 +2014,25 @@ class Tectonic < Roda
   # the denominator, which BigDecimal, Float, Integer and Rational all answer.
   def weight_label(weight)
     weight && Plates.numeric(weight)
+  end
+
+  # Where Withings sends a browser back, which has to be the same string in the redirect out
+  # and in the exchange afterwards -- the provider compares them and refuses a mismatch.
+  #
+  # Built from MCP_PUBLIC_BASE_URL because that is where the app already keeps its own public
+  # address, rather than from the incoming request: a request arriving on a preview host would
+  # otherwise ask Withings to redirect somewhere the registration does not list. #472.
+  def withings_redirect_uri
+    "#{MCP::Config.public_base_url}/withings/callback"
+  end
+
+  # Back to settings with something to say. The callback has four outcomes a lifter can tell
+  # apart -- connected, refused, unreachable, and a state that did not match -- and saying
+  # them out loud is the difference between a page that worked and a page that silently did
+  # nothing. #472.
+  def settings_with(notice)
+    session['settings.notice'] = notice
+    request.redirect '/settings'
   end
 
   # A session-length budget off a form, or nothing. #446.

@@ -96,6 +96,25 @@ services:
       # credential, but on production an absent key means nobody can recover an account.
       - key: RESEND_API_KEY
         sync: false
+      # Withings, for reading a lifter's own weight and body composition. #472.
+      #
+      # The client id is not a secret -- it travels in the authorize URL in plain sight -- but
+      # it is `sync: false` alongside the secret so both are set in one place and neither is
+      # in this public repository by accident.
+      #
+      # Absent, the app boots and the settings page says there is nothing to connect to. That
+      # is deliberate and is Mailer's rule: a checkout or a preview deploy stays walkable
+      # without a credential. It also means forgetting to set these here does not break the
+      # deploy, it just makes the feature quietly unavailable -- so if Withings is connected
+      # locally and not in production, this is the thing to check.
+      - key: WITHINGS_CLIENT_ID
+        sync: false
+      - key: WITHINGS_SECRET
+        sync: false
+      # The API host. Not a secret, and named rather than hard-coded because Withings
+      # publishes more than one; the app defaults to the public cloud without it.
+      - key: WITHINGS_API_ENDPOINT
+        value: https://wbsapi.withings.net
       # The From address. Must be on a domain verified with Resend or the API refuses every
       # send -- which is the most common way this is set up wrongly, so the refusal is logged
       # with Resend's own response body rather than swallowed.

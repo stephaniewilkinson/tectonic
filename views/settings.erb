@@ -1,6 +1,19 @@
 <div class="mx-auto max-w-md">
   <h1 class="text-3xl font-semibold text-gray-900">Settings</h1>
 
+  <%# What the last thing you did here actually did. #472 needs it most: connecting to
+      Withings leaves the site, comes back through a redirect, and can fail in four
+      distinguishable ways -- so a page that looked identical afterwards would be the app
+      refusing to say whether it worked.
+
+      role="status" rather than alert: it is the outcome of something just asked for, not an
+      interruption. Read once and gone, so a reload does not re-announce it. %>
+  <%- if @notice %>
+    <p role="status" class="mt-4 rounded-md border border-sky-800 bg-sky-50 px-3 py-2 text-sm text-gray-700">
+      <%= @notice %>
+    </p>
+  <%- end %>
+
   <%# Two forms, not one. A week start and a plate inventory are unrelated answers, and a
       single Save across both would mean changing either required re-submitting the other.
       They share a page because they are the same kind of thing -- a per-account preference
@@ -295,4 +308,65 @@
             class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5
                    text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Save</button>
   </form>
+
+  <%# Reading your own bodyweight from Withings. #472.
+
+      Its own form, outside the equipment one above, on the same argument the page already
+      makes twice: these are unrelated answers and one Save across them would mean changing
+      the rack to connect a scale.
+
+      Three states rather than two. A grant revoked from Withings' own app leaves a row here
+      that no longer buys anything, and a page saying "connected" about it would be wrong in
+      the one way that is hard to notice -- readings simply stop arriving. %>
+  <h2 class="mt-10 text-xl font-semibold text-gray-900">Withings</h2>
+
+  <%- if !@withings_configured %>
+    <p class="mt-2 text-sm text-gray-600">
+      This deployment has no Withings credentials set, so there is nothing to connect to.
+      That is the ordinary state of a local checkout.
+    </p>
+  <%- elsif @withings[:state] == :absent %>
+    <p class="mt-2 text-sm text-gray-600">
+      Connect your Withings account and the app can read your weight and body composition
+      alongside your training. It reads; it never writes anything back.
+    </p>
+    <form method="post" action="/settings/withings/connect" class="mt-3">
+      <%== csrf_tag('/settings/withings/connect') %>
+      <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                    text-gray-900 hover:bg-lime-600">Connect Withings</button>
+    </form>
+  <%- else %>
+    <p class="mt-2 text-sm text-gray-600">
+      <%- if @withings[:state] == :stale %>
+        Connected on <%= @withings[:connected_at].strftime('%-d %b %Y') %>, but the permission
+        has expired and could not be renewed &mdash; usually because it was revoked from
+        Withings itself. Connect again to resume.
+      <%- else %>
+        Connected on <%= @withings[:connected_at].strftime('%-d %b %Y') %>.
+        <%- if @withings[:synced_at] %>
+          Last read <%= @withings[:synced_at].strftime('%-d %b at %H:%M') %>.
+        <%- else %>
+          Nothing has been read yet.
+        <%- end %>
+      <%- end %>
+    </p>
+    <div class="mt-3 flex items-center gap-2">
+      <%- if @withings[:state] == :stale %>
+        <form method="post" action="/settings/withings/connect">
+          <%== csrf_tag('/settings/withings/connect') %>
+          <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                        text-gray-900 hover:bg-lime-600">Reconnect</button>
+        </form>
+      <%- end %>
+      <form method="post" action="/settings/withings/disconnect">
+        <%== csrf_tag('/settings/withings/disconnect') %>
+        <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 px-3 text-sm
+                                      font-semibold text-gray-700 hover:bg-gray-50">Disconnect</button>
+      </form>
+    </div>
+    <%# Said plainly because it is the question anybody hesitating over Disconnect has. %>
+    <p class="mt-2 text-xs text-gray-500">
+      Disconnecting stops the app asking for more. Measurements already read stay where they are.
+    </p>
+  <%- end %>
 </div>
