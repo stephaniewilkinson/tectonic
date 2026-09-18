@@ -320,7 +320,12 @@
       the one way that is hard to notice -- readings simply stop arriving. %>
   <h2 class="mt-10 text-xl font-semibold text-gray-900">Withings</h2>
 
-  <%- if !@withings_configured %>
+  <%# The connection is asked about *before* the credentials, and the order is load-bearing.
+      Disconnecting is a local delete -- it forgets a row, it does not call Withings -- so it
+      must stay available even on a deployment whose credentials have been removed. The other
+      way round, a lifter who was connected when the keys went away could no longer revoke
+      what they had granted, which is the one thing they must always be able to do. %>
+  <%- if @withings[:state] == :absent && !@withings_configured %>
     <p class="mt-2 text-sm text-gray-600">
       This deployment has no Withings credentials set, so there is nothing to connect to.
       That is the ordinary state of a local checkout.
@@ -351,7 +356,7 @@
       <%- end %>
     </p>
     <div class="mt-3 flex items-center gap-2">
-      <%- if @withings[:state] == :stale %>
+      <%- if @withings[:state] == :stale && @withings_configured %>
         <form method="post" action="/settings/withings/connect">
           <%== csrf_tag('/settings/withings/connect') %>
           <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold

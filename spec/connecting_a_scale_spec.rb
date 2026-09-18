@@ -235,6 +235,12 @@ end
 
 # Disconnecting forgets the permission and keeps the measurements: they are a record of what
 # the lifter weighed, which stays true whether or not the app may still ask for more.
+#
+# Deliberately *not* wrapped in with_credentials, and that is the point rather than an
+# oversight. Disconnecting is a local delete -- it forgets a row and calls nobody -- so it has
+# to work on a deployment whose keys have been removed. CI caught this: with no .env there,
+# the page hid the button behind a credentials check and somebody already connected could not
+# revoke what they had granted.
 describe 'disconnecting' do
   include Rack::Test::Methods
   include RouteOwnership
