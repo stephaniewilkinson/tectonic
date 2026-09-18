@@ -155,6 +155,9 @@ describe 'a block run after a stated max was cleared' do
   include Rack::Test::Methods
   include BlockProgress
 
+  # Asked by name since #450, which leaves movements carrying nothing at all out of the
+  # unnarrowed read. Naming one is how you ask about a movement with nothing on it, and it is
+  # the more direct way to test an opener anyway.
   it 'reports the estimate rather than the number that was cleared' do
     minted = mint(scopes: %w[read write])
     exercise = movement(minted.account_id)
@@ -162,7 +165,7 @@ describe 'a block run after a stated max was cleared' do
     Tectonic::TrainingMax.replace(minted.account_id, exercise.id, nil)
     a_block(minted.account_id, exercise, start_date: Date.today, name: 'After')
 
-    call_tool('block_progress', raw: minted.raw, arguments: {})
+    call_tool('block_progress', raw: minted.raw, arguments: { exercise: exercise.name })
 
     refute_equal 315, openers(exercise.name).first['pounds']
   end
@@ -174,7 +177,7 @@ describe 'a block run after a stated max was cleared' do
     exercise = movement(minted.account_id)
     a_block(minted.account_id, exercise, start_date: Date.today, name: 'Empty')
 
-    call_tool('block_progress', raw: minted.raw, arguments: {})
+    call_tool('block_progress', raw: minted.raw, arguments: { exercise: exercise.name })
 
     assert_nil openers(exercise.name).first['pounds']
   end
@@ -279,11 +282,16 @@ describe 'a goal on a movement not in any block' do
   include Rack::Test::Methods
   include BlockProgress
 
+  # in_block carries a max as well as a block, which is what makes it reportable since #450:
+  # a movement with no max, no goal and no opener is left out of the unnarrowed read. The
+  # point being pinned is unchanged -- an accessory carrying only a goal still gets a row,
+  # which is the half #308 put in deliberately.
   it 'gets a row of its own' do
     minted = mint(scopes: %w[read write])
     in_block = movement(minted.account_id)
     aspiring = movement(minted.account_id)
     a_block(minted.account_id, in_block, start_date: Date.today)
+    Tectonic::TrainingMax.replace(minted.account_id, in_block.id, 315)
     Tectonic::Goal.replace(minted.account_id, aspiring.id, 225)
 
     call_tool('block_progress', raw: minted.raw, arguments: {})

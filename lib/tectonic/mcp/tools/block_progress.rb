@@ -45,8 +45,12 @@ class Tectonic < Roda
                     'goal set for that movement. Answers "am I on pace": it returns the ' \
                     'training max each block was generated against, newest block first, ' \
                     'plus the goal, its deadline and how far there is to go. Narrow to one ' \
-                    'movement with exercise, and how far back with blocks. It reports the ' \
-                    'numbers and does not judge whether they are enough.'
+                    'movement with exercise, and how far back with blocks. Movements carrying ' \
+                    'no max, no goal and no opener are left out, since a block is mostly ' \
+                    'accessory work with nothing to compare; naming one in exercise reports ' \
+                    'it either way. Each block also carries commanded_reps, the reps done to ' \
+                    "a referee's timing in it, for training the pause a meet judges. It " \
+                    'reports the numbers and does not judge whether they are enough.'
         scope :read
         input_schema(
           type: 'object',
@@ -57,8 +61,99 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           blocks = recent(context, arguments)
           movements = subjects(context, blocks, arguments)
-          rows = movements.map { |exercise| movement(context, exercise, blocks) }
-          ok(summary(rows, blocks), structured: { movements: rows, blocks: blocks.map { |b| named(b) } })
+          rows = reportable(movements.map { |exercise| movement(context, exercise, blocks) }, arguments)
+          commanded = commanded_reps(context, blocks)
+          ok("#{summary(rows, blocks)}#{commanded_sentence(commanded, blocks)}",
+             structured: { movements: rows,
+                           blocks: blocks.map { |b| named(b).merge(commanded_reps: commanded[b.id] || 0) } })
+        end
+
+        # How many commanded reps each block contains. #453.
+        #
+        # `is_commanded` has been on sets since 031 and get_workout's own comment says why it
+        # was added: the flag "is the only thing on the row saying the set was done to a
+        # referee's timing rather than the lifter's, and a session read back without it cannot
+        # answer 'how many commanded reps did this block contain' -- which is the question the
+        # column was added for". Nothing answered it. The flag was readable one session at a
+        # time and the block-level total, which is the number #453 asks for, did not exist.
+        #
+        # Reps rather than sets, because that is what #453 asks for and it is the honest unit:
+        # a paused triple is three commands and a paused single is one, and a lifter training
+        # for a meet is counting the times they have waited for "press".
+        #
+        # Per-side reps count twice, on Volume::WORKED_REPS' rule -- eight per side is sixteen
+        # commands. Warmups are in, unlike Volume: a commanded warmup single is command
+        # practice, which is the whole point of doing one.
+        #
+        # One query for every block rather than one per block, walking the chain a session
+        # hangs off: a set belongs to a workout, which names the program day it was generated
+        # from, which belongs to a week, which belongs to the block. Scoped by `context.sets`,
+        # so another account's training is unreachable rather than merely filtered out.
+        BLOCK_OF_A_SET = Sequel[:program_weeks][:program_id]
+
+        def self.commanded_reps(context, blocks)
+          commanded(context).where(BLOCK_OF_A_SET => blocks.map(&:id))
+                            .group(BLOCK_OF_A_SET)
+                            .select_hash(BLOCK_OF_A_SET, COMMANDED_REPS)
+        end
+
+        def self.commanded(context)
+          context.sets.where(is_commanded: true, is_completed: true)
+                 .join(:workouts, id: :workout_id)
+                 .join(:program_days, id: Sequel[:workouts][:program_day_id])
+                 .join(:program_weeks, id: Sequel[:program_days][:program_week_id])
+        end
+
+        # Doubled for a per-side count, on Volume::WORKED_REPS' argument: eight reps per side
+        # is sixteen reps of work and sixteen commands.
+        COMMANDED_REPS = Sequel.as(
+          Sequel.function(:sum,
+                          Sequel.lit('CASE WHEN sets.is_per_side THEN sets.reps * 2 ELSE sets.reps END')),
+          :reps
+        )
+
+        # Said only where there are any, and named by block rather than by id. A block with
+        # none is every block trained so far, and "0 commanded reps" on every answer would be
+        # the noise `aim` refuses to print about goals.
+        def self.commanded_sentence(commanded, blocks)
+          trained = blocks.reject { |block| commanded[block.id].to_i.zero? }
+          return '' if trained.empty?
+
+          counted = trained.map { |block| "#{block.name} #{commanded[block.id]}" }.join(', ')
+          "\nCommanded reps, for the timing a meet judges: #{counted}."
+        end
+
+        # The movements with something to say, which on a real account is a small fraction of
+        # the ones prescribed. #450.
+        #
+        # `subjects` takes everything in the blocks being reported, and most of a block is
+        # accessory work carrying no training max and no goal -- banded clamshells, dead bugs,
+        # bike intervals. Those came back as rows of nulls: on the reporting account, **thirty
+        # of thirty-three movements**, with the three lifts the question is actually about
+        # buried among them.
+        #
+        # That is the argument `aim` already makes one method down about a clause -- "a tool
+        # that appended 'no goal set' to every row would bury the rows that have one" -- and it
+        # is truer of a whole row than of a phrase. A reader asking "am I on pace" wants the
+        # squat, the bench and the deadlift.
+        #
+        # A row survives on any of the three: a max today, a goal, or an opener in some block.
+        # The goal clause matters on its own and is why this is not simply "has a max" -- #308
+        # put accessories with targets in deliberately, so a lifter bringing one up before it
+        # is in any block is not met with silence.
+        #
+        # Never filtered when the caller named a movement. Asking about the clamshell and being
+        # told nothing at all is worse than being told it has nothing on it, and the empty
+        # answer is the true one to that question.
+        def self.reportable(rows, arguments)
+          return rows if arguments[:exercise]
+
+          rows.select { |row| worth_saying?(row) }
+        end
+
+        def self.worth_saying?(row)
+          row.dig(:training_max, :pounds) || row[:goal] ||
+            row[:opened_at].any? { |opener| opener[:pounds] }
         end
 
         # The blocks to report on, newest first, which is `list_programs`' own order.
@@ -144,6 +239,14 @@ class Tectonic < Roda
         # would be the easiest of all to reduce to a number nobody can act on.
         def self.summary(rows, blocks)
           return 'No blocks yet, so there is nothing to compare.' if blocks.empty?
+          # Blocks with nothing carrying a max or a goal anywhere in them. Said rather than
+          # answered with a bare heading and no rows under it, which reads as a tool that
+          # failed rather than one with nothing to report.
+          if rows.empty?
+            return "Across #{blocks.length} block(s), no movement carries a training max or a " \
+                   'goal yet, so there is nothing to compare. Set a max on the movements you ' \
+                   'are tracking and this answers "am I on pace".'
+          end
 
           ["Across #{blocks.length} block(s), newest first:", *rows.map { |row| line(row) }].join("\n")
         end
