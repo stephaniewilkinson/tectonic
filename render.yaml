@@ -37,6 +37,11 @@ services:
     name: tectonic
     runtime: ruby
     plan: starter # preDeployCommand requires a paid instance type
+    # Declared rather than left to the default, which happens to be Oregon and happens to
+    # match. A file whose whole job is to be the source of truth should not depend on a
+    # default agreeing with reality -- and on a Blueprint, a region that disagreed would not
+    # move the service, it would propose a second one somewhere else.
+    region: oregon
     buildCommand: bundle install
     preDeployCommand: bundle exec rake db:migrate && bundle exec rake library:exercises
     # Puma with a config file rather than rackup on stock defaults, so the thread count
