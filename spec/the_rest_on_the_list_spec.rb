@@ -28,6 +28,22 @@ module RestColumn
     get '/exercises'
     last_response.body.dup.force_encoding(Encoding::UTF_8)
   end
+
+  # One movement's row, because a whole page is the wrong thing to match a short phrase
+  # against. `refute_includes index, '3m'` was flaky for exactly that reason: the page carries
+  # a random CSRF token, and one run in a handful produced `...KG3m9W4...`, which contains it.
+  # A two-character needle and a 40KB haystack is a test that fails on a coin toss.
+  def row_for(exercise)
+    index[%r{<tr>(?:(?!</tr>).)*#{Regexp.escape(exercise.name)}.*?</tr>}m] ||
+      raise("no row for #{exercise.name}")
+  end
+
+  # What the rest cell says, which is the only cell rendering a duration. The training max
+  # beside it wears the same classes and holds a bare number, so anchoring on the span and its
+  # contents separates them without depending on column order.
+  def rest_cell(exercise)
+    row_for(exercise)[/tabular-nums[^>]*>\s*([^<\s][^<]*?)\s*</m, 1]
+  end
 end
 
 describe 'the rest column' do
@@ -43,16 +59,32 @@ describe 'the rest column' do
     assert_includes index, '>Rest</th>'
   end
 
-  # Through Timing.phrase, which is how the session screen and the movement's own page both
-  # say it. "180 seconds" and "3m" are the same fact and two spellings is one too many.
+  # Through Timing.named, which is how the movement's own page and its edit form both say it.
+  # "180 seconds" and "3m" are the same fact and two spellings is one too many.
   it 'says a named rest the way the rest of the app says it' do
-    an_exercise(@account_id, rest: 180)
+    exercise = an_exercise(@account_id, rest: 180)
 
-    assert_includes index, Tectonic::Timing.phrase(180)
+    assert_equal Tectonic::Timing.named(180), rest_cell(exercise)
   end
 
-  # A column of dashes is the whole point: an unanswered question has to look unanswered.
-  #
+  # `named` rather than `phrase` since #510: a rest of 150 is a length somebody typed, and
+  # phrase drops the seconds above two minutes, so it read as "2m" -- which is what 120 reads
+  # as too, and the two are rests a lifter can tell apart.
+  it 'keeps the seconds of a rest that is not a round number of minutes' do
+    exercise = an_exercise(@account_id, rest: 150)
+
+    assert_equal '2m 30s', rest_cell(exercise)
+  end
+end
+
+# A column of dashes is the whole point: an unanswered question has to look unanswered.
+describe 'a movement with no rest named' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include RestColumn
+
+  before { @account_id = login }
+
   # Counted rather than matched on "&mdash;", which the training max beside it also prints for
   # a movement nobody has stated one for -- so a bare assert_includes would pass with no rest
   # column on the page at all. Two cells per row are blank where nothing is named and one where
@@ -70,9 +102,9 @@ describe 'the rest column' do
   # the same check: a column that printed something for an unanswered movement would be the app
   # suggesting a length, which is exactly what it must not do.
   it 'names no length at all where nobody has named one' do
-    an_exercise(@account_id)
+    exercise = an_exercise(@account_id)
 
-    refute_includes index, Tectonic::Timing.phrase(180)
+    assert_nil rest_cell(exercise)
   end
 end
 

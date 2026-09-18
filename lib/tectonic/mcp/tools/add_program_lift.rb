@@ -32,7 +32,12 @@ class Tectonic < Roda
                     'than inventing a number. When it does prescribe one, the usual ranges ' \
                     'are 180 to 240 seconds for a heavy main lift and 60 to 120 for ' \
                     'accessory work -- longer rest supports maximal strength on compound ' \
-                    'lifts, shorter suits accessories. Worth setting deliberately on the ' \
+                    'lifts, shorter suits accessories. warmup_sets, 0 to 6, is how many rungs ' \
+                    'the warmup ramp gets including the empty bar; leave it out and it is ' \
+                    'worked out from how far the top weight is above the bar, which is what ' \
+                    'you want almost always. Send 0 for no ramp at all -- worth it on an ' \
+                    'accessory late in a session that follows the same pattern as the lift ' \
+                    'before it. Worth setting deliberately on the ' \
                     'main lifts of a strength block, because without one the gaps become ' \
                     'whatever happens, and what happens is uneven. ' \
                     'is_commanded says the working sets are done under meet commands -- ' \
@@ -63,6 +68,7 @@ class Tectonic < Roda
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: { type: 'integer' },
             rest_seconds: { type: 'integer' }, is_commanded: { type: 'boolean' },
+            warmup_sets: { type: 'integer' },
             bench_angle_degrees: { type: 'integer' }, rack_hole: { type: 'integer' },
             safety_hole: { type: 'integer' },
             percent_of: { type: 'string' }, note: { type: 'string' }

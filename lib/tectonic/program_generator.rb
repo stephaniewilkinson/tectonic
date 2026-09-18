@@ -221,10 +221,17 @@ class Tectonic < Roda
       return write_flat(workout, lift, top_weight(week, lift), standing) if lift.timed?
 
       top = top_weight(week, lift)
-      ramp = Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
-                              loading: loading(lift))
-      ramp.sum { |set| insert_set(workout, lift, set, is_warmup: true, standing:) } +
+      # `rungs` is the lift's own answer where it has one and nil where it has not, which is
+      # every lift written before 040 -- so an unanswered lift gets the ratio-based default and
+      # nothing already in a block has to be edited to benefit. Zero means no ramp at all, and
+      # is why this passes the column through rather than testing it for truthiness. #451.
+      ramp(lift, top).sum { |set| insert_set(workout, lift, set, is_warmup: true, standing:) } +
         working_sets(lift, top).sum { |set| insert_set(workout, lift, set, is_warmup: false, standing:) }
+    end
+
+    def ramp(lift, top)
+      Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
+                       loading: loading(lift), rungs: lift.warmup_sets)
     end
 
     # Every set at the same load, with no ramp before them. Two kinds of work want this.
