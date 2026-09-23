@@ -42,8 +42,13 @@
     </p>
   <%- else %>
     <p class="mt-2 text-sm text-gray-700">
+      <%# The verb agrees with the count as well as the noun. "1 session ... overlap" was the
+          state this shipped in: the noun was pluralised and the verb was not, so the one case
+          a lifter reaches by answering all but the last question read as broken English at
+          exactly the moment the page was nearly done with them. %>
       <%= @proposals.length %> session<%= 's' unless @proposals.length == 1 %> from your history
-      overlap something your watch recorded. Each one is a guess &mdash; say which are right.
+      overlap<%= 's' if @proposals.length == 1 %> something your watch recorded. Each one is a
+      guess &mdash; say which are right.
     </p>
     <%# That the other door exists, said on this side too. #534.
 
