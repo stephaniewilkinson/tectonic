@@ -3,6 +3,7 @@
 require 'date'
 require_relative '../tool'
 require_relative 'support'
+require_relative 'freshness'
 require_relative '../../body_readings'
 
 class Tectonic < Roda
@@ -28,9 +29,22 @@ class Tectonic < Roda
       #
       # **Nothing here writes.** The scale is the instrument and the app is not, so there is
       # no tool in this file or the two beside it that puts a measurement into the table --
-      # #518's sync is the only thing that does.
+      # #518's sync is the only thing that does. It is also what this tool asks to run before
+      # it reads (#533): the fetch and this tool were built in separate worktrees and nothing
+      # joined them, so the table had no filler and this reported its emptiness faithfully
+      # forever. Freshness carries both halves of that call -- the asking, and what may be
+      # said afterwards about how whole the window is.
       class HealthReadings < Tool
         DEFAULT_DAYS = 90
+
+        # What a hole in the window does to *this* answer, in this tool's own terms. Every
+        # figure it reports is an aggregate -- a count, the ends of a range, a band -- so a
+        # window missing a page produces every one of them correctly, over a window that is
+        # not the one the caller asked about. The latest reading is the one that stings: a
+        # throttled fetch stops before this morning and "latest 81.4 on Tuesday" is then a
+        # true sentence about a stale table.
+        GAP_RISK = 'A count, a range and a band are each computed over whatever arrived, so all of ' \
+                   'them would describe a smaller window than the one asked for, without saying so.'
 
         tool_name 'health_readings'
 
@@ -56,15 +70,28 @@ class Tectonic < Roda
           required: ['metric'], additionalProperties: false
         )
 
+        # The fetch goes first, before the window is even worked out, because the rows it
+        # writes are rows this query has to see -- a read that asked afterwards would report
+        # the table as it was a moment before the readings it triggered arrived.
         def self.perform(context:, arguments:)
           metric = named(arguments)
+          fresh = Freshness.checked(context, risk: GAP_RISK)
           from, to = bounds(context, arguments)
           rows = BodyReadings.in_window(context.health_metrics, metric:, from:, to:, source: arguments[:source])
-          return empty(context, metric, from, to) if rows.empty?
+          return empty(context, metric, from, to, fresh) if rows.empty?
 
+          answer(metric, [from, to], rows, arguments, fresh)
+        end
+
+        # The window arrives as the pair it was computed as rather than as two arguments,
+        # which is the same trade bodyweight_trend makes for the same reason: the alternative
+        # is reading `bounds` a second time in here, and two reads of a default window is two
+        # chances to resolve "today" against two different days.
+        def self.answer(metric, window, rows, arguments, fresh)
+          from, to = window
           instruments = BodyReadings.by_instrument(rows).map { |key, group| instrument(key, group, arguments) }
-          ok(summary(metric, from, to, instruments, arguments),
-             structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments: })
+          ok(Freshness.told(summary(metric, from, to, instruments, arguments), fresh),
+             structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments:, freshness: fresh })
         end
 
         # A metric name is free text in the table on purpose, so this refuses only the empty
@@ -109,11 +136,17 @@ class Tectonic < Roda
         # account actually holds. A model that asked for `bodyweight` and got `[]` cannot tell
         # a wrong name from an empty table, and those two want opposite next moves -- one is
         # "ask again as weight" and the other is "the scale has not synced".
-        def self.empty(context, metric, from, to)
+        #
+        # Which is the answer the freshness note completes, and this is the place it matters
+        # most: "no readings" is a true sentence about a revoked grant and a lifter who has
+        # not weighed in, and the third possibility -- a fetch that never got through -- is
+        # invisible from here. An empty answer that cannot say which of the three it is, is
+        # the silent lie #533 exists to remove.
+        def self.empty(context, metric, from, to, fresh)
           held = BodyReadings.metrics_held(context.health_metrics)
-          ok("No #{metric} readings between #{from} and #{to}.#{held_phrase(held)}",
+          ok(Freshness.told(["No #{metric} readings between #{from} and #{to}.#{held_phrase(held)}"], fresh),
              structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments: [],
-                           metrics_held: held })
+                           metrics_held: held, freshness: fresh })
         end
 
         def self.held_phrase(held)
@@ -125,9 +158,14 @@ class Tectonic < Roda
         # The prose, because plenty of clients render only the text -- #262's lesson, and a
         # tool whose whole job is a handful of numbers is the easiest of all to reduce to a
         # count nobody can act on.
+        #
+        # Lines rather than a finished string, so that Freshness.told can put its note in
+        # front of them or behind them: where a caveat sits is part of what it says, and a
+        # warning appended under three instrument lines is a warning read after the number it
+        # was meant to qualify.
         def self.summary(metric, from, to, instruments, arguments)
           head = "#{metric}, #{from} to #{to}, by instrument:"
-          [head, *instruments.map { |view| line(view) }, tail(arguments)].compact.join("\n")
+          [head, *instruments.map { |view| line(view) }, tail(arguments)]
         end
 
         # The band is in the sentence and not only in the payload, for the reason #519 gives:

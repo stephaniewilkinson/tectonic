@@ -25,8 +25,8 @@ class Tectonic < Roda
   # a call only if the last one is old enough to be worth another. The measurements are
   # current exactly when somebody is looking at them and at no other time, which is both
   # cheaper and the same rule the rest of the app follows. #518 lists this as its open
-  # question and recommends this answer; it is built rather than settled, and one call site
-  # moves if it turns out to be wrong.
+  # question and recommends this answer; #533 wired it up, so the callers are the three
+  # reading tools and nothing else, and moving the trigger means moving those three.
   #
   # ## What a caller is told, and what it must not conclude
   #
@@ -147,7 +147,14 @@ class Tectonic < Roda
     module_function
 
     # The entry point for anything about to read measurements: bring them up to date if they
-    # are not, and otherwise do nothing at all. #519's tools call this before they read.
+    # are not, and otherwise do nothing at all.
+    #
+    # #519's three reading tools -- health_readings, bodyweight_trend and body_composition --
+    # call this first, through MCP::Tools::Freshness, and then report the outcome it returns
+    # alongside whatever they read. They are its only callers, and between #518 and #533 there
+    # were none at all -- this module was finished, specced and wired to nothing, and the
+    # symptom was a table that stayed empty while every other part of the app went on
+    # reporting the connection as live.
     #
     # Cheap in the ordinary case, which is the case that matters -- one indexed row by account
     # id, and no network.
