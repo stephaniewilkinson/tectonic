@@ -32,7 +32,7 @@ module PageAssets
   def make_account
     email = "#{SecureRandom.hex}@example.com"
     password = 'pw12345678'
-    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password), created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
     [email, password]
   end
 

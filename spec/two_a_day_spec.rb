@@ -33,7 +33,7 @@ module TwoADay
   def login
     email = "#{SecureRandom.hex}@example.com"
     password = 'pw12345678'
-    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password), created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
     get '/login'
     post '/login', { login: email, password:, '_csrf' => last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1] }
     @account_id = DB[:accounts].where(email:).get(:id)

@@ -25,7 +25,7 @@ module OAuthFlow
 
   def create_account(password: 'correcthorsebatterystaple')
     email = "#{SecureRandom.hex}@example.com"
-    id = DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password), created_on: Time.now)
+    id = DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
     [id, email, password]
   end
 

@@ -26,7 +26,7 @@ def probe_transport(tools, env)
 end
 
 def new_account
-  DB[:accounts].insert(email: "#{SecureRandom.hex}@example.com", password_hash: 'x', created_on: Time.now)
+  DB[:accounts].insert(email: "#{SecureRandom.hex}@example.com", password_hash: 'x')
 end
 
 # A registered OAuth client (the "LLM") to attribute a test token to. Fresh per mint so
