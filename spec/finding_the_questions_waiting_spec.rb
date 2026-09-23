@@ -186,6 +186,34 @@ describe 'the permanent address of the review list' do
   end
 end
 
+describe 'the sentence the review list opens with' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include FindingTheQuestions
+
+  # The noun was pluralised against the count and the verb was not, so one proposal read
+  # "1 session from your history overlap something your watch recorded". One is not an edge
+  # case here: it is where every queue ends, reached by answering all but the last question,
+  # so the broken reading was waiting at the moment the page was nearly done with the lifter.
+  it 'agrees its verb with a single session' do
+    questions_waiting(1)
+
+    get '/workouts/withings'
+
+    assert_includes last_response.body, '1 session from your history'
+    assert_includes last_response.body, 'overlaps something your watch recorded'
+  end
+
+  it 'still reads as plural for more than one' do
+    questions_waiting(3)
+
+    get '/workouts/withings'
+
+    assert_includes last_response.body, '3 sessions from your history'
+    assert_includes last_response.body, 'overlap something your watch recorded'
+  end
+end
+
 describe 'what a doorway to the review list asks Withings' do
   include Rack::Test::Methods
   include RouteOwnership
