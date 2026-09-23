@@ -279,7 +279,7 @@ describe 'what the two generated sessions carry' do
   it 'differs in nothing a lifter can see' do
     sessions = Tectonic::ProgramGenerator.new(two_day_program).generate(1).sort_by(&:id)
     first, second = sessions
-    ignored = %i[id program_day_id created_on created_at]
+    ignored = %i[id program_day_id created_at]
 
     assert_equal %w[Squat Walk], sessions.map { |session| session.program_day.focus }.sort
     assert_equal first.values.except(*ignored), second.values.except(*ignored)
