@@ -12,8 +12,7 @@ require 'date'
 # it, and a plank became a 10 lb weighted plank in three weeks.
 module ExerciseTypes
   def an_account
-    DB[:accounts].insert(email: "types-#{SecureRandom.hex(4)}@example.com",
-                         password_hash: 'x', created_on: Time.now)
+    DB[:accounts].insert(email: "types-#{SecureRandom.hex(4)}@example.com", password_hash: 'x')
   end
 
   def a_movement(account_id, barbell: false, **defaults)

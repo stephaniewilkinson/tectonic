@@ -105,7 +105,7 @@ end
 # would have read the wrong column and called an account empty on the strength of it.
 module Ownership
   def account
-    DB[:accounts].insert(email: "#{SecureRandom.hex}@example.com", password_hash: 'x', created_on: Time.now)
+    DB[:accounts].insert(email: "#{SecureRandom.hex}@example.com", password_hash: 'x')
   end
 end
 

@@ -33,8 +33,7 @@ module DetectedZone
   def sign_in_fresh(zone: nil)
     email = "#{SecureRandom.hex}@example.com"
     password = 'pw12345678'
-    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password),
-                         created_on: Time.now, time_zone: zone)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password), time_zone: zone)
     get '/login'
     post '/login', { login: email, password:, '_csrf' => token_from(last_response.body) }
     DB[:accounts].where(email:).get(:id)
@@ -264,7 +263,7 @@ describe 'a real browser signing in for the first time' do
   it 'sets the zone on an account that has never answered' do
     email = "#{SecureRandom.hex}@example.com"
     password = 'pw12345678'
-    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password), created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
     visit '/login'
     fill_in 'login', with: email
     fill_in 'password', with: password

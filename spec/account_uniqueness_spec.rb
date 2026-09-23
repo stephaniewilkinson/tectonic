@@ -94,10 +94,10 @@ describe 'the database rule behind it' do
   # rule from here rather than from Rodauth.
   it 'refuses a duplicate address written directly' do
     email = "#{SecureRandom.hex}@example.com"
-    DB[:accounts].insert(email:, password_hash: 'x', created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: 'x')
 
     assert_raises(Sequel::UniqueConstraintViolation) do
-      DB[:accounts].insert(email:, password_hash: 'x', created_on: Time.now)
+      DB[:accounts].insert(email:, password_hash: 'x')
     end
   end
 
@@ -107,8 +107,8 @@ describe 'the database rule behind it' do
   # stored address has a capital in it. See the note on migrate/027.
   it 'still allows two accounts differing only in case, which is a known gap' do
     handle = SecureRandom.hex
-    DB[:accounts].insert(email: "#{handle}@example.com", password_hash: 'x', created_on: Time.now)
-    DB[:accounts].insert(email: "#{handle.upcase}@example.com", password_hash: 'x', created_on: Time.now)
+    DB[:accounts].insert(email: "#{handle}@example.com", password_hash: 'x')
+    DB[:accounts].insert(email: "#{handle.upcase}@example.com", password_hash: 'x')
 
     assert_equal 2, DB[:accounts].where(Sequel.ilike(:email, "#{handle}@example.com")).count
   end

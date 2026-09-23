@@ -24,7 +24,7 @@ module FetchingFromTheScale
   # in would only be a slower way to get an id.
   def an_account
     email = "#{SecureRandom.hex}@example.com"
-    DB[:accounts].insert(email:, password_hash: 'not-a-real-hash', created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: 'not-a-real-hash')
   end
 
   # A connection that has been read is one that has been read *back* to somewhere as well, so
