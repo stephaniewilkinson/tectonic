@@ -7,21 +7,427 @@
       refusing to say whether it worked.
 
       role="status" rather than alert: it is the outcome of something just asked for, not an
-      interruption. Read once and gone, so a reload does not re-announce it. %>
+      interruption. Read once and gone, so a reload does not re-announce it.
+
+      Above the section index and outside every section, because it is the answer to the last
+      thing asked rather than a fact about one setting -- and because the flows that set it are
+      the ones that come back to the top of the page. #529 left it here for that reason: a
+      notice inside the Wearables block would be jumped past by the very redirect that wrote
+      it. %>
   <%- if @notice %>
     <p role="status" class="mt-4 rounded-md border border-sky-800 bg-sky-50 px-3 py-2 text-sm text-gray-700">
       <%= @notice %>
     </p>
   <%- end %>
 
-  <%# Two forms, not one. A week start and a plate inventory are unrelated answers, and a
-      single Save across both would mean changing either required re-submitting the other.
-      They share a page because they are the same kind of thing -- a per-account preference
-      about how the app should behave -- and splitting them put settings in two places
-      (#189).
+  <%# Two forms, not one -- four of them now. A week start and a plate inventory are unrelated
+      answers, and a single Save across both would mean changing either required re-submitting
+      the other. They share a page because they are the same kind of thing -- a per-account
+      preference about how the app should behave -- and splitting them put settings in two
+      places (#189).
 
       No units here. That was the largest part of #189 and it was dropped outright: pounds
       everywhere, no kg, so there is nothing to choose. %>
+
+  <%# A way to reach one of these without scrolling past the other four. #529.
+
+      The issue asks for submenus under the settings dropdown, and there is no dropdown: the
+      top bar is six flat links and `settings` is one of them. Asked what was wanted, the
+      answer was the page rather than the bar -- group what is already here under the five
+      names below, in this order, and leave the nav exactly as it is. So nothing above this
+      line moves, `assistants` keeps its place in the bar, and a spec pins both.
+
+      Anchors rather than pages or disclosures, and what each would have cost is the argument.
+
+      A page per section -- /settings/plates, /settings/wearables -- is the shape the word
+      "submenu" suggests and the one that breaks what is here: four of these five sections are
+      forms that post independently, one of them posts two racks in a single submission on
+      purpose, and dealing them out across routes means four more routes, four more views and
+      four more redirects to get wrong, on a page whose only actual problem is its length. It
+      also changes what a save means, which is the one thing this could not do.
+
+      Collapsing them behind taps hides four in five by default, which is worse on the phone
+      this is for: a lifter who came to change one plate count taps twice instead of once, and
+      the open/shut state then has to survive a save and a reload or the page is lying about
+      where it was. It would also be a fourth copy of the disclosure chevron, which
+      named_styles_spec pins at three.
+
+      So the page stays one page, every form stays where it was and posts exactly what it
+      posted, and the fragment does the work. It renders for nothing, it survives a reload
+      because it is in the URL, the back button undoes it, it needs no JavaScript, and the
+      saves land back on the section they were made in rather than at the top. What it buys is
+      smaller than a menu looks -- five links, not a tree -- and it is the whole of what was
+      asked for: a way to get to one of these directly.
+
+      The links are tap targets rather than a sentence with five words underlined in it,
+      because this row is the thing being aimed at with a thumb before anything else on the
+      page is. %>
+  <nav aria-label="Settings sections" class="mt-4 border-y border-gray-200">
+    <ul class="flex flex-wrap items-center gap-x-5">
+      <%- { 'weight-plates' => 'Weight plates', 'wearables' => 'Wearables', 'ai-agents' => 'AI agents',
+            'time-and-week' => 'Time and week', 'session-length' => 'Session length' }.each do |anchor, name| %>
+        <li>
+          <a href="#<%= anchor %>"
+             class="inline-flex min-h-11 items-center text-sm font-semibold text-lime-700 hover:text-lime-800">
+            <%= name %>
+          </a>
+        </li>
+      <%- end %>
+    </ul>
+  </nav>
+
+  <%# The rack first, because it is the longest section and the one most often come back to:
+      plates get sold and bought, and every number the app prints is rounded to what this says.
+      #529 asked for this order by name.
+
+      "Weight plates" rather than "Equipment", which is also theirs. Equipment was a heading
+      that could have held the bar, the rack, a belt and a watch, and this section holds
+      exactly two racks' worth of plates and the two handles they go on.
+
+      scroll-mt keeps the heading off the very top edge when the fragment lands on it, so a
+      section arrives looking like the top of something rather than like a line that happens to
+      be first. %>
+  <section id="weight-plates" class="scroll-mt-4">
+    <h2 class="mt-8 text-xl font-semibold text-gray-900">Weight plates</h2>
+    <p class="mt-2 text-sm text-gray-600">
+      What you lift with. Every weight the app works out &mdash; warmups, working sets, the
+      plate breakdown, and how much a programme adds after a good week &mdash; is rounded to
+      something this rack can actually load.
+    </p>
+
+    <%# What changing the rack did to the sessions already written. #439.
+        Saving used to affect only the next generation, so a block already on the calendar kept
+        whatever the app had believed about the plates on the day it was generated -- which is
+        how the same movement came to be prescribed at 44 one week and 45 the next, 45 being a
+        dumbbell a 4 lb handle cannot build. Now it reaches them, and this says so: a lifter who
+        opens next Monday and finds a different number on it should have been told here rather
+        than left to notice.
+
+        Only when something actually moved. The count is of sessions whose weights changed, not
+        of sessions rewritten, so correcting a typo in a plate count does not announce that it
+        rewrote a fortnight of training when it changed nothing at all.
+
+        Inside this section rather than beside the notice at the top, and it is the save's own
+        redirect that makes the difference: the rack form comes back to #weight-plates, so an
+        announcement about the rack has to be in the part of the page that lands under the
+        thumb. %>
+    <%- if @rerounded.positive? %>
+      <p class="mt-3 rounded-lg border border-sky-800 bg-sky-50 px-4 py-3 text-sm text-gray-700">
+        Your rack changed, so
+        <strong><%= @rerounded %> upcoming <%= @rerounded == 1 ? 'session was' : 'sessions were' %></strong>
+        rewritten onto weights it can load. Sets you had already marked as done were left exactly
+        as they were.
+      </p>
+    <%- end %>
+
+    <form method="post" action="/settings" class="mt-6 space-y-6">
+      <%== csrf_tag('/settings') %>
+
+      <%# Two racks, named. #369 asks for the plate inventory to be "separated into a barbell
+          plates and a dumbbell pairs/plates option", and the separation is what makes either of
+          them readable: without a heading the second block of ten spin buttons is ten more of
+          the first, and the counts mean different things. %>
+      <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Barbell</h3>
+
+      <div>
+        <%# Named rather than just "Bar", which is #439's complaint about every field on this
+            form: the label has to say which number it wants, because the wrong reading is not
+            obviously wrong anywhere afterwards. %>
+        <label for="bar_weight" class="block text-sm font-medium text-gray-900">
+          The empty bar, on its own
+        </label>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="number" id="bar_weight" name="bar_weight" min="1" step="any" autocomplete="off"
+                 value="<%= weight_label(@equipment.bar_weight) %>"
+                 class="<%= field_style %> w-28 py-1.5 text-gray-900">
+          <span class="text-sm text-gray-500">lb</span>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend class="text-sm font-medium text-gray-900">Plates</legend>
+        <p class="mt-1 text-sm text-gray-500">
+          Pairs, not single plates &mdash; a bar is loaded on both sides. Set a count to zero
+          to say you no longer own it. Your smallest plate decides the smallest jump you can
+          make: <span class="font-semibold text-gray-900"><%= @equipment.increment %> lb</span>.
+        </p>
+        <%# What the answers add up to, which is the check #439 asks for. Derived through the
+            same enumeration the generator prescribes from, so a lifter who read "pairs" as
+            "plates" sees a top end twice what their rack can really do -- which restating the
+            numbers they typed would never have shown them. %>
+        <%- if (range = loadable_range(@equipment.loadable_totals)) %>
+          <p class="mt-1 text-sm text-gray-500">
+            That loads <span class="font-semibold text-gray-900"><%= range %></span>.
+          </p>
+        <%- end %>
+        <div class="mt-3 space-y-2">
+          <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
+            <div class="flex items-center gap-3">
+              <%# A real label, not a lookalike span: the "45 lb" text was beside each box
+                  with nothing connecting the two, so a screen reader heard ten anonymous
+                  spin buttons -- on the form that decides what the whole app can load.
+                  The id swaps the dot out of 2.5 and 1.25 because a dot in an id is legal
+                  HTML that CSS and querySelector both read as a class boundary. %>
+              <label for="plates_<%= denomination.to_s.tr('.', '_') %>"
+                     class="w-16 text-right font-mono text-sm text-gray-900">
+                <%= denomination %> lb
+              </label>
+              <input type="number" min="0" step="1" autocomplete="off"
+                     id="plates_<%= denomination.to_s.tr('.', '_') %>"
+                     name="plates[<%= denomination %>]"
+                     value="<%= @equipment.pairs.fetch(denomination, 0) %>"
+                     class="<%= field_style %> w-20 py-1.5 text-gray-900">
+              <span class="text-sm text-gray-500">pairs</span>
+            </div>
+          <%- end %>
+        </div>
+      </fieldset>
+
+      <%# The second rack. #369.
+          Until now the app knew what plates an account owns and nothing at all about its
+          dumbbells, so it assumed fives -- which #259 named as an assumption when it made it.
+          That is right for a fixed rack and wrong in both directions for an adjustable set: a
+          pair of Powerblocks steps in 2.5 at the bottom, so 27.5 is loadable and was being
+          rounded away; and a handle with only 5s and 10s on the shelf cannot make 22.5, which
+          the assumption cheerfully prescribed.
+
+          Blank is the ordinary answer and says so, because most people have a fixed rack and
+          nobody should have to fill this in to be described correctly. It is also the way back:
+          clearing the handle returns the account to the assumption, which would otherwise be
+          unsayable once it had been said. %>
+      <h3 class="border-t border-gray-200 pt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">
+        Dumbbells
+      </h3>
+
+      <div>
+        <%# "Handle" was the worst of them, and #439 says so: it is ambiguous between one handle
+            and the pair, and the two readings differ by a factor of two. %>
+        <label for="dumbbell_handle_weight" class="block text-sm font-medium text-gray-900">
+          One handle, with nothing on it
+        </label>
+        <p class="mt-1 text-sm text-gray-500">
+          Only for plate-loaded or adjustable dumbbells. Leave it blank for a fixed rack, which
+          the app treats as running in
+          <span class="font-semibold text-gray-900"><%= Tectonic::Equipment::DUMBBELL_INCREMENT %> lb</span> steps.
+        </p>
+        <%- if @equipment.dumbbell_handle_weight&.positive? %>
+          <p class="mt-1 text-sm text-gray-500">
+            <span class="font-semibold text-gray-900"><%= weight_label(@equipment.dumbbell_handle_weight) %> lb</span>
+            each, <%= weight_label(@equipment.dumbbell_handle_weight * 2) %> lb for the pair.
+          </p>
+        <%- end %>
+        <div class="mt-1 flex items-center gap-2">
+          <input type="number" id="dumbbell_handle_weight" name="dumbbell_handle_weight" min="0" step="any"
+                 autocomplete="off" value="<%= weight_label(@equipment.dumbbell_handle_weight) %>"
+                 class="<%= field_style %> w-28 py-1.5 text-gray-900">
+          <span class="text-sm text-gray-500">lb</span>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend class="text-sm font-medium text-gray-900">Dumbbell plates</legend>
+        <%# "Per dumbbell" is the whole of what has to be said here, and it has to be said: an
+            adjustable set is sold as two handles sharing one plate set, so a lifter counting the
+            shelf is counting what goes on one dumbbell. Asking across both would make every
+            number on this form twice what anybody would write down. %>
+        <p class="mt-1 text-sm text-gray-500">
+          Pairs per dumbbell &mdash; one pair is one plate on each end. Your smallest decides the
+          smallest jump:
+          <span class="font-semibold text-gray-900"><%= @equipment.dumbbell_increment %> lb</span>.
+        </p>
+        <%# Said twice, because since #439 a movement says how many dumbbells it is done with and
+            the answers are different. Every plate size has to go on both ends of every handle in
+            use, so a matched pair spends two pairs of a size where a single spends one and
+            reaches roughly half as far up the shelf.
+
+            This is also the shortest explanation of a thing that would otherwise look like a
+            bug: a dumbbell bench prescribed lighter than a single-arm row off the same plates. %>
+        <%- if (ranges = dumbbell_ranges(@equipment)) %>
+          <p class="mt-1 text-sm text-gray-500">
+            One dumbbell loads <span class="font-semibold text-gray-900"><%= ranges[:one] %></span>.
+            A matched pair loads <span class="font-semibold text-gray-900"><%= ranges[:pair] %></span> each,
+            because both handles need the same plates.
+          </p>
+        <%- end %>
+        <div class="mt-3 space-y-2">
+          <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
+            <div class="flex items-center gap-3">
+              <label for="dumbbell_plates_<%= denomination.to_s.tr('.', '_') %>"
+                     class="w-16 text-right font-mono text-sm text-gray-900">
+                <%= denomination %> lb
+              </label>
+              <input type="number" min="0" step="1" autocomplete="off"
+                     id="dumbbell_plates_<%= denomination.to_s.tr('.', '_') %>"
+                     name="dumbbell_plates[<%= denomination %>]"
+                     value="<%= @equipment.dumbbell_pairs.fetch(denomination, 0) %>"
+                     class="<%= field_style %> w-20 py-1.5 text-gray-900">
+              <span class="text-sm text-gray-500">pairs</span>
+            </div>
+          <%- end %>
+        </div>
+      </fieldset>
+
+      <button type="submit"
+              class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5
+                     text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Save</button>
+    </form>
+  </section>
+
+  <%# Reading your own bodyweight from Withings. #472.
+
+      Its own form, outside the equipment one above, on the same argument the page already
+      makes twice: these are unrelated answers and one Save across them would mean changing
+      the rack to connect a scale.
+
+      Three states rather than two. A grant revoked from Withings' own app leaves a row here
+      that no longer buys anything, and a page saying "connected" about it would be wrong in
+      the one way that is hard to notice -- readings simply stop arriving.
+
+      "Wearables" rather than "Withings", which is #529's renaming and is the one with an
+      argument behind it: Withings is one wearable of several this app might read one day --
+      Apple Health is a deferred ticket -- and a section named after a vendor has to be renamed
+      the day a second one arrives, taking every link and every spec that mentions it along.
+      The brand keeps the heading below, where it belongs: it is which wearable, not what the
+      section is for, and a second one lands here as another h3 rather than as a rewrite. %>
+  <section id="wearables" class="scroll-mt-4">
+    <h2 class="mt-10 text-xl font-semibold text-gray-900">Wearables</h2>
+    <p class="mt-2 text-sm text-gray-600">
+      What the app may read from something you wear. One device so far, and everything it
+      reads sits alongside your training rather than replacing any of it.
+    </p>
+
+    <h3 class="mt-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Withings</h3>
+
+    <%# The connection is asked about *before* the credentials, and the order is load-bearing.
+        Disconnecting is a local delete -- it forgets a row, it does not call Withings -- so it
+        must stay available even on a deployment whose credentials have been removed. The other
+        way round, a lifter who was connected when the keys went away could no longer revoke
+        what they had granted, which is the one thing they must always be able to do. %>
+    <%- if @withings[:state] == :absent && !@withings_configured %>
+      <p class="mt-2 text-sm text-gray-600">
+        This deployment has no Withings credentials set, so there is nothing to connect to.
+        That is the ordinary state of a local checkout.
+      </p>
+    <%- elsif @withings[:state] == :absent %>
+      <p class="mt-2 text-sm text-gray-600">
+        Connect your Withings account and the app can read your weight and body composition
+        alongside your training. It reads; it never writes anything back.
+      </p>
+      <form method="post" action="/settings/withings/connect" class="mt-3">
+        <%== csrf_tag('/settings/withings/connect') %>
+        <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                      text-gray-900 hover:bg-lime-600">Connect Withings</button>
+      </form>
+    <%- else %>
+      <p class="mt-2 text-sm text-gray-600">
+        <%- if @withings[:state] == :stale %>
+          Connected on <%= @withings[:connected_at].strftime('%-d %b %Y') %>, but the permission
+          has expired and could not be renewed &mdash; usually because it was revoked from
+          Withings itself. Connect again to resume.
+        <%- else %>
+          Connected on <%= @withings[:connected_at].strftime('%-d %b %Y') %>.
+          <%- if @withings[:synced_at] %>
+            Last read <%= @withings[:synced_at].strftime('%-d %b at %H:%M') %>.
+          <%- else %>
+            Nothing has been read yet.
+          <%- end %>
+        <%- end %>
+      </p>
+      <div class="mt-3 flex items-center gap-2">
+        <%- if @withings[:state] == :stale && @withings_configured %>
+          <form method="post" action="/settings/withings/connect">
+            <%== csrf_tag('/settings/withings/connect') %>
+            <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                          text-gray-900 hover:bg-lime-600">Reconnect</button>
+          </form>
+        <%- end %>
+        <form method="post" action="/settings/withings/disconnect">
+          <%== csrf_tag('/settings/withings/disconnect') %>
+          <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 px-3 text-sm
+                                        font-semibold text-gray-700 hover:bg-gray-50">Disconnect</button>
+        </form>
+      </div>
+      <%# Said plainly because it is the question anybody hesitating over Disconnect has. %>
+      <p class="mt-2 text-xs text-gray-500">
+        Disconnecting stops the app asking for more. Measurements already read stay where they are.
+      </p>
+      <%# The review list's permanent address. #534.
+
+          /workouts/withings had nothing at all pointing at it: a lifter who ran the backfill,
+          closed the terminal and came back on Sunday could only reach their own questions by
+          remembering a URL. The prompt that actually catches somebody is on /workouts, and it
+          is only there while something is waiting, which is right for a prompt and wrong for an
+          address -- a screen that can only be found when it has work on it cannot be gone back
+          to, and a lifter who wants to check whether they finished has nowhere to look.
+
+          So the link that is always here is here, with the connection that produces the
+          questions. It is the one place in the app where a lifter already reasons about the
+          watch, nothing else in the app moves when it appears, and it is asked about the same
+          way it is found -- which is what the nav could not offer at any price: a permanent nav
+          entry is carried on every page by every lifter, and a conditional one moves the entries
+          after it.
+
+          It says the count rather than only linking, so the link can be decided about without
+          being followed. Nought is worth printing here and is not worth printing on /workouts:
+          there, the absence of the line is the message, and a box saying nothing is waiting
+          would be clutter on a page about something else. Here the link is unconditional, so
+          the sentence has to be able to say the screen is empty. %>
+      <p class="mt-4 text-sm text-gray-700">
+        <a href="/workouts/withings" class="font-semibold text-lime-700 hover:text-lime-800">Matches from
+          your watch</a>
+        &mdash;
+        <%- if @withings_waiting.positive? %>
+          <%= @withings_waiting %> session<%= 's' unless @withings_waiting == 1 %> from your history
+          <%= @withings_waiting == 1 ? 'is' : 'are' %> waiting for an answer.
+        <%- else %>
+          nothing is waiting for an answer.
+        <%- end %>
+      </p>
+    <%- end %>
+  </section>
+
+  <%# The connector, named here as a section and left living where it already lives. #529.
+
+      It is the odd one of the five. The other four are settings in the strict sense -- answers
+      stored against this account, changed by a form and saved -- and this one is a walk: an
+      address to paste into an assistant, the instructions for where each client hides the
+      paste box, and the list of what is currently connected with a Disconnect beside each.
+
+      So two things were deliberately not done. The whole of /connections was not dragged in
+      here, because that walk leaves the site and comes back through an approval screen and
+      wants a page of its own rather than a fifth of one -- and because a settings page that
+      held it would be asking a lifter to scroll past a credential-shaped URL to reach their
+      plate counts. And the markup was not copied, because two copies of that URL is two places
+      to change it and one of them will be missed; a section that links is a section that
+      cannot drift.
+
+      `assistants` also keeps its place in the top bar pointing at the same page, which was
+      asked for in as many words. It is #534's argument about a nav entry, run backwards: people
+      learn where things are by position, and taking an entry away moves every entry after it
+      just as surely as adding one does.
+
+      The count is here for the same reason the matches count is in the section above -- it is
+      what lets somebody decide not to follow the link -- and it is one query that reads no
+      assistant's details, because this page has no use for them. %>
+  <section id="ai-agents" class="scroll-mt-4">
+    <h2 class="mt-10 text-xl font-semibold text-gray-900">AI agents</h2>
+    <p class="mt-2 text-sm text-gray-600">
+      An assistant you have connected can read your training and write it: plan a block, log a
+      session, correct a set you typed wrong. It sees your account and nothing else. Connecting
+      one takes a few steps in the assistant itself, so it has a page of its own.
+    </p>
+    <p class="mt-4 text-sm text-gray-700">
+      <a href="/connections" class="font-semibold text-lime-700 hover:text-lime-800">Assistants</a>
+      &mdash;
+      <%- if @assistants.positive? %>
+        <%= @assistants %> assistant<%= 's' unless @assistants == 1 %>
+        <%= @assistants == 1 ? 'is' : 'are' %> connected, and can be disconnected there.
+      <%- else %>
+        nothing is connected yet.
+      <%- end %>
+    </p>
+  </section>
+
   <%# Where you are, which is the whole of what decides what day it is here. #349.
 
       This app ran on the server's clock, and the server is UTC, so a lifter in New York at
@@ -30,70 +436,83 @@
       opened a second empty workout beside the real one, and the session they were halfway
       through was marked missed on the calendar.
 
-      The date under the picker is the point of the whole setting, so it is shown rather than
-      described: it is either today or it is not, and a lifter can tell at a glance which.
+      Under one heading with the week start since #529, because they are one idea: both answer
+      "when is it, for me", one to the day and one to the week, and neither is any use to
+      somebody who came looking for the other. Two forms still, and two saves, for the reason
+      the top of this page gives -- the heading is the grouping, not the submission. %>
+  <section id="time-and-week" class="scroll-mt-4">
+    <h2 class="mt-10 text-xl font-semibold text-gray-900">Time and week</h2>
 
-      A list rather than a text box, because "EST" and "GMT+5" are what people type and
-      neither resolves -- and it is a curated list rather than all six hundred IANA names,
-      because this is set on a phone. Whatever is already stored stays in the list even when
-      it is not one of the offerings, so a zone set by hand is never quietly replaced by the
-      nearest one on offer. %>
-  <h2 class="mt-8 text-xl font-semibold text-gray-900">Time zone</h2>
-  <p class="mt-2 text-sm text-gray-600">
-    What counts as today, which decides which session you land on when you sign in and which
-    day a workout is logged against. Unset means UTC.
-  </p>
+    <%# The date under the picker is the point of the whole setting, so it is shown rather than
+        described: it is either today or it is not, and a lifter can tell at a glance which.
 
-  <form method="post" action="/settings/zone" class="mt-4">
-    <%== csrf_tag('/settings/zone') %>
-    <label for="time_zone" class="block text-sm font-medium text-gray-900">Your time zone</label>
-    <select name="time_zone" id="time_zone"
-            class="<%= field_style %> mt-2 min-h-11 w-full px-2 text-base">
-      <option value="">Unset (UTC)</option>
-      <%- Tectonic::Clock.zone_options(@time_zone).each do |zone| %>
-        <option value="<%= zone %>" <%= 'selected' if zone == @time_zone %>><%= zone %></option>
-      <%- end %>
-    </select>
-    <p class="mt-2 text-sm text-gray-500">
-      Today here is <%= @today.strftime('%A %-d %B %Y') %>.
+        A list rather than a text box, because "EST" and "GMT+5" are what people type and
+        neither resolves -- and it is a curated list rather than all six hundred IANA names,
+        because this is set on a phone. Whatever is already stored stays in the list even when
+        it is not one of the offerings, so a zone set by hand is never quietly replaced by the
+        nearest one on offer. %>
+    <h3 class="mt-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Time zone</h3>
+    <p class="mt-2 text-sm text-gray-600">
+      What counts as today, which decides which session you land on when you sign in and which
+      day a workout is logged against. Unset means UTC.
     </p>
-    <button type="submit"
-            class="<%= button_style %> mt-4 min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold
-                   text-gray-900 hover:bg-lime-600">Save</button>
-  </form>
 
-  <h2 class="mt-8 text-xl font-semibold text-gray-900">Week</h2>
-  <p class="mt-2 text-sm text-gray-600">
-    Which day the calendar grid begins on. It has always begun on Sunday, and not by
-    decision &mdash; that is simply the day <code>Date#wday</code> counts from.
-  </p>
+    <form method="post" action="/settings/zone" class="mt-4">
+      <%== csrf_tag('/settings/zone') %>
+      <label for="time_zone" class="block text-sm font-medium text-gray-900">Your time zone</label>
+      <select name="time_zone" id="time_zone"
+              class="<%= field_style %> mt-2 min-h-11 w-full px-2 text-base">
+        <option value="">Unset (UTC)</option>
+        <%- Tectonic::Clock.zone_options(@time_zone).each do |zone| %>
+          <option value="<%= zone %>" <%= 'selected' if zone == @time_zone %>><%= zone %></option>
+        <%- end %>
+      </select>
+      <p class="mt-2 text-sm text-gray-500">
+        Today here is <%= @today.strftime('%A %-d %B %Y') %>.
+      </p>
+      <button type="submit"
+              class="<%= button_style %> mt-4 min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold
+                     text-gray-900 hover:bg-lime-600">Save</button>
+    </form>
 
-  <form method="post" action="/settings/week" class="mt-4">
-    <%== csrf_tag('/settings/week') %>
-    <fieldset>
-      <legend class="sr-only">Week starts on</legend>
-      <div class="flex gap-2">
-        <%- { 0 => 'Sunday', 1 => 'Monday' }.each do |wday, name| %>
-          <%# A radio rather than a select, because two options in a menu is a menu that
-              hides one of them behind a tap. Labels wrap the input so the whole 44px of it
-              is the target. %>
-          <%# An instance variable rather than a local, as views/workouts/show.erb does and
-              for the reason its comment gives: erb_lint hands each tag to rubocop as a
-              snippet of its own, so a local assigned in one tag and read in the next is a
-              useless assignment to every cop that sees it. %>
-          <%- @chosen = @week_starts_on == wday %>
-          <label class="<%= button_style %> flex min-h-11 flex-1 cursor-pointer items-center justify-center
+    <h3 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Week</h3>
+    <p class="mt-2 text-sm text-gray-600">
+      Which day the calendar grid begins on. It has always begun on Sunday, and not by
+      decision &mdash; that is simply the day <code>Date#wday</code> counts from.
+    </p>
+
+    <form method="post" action="/settings/week" class="mt-4">
+      <%== csrf_tag('/settings/week') %>
+      <fieldset>
+        <legend class="sr-only">Week starts on</legend>
+        <div class="flex gap-2">
+          <%- { 0 => 'Sunday', 1 => 'Monday' }.each do |wday, name| %>
+            <%# A radio rather than a select, because two options in a menu is a menu that
+                hides one of them behind a tap. Labels wrap the input so the whole 44px of it
+                is the target. %>
+            <%# An instance variable rather than a local, as views/workouts/show.erb does and
+                for the reason its comment gives: erb_lint hands each tag to rubocop as a
+                snippet of its own, so a local assigned in one tag and read in the next is a
+                useless assignment to every cop that sees it. %>
+            <%- @chosen = @week_starts_on == wday %>
+            <%# The class list's continuation lines sit a step shallower than the attribute
+                they belong to, which is not a slip: this section gained an indent when #529
+                wrapped it, and the ternary below is one of the longest lines in the app.
+                erb_lint hands it to rubocop with the indentation included, and two more
+                columns put it over 120. %>
+            <label class="<%= button_style %> flex min-h-11 flex-1 cursor-pointer items-center justify-center
                         border px-4 text-sm font-semibold
                         <%= @chosen ? 'border-sky-800 bg-sky-800 text-white' : 'border-gray-300 bg-white text-gray-700' %>
                         <%= 'hover:bg-gray-50' unless @chosen %>">
-            <input type="radio" name="week_starts_on" value="<%= wday %>" class="sr-only" <%= 'checked' if @chosen %>>
-            <%= name %>
-          </label>
-        <%- end %>
-      </div>
-    </fieldset>
-    <button type="submit" class="<%= button_style %> mt-3 bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Save</button>
-  </form>
+              <input type="radio" name="week_starts_on" value="<%= wday %>" class="sr-only" <%= 'checked' if @chosen %>>
+              <%= name %>
+            </label>
+          <%- end %>
+        </div>
+      </fieldset>
+      <button type="submit" class="<%= button_style %> mt-3 bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Save</button>
+    </form>
+  </section>
 
   <%# How long you have to train. #446.
 
@@ -109,301 +528,29 @@
 
       A block can still say otherwise and wins where it does, because a peaking week really can
       be longer. What changes is that a block saying nothing inherits an answer instead of
-      switching the check off. %>
-  <h2 class="mt-8 text-xl font-semibold text-gray-900">Session length</h2>
-  <p class="mt-2 text-sm text-gray-600">
-    How long you have for a session. When a week is generated, any day estimated to run past
-    this is named along with how far over it is. Leave it blank for no warning.
-  </p>
+      switching the check off.
 
-  <form method="post" action="/settings/budget" class="mt-4">
-    <%== csrf_tag('/settings/budget') %>
-    <label for="minutes" class="block text-sm font-medium text-gray-900">Time for a session</label>
-    <div class="mt-1 flex items-center gap-2">
-      <input type="number" id="minutes" name="minutes" min="10" max="300" step="5" autocomplete="off"
-             value="<%= @time_budget_minutes %>"
-             class="<%= field_style %> w-28 py-1.5 text-gray-900">
-      <span class="text-sm text-gray-500">minutes</span>
-    </div>
-    <button type="submit"
-            class="<%= button_style %> mt-4 min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold
-                   text-gray-900 hover:bg-lime-600">Save</button>
-  </form>
-
-  <h2 class="mt-10 text-xl font-semibold text-gray-900">Equipment</h2>
-  <p class="mt-2 text-sm text-gray-600">
-    What you lift with. Every weight the app works out &mdash; warmups, working sets, the
-    plate breakdown, and how much a programme adds after a good week &mdash; is rounded to
-    something this rack can actually load.
-  </p>
-
-  <%# What changing the rack did to the sessions already written. #439.
-      Saving used to affect only the next generation, so a block already on the calendar kept
-      whatever the app had believed about the plates on the day it was generated -- which is
-      how the same movement came to be prescribed at 44 one week and 45 the next, 45 being a
-      dumbbell a 4 lb handle cannot build. Now it reaches them, and this says so: a lifter who
-      opens next Monday and finds a different number on it should have been told here rather
-      than left to notice.
-
-      Only when something actually moved. The count is of sessions whose weights changed, not
-      of sessions rewritten, so correcting a typo in a plate count does not announce that it
-      rewrote a fortnight of training when it changed nothing at all. %>
-  <%- if @rerounded.positive? %>
-    <p class="mt-3 rounded-lg border border-sky-800 bg-sky-50 px-4 py-3 text-sm text-gray-700">
-      Your rack changed, so
-      <strong><%= @rerounded %> upcoming <%= @rerounded == 1 ? 'session was' : 'sessions were' %></strong>
-      rewritten onto weights it can load. Sets you had already marked as done were left exactly
-      as they were.
-    </p>
-  <%- end %>
-
-  <form method="post" action="/settings" class="mt-6 space-y-6">
-    <%== csrf_tag('/settings') %>
-
-    <%# Two racks, named. #369 asks for the plate inventory to be "separated into a barbell
-        plates and a dumbbell pairs/plates option", and the separation is what makes either of
-        them readable: without a heading the second block of ten spin buttons is ten more of
-        the first, and the counts mean different things. %>
-    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Barbell</h3>
-
-    <div>
-      <%# Named rather than just "Bar", which is #439's complaint about every field on this
-          form: the label has to say which number it wants, because the wrong reading is not
-          obviously wrong anywhere afterwards. %>
-      <label for="bar_weight" class="block text-sm font-medium text-gray-900">
-        The empty bar, on its own
-      </label>
-      <div class="mt-1 flex items-center gap-2">
-        <input type="number" id="bar_weight" name="bar_weight" min="1" step="any" autocomplete="off"
-               value="<%= weight_label(@equipment.bar_weight) %>"
-               class="<%= field_style %> w-28 py-1.5 text-gray-900">
-        <span class="text-sm text-gray-500">lb</span>
-      </div>
-    </div>
-
-    <fieldset>
-      <legend class="text-sm font-medium text-gray-900">Plates</legend>
-      <p class="mt-1 text-sm text-gray-500">
-        Pairs, not single plates &mdash; a bar is loaded on both sides. Set a count to zero
-        to say you no longer own it. Your smallest plate decides the smallest jump you can
-        make: <span class="font-semibold text-gray-900"><%= @equipment.increment %> lb</span>.
-      </p>
-      <%# What the answers add up to, which is the check #439 asks for. Derived through the
-          same enumeration the generator prescribes from, so a lifter who read "pairs" as
-          "plates" sees a top end twice what their rack can really do -- which restating the
-          numbers they typed would never have shown them. %>
-      <%- if (range = loadable_range(@equipment.loadable_totals)) %>
-        <p class="mt-1 text-sm text-gray-500">
-          That loads <span class="font-semibold text-gray-900"><%= range %></span>.
-        </p>
-      <%- end %>
-      <div class="mt-3 space-y-2">
-        <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
-          <div class="flex items-center gap-3">
-            <%# A real label, not a lookalike span: the "45 lb" text was beside each box
-                with nothing connecting the two, so a screen reader heard ten anonymous
-                spin buttons -- on the form that decides what the whole app can load.
-                The id swaps the dot out of 2.5 and 1.25 because a dot in an id is legal
-                HTML that CSS and querySelector both read as a class boundary. %>
-            <label for="plates_<%= denomination.to_s.tr('.', '_') %>"
-                   class="w-16 text-right font-mono text-sm text-gray-900">
-              <%= denomination %> lb
-            </label>
-            <input type="number" min="0" step="1" autocomplete="off"
-                   id="plates_<%= denomination.to_s.tr('.', '_') %>"
-                   name="plates[<%= denomination %>]"
-                   value="<%= @equipment.pairs.fetch(denomination, 0) %>"
-                   class="<%= field_style %> w-20 py-1.5 text-gray-900">
-            <span class="text-sm text-gray-500">pairs</span>
-          </div>
-        <%- end %>
-      </div>
-    </fieldset>
-
-    <%# The second rack. #369.
-        Until now the app knew what plates an account owns and nothing at all about its
-        dumbbells, so it assumed fives -- which #259 named as an assumption when it made it.
-        That is right for a fixed rack and wrong in both directions for an adjustable set: a
-        pair of Powerblocks steps in 2.5 at the bottom, so 27.5 is loadable and was being
-        rounded away; and a handle with only 5s and 10s on the shelf cannot make 22.5, which
-        the assumption cheerfully prescribed.
-
-        Blank is the ordinary answer and says so, because most people have a fixed rack and
-        nobody should have to fill this in to be described correctly. It is also the way back:
-        clearing the handle returns the account to the assumption, which would otherwise be
-        unsayable once it had been said. %>
-    <h3 class="border-t border-gray-200 pt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">
-      Dumbbells
-    </h3>
-
-    <div>
-      <%# "Handle" was the worst of them, and #439 says so: it is ambiguous between one handle
-          and the pair, and the two readings differ by a factor of two. %>
-      <label for="dumbbell_handle_weight" class="block text-sm font-medium text-gray-900">
-        One handle, with nothing on it
-      </label>
-      <p class="mt-1 text-sm text-gray-500">
-        Only for plate-loaded or adjustable dumbbells. Leave it blank for a fixed rack, which
-        the app treats as running in
-        <span class="font-semibold text-gray-900"><%= Tectonic::Equipment::DUMBBELL_INCREMENT %> lb</span> steps.
-      </p>
-      <%- if @equipment.dumbbell_handle_weight&.positive? %>
-        <p class="mt-1 text-sm text-gray-500">
-          <span class="font-semibold text-gray-900"><%= weight_label(@equipment.dumbbell_handle_weight) %> lb</span>
-          each, <%= weight_label(@equipment.dumbbell_handle_weight * 2) %> lb for the pair.
-        </p>
-      <%- end %>
-      <div class="mt-1 flex items-center gap-2">
-        <input type="number" id="dumbbell_handle_weight" name="dumbbell_handle_weight" min="0" step="any"
-               autocomplete="off" value="<%= weight_label(@equipment.dumbbell_handle_weight) %>"
-               class="<%= field_style %> w-28 py-1.5 text-gray-900">
-        <span class="text-sm text-gray-500">lb</span>
-      </div>
-    </div>
-
-    <fieldset>
-      <legend class="text-sm font-medium text-gray-900">Dumbbell plates</legend>
-      <%# "Per dumbbell" is the whole of what has to be said here, and it has to be said: an
-          adjustable set is sold as two handles sharing one plate set, so a lifter counting the
-          shelf is counting what goes on one dumbbell. Asking across both would make every
-          number on this form twice what anybody would write down. %>
-      <p class="mt-1 text-sm text-gray-500">
-        Pairs per dumbbell &mdash; one pair is one plate on each end. Your smallest decides the
-        smallest jump:
-        <span class="font-semibold text-gray-900"><%= @equipment.dumbbell_increment %> lb</span>.
-      </p>
-      <%# Said twice, because since #439 a movement says how many dumbbells it is done with and
-          the answers are different. Every plate size has to go on both ends of every handle in
-          use, so a matched pair spends two pairs of a size where a single spends one and
-          reaches roughly half as far up the shelf.
-
-          This is also the shortest explanation of a thing that would otherwise look like a
-          bug: a dumbbell bench prescribed lighter than a single-arm row off the same plates. %>
-      <%- if (ranges = dumbbell_ranges(@equipment)) %>
-        <p class="mt-1 text-sm text-gray-500">
-          One dumbbell loads <span class="font-semibold text-gray-900"><%= ranges[:one] %></span>.
-          A matched pair loads <span class="font-semibold text-gray-900"><%= ranges[:pair] %></span> each,
-          because both handles need the same plates.
-        </p>
-      <%- end %>
-      <div class="mt-3 space-y-2">
-        <%- Tectonic::Equipment::OFFERED.each do |denomination| %>
-          <div class="flex items-center gap-3">
-            <label for="dumbbell_plates_<%= denomination.to_s.tr('.', '_') %>"
-                   class="w-16 text-right font-mono text-sm text-gray-900">
-              <%= denomination %> lb
-            </label>
-            <input type="number" min="0" step="1" autocomplete="off"
-                   id="dumbbell_plates_<%= denomination.to_s.tr('.', '_') %>"
-                   name="dumbbell_plates[<%= denomination %>]"
-                   value="<%= @equipment.dumbbell_pairs.fetch(denomination, 0) %>"
-                   class="<%= field_style %> w-20 py-1.5 text-gray-900">
-            <span class="text-sm text-gray-500">pairs</span>
-          </div>
-        <%- end %>
-      </div>
-    </fieldset>
-
-    <button type="submit"
-            class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5
-                   text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Save</button>
-  </form>
-
-  <%# Reading your own bodyweight from Withings. #472.
-
-      Its own form, outside the equipment one above, on the same argument the page already
-      makes twice: these are unrelated answers and one Save across them would mean changing
-      the rack to connect a scale.
-
-      Three states rather than two. A grant revoked from Withings' own app leaves a row here
-      that no longer buys anything, and a page saying "connected" about it would be wrong in
-      the one way that is hard to notice -- readings simply stop arriving. %>
-  <h2 class="mt-10 text-xl font-semibold text-gray-900">Withings</h2>
-
-  <%# The connection is asked about *before* the credentials, and the order is load-bearing.
-      Disconnecting is a local delete -- it forgets a row, it does not call Withings -- so it
-      must stay available even on a deployment whose credentials have been removed. The other
-      way round, a lifter who was connected when the keys went away could no longer revoke
-      what they had granted, which is the one thing they must always be able to do. %>
-  <%- if @withings[:state] == :absent && !@withings_configured %>
+      Last of the five, and the only one #529 left where it was: it is one number, set once, and
+      the section index above is what stops being last meaning being unfindable. %>
+  <section id="session-length" class="scroll-mt-4">
+    <h2 class="mt-10 text-xl font-semibold text-gray-900">Session length</h2>
     <p class="mt-2 text-sm text-gray-600">
-      This deployment has no Withings credentials set, so there is nothing to connect to.
-      That is the ordinary state of a local checkout.
+      How long you have for a session. When a week is generated, any day estimated to run past
+      this is named along with how far over it is. Leave it blank for no warning.
     </p>
-  <%- elsif @withings[:state] == :absent %>
-    <p class="mt-2 text-sm text-gray-600">
-      Connect your Withings account and the app can read your weight and body composition
-      alongside your training. It reads; it never writes anything back.
-    </p>
-    <form method="post" action="/settings/withings/connect" class="mt-3">
-      <%== csrf_tag('/settings/withings/connect') %>
-      <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
-                                    text-gray-900 hover:bg-lime-600">Connect Withings</button>
+
+    <form method="post" action="/settings/budget" class="mt-4">
+      <%== csrf_tag('/settings/budget') %>
+      <label for="minutes" class="block text-sm font-medium text-gray-900">Time for a session</label>
+      <div class="mt-1 flex items-center gap-2">
+        <input type="number" id="minutes" name="minutes" min="10" max="300" step="5" autocomplete="off"
+               value="<%= @time_budget_minutes %>"
+               class="<%= field_style %> w-28 py-1.5 text-gray-900">
+        <span class="text-sm text-gray-500">minutes</span>
+      </div>
+      <button type="submit"
+              class="<%= button_style %> mt-4 min-h-11 bg-lime-500 px-3 py-2 text-sm font-semibold
+                     text-gray-900 hover:bg-lime-600">Save</button>
     </form>
-  <%- else %>
-    <p class="mt-2 text-sm text-gray-600">
-      <%- if @withings[:state] == :stale %>
-        Connected on <%= @withings[:connected_at].strftime('%-d %b %Y') %>, but the permission
-        has expired and could not be renewed &mdash; usually because it was revoked from
-        Withings itself. Connect again to resume.
-      <%- else %>
-        Connected on <%= @withings[:connected_at].strftime('%-d %b %Y') %>.
-        <%- if @withings[:synced_at] %>
-          Last read <%= @withings[:synced_at].strftime('%-d %b at %H:%M') %>.
-        <%- else %>
-          Nothing has been read yet.
-        <%- end %>
-      <%- end %>
-    </p>
-    <div class="mt-3 flex items-center gap-2">
-      <%- if @withings[:state] == :stale && @withings_configured %>
-        <form method="post" action="/settings/withings/connect">
-          <%== csrf_tag('/settings/withings/connect') %>
-          <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
-                                        text-gray-900 hover:bg-lime-600">Reconnect</button>
-        </form>
-      <%- end %>
-      <form method="post" action="/settings/withings/disconnect">
-        <%== csrf_tag('/settings/withings/disconnect') %>
-        <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 px-3 text-sm
-                                      font-semibold text-gray-700 hover:bg-gray-50">Disconnect</button>
-      </form>
-    </div>
-    <%# Said plainly because it is the question anybody hesitating over Disconnect has. %>
-    <p class="mt-2 text-xs text-gray-500">
-      Disconnecting stops the app asking for more. Measurements already read stay where they are.
-    </p>
-    <%# The review list's permanent address. #534.
-
-        /workouts/withings had nothing at all pointing at it: a lifter who ran the backfill,
-        closed the terminal and came back on Sunday could only reach their own questions by
-        remembering a URL. The prompt that actually catches somebody is on /workouts, and it
-        is only there while something is waiting, which is right for a prompt and wrong for an
-        address -- a screen that can only be found when it has work on it cannot be gone back
-        to, and a lifter who wants to check whether they finished has nowhere to look.
-
-        So the link that is always here is here, with the connection that produces the
-        questions. It is the one place in the app where a lifter already reasons about the
-        watch, nothing else in the app moves when it appears, and it is asked about the same
-        way it is found -- which is what the nav could not offer at any price: a permanent nav
-        entry is carried on every page by every lifter, and a conditional one moves the entries
-        after it.
-
-        It says the count rather than only linking, so the link can be decided about without
-        being followed. Nought is worth printing here and is not worth printing on /workouts:
-        there, the absence of the line is the message, and a box saying nothing is waiting
-        would be clutter on a page about something else. Here the link is unconditional, so
-        the sentence has to be able to say the screen is empty. %>
-    <p class="mt-4 text-sm text-gray-700">
-      <a href="/workouts/withings" class="font-semibold text-lime-700 hover:text-lime-800">Matches from
-        your watch</a>
-      &mdash;
-      <%- if @withings_waiting.positive? %>
-        <%= @withings_waiting %> session<%= 's' unless @withings_waiting == 1 %> from your history
-        <%= @withings_waiting == 1 ? 'is' : 'are' %> waiting for an answer.
-      <%- else %>
-        nothing is waiting for an answer.
-      <%- end %>
-    </p>
-  <%- end %>
+  </section>
 </div>
