@@ -100,8 +100,34 @@
       the reporting account the watch had recorded two activities that morning and neither
       overlapped the session being read; the page said nothing had arrived, about two things
       that had, and advised waiting for a third that was never coming. Telling them apart
-      costs one count -- see `nearby` -- and it matters more now than it did, because a
+      costs one query -- see `nearby` -- and it matters more now than it did, because a
       lifter who has just pressed check is owed an answer rather than a hedge.
+
+      **And `:elsewhere` names them, which is #568.** *"Withings has 2 activities around this
+      session, and none of them overlaps it"* was true and still not enough to act on: it
+      states a number and leaves the lifter unable to check it, to recognise their own
+      afternoon in it, or to notice that one of the two is plainly the lift they are reading,
+      filed against a clock that disagrees. The page had every one of those answers in hand --
+      `nearby` selected the rows and kept the count -- and said none of them.
+
+      **The session's own two ends are half of it.** Two clock times for an activity are a
+      fact about the watch; the same two beside the session's own are the evidence for the
+      sentence above them, and a reader can see for themselves that 13:13 to 14:18 is not
+      13:10 to 13:48. Asserting a mismatch while withholding the numbers is asking to be taken
+      on trust about the one thing that is cheap to show. They come out of the hash rather
+      than off `@timing` so that what is printed is the interval the comparison was made
+      against.
+
+      **A cap rather than everything**, at `NAMED`, because this is a box under a session on a
+      phone, and a lifter whose watch recorded ten things that day is not served by ten lines
+      pushing the controls below the fold. The three nearest the session and a count of the
+      rest says what was recorded and admits there is more; a wall would be a second way of
+      being unreadable.
+
+      Still `:elsewhere` and still not `:waiting`. What #560 split is the claim -- *"nothing
+      has arrived"* against *"something arrived and it was not this"* -- and naming what
+      arrived is the second claim made properly, not the two folded back together. The other
+      branch is untouched and keeps its wording exactly.
 
       **Late is not absent**, which is #520's rule and survives intact in the first branch.
       Closing a workout in the Withings app starts an upload; their servers get it seconds to
@@ -121,12 +147,56 @@
   <div class="mt-4 rounded-md border border-gray-300 bg-white px-4 py-3">
     <%- if @withings[:state] == :elsewhere %>
       <p class="text-sm text-gray-700">
-        <%- if @withings[:nearby] == 1 %>
-          Withings has one activity around this session, and it does not overlap it.
+        <%- if @withings[:count] == 1 %>
+          Withings has one activity around this session, and it does not overlap it:
         <%- else %>
-          Withings has <%= @withings[:nearby] %> activities around this session, and none of
-          them overlaps it.
+          Withings has <%= @withings[:count] %> activities around this session, and none of
+          them overlaps it:
         <%- end %>
+      </p>
+      <%# What the watch actually recorded, named and timed. #568.
+
+          The category first and in the darker grey, because it is the word a lifter reads to
+          decide whether any of this is theirs -- "Lift weights" on a day they did not think
+          they had lifted is the whole reason to look further, and "Bicycling" ends the
+          question in one glance. It is `called`, so a category Withings has published no name
+          for prints as its id rather than as an invented word; see the note there.
+
+          The day is said only where it differs from the session's, and said against the
+          session rather than against today -- "the day before", never "yesterday", which
+          would be a claim about this morning on a record from March.
+
+          `_clock_time` for both ends, exactly as the proposal branch above does it: the
+          server has no idea what timezone anybody is in (#349), so the instant goes over the
+          wire and the reader's own browser formats it. Formatting these by hand here would
+          be the one place on the page that tells a lifter in California their afternoon
+          happened at one in the morning. %>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+        <%- @withings[:nearby].each do |activity| %>
+          <li>
+            <span class="font-medium text-gray-900"><%= Tectonic::WithingsWorkouts.called(activity[:category]) %></span>
+            &mdash;
+            <%- if (day = Tectonic::WithingsWorkouts.day_apart(activity[:started_at], @withings[:session])) %>
+              <%= day %>,
+            <%- end %>
+            <%== render('workouts/_clock_time', locals: { at: activity[:started_at] }) %>
+            to
+            <%== render('workouts/_clock_time', locals: { at: activity[:ended_at] }) %>
+          </li>
+        <%- end %>
+        <%# The ones there was no room for, counted rather than dropped in silence. A box
+            that showed three of eleven and said so is telling the truth about a busy day;
+            one that showed three and stopped would be the same withholding in a smaller
+            font. %>
+        <%- if @withings[:count] > @withings[:nearby].length %>
+          <li>and <%= @withings[:count] - @withings[:nearby].length %> more around this session</li>
+        <%- end %>
+      </ul>
+      <p class="mt-2 text-sm text-gray-700">
+        This session ran
+        <%== render('workouts/_clock_time', locals: { at: @withings[:session].first }) %>
+        to
+        <%== render('workouts/_clock_time', locals: { at: @withings[:session].last }) %>.
       </p>
       <p class="mt-1 text-xs text-gray-600">
         So something was recorded and it was not this session. Checking again will only help
