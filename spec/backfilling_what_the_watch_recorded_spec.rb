@@ -75,6 +75,34 @@ module Backfilling
   def connection(account_id) = DB[:account_withings].where(account_id:).first
 
   def proposals(account_id) = DB[:withings_workouts].where(account_id:).exclude(proposed_workout_id: nil).all
+
+  # How far back this account's history has been read, by whichever route read it. The same
+  # column the import button keeps, which is the point: there is one answer to "how far back"
+  # and both entry points write it. #554.
+  def read_back_to(account_id) = connection(account_id)[:workouts_imported_year]
+
+  # A session in a named year rather than "a while ago", because the claims below are about
+  # a walk that stops several years short of the earliest one and a relative stamp would make
+  # that distance depend on the day the suite runs.
+  def session_from(year) = trained_session(@account_id, started_at: Time.new(year, 6, 15, 10, 0, 0), minutes: 52)
+
+  # Withings answering for the recent years and refusing below a given one, which is what a
+  # throttle looks like from here: status 601 inside an HTTP 200, folded into the same nil as
+  # a revoked token. An empty array is a year that genuinely held nothing.
+  def answering_down_to(year)
+    ->(_token, from:, **_rest) { from.year >= year ? [] : nil }
+  end
+
+  # A lifter with three years behind them and a run told to read only the most recent one.
+  # Every year it asked for answered, so the walk is complete in its own terms -- and complete
+  # in its own terms is exactly what a narrowed walk must not be allowed to mean. #554.
+  def narrowly_backfilled
+    @account_id = login
+    connect(@account_id)
+    @earliest = Date.today.year - 3
+    @workout_id = session_from(@earliest)
+    @report = backfill(@account_id, answering, since: Date.today.year - 1)
+  end
 end
 
 describe 'the range a backfill asks Withings for' do
@@ -160,6 +188,12 @@ describe 'a walk Withings stopped answering part way' do
   it 'leaves the backfill watermark unstamped' do
     assert_nil connection(@account_id)[:workouts_backfilled_at]
   end
+
+  # And writes no year down either. A walk refused in the year it started has read nothing,
+  # and "read back to this year" is a different claim from "read nothing at all".
+  it 'records no year as read, having read none' do
+    assert_nil read_back_to(@account_id)
+  end
 end
 
 describe 'a walk that finished' do
@@ -190,6 +224,134 @@ describe 'a walk that finished' do
   # the same rows again is a hundred requests for nothing.
   it 'starts the next run at the year it got to' do
     assert_equal years_from(Date.today.year), asked_for(@account_id)
+  end
+end
+
+describe 'a walk the operator narrowed to the recent years' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  before { narrowly_backfilled }
+
+  # The watermark's claim is "everything older than this instant has been read". A walk that
+  # started at last year and never went near this lifter's 2022 cannot make that claim, and
+  # stamping it anyway is what makes the loss permanent rather than merely incomplete.
+  it 'does not claim the years behind it have been read' do
+    assert_nil connection(@account_id)[:workouts_backfilled_at]
+  end
+
+  # The failure the issue is actually about. A narrowed run must leave the default run that
+  # follows it walking every year back to the earliest stamped set, because those years have
+  # never been read by anybody and nothing else is ever going to read them.
+  it 'leaves a later default run walking back to the earliest stamped set' do
+    assert_equal years_from(@earliest), asked_for(@account_id)
+  end
+
+  # And the years it did read are worth writing down, because a walk of last year onward
+  # genuinely has read last year onward. That is what makes a narrowed run useful rather
+  # than merely harmless.
+  it 'records how far back it did read' do
+    assert_equal Date.today.year - 1, read_back_to(@account_id)
+  end
+end
+
+describe 'what a narrowed walk says for itself afterwards' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  before { narrowly_backfilled }
+
+  # The other half of #554: the task printed a completed walk, and an operator had nothing in
+  # front of them to tell that apart from a walk of the whole history.
+  it 'reports how far back it read and where the history it did not read begins' do
+    assert_equal Date.today.year - 1, @report[:read_back_to]
+    assert_equal @earliest, @report[:earliest]
+  end
+
+  # And the import button believes it, because it is the same claim in the same column: a
+  # lifter who ran the task from a terminal should not be asked to press for the years it
+  # already fetched.
+  it 'leaves the import button offering the first year the walk did not reach' do
+    assert_equal Date.today.year - 2, Tectonic::WithingsBackfill.pending(@account_id)[:year]
+  end
+end
+
+describe 'a walk narrowed to a year before this lifter had started training' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  before do
+    @account_id = login
+    connect(@account_id)
+    @earliest = Date.today.year - 2
+    @workout_id = session_from(@earliest)
+    backfill(@account_id, answering, since: @earliest - 1)
+  end
+
+  # SINCE is not evidence of a partial walk -- it is only evidence that the operator chose
+  # the bound. This one chose a bound below the floor, so the walk read every year that could
+  # hold anything matchable, and refusing to stamp it would make the task re-read a whole
+  # history on every subsequent run for no reason at all.
+  it 'stamps the watermark, because it did read everything there was to read' do
+    refute_nil connection(@account_id)[:workouts_backfilled_at]
+  end
+
+  it 'starts the next run at the year it got to' do
+    assert_equal years_from(Date.today.year), asked_for(@account_id)
+  end
+end
+
+describe 'a walk Withings stopped answering after the first year or two' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  before do
+    @account_id = login
+    connect(@account_id)
+    @earliest = Date.today.year - 3
+    @workout_id = session_from(@earliest)
+    @report = backfill(@account_id, answering_down_to(Date.today.year - 1))
+  end
+
+  it 'says where it stopped rather than reporting a decade with nothing in it' do
+    refute @report[:complete]
+    assert_equal Date.today.year - 2, @report[:stopped_at]
+  end
+
+  it 'leaves the watermark unstamped' do
+    assert_nil connection(@account_id)[:workouts_backfilled_at]
+  end
+
+  # The years above the refusal did answer and were stored, and saying so costs nothing and
+  # saves a press. What it must never say is that it read the year it was refused in.
+  it 'records the years that answered and not the one that did not' do
+    assert_equal Date.today.year - 1, read_back_to(@account_id)
+  end
+end
+
+describe 'a narrowed walk for a lifter who has already read further back than it does' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  before do
+    @account_id = login
+    connect(@account_id)
+    @earliest = Date.today.year - 3
+    @workout_id = session_from(@earliest)
+    DB[:account_withings].where(account_id: @account_id).update(workouts_imported_year: @earliest)
+    backfill(@account_id, answering, since: Date.today.year)
+  end
+
+  # The cursor only ever moves backwards. A run of this year alone has not un-read 2022, and
+  # a cursor that moved forwards would hand those years back to the import button as though
+  # nobody had ever fetched them -- or, worse, let a later reader believe the gap was real.
+  it 'does not drag the cursor forward over years somebody has already read' do
+    assert_equal @earliest, read_back_to(@account_id)
   end
 end
 
@@ -364,6 +526,7 @@ describe 'a dry run' do
   it 'writes nothing at all' do
     assert_empty DB[:withings_workouts].all
     assert_nil connection(@account_id)[:workouts_backfilled_at]
+    assert_nil read_back_to(@account_id)
   end
 
   # It is the real walk inside a transaction that always rolls back, rather than a second
