@@ -479,6 +479,12 @@ class Tectonic < Roda
     #
     # Units are deliberately not here. That was the largest part of the issue and it was
     # dropped: pounds everywhere, no kg, so there is nothing to choose.
+    #
+    # Grouped into five named sections since #529 -- weight plates, wearables, AI agents, time
+    # and week, session length -- with a fragment each. That is a change to the template and
+    # to where these redirects land, and to nothing else: every form below still posts what it
+    # posted, to the address it posted to. The fragments are why the redirects carry one; the
+    # argument for anchors over routes or disclosures is at the top of views/settings.erb.
     r.on 'settings' do
       rodauth.require_login
       @account_id = rodauth.account_from_session[:id]
@@ -496,7 +502,14 @@ class Tectonic < Roda
         # reader handling a value nobody will ever choose.
         chosen = r.params['week_starts_on'].to_i
         DB[:accounts].where(id: @account_id).update(week_starts_on: chosen) if Calendar::WEEK_STARTS.include?(chosen)
-        r.redirect '/settings'
+        # Back to the section it was saved in rather than to the top of the page. #529.
+        #
+        # The page is five sections deep now and a save that landed at the top would undo the
+        # one thing the section index buys: a lifter who aimed at Time and week, changed the
+        # day and pressed Save would be put back above Weight plates and have to aim again.
+        # A fragment on a redirect is not sent to the server, so this changes where the browser
+        # stops scrolling and nothing else about the request.
+        r.redirect '/settings#time-and-week'
       end
 
       # How long a session should take. #446.
@@ -518,7 +531,7 @@ class Tectonic < Roda
       r.post 'budget' do
         check_csrf!
         DB[:accounts].where(id: @account_id).update(time_budget_minutes: clean_budget(r.params['minutes']))
-        r.redirect '/settings'
+        r.redirect '/settings#session-length'
       end
 
       # Handing Withings permission to be read. #472.
@@ -545,6 +558,11 @@ class Tectonic < Roda
         check_csrf!
         WithingsConnection.forget(@account_id)
         session['settings.notice'] = 'Withings disconnected. Your measurements are still here.'
+        # No fragment on this one, unlike the four saves. What the lifter needs to read is the
+        # notice, and the notice is at the top of the page above the section index -- because
+        # it is the answer to the last thing asked rather than a fact about one section, and
+        # because the Withings callback lands here with the same kind of sentence. A redirect
+        # that jumped to #wearables would scroll straight past the only new thing on the page.
         r.redirect '/settings'
       end
 
@@ -561,7 +579,7 @@ class Tectonic < Roda
           DB[:accounts].where(id: @account_id).update(time_zone: chosen.empty? ? nil : chosen)
         end
         session.delete('zone.detect')
-        r.redirect '/settings'
+        r.redirect '/settings#time-and-week'
       end
 
       # What the browser says the zone is. #349.
@@ -611,7 +629,11 @@ class Tectonic < Roda
         # Completed sets are safe because refresh never touches them, so this cannot rewrite
         # training that has already happened -- see RackChange.
         moved = RackChange.reround(@account_id, today: Clock.today(Clock.zone_of(@account_id)))
-        r.redirect(moved.positive? ? "/settings?rerounded=#{moved}" : '/settings')
+        # The fragment goes after the query string, which is the order a URL is written in and
+        # not a detail a browser is forgiving about: everything after the first `#` is the
+        # fragment, so `/settings#weight-plates?rerounded=2` would be a fragment nothing on the
+        # page has an id for and a count the route never sees.
+        r.redirect(moved.positive? ? "/settings?rerounded=#{moved}#weight-plates" : '/settings#weight-plates')
       end
 
       r.get do
@@ -644,6 +666,15 @@ class Tectonic < Roda
         # Withings on this page beyond how to start, and should not pay a query to be told
         # nothing.
         @withings_waiting = WithingsProposals.waiting_count(@account_id) unless @withings[:state] == :absent
+        # And how many assistants this account has let in, for the AI agents section. #529.
+        #
+        # The section is a signpost to /connections rather than a second copy of it, so this is
+        # the only thing it needs to know: a count lets somebody decide the link is not worth
+        # following, which is the same job the sentence above does for the review list. Asked
+        # unconditionally, because unlike Withings there is no state in which the section is
+        # absent -- "nothing is connected yet" is the answer most accounts get and it is worth
+        # a query to be able to say it.
+        @assistants = Connection.count_for_account(@account_id)
         # Read once and taken out of the session, the same shape the exercise page uses, so a
         # reload does not re-announce a connection made ten minutes ago.
         @notice = session.delete('settings.notice')

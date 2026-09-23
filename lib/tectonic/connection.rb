@@ -31,10 +31,32 @@ class Tectonic < Roda
                              .sort_by(&:connected_at).reverse
     end
 
-    def self.live_grants(account_id)
+    # How many assistants are connected, for the sentence in settings that links to
+    # /connections. #529.
+    #
+    # A number rather than the objects, and the difference is the same one #534 drew for the
+    # Withings count: `for_account` loads every live grant, then looks an application up per
+    # distinct client, to build objects a sentence saying "2 are connected" has no use for. One
+    # count is one query, and settings pays it on every load.
+    #
+    # Counted through the same live-grant scope `for_account` folds, so the two pages cannot
+    # come to disagree about what "connected" means -- a revoked grant, or one whose refresh
+    # window has closed, is absent from both or from neither. The one way they can differ is a
+    # grant pointing at an application row that has gone: `build` drops it and this counts it.
+    # Nothing in this app deletes an application, and if something ever does, the fix belongs
+    # there rather than in two readers agreeing to look the other way.
+    def self.count_for_account(account_id)
+      live(account_id).select(:oauth_application_id).distinct.count
+    end
+
+    def self.live_grants(account_id) = live(account_id).order(:created_at).all
+
+    # What counts as a connection, in one place, because two readers of it now exist and a
+    # copy of this clause would be a settings page and a connections page quietly disagreeing
+    # about whether an expired grant is still an assistant.
+    def self.live(account_id)
       DB[:oauth_grants].where(account_id:, revoked_at: nil)
                        .where { expires_in > Sequel.date_sub(Sequel::CURRENT_TIMESTAMP, seconds: REFRESH_WINDOW) }
-                       .order(:created_at).all
     end
 
     def self.build(application_id, grants)
