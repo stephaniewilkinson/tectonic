@@ -32,6 +32,21 @@ def generated_session(account_id)
   [workout_id, warmup_id]
 end
 
+# Choosing the movement on the set form, which stopped being `select ..., from:` when #525
+# turned that menu into a search box. The select is still there and is still what posts --
+# the rack_test specs that drive this form go on using it, and do not go through here -- but
+# in a real browser the script hides it behind a combobox, and a hidden select is not one
+# Capybara will operate. Typing the name and tapping the result is what a lifter does now.
+#
+# Its own helper rather than three copies, because every caller here is building a fixture
+# rather than testing the picker; spec/finding_a_movement_browser_spec.rb is where the
+# control itself is argued with.
+def pick_the_movement(name)
+  find('#exercise-search').click
+  find('#exercise-search').send_keys(*name.chars)
+  find('#exercise-listbox [role="option"]', text: name, exact_text: true).click
+end
+
 # A logged session with one working set in it, typed in through the forms rather than
 # inserted -- what is being tested is what the session screen does to a set somebody
 # logged, and the new-set form is how they logged it. Top level beside the two helpers
@@ -42,7 +57,7 @@ def a_session_with_one_set_at(weight)
   click_on 'Save'
   workout = current_path
   visit "#{workout}sets/new"
-  select 'Back Squat', from: 'exercise_id'
+  pick_the_movement('Back Squat')
   fill_in 'weight', with: weight.to_s
   fill_in 'reps', with: '5'
   click_on 'Save'
@@ -68,7 +83,7 @@ describe 'the session view' do
     click_on 'Save'
     workout = current_path
     visit "#{workout}sets/new"
-    select 'Back Squat', from: 'exercise_id'
+    pick_the_movement('Back Squat')
     fill_in 'weight', with: '135'
     fill_in 'reps', with: '5'
     click_on 'Save'
@@ -146,7 +161,7 @@ describe 'a weight that is not on the five pound grid' do
     click_on 'Save'
     workout = current_path
     visit "#{workout}sets/new"
-    select 'Back Squat', from: 'exercise_id'
+    pick_the_movement('Back Squat')
     fill_in 'weight', with: '138'
     fill_in 'reps', with: '5'
     click_on 'Save'

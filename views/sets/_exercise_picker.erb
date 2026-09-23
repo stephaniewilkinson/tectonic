@@ -1,0 +1,435 @@
+<%# Which movement a set is of, asked as a search box rather than as a scroll wheel. #525.
+
+    The control this replaces is one <select> carrying every movement the account can see:
+    fifty-four library lifts plus their own, which is eighty-four on the reporting account
+    and grows with every accessory they add. On a desktop that is a long menu. On a phone it
+    is a wheel with eighty-four detents, spun with a thumb, mid-session, between sets, to
+    find "Single-Arm DB Row" -- and the two optgroups help exactly as much as two signposts
+    help on a road you are already driving past. Typing four letters is the whole feature.
+
+    **The list stays in the page and the filtering happens in the browser. There is no
+    search endpoint, and that is the argument rather than the shortcut.**
+
+    The issue asks for this "with htmx", and htmx is the wrong mechanism here for the reason
+    #516 has just finished paying for. A picker driven by hx-get per keystroke is a picker
+    that needs the network to answer a question the page already knows the answer to, and
+    this app is used in basements. The failure mode is not a slow list, it is htmx's swap
+    rule: a request that does not arrive swaps nothing, so a lifter three sets into squats
+    types "row", watches an empty box, and has no way to log the set they just did. That is
+    the exact silence #516 shipped a banner to end, reintroduced on the one form that writes
+    training by hand.
+
+    The size of the thing settles it. The whole list is about three kilobytes of markup and
+    is *already* in the page today -- the select has always carried every option -- so
+    keeping it costs nothing new and removes the network from the interaction entirely. A
+    server round trip per keystroke over gym LTE is two hundred milliseconds of nothing
+    happening, which on a search box reads as broken even when it works. Filtering an array
+    of eighty-four strings takes no measurable time at all.
+
+    So the honest answer to "typeahead search with htmx" is that the search half is worth
+    having and the htmx half is not, and that this page consequently loads no htmx at all --
+    which is #237's rule (50KB is not paid for by a page that has no use for it) applied to
+    the one screen where a phone is holding one bar of signal. If the movement list ever
+    outgrows the page -- thousands of rows, or matching on notes the page does not carry --
+    the endpoint becomes worth its cost, and the shape here is what it would hang off: the
+    listbox is built from a list, and where that list comes from is one function.
+
+    **The <select> is still the control.** It is not a leftover; it is where the answer
+    lives. The script hides it and drives it, so:
+
+      - With no JavaScript -- a blocked script, a failed asset, a browser in a state nobody
+        predicted -- the page is byte-for-byte the form that shipped before this, wheel and
+        all. Nothing about picking a movement is new enough to be worth losing entirely.
+      - The edit form still opens on the movement the set is already on, because
+        _exercise_options still marks it selected and the script reads the selection from
+        the select rather than deciding one. The comment on that partial explains what is at
+        stake: a menu with nothing marked submits its first option, so a picker that forgot
+        its selection would quietly move an edited set to whichever movement sorts first.
+      - A set posted without the picker being touched posts the same exercise_id it always
+        did. There is no hidden input to keep in step, no change event to have missed, and
+        no state that exists only in JavaScript -- the one thing the browser submits is the
+        one thing the server rendered.
+
+    A hidden input plus a text box would have been fewer moving parts and is the wrong trade:
+    it makes the value a thing only the script can set, and the failure it buys is silent
+    and is somebody's training log.
+
+    The two groups survive into the results, and they are real information rather than
+    decoration -- "is this the library Bent-Over Row or the one I made with my own name for
+    it" is the question a lifter is asking when they go looking for their own variant. They
+    are read off the optgroups, so the markup that draws them stays in one place, and a
+    group with nothing matching in it disappears along with its heading.
+
+    Within a group the order is the select's own, which is the order the route asks for
+    (`order(:id)`). Ranking matches by how well they match would read better on a flat list
+    and cannot be done without dissolving the groups, and the groups are worth more: eight
+    matches under two headings is a shorter question than eight matches in relevance order.
+    That the underlying order is insertion rather than alphabetical is a fair complaint and
+    not this change's to fix -- sets_spec leans on it deliberately, and moving it is a
+    separate argument about a default.
+
+    Matching is every whitespace-separated term appearing somewhere in the name, folded to
+    lowercase. Substrings rather than prefixes, because the word a lifter reaches for is
+    rarely the first one: "row" has to find Single-Arm DB Row, and "db row" has to find it
+    without knowing that "Single-Arm" comes first. %>
+<div data-exercise-picker>
+  <%# The fallback, and the thing that submits. Hidden by the script below rather than by a
+      class, because a container that is display:none still submits every control inside it
+      -- only `disabled` stops that -- and because `hidden` takes the select out of the tab
+      order and out of the accessibility tree in one attribute. Two labels rather than one
+      shared between the two controls: a <label for> names exactly one element, and the one
+      that is not on screen goes away with the branch it belongs to.
+
+      It was unlabelled until now, which is worth naming as a bug rather than as a tidy-up:
+      a select whose only description is the option currently showing tells a screen reader
+      "Back Squat, combo box" and nothing about what the question is. %>
+  <div data-picker-native>
+    <label for="exercise_id" class="block text-sm font-medium text-gray-900">Movement</label>
+    <select id="exercise_id" name="exercise_id"
+           class="<%= field_style %> mt-2 block w-full py-1.5 pr-10 text-gray-900 sm:text-sm sm:leading-6">
+      <%== render('sets/_exercise_options') %>
+    </select>
+  </div>
+
+  <%# The combobox, drawn only once the script that drives it has run. `hidden` here and
+      revealed below, rather than the other way round, so that the working control is the one
+      on screen in every state: a browser that never runs the script shows the select, and one
+      that does swaps the pair before it paints, because the script is inline and immediately
+      after the markup it needs.
+
+      The ARIA is the APG combobox-with-list-autocomplete pattern written out: the input
+      carries the combobox role, says whether the popup is open, names the listbox it
+      controls, and points aria-activedescendant at the option under the keyboard cursor --
+      which is how a listbox is navigated without focus ever leaving the text box. The
+      options are not focusable and must not be; a Tab that walked eighty-four of them would
+      be a worse wheel than the one this replaces.
+
+      text-base and min-h-11 for the same two reasons they appear on every other control this
+      app puts under a thumb: iOS Safari zooms the page in on a field whose text is under
+      16px and the way back out is a pinch, and 44px is the size of a thumb. %>
+  <div data-picker-search hidden class="relative">
+    <label for="exercise-search" class="block text-sm font-medium text-gray-900">Movement</label>
+    <input type="text" id="exercise-search" data-picker-input
+           role="combobox" aria-expanded="false" aria-controls="exercise-listbox"
+           aria-autocomplete="list" aria-describedby="exercise-search-help"
+           autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+           enterkeyhint="done"
+           class="<%= field_style %> mt-2 block min-h-11 w-full py-1.5 text-base text-gray-900 sm:text-sm sm:leading-6">
+    <p id="exercise-search-help" class="mt-1 text-sm text-gray-500">Type part of the name to narrow the list.</p>
+    <%# Overlaid rather than in the flow, so that opening it does not push Weight and Reps
+        down the screen every time the box takes focus. z-10 clears the form and nothing
+        else: this is not the session screen, which stacks four fixed things at its foot. %>
+    <div data-picker-popup hidden
+         class="absolute z-10 mt-1 max-h-72 w-full overflow-y-auto rounded-md bg-white py-1 shadow-lg ring-1 ring-gray-300">
+      <ul id="exercise-listbox" data-picker-list role="listbox" aria-label="Movements"></ul>
+      <%# Outside the listbox, deliberately. A listbox may only contain options and groups,
+          so a "nothing matches" row inside it would be a sentence announced as an option --
+          and an option a lifter could try to choose. The live region below says it out loud;
+          this is the same news for somebody who can see the box. %>
+      <p data-picker-empty hidden class="px-3 py-2 text-sm text-gray-500">
+        No movement matches that.
+      </p>
+    </div>
+    <%# What just happened, said once, to the reader who cannot watch the list shorten --
+        the same argument and the same shape as the session screen's announcement region
+        (#336). Polite, so it waits for a gap rather than cutting across the letters being
+        echoed back as they are typed, and empty on first render because a live region
+        announces changes to itself and one that arrives carrying its sentence says nothing. %>
+    <p data-picker-announce role="status" aria-live="polite" class="sr-only"></p>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var picker = document.querySelector('[data-exercise-picker]');
+    if (!picker) { return; }
+
+    var select = picker.querySelector('select');
+    var native = picker.querySelector('[data-picker-native]');
+    var search = picker.querySelector('[data-picker-search]');
+    var input = picker.querySelector('[data-picker-input]');
+    var popup = picker.querySelector('[data-picker-popup]');
+    var list = picker.querySelector('[data-picker-list]');
+    var empty = picker.querySelector('[data-picker-empty]');
+    var announce = picker.querySelector('[data-picker-announce]');
+
+    // An account with nothing to pick from keeps the select. There is no list to search and
+    // a search box over nothing is a worse answer than an empty menu, which at least looks
+    // like what it is.
+    if (!select || !select.options.length) { return; }
+
+    // The class lists, written here rather than toggled as modifiers, because the active
+    // row changes its text colour and Tailwind gives no guarantee about which of two colour
+    // utilities on one element wins. Assigning the whole list is the only way to be sure
+    // that text-white beats text-gray-700 rather than depending on the order the stylesheet
+    // happened to compile in.
+    var ROW = 'flex min-h-11 cursor-pointer items-center px-3 text-base';
+    var IDLE = ' text-gray-700';
+    var ACTIVE = ' bg-sky-800 text-white';
+    // The movement the set is on, called out among the rest. The input already shows its
+    // name; this is for the moment the list is open over it and the name is no longer the
+    // thing being read.
+    var CHOSEN = ' font-semibold';
+
+    // Every option, flattened out of the select with the group it came from carried along.
+    // Read once: the select does not change under this page, and rebuilding the list on
+    // every keystroke would be work done for nothing.
+    var movements = [];
+    var groups = [];
+
+    function collect() {
+      var containers = select.querySelectorAll('optgroup');
+      if (!containers.length) { containers = [select]; }
+      for (var i = 0; i < containers.length; i++) {
+        var label = containers[i].label || '';
+        var options = containers[i].querySelectorAll('option');
+        var members = [];
+        for (var j = 0; j < options.length; j++) {
+          members.push({ id: options[j].value, name: options[j].text, group: label });
+        }
+        if (members.length) { groups.push({ label: label, members: members }); }
+        movements = movements.concat(members);
+      }
+    }
+
+    // The listbox, built once from the groups above.
+    //
+    // Nothing here is assembled as a string of markup. Exercise names are typed by people
+    // and this app has a spec file about what happens when one of them contains a less-than
+    // sign; textContent cannot be talked into being an element, and innerHTML can.
+    //
+    // The nesting is what the APG's grouped listbox asks for: a presentational row holding a
+    // visible heading and a role="group" of options that names it. A bare heading among the
+    // options would be announced as an option, which is how "Library" becomes a movement
+    // somebody can pick.
+    function build() {
+      for (var i = 0; i < groups.length; i++) {
+        var wrapper = document.createElement('li');
+        wrapper.setAttribute('role', 'presentation');
+        var heading = document.createElement('span');
+        heading.id = 'exercise-group-' + i;
+        // Not uppercased by CSS. A browser draws an optgroup label in its own plain words and
+        // so does this, which keeps what is on screen and what a screen reader says the same
+        // string -- text-transform changes only the first of those.
+        heading.className = 'block px-3 pb-1 pt-2 text-xs font-semibold text-gray-500';
+        heading.textContent = groups[i].label;
+        var inner = document.createElement('ul');
+        inner.setAttribute('role', 'group');
+        inner.setAttribute('aria-labelledby', heading.id);
+        for (var j = 0; j < groups[i].members.length; j++) {
+          var movement = groups[i].members[j];
+          var row = document.createElement('li');
+          row.setAttribute('role', 'option');
+          row.setAttribute('aria-selected', 'false');
+          row.id = 'exercise-option-' + movement.id;
+          row.setAttribute('data-exercise-id', movement.id);
+          row.textContent = movement.name;
+          movement.element = row;
+          inner.appendChild(row);
+        }
+        wrapper.appendChild(heading);
+        wrapper.appendChild(inner);
+        groups[i].element = wrapper;
+        list.appendChild(wrapper);
+      }
+    }
+
+    function chosenId() { return select.value; }
+
+    function nameOf(id) {
+      for (var i = 0; i < movements.length; i++) {
+        if (movements[i].id === id) { return movements[i].name; }
+      }
+      return '';
+    }
+
+    // Which movements a query leaves standing. Every term has to appear somewhere in the
+    // name, so the terms may be given in any order and none of them has to start a word:
+    // "db row" finds Single-Arm DB Row, which is the search this feature exists for.
+    function matches(movement, terms) {
+      var name = movement.name.toLowerCase();
+      for (var i = 0; i < terms.length; i++) {
+        if (name.indexOf(terms[i]) === -1) { return false; }
+      }
+      return true;
+    }
+
+    // The whole list redrawn from the query, rather than the rows that changed patched.
+    // There are eighty-odd of them and four things that can move any of them; deciding all
+    // of it from the two pieces of state is shorter than the transitions would be, and it
+    // cannot leave a heading standing over a group with nothing under it.
+    var visible = [];
+    var active = null;
+
+    function draw(query) {
+      var terms = query.toLowerCase().split(/\s+/).filter(function (term) { return term.length; });
+      visible = [];
+      for (var i = 0; i < groups.length; i++) {
+        var shown = 0;
+        for (var j = 0; j < groups[i].members.length; j++) {
+          var movement = groups[i].members[j];
+          var hit = matches(movement, terms);
+          movement.element.hidden = !hit;
+          if (hit) {
+            shown++;
+            visible.push(movement);
+          }
+        }
+        groups[i].element.hidden = shown === 0;
+      }
+      empty.hidden = visible.length > 0;
+      if (visible.indexOf(active) === -1) { activate(visible.length ? visible[0] : null); }
+      paint();
+    }
+
+    // The keyboard cursor. It is aria-activedescendant rather than focus, which is the whole
+    // of why the text box keeps the caret while the list is being walked -- and why the
+    // options carry no tabindex: a Tab stop per movement would be the scroll wheel again
+    // with worse manners.
+    function activate(movement) {
+      active = movement;
+      if (movement) {
+        input.setAttribute('aria-activedescendant', movement.element.id);
+        movement.element.scrollIntoView({ block: 'nearest' });
+      } else {
+        input.removeAttribute('aria-activedescendant');
+      }
+    }
+
+    function paint() {
+      var chosen = chosenId();
+      for (var i = 0; i < movements.length; i++) {
+        var movement = movements[i];
+        var selected = movement.id === chosen;
+        movement.element.setAttribute('aria-selected', selected ? 'true' : 'false');
+        movement.element.className = ROW + (movement === active ? ACTIVE : IDLE) + (selected ? CHOSEN : '');
+      }
+    }
+
+    function said(sentence) { announce.textContent = sentence; }
+
+    function open(query) {
+      draw(query);
+      popup.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+    }
+
+    // Closing always puts the text back to the movement that is actually going to be posted.
+    // That invariant is the point of the whole control: the box is a search field and the
+    // select is the answer, and a box left reading "sing" over a set that is still on Back
+    // Squat would be the form lying about what Save is about to do.
+    function close() {
+      popup.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+      input.removeAttribute('aria-activedescendant');
+      active = null;
+      input.value = nameOf(chosenId());
+      paint();
+    }
+
+    function choose(movement) {
+      if (!movement) { return; }
+      select.value = movement.id;
+      close();
+      // The group as well as the name, because "Bent-Over Row" from the library and
+      // "Bent-Over Row" as somebody has redefined it for themselves are the same six
+      // syllables and a different movement.
+      said(movement.name + ', ' + movement.group);
+    }
+
+    function step(by) {
+      if (!visible.length) { return; }
+      var at = visible.indexOf(active);
+      var next = at === -1 ? 0 : at + by;
+      if (next < 0) { next = visible.length - 1; }
+      if (next >= visible.length) { next = 0; }
+      activate(visible[next]);
+      paint();
+    }
+
+    collect();
+    build();
+    input.value = nameOf(chosenId());
+    // The swap. Both halves in one place so there is no state in which neither control is
+    // on screen, and after the list is built so the first tap has something to open.
+    native.hidden = true;
+    search.hidden = false;
+
+    // Opening on focus rather than waiting for a keystroke, because the first thing a thumb
+    // does to this box is tap it, and a tap that produces nothing reads as a dead control.
+    // The text is selected so that typing replaces the movement already named rather than
+    // appending to it -- on the edit form the box arrives full, and clearing it by hand with
+    // a backspace key on a phone keyboard is exactly the friction this change is about.
+    input.addEventListener('focus', function () {
+      input.select();
+      open('');
+      activate(visible.filter(function (movement) { return movement.id === chosenId(); })[0] || visible[0]);
+      paint();
+    });
+
+    input.addEventListener('input', function () {
+      open(input.value);
+      said(visible.length === 1 ? '1 movement' :
+        (visible.length ? visible.length + ' movements' : 'No movement matches that.'));
+    });
+
+    input.addEventListener('keydown', function (event) {
+      var key = event.key;
+      if (key === 'ArrowDown' || key === 'ArrowUp') {
+        // Down on a closed box opens it rather than moving anything, which is the one
+        // keyboard gesture a native select has that a text box does not come with.
+        if (popup.hidden) { open(input.value); } else { step(key === 'ArrowDown' ? 1 : -1); }
+        event.preventDefault();
+      } else if (key === 'Home' && !popup.hidden) {
+        activate(visible[0]);
+        paint();
+        event.preventDefault();
+      } else if (key === 'End' && !popup.hidden) {
+        activate(visible[visible.length - 1]);
+        paint();
+        event.preventDefault();
+      } else if (key === 'Enter') {
+        // Only while the list is open, and only then. Enter on a closed box is a lifter
+        // submitting the form from the keyboard, which is a thing this form has always let
+        // them do and is not this control's to take away.
+        //
+        // With nothing matching there is nothing to commit, so Enter closes instead of doing
+        // nothing at all. It is the same key on a phone -- enterkeyhint puts "Done" on it --
+        // and a Done that leaves the list standing over the rest of the form is a control
+        // somebody is stuck inside.
+        if (!popup.hidden) {
+          if (active) { choose(active); } else { close(); }
+          event.preventDefault();
+        }
+      } else if (key === 'Escape') {
+        // Back to the movement on the set, which is what close() means by closing. A lifter
+        // who opened the picker by accident mid-edit gets out of it without having changed
+        // anything, which on the edit form is the difference between a typo and a set filed
+        // under the wrong lift.
+        if (!popup.hidden) {
+          close();
+          event.preventDefault();
+        }
+      }
+    });
+
+    // mousedown rather than click, and refused rather than handled: letting the press move
+    // focus would blur the input, and blur closes the popup and puts the text back, so the
+    // click would land on a row that is no longer there. Preventing the default keeps the
+    // caret in the box and the click still arrives. A tap on a phone synthesises both.
+    popup.addEventListener('mousedown', function (event) { event.preventDefault(); });
+
+    popup.addEventListener('click', function (event) {
+      var row = event.target.closest('[data-exercise-id]');
+      if (!row) { return; }
+      choose(movements.filter(function (movement) { return movement.element === row; })[0]);
+    });
+
+    // Leaving the box is not a choice. Whatever half-typed word is in it goes, and the name
+    // of the movement that will actually be posted comes back -- the same invariant close()
+    // exists for, applied to the one way out of the control that is not a key press.
+    input.addEventListener('blur', close);
+
+    paint();
+  })();
+</script>
