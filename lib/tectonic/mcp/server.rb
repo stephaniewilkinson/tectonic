@@ -34,6 +34,9 @@ require_relative 'tools/add_program_lift'
 require_relative 'tools/update_program_lift'
 require_relative 'tools/delete_program_lift'
 require_relative 'tools/generate_program_week'
+require_relative 'tools/health_readings'
+require_relative 'tools/bodyweight_trend'
+require_relative 'tools/body_composition'
 require_relative 'tools/search'
 require_relative 'tools/fetch'
 
@@ -62,6 +65,10 @@ class Tectonic < Roda
         Tools::AddProgramWeek, Tools::AddProgramDay, Tools::UpdateProgramDay,
         Tools::AddProgramLift, Tools::UpdateProgramLift, Tools::DeleteProgramLift,
         Tools::GenerateProgramWeek,
+        # What the scale said. All three read and none writes: the instrument records a
+        # measurement and this app does not, so #518's sync is the only thing that fills the
+        # table these three read from.
+        Tools::HealthReadings, Tools::BodyweightTrend, Tools::BodyComposition,
         # search + fetch satisfy ChatGPT's connector contract (composer + Deep Research).
         Tools::Search, Tools::Fetch
       ].freeze
