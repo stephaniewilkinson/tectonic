@@ -30,7 +30,15 @@ Metrics/ClassLength:
 # caller learned that Withings can answer `more: 0` and the other did not. The module is also
 # most of comment by volume, because the provider's behaviour is not guessable from its
 # documentation and every trap in it has been paid for once already.
-# WithingsMeasures is the third, and it is the sibling of the second: the one read of the
+# WithingsWorkouts is the third, and the same argument again with a different seam. It is the
+# one answer to "is this recording of this session", and the split somebody would reach for --
+# fetching and storing on one side, scoring and wording on the other -- cuts straight through
+# what the two halves share: one interval, one MARGIN_DAYS either side of it, one rule about
+# which rows are still a question. The fetch asks Withings for a window and the score is
+# computed over that window, so putting them in two files is putting one definition of "around
+# this session" in two places. #553 is what that costs, and it is cited twice above for the
+# same reason.
+# WithingsMeasures is the fourth, and it is the sibling of the second: the one read of the
 # scale, which since #557 asks for its window a piece at a time so that a read refused partway
 # has something to show for the pieces that arrived. What makes it long is one invariant with
 # two halves -- which piece to ask for next, and what a piece that arrived whole is allowed to
@@ -43,6 +51,7 @@ Metrics/ModuleLength:
   Exclude:
     - "lib/tectonic/mcp/tools/program_writer.rb"
     - "lib/tectonic/withings_backfill.rb"
+    - "lib/tectonic/withings_workouts.rb"
     - "lib/tectonic/withings_measures.rb"
 
 AllCops:
