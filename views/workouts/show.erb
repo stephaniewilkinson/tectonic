@@ -91,24 +91,39 @@
     about training that never happened. %>
 <%- if @timing[:overall] %>
   <p class="mt-2 text-sm text-gray-500">
-    <%# The watch first, where one has been matched. #520.
+    <%# The app's own arithmetic, matched watch or not. #571.
 
-        This is the app deferring, and it is deliberate. Everything else on this line is
-        arithmetic on taps: the session began when a set was first marked done and ended
-        when the lifter said so, which is an inference from when somebody touched a phone.
-        The watch was strapped to them and *measured* it. Where the two disagree about how
-        long a session took, #520 says the watch is right and the app should say so rather
-        than quietly keeping its own figure.
+        This line used to defer, and the deferral was the substance of #520: *"where the two
+        disagree about how long a session took, the watch is right and the app should say so
+        rather than quietly keeping its own figure."* #528 implemented it literally -- the
+        watch's span printed first and labelled as measured, the tap-derived figure kept
+        beside it and hedged as "from your taps" so that nobody could confuse the two.
 
-        Both numbers stay on the line, and the tap-derived one gets the words "from your
-        taps" the moment there is a watch figure beside it to be confused with. A page that
-        showed one number whose meaning depended on whether a match existed would be worse
-        than either reading: a lifter comparing this Tuesday to last would have no way to
-        know they were comparing two different measurements. %>
-    <%- if matched_activity %>
-      <%= Timing.phrase(watch_seconds) %> measured by your watch
-      <span aria-hidden="true">&middot;</span>
-    <%- end %>
+        The rule was right about instruments in general and wrong about this instrument. On
+        the reporting account's own data the watch starts late and runs long: it called a
+        session 6:13 to 7:18 that ran 6:07 to 6:53, twenty-five minutes of its recording
+        falling after the last completed set, and on the following morning it bracketed a
+        shorter, later window than the session it was supposedly measuring. Both of those
+        rows carry `attrib = 7` and came back with no `effduration`, which is what an
+        activity the watch *detected* looks like rather than one somebody deliberately
+        started on it. So deferring did not put a real number in place of an estimate; it
+        redisplayed a 46 minute session as an hour, over the top of the right answer. #571
+        carries the numbers.
+
+        What the taps measure is when a set was actually marked done. That is an inference
+        from somebody touching a phone, and #520 was right that it is an inference -- but it
+        is an inference about the lifting, and on this evidence a closer one than the watch
+        manages. So the figure here is the app's, always, and it means the same thing on
+        every session in a week read back.
+
+        **"from your taps" went with it.** It was never a hedge about accuracy: it was there
+        because a second number stood beside this one and a reader was owed the name of the
+        instrument each came from. With nothing competing, it only makes a plain measurement
+        sound unsure of itself, and it would be the one clause on the page apologising for
+        the number the page is most confident about. The answer #528 was reaching for -- a
+        reader can always tell which instrument a number came from -- is kept by putting what
+        only the watch knows in views/workouts/_withings_match.erb and labelling all of it as
+        the watch's, rather than by labelling this. %>
     <%- if @timing[:discarded].positive? %>
       <%= Timing.phrase(@timing[:active]) %> active
       <span aria-hidden="true">&middot;</span>
@@ -116,7 +131,6 @@
     <%- else %>
       <%= Timing.phrase(@timing[:overall]) %><%= ' so far' if @timing[:overall_basis] == :in_progress %>
     <%- end %>
-    <%= 'from your taps' if matched_activity %>
     <%- if @timing[:typical_turnaround] %>
       <span aria-hidden="true">&middot;</span>
       typically <%= Timing.phrase(@timing[:typical_turnaround]) %> between sets
@@ -138,25 +152,27 @@
       exist yet, and the line above already says "so far" about it; printing a start alone
       under that reads as though the session were over. The stamps themselves are the same
       two `overall` has always subtracted -- this stops throwing the ends away. %>
-  <%# The same preference applied to the two ends. #520.
+  <%# The session's own two ends, matched watch or not. #571.
 
-      The line above defers about the length, so this has to defer about where the session
-      sat in the day, or the page would report a 49 minute session running from 18:02 to
-      18:55 and leave a reader to work out which half to believe. The watch's ends are the
-      ones the length above is the difference of.
+      These deferred too, and had to while the line above did: a page reporting a 49 minute
+      session running from 18:02 to 18:55 leaves a reader working out which half to believe,
+      so #528 took both halves from the same instrument and the watch's ends were the ones
+      its span was the difference of. That constraint is intact and satisfied the other way
+      round -- the length above is the difference of these two, because both are the taps.
 
-      It also reaches a session the tap-derived line cannot: `overall_basis == :finished`
-      keeps the stamps off a session still in progress, because printing a start under a
-      length that says "so far" reads as though it were over. A matched session has a real
-      measured end whether or not anybody tapped finish, so there is nothing to withhold. %>
-  <%- if matched_activity %>
-    <p class="mt-1 text-sm text-gray-500">
-      <%== render('workouts/_clock_time', locals: { at: matched_activity[:started_at] }) %>
-      to
-      <%== render('workouts/_clock_time', locals: { at: matched_activity[:ended_at] }) %>
-      on your watch
-    </p>
-  <%- elsif @timing[:started_at] && @timing[:overall_basis] == :finished %>
+      **And the guard on a session still running comes back.** #528 let a matched session
+      past `overall_basis == :finished`, reasoning that the watch has a real measured end
+      whether or not anybody tapped finish, so there was nothing to withhold. That reasoning
+      was about the watch's end and this is not the watch's end. The app's end of a session
+      nobody has finished does not exist yet -- the line above says "so far" about exactly
+      that -- and printing a start underneath it would read as though the session were over,
+      which is the whole of what this guard has always been for.
+
+      The watch's own two ends are not lost with the deferral. They keep a line of their own
+      in views/workouts/_withings_match.erb, named there as the watch's recording, which is
+      where a lifter wondering why their watch says an hour can find the answer without it
+      ever being the figure labelled as the session. %>
+  <%- if @timing[:started_at] && @timing[:overall_basis] == :finished %>
     <p class="mt-1 text-sm text-gray-500">
       <%== render('workouts/_clock_time', locals: { at: @timing[:started_at] }) %>
       to

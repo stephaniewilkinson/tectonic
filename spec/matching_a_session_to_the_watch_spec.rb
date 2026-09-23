@@ -658,31 +658,94 @@ describe 'confirming a match' do
   end
 end
 
-describe 'the record page once a match is confirmed' do
-  include Rack::Test::Methods
-  include RouteOwnership
+# A session that has been answered yes, and the page as it looked before the answer. Split
+# out of the describes below for the reason the rest of this file is split: the linter counts
+# lines in a block, and two claims -- what a match leaves alone, and what it adds -- are two
+# describes rather than one long one.
+module AfterYes
   include SayingYes
 
-  before do
+  # The session is 52 minutes of taps and the activity is 48 minutes of watch, so a page that
+  # defers is visibly a different page and one that does not is byte for byte the same one.
+  def a_confirmed_match
     a_session_with_an_offer
+    @unmatched = duration_line
     answer('match', 'activity' => 'w-1')
     record(@workout_id, [])
   end
 
-  # Where the two disagree about how long a session took, the watch is right -- and the page
-  # has to say that it is deferring, or a number silently changes meaning depending on
-  # whether a match exists.
-  it 'prefers the length the watch measured, and says whose it is' do
-    assert_includes last_response.body, '48m measured by your watch'
-    assert_includes last_response.body, 'from your taps'
+  # The paragraph that answers "how long did this take". Found by the classes it is drawn
+  # with, because nothing else on the record page identifies it and a hook put in the markup
+  # for a test's benefit would be a fixture shipped to production. A miss would make the
+  # comparison below pass by comparing nil to nil, so it is refused here instead.
+  def duration_line
+    line = last_response.body[%r{<p class="mt-2 text-sm text-gray-500">(.*?)</p>}m, 1]
+
+    refute_nil line, 'the record page no longer draws its duration line where this spec looks'
+    line.split.join(' ')
+  end
+end
+
+describe 'what a confirmed match leaves exactly as it was' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include AfterYes
+
+  before { a_confirmed_match }
+
+  # The reversal, pinned. #571.
+  #
+  # #520 ruled that "where the two disagree about how long a session took, the watch is
+  # right", and #528 printed the watch's 48m over the session's 52m. The reporting account's
+  # own data says the watch starts late and runs long -- 6:13 to 7:18 against a session of
+  # 6:07 to 6:53 -- so deferring redisplayed a 46 minute session as an hour, over the top of
+  # the right answer.
+  #
+  # Said as a comparison rather than as a string, because the claim is not "the page says
+  # 52m": it is that answering yes changes *nothing* about how long the session is reported
+  # to have taken. A spec naming the figure would go on passing the day a match started
+  # quietly swapping one number for another that happened to read the same.
+  it 'leaves the session the length its own taps measured' do
+    assert_equal @unmatched, duration_line
   end
 
-  it 'prefers the two ends the watch measured too' do
-    assert_includes last_response.body, 'on your watch'
+  # And the hedge #528 added goes with it. It was there because a watch figure stood beside
+  # this one and a reader needed to know which instrument each came from; with nothing
+  # competing, it only makes a plain measurement sound unsure of itself.
+  it 'stops hedging the length, because nothing stands beside it to be confused with' do
+    refute_includes last_response.body, 'from your taps'
+    refute_includes last_response.body, 'measured by your watch'
   end
 
+  # The two ends deferred for the same reason the length did, and come back for the same
+  # reason. The watch's start is a minute after the session's, which is what makes these two
+  # assertions different assertions.
+  it 'keeps the two ends its own taps measured' do
+    assert_includes last_response.body, %(data-local="#{@started_at.to_i}")
+    refute_includes last_response.body, 'on your watch'
+  end
+end
+
+describe 'what a confirmed match adds, which is what only the watch knows' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include AfterYes
+
+  before { a_confirmed_match }
+
+  # The whole remaining case for matching at all, and no arithmetic on taps will ever
+  # produce it. All three figures, because an average of 128 over a session that ran 61 to
+  # 164 is interval work and the same average over one that ran 120 to 136 is a grind.
   it 'shows the heart rate, which only the watch has' do
-    assert_includes last_response.body, '128 bpm average'
+    assert_includes last_response.body, '128 bpm average, 61 to 164'
+  end
+
+  # Not thrown away either. It is stored, it is real, and it is the interval the overlap was
+  # computed from, so a lifter wondering why their watch says otherwise is owed the answer --
+  # named as the watch's recording, and nowhere near the lines that are the session's.
+  it 'still shows what the watch itself recorded, labelled as the watch and not the session' do
+    assert_includes last_response.body, 'Your watch&rsquo;s own recording ran'
+    assert_includes last_response.body, '(48m)'
   end
 end
 

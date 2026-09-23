@@ -1989,31 +1989,81 @@ class Tectonic < Roda
 
   # The Withings activity this session has been matched to, or nil. #520.
   #
-  # One reading of `@withings[:state]`, in one place, because the record page asks the same
-  # question in four spots -- the length, the two ends, the block under them, and whether to
-  # say "from your taps" -- and four copies of `@withings && @withings[:state] == :matched`
-  # is four places for one of them to drift and start reporting the watch's numbers under
-  # the app's labels.
+  # One reading of `@withings[:state]`, in one place, because more than one thing on the
+  # record page asks it and two copies of `@withings && @withings[:state] == :matched` is two
+  # places for one of them to drift and start reporting the watch's numbers under the app's
+  # labels.
+  #
+  # It used to be asked in four spots -- the length, the two ends, the block under them, and
+  # whether to say "from your taps" -- and since #571 the first, second and fourth of those
+  # no longer ask at all: the session's length and its two ends are the lifter's own taps
+  # whether or not a match exists, so the lines that draw them have nothing to decide. What
+  # is left is the block that reports what only the watch knows, which is the whole of what a
+  # confirmed match is worth now. Keeping the reader here rather than folding it back into
+  # that one branch costs nothing and leaves the state read in one spelling.
   def matched_activity
     return nil unless @withings && @withings[:state] == :matched
 
     @withings[:activity]
   end
 
-  # How long the watch says it took.
+  # How long the watch's own recording ran. Not how long the session took. #571.
   #
-  # The wall-clock span rather than Withings' own `effduration`, which is their judgement
-  # about how much of that span was work. Two reasons. It is the figure that sits beside the
-  # app's own overall span and answers the same question, so they are comparable; and the
-  # active-versus-elapsed split on this page is already made from a threshold this app
-  # defends in lib/tectonic/timing.rb, so borrowing a second opinion about it from another
-  # vendor would put two unexplained trims on one line. `effduration` is stored and can have
-  # its own line the day something asks for it.
+  # That distinction is the whole of #571 and it used to be the opposite. This number was
+  # printed as the session's length, on #520's rule that "where the two disagree about how
+  # long a session took, the watch is right and the app should say so rather than quietly
+  # keeping its own figure". The reporting account's own data is the counter-example: the
+  # watch began six minutes after their first completed set and kept recording for
+  # twenty-five minutes after their last, and on the following morning bracketed a shorter,
+  # later window than the session entirely. Both rows carry `attrib = 7` and no
+  # `effduration`, which is the shape of an activity the watch *detected* rather than one a
+  # lifter started on it deliberately. So this answers a question about the watch, and the
+  # question about the session is answered by Timing, matched or not.
+  #
+  # Still the wall-clock span rather than Withings' own `effduration`, and now for a simpler
+  # reason than the one that used to sit here. The old argument was about comparability --
+  # this figure stood beside the app's overall span and had to mean the same thing, and a
+  # second vendor's opinion about what counted as work would have put two unexplained trims
+  # on one line. It no longer stands beside anything. What is left is that the two ends are
+  # what the page prints either side of this number and what the overlap was computed from,
+  # so the span between them is the only figure a reader can check. `effduration` is stored
+  # and can have its own line the day something asks for it -- and on these two rows it is
+  # absent anyway, which is itself the tell.
   def watch_seconds
     activity = matched_activity
     return nil unless activity
 
     (activity[:ended_at] - activity[:started_at]).to_i
+  end
+
+  # What the watch's heart rate sensor saw, as a phrase, or nil where it saw nothing. #571.
+  #
+  # **The average, and the range around it.** Two sessions can both average 128 bpm and be
+  # nothing alike: one that ran 61 to 164 was intervals with real recoveries between them,
+  # one that ran 120 to 136 was a grind that never let go. The average alone cannot tell them
+  # apart and all three numbers have been stored since 042. Until #571 the low was written on
+  # every fetch and shown on no page, which is the cheapest kind of waste -- and heart rate is
+  # now the entire case for confirming a match at all, so this is the place to spend the line.
+  #
+  # **Absent rather than zero, at every level.** A watch with no optical sensor, or one worn
+  # loosely over a sleeve, reports no heart rate whatever, and "0 bpm average" under a session
+  # would be a reading where there is a gap. The range hangs off both ends being present for
+  # the same reason: a range with one end is not a range, and a low on its own is a number
+  # nobody asked for. A max with no min keeps the older wording, because a peak is a claim
+  # that stands up by itself.
+  #
+  # A phrase rather than the three numbers and the branching inline in the view, because this
+  # is three conditions deep and an ERB tag that deep is one nobody will read before changing.
+  def watch_heart_rate
+    activity = matched_activity
+    average = activity && activity[:hr_average]
+    return nil unless average
+
+    low = activity[:hr_min]
+    high = activity[:hr_max]
+    return "#{average} bpm average, #{low} to #{high}" if low && high
+
+    high ? "#{average} bpm average, #{high} peak" : "#{average} bpm average"
   end
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named
