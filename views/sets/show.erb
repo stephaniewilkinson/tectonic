@@ -9,8 +9,12 @@
     <div class="flex justify-between py-3">
       <dt class="text-gray-500">Workout</dt>
       <dd>
+        <%# The session this set belongs to, named by the day it was trained. #572, and the
+            same rule everywhere else (Workout#performed_or_planned_on). The link has to land
+            on a page with this date at the top of it, and until now it did not: this said
+            Friday and the record page it opened said Friday too, both of them the plan. %>
         <a href="/workouts/<%= @set.workout[:id] %>" class="font-medium text-lime-700 hover:text-lime-800">
-          <%= @set.workout[:date].strftime('%A %B %-d, %Y') %>
+          <%= @set.workout.performed_or_planned_on.strftime('%A %B %-d, %Y') %>
         </a>
       </dd>
     </div>

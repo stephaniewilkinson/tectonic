@@ -45,10 +45,13 @@ module QueryCount
     tally.queries
   end
 
-  # A session of `lifts` movements, four sets apiece, on its own workout.
+  # A session of `lifts` movements, four sets apiece, on its own workout. The movements are
+  # shared across the sessions, which is what makes them worth returning: one of them is a lift
+  # trained in every session, so its history page is `workouts * 4` sets long and grows with
+  # the account the way a real one does.
   def training(account_id, workouts:, lifts:)
     movements = Array.new(lifts) { DB[:exercises].insert(name: "Lift #{SecureRandom.hex(4)}", account_id:) }
-    Array.new(workouts) { |day| a_session(account_id, movements, day) }
+    [Array.new(workouts) { |day| a_session(account_id, movements, day) }, movements]
   end
 
   def a_session(account_id, movements, day)
@@ -62,6 +65,21 @@ module QueryCount
     workout_id
   end
 
+  # What each page is allowed, so that "constant" cannot be satisfied by a page that is
+  # constantly expensive. Generous on purpose: this is a guard against a per-row query coming
+  # back, not a budget anybody should be tuning against.
+  #
+  # Single figures for the four session pages, and a higher one for exercise history, which
+  # joined this file with #572 at twenty-one. That number is not what #572 did to it -- it is
+  # what the page already was, and it is constant, which is the property this file exists to
+  # protect. It draws a training max, an estimate off the whole set history, a goal, a rest,
+  # and a progress chart that asks several questions of its own, and each of those is one query
+  # whether the lifter has trained twice or two hundred times. Raising this to let a per-row
+  # query in would be the misuse the paragraph above warns against; naming what a genuinely
+  # heavy constant page costs is not, and the gap between 21 and 30 is deliberately too small
+  # to absorb one -- the unfixed version of #572's eager load cost this page 100.
+  CEILINGS = Hash.new(10).merge('exercise history' => 30).freeze
+
   def cost_of(path)
     queries_while { get path }
   end
@@ -70,11 +88,19 @@ module QueryCount
   # measured against a query plan cache the large case warmed.
   def costs_for(workouts:, lifts:)
     account_id = login
-    workout = training(account_id, workouts:, lifts:).first
+    sessions, movements = training(account_id, workouts:, lifts:)
+    workout = sessions.first
+    # Exercise history joins the list with #572. It dates every row by the session the set came
+    # from, and it walked `set.workout` per row to do it -- a query a set, a hundred of them for
+    # a hundred squat sets, growing every session and never failing anything. The route eager
+    # loads those sessions now, and asks for their completion stamps in the same load, because
+    # the date on each row is the day the session was trained rather than the day it was
+    # planned and `performed_on` will otherwise go and fetch that one session at a time.
     { '/workouts' => cost_of('/workouts'),
       'record' => cost_of("/workouts/#{workout}"),
       'sets' => cost_of("/workouts/#{workout}/sets"),
-      'session' => cost_of("/workouts/#{workout}/session") }
+      'session' => cost_of("/workouts/#{workout}/session"),
+      'exercise history' => cost_of("/exercises/#{movements.first}") }
   end
 end
 
@@ -101,11 +127,11 @@ describe 'what a page costs to render' do
     end
   end
 
-  # A ceiling as well, so that "constant" cannot be satisfied by a page that is constantly
-  # expensive. Generous on purpose: this is a guard against a per-row query coming back, not
-  # a budget anybody should be tuning against.
-  it 'stays in single figures' do
-    @large_costs.each { |page, cost| assert_operator cost, :<, 10, "#{page} costs #{cost} queries" }
+  # And a ceiling apiece, for the reason set out on CEILINGS.
+  it 'stays inside what each page is allowed' do
+    @large_costs.each do |page, cost|
+      assert_operator cost, :<, QueryCount::CEILINGS[page], "#{page} costs #{cost} queries"
+    end
   end
 end
 

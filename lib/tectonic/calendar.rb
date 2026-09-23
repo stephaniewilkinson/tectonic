@@ -119,11 +119,14 @@ class Tectonic < Roda
     # that reports the plan is a calendar that cannot answer "when did I actually train",
     # which is the only question a diary is for.
     #
-    # `on_calendar` is where that decision lives; this just groups by it.
+    # `Workout#performed_or_planned_on` is where that decision lives; this just groups by it.
+    # It was called `on_calendar` until #572 -- named for this caller, which is how it came to
+    # have only this caller while six other pages went on printing the plan. Same rule, same
+    # fallback, a name that says what it answers rather than who asks.
     def by_day(account_id, from, to)
       Workout.where(account_id:).where(within(from, to))
              .with_performed_on.order(:date, :id).all
-             .group_by(&:on_calendar)
+             .group_by(&:performed_or_planned_on)
     end
 
     # A session belongs in this grid if *either* of its dates falls in it, and both halves

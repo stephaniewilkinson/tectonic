@@ -2,7 +2,10 @@
   <div class="sm:flex sm:items-center">
     <div class="sm:flex-auto">
       <h1 class="text-3xl font-semibold text-gray-900">Sets</h1>
-      <p class="mt-2 text-sm text-gray-700"><%= @workout[:date].strftime('%A %B %-d, %Y') %></p>
+      <%# Which session's sets these are, dated by when they were lifted rather than by when
+          the programme asked for them. #572, and Workout#performed_or_planned_on is the rule:
+          performed where there is a stamp to read, planned where there is not. %>
+      <p class="mt-2 text-sm text-gray-700"><%= @workout.performed_or_planned_on.strftime('%A %B %-d, %Y') %></p>
     </div>
     <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
       <a href="/workouts/<%= @workout[:id] %>/sets/new" class="<%= button_style %> block bg-lime-500 px-3 py-2 text-center text-sm font-semibold text-gray-900 hover:bg-lime-600">Add a set</a>
