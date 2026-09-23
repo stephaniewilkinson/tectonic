@@ -46,6 +46,11 @@ module FetchingFromTheScale
   def weight(value: 81_448, unit: -3) = { 'type' => 1, 'value' => value, 'unit' => unit }
   def fat_ratio(value: 27_900, unit: -3) = { 'type' => 6, 'value' => value, 'unit' => unit }
 
+  # Type 11, which Withings' reference calls "Heart Pulse (bpm) - only for BPM and scale
+  # devices": the pulse an instrument takes while it is taking some other reading. Unit 0,
+  # because a heart rate is a whole number of beats and Withings send it as one.
+  def heart_pulse(value: 62, unit: 0) = { 'type' => 11, 'value' => value, 'unit' => unit }
+
   def a_weigh_in(grpid: 4001, at: Time.now - 3600, measures: nil, attrib: 0)
     { 'grpid' => grpid, 'date' => at.to_i, 'attrib' => attrib, 'category' => 1,
       'measures' => measures || [weight, fat_ratio] }
@@ -147,6 +152,69 @@ describe 'which of a weigh-in is kept' do
     answering(page([a_weigh_in(at: taken)])) { Tectonic::WithingsMeasures.fetch(@account_id) }
 
     assert_in_delta taken, readings(@account_id).first[:measured_at], 1
+  end
+end
+
+# The pulse an instrument takes while it is taking something else. #579.
+#
+# It rides the request `MEASTYPES` already builds, so there is nothing here about windows or
+# watermarks -- the only question is whether a type this table now names becomes a row, and
+# whether it says what it is when it does.
+describe 'a heart rate taken during a weigh-in' do
+  include FetchingFromTheScale
+
+  before do
+    @account_id = an_account
+    connect(@account_id)
+  end
+
+  # The whole of the change: 11 was being skipped by `store_measure` as a type with no name,
+  # exactly like the 91 above, on the strength of a comment that said heart rate was somebody
+  # else's later ticket. It is in the plan tier this account has and on the call already made.
+  it 'becomes a row rather than being skipped as unnamed' do
+    answering(page([a_weigh_in(measures: [weight, heart_pulse])])) do
+      Tectonic::WithingsMeasures.fetch(@account_id)
+    end
+
+    assert_equal(%w[standing_hr weight], readings(@account_id).map { |row| row[:metric] })
+  end
+
+  # `standing_hr` and not `resting_hr`: this is a pulse taken standing on a scale or sitting
+  # with a cuff on, which is not a resting heart rate in the sense anybody means by that, and
+  # it is not a workout heart rate either -- those are on `withings_workouts` with the
+  # activity they were measured over. A name a reader can mistake is the whole failure here.
+  it 'is named for the pulse it is rather than for a rest nobody took' do
+    answering(page([a_weigh_in(measures: [heart_pulse])])) { Tectonic::WithingsMeasures.fetch(@account_id) }
+    row = readings(@account_id).first
+
+    assert_equal 'standing_hr', row[:metric]
+    assert_equal 'bpm', row[:unit]
+  end
+
+  # Unit 0, so the exponent arithmetic is the identity -- which is worth pinning precisely
+  # because it is the case where getting `real` wrong would look right.
+  it 'stores the beats per minute Withings sent' do
+    answering(page([a_weigh_in(measures: [heart_pulse(value: 58)])])) do
+      Tectonic::WithingsMeasures.fetch(@account_id)
+    end
+
+    assert_equal BigDecimal('58'), readings(@account_id).first[:value]
+  end
+end
+
+# The other half of the same line, on the wire rather than in the table.
+describe 'the types a request for measurements names' do
+  include FetchingFromTheScale
+
+  # 11 has to be asked for by number, and the number has to reach the one string the request
+  # is built from. A `METRICS` entry that never got into `meastypes` would store nothing and
+  # look exactly like an account with no device that takes a pulse.
+  it 'includes the heart pulse this app now has a name for' do
+    @account_id = an_account
+    connect(@account_id)
+    answering(page([])) { Tectonic::WithingsMeasures.fetch(@account_id) }
+
+    assert_includes @asked.first[:meastypes].split(','), '11'
   end
 end
 
