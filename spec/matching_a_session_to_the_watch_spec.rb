@@ -18,8 +18,10 @@ require_relative '../lib/tectonic/withings_workouts'
 # enforces and also the one that reads: each names one claim about the flow.
 module MatchingTheWatch
   # A session with two completed sets, an hour ago, finished. An hour ago rather than last
-  # week because the proposal is a forward flow and deliberately stops looking after
-  # LOOKS_BACK -- there is a describe below that asserts that boundary on purpose.
+  # week because an hour ago is inside `STILL_ARRIVING`, which is the only thing age decides
+  # since #560: whether the box may say a watch upload might still be coming. Whether an
+  # activity is *offered* no longer depends on it at all, and there are describes below for
+  # both halves of that.
   def trained_session(account_id, started_at: Time.now - 3600, minutes: 52)
     ended_at = started_at + (minutes * 60)
     workout_id = DB[:workouts].insert(account_id:, date: started_at.to_date.to_time,
@@ -50,11 +52,47 @@ module MatchingTheWatch
                                          'expires_in' => 10_800, 'userid' => '9001' })
   end
 
-  # The page, with whatever Withings was going to answer stubbed out. `nil` is the answer
-  # that means "Withings did not say" -- a throttle, a revoked grant, a timeout -- and `[]`
-  # is the one that means "Withings said there was nothing".
-  def record(workout_id, answer)
-    Tectonic::Withings.stub(:workouts, answer) { get "/workouts/#{workout_id}" }
+  # The page, opened after Withings has already sent whatever it was going to send.
+  #
+  # **A page view fetches nothing since #560**, so the activities have to be in the database
+  # before the render rather than arriving during it -- which is what `store` does, and what
+  # a press of check or a run of the backfill would have done earlier. Every assertion about
+  # what the box says is therefore an assertion about stored rows, which is the whole of what
+  # the record page now knows.
+  def record(workout_id, found = [])
+    @workout_id = workout_id
+    found.each { |activity| Tectonic::WithingsWorkouts.store(@account_id, activity) }
+    get "/workouts/#{workout_id}"
+  end
+
+  # Asking, which is the one thing on a record page that calls Withings at all. Presses the
+  # form the box draws, with whatever Withings was going to answer stubbed, and follows the
+  # redirect back to the record -- so what an assertion reads is the page a lifter lands on.
+  #
+  # `nil` is the answer meaning "Withings did not say" -- a throttle, a revoked grant, a
+  # timeout -- and `[]` is the one meaning "Withings said there was nothing".
+  def check_now(answer = [])
+    Tectonic::Withings.stub(:workouts, answer) { press_check }
+    follow_redirect!
+  end
+
+  # The press on its own, unstubbed, for the specs that want to watch what goes over the wire.
+  def press_check
+    action = "/workouts/#{@workout_id}/withings/check"
+    post action, { '_csrf' => token_for_form("/workouts/#{@workout_id}", action) }
+  end
+
+  # How many requests something made, counted at the one door every Withings request goes
+  # through. A count at `Withings.workouts` would keep passing the day a page started
+  # reaching for a different method on the same service.
+  def calls_while(&)
+    calls = 0
+    counting = lambda do |_path, **_form|
+      calls += 1
+      { 'series' => [] }
+    end
+    Tectonic::Withings.stub(:post, counting, &)
+    calls
   end
 
   def stored(account_id) = DB[:withings_workouts].where(account_id:).all
@@ -172,7 +210,7 @@ describe 'the overlap gate' do
   it 'does not propose one that ended before the session started' do
     record(@workout_id, [activity(starts: @started_at - 7200, minutes: 60)])
 
-    assert_includes last_response.body, 'Nothing from Withings yet'
+    refute_includes last_response.body, 'Was that this session?'
   end
 
   # Touching at an instant is not overlapping. The gate is strict on both sides.
@@ -187,7 +225,75 @@ describe 'the overlap gate' do
   it 'finds nothing for a session logged long after it was trained' do
     record(@workout_id, [activity(starts: Time.now - (9 * 3600), minutes: 50)])
 
-    assert_includes last_response.body, 'Nothing from Withings yet'
+    refute_includes last_response.body, 'Was that this session?'
+  end
+end
+
+# The half of #560 that is wording. `:waiting` covered two situations and its sentence --
+# *"Nothing from Withings yet -- check back in a minute"* -- fits only one of them. The
+# reporting account was in the other: two activities stored from that morning, neither
+# overlapping the session on screen, and a page saying nothing had arrived.
+module NoneOfThem
+  include MatchingTheWatch
+
+  def a_session_with_things_around_it
+    @account_id = login
+    connect(@account_id)
+    @started_at = Time.now - 3600
+    @workout_id = trained_session(@account_id, started_at: @started_at)
+  end
+
+  def a_walk(id: 'walk', before: 7200) = activity(id:, starts: @started_at - before, minutes: 30)
+end
+
+describe 'a session Withings has activities around but none of' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include NoneOfThem
+
+  before { a_session_with_things_around_it }
+
+  # Something was recorded. Saying nothing arrived is false about a thing sitting in the
+  # database, and the advice that follows from it -- wait and reload -- never pays off.
+  it 'says what arrived rather than that nothing did' do
+    record(@workout_id, [a_walk, activity(id: 'ride', starts: @started_at + 7200, minutes: 30)])
+
+    assert_includes last_response.body, 'Withings has 2 activities around this session'
+    refute_includes last_response.body, 'Nothing from Withings'
+  end
+
+  # One is one, not "1 activities". The count is read by a person.
+  it 'counts one activity in the singular' do
+    record(@workout_id, [a_walk])
+
+    assert_includes last_response.body, 'Withings has one activity around this session'
+  end
+end
+
+describe 'the activities that sentence is allowed to count' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include NoneOfThem
+
+  before { a_session_with_things_around_it }
+
+  # An activity that overlaps but has been refused is not something this session may be
+  # offered, so it is not in the count either -- "2 activities, none of them overlapping"
+  # printed over a set containing one that does would be the same lie in a new place.
+  it 'leaves out an overlapping activity the lifter has already refused' do
+    record(@workout_id, [a_walk, activity(id: 'lift', starts: @started_at, minutes: 50)])
+    DB[:withings_workouts].where(external_id: 'lift').update(dismissed_at: Time.now)
+    get "/workouts/#{@workout_id}"
+
+    assert_includes last_response.body, 'Withings has one activity around this session'
+  end
+
+  # A day either side is the span a fetch asks for, so it is the span the sentence reports
+  # on. An activity from a fortnight ago was never part of the answer to this question.
+  it 'does not count an activity from another week' do
+    record(@workout_id, [a_walk(id: 'far', before: 14 * 24 * 3600)])
+
+    assert_includes last_response.body, 'Nothing from Withings for this session yet'
   end
 end
 
@@ -209,7 +315,7 @@ describe 'a fetch that came back empty' do
   it 'says to check back rather than that there was no activity' do
     record(@workout_id, [])
 
-    assert_includes last_response.body, 'Nothing from Withings yet'
+    assert_includes last_response.body, 'Nothing from Withings for this session yet'
     refute_includes last_response.body, 'No activity'
   end
 
@@ -220,36 +326,14 @@ describe 'a fetch that came back empty' do
 
     assert_includes last_response.body, 'withings/dismiss'
   end
-end
 
-describe 'a fetch that did not come back at all' do
-  include Rack::Test::Methods
-  include RouteOwnership
-  include MatchingTheWatch
+  # #560's first half: the box told somebody to check and gave them nothing to check with,
+  # so the only control on screen was the irreversible one.
+  it 'offers a way to check, which is what the sentence asks for' do
+    record(@workout_id, [])
 
-  before do
-    @account_id = login
-    connect(@account_id)
-    @workout_id = trained_session(@account_id)
-  end
-
-  # The trap. Withings signals rate limiting as body status 601 and delivers it over HTTP
-  # 200, and `Withings.answered` folds that into the same nil as a revoked token -- so a
-  # throttled fetch arrives here looking exactly like an empty one. Rendering it as "nothing
-  # yet" would be the app asserting something about an afternoon it never asked about.
-  it 'says Withings could not be reached rather than that nothing arrived' do
-    record(@workout_id, nil)
-
-    assert_includes last_response.body, 'could not be reached'
-    refute_includes last_response.body, 'Nothing from Withings yet'
-  end
-
-  # Dismissing answers a question, and this state is the app admitting it has not managed to
-  # ask one.
-  it 'offers no way to dismiss a question it never managed to ask' do
-    record(@workout_id, nil)
-
-    refute_includes last_response.body, 'withings/dismiss'
+    assert_includes last_response.body, "/workouts/#{@workout_id}/withings/check"
+    assert_includes last_response.body, 'Check Withings now'
   end
 end
 
@@ -267,16 +351,31 @@ describe 'a record page with nothing to ask about' do
     refute_includes last_response.body, 'Withings'
   end
 
-  # The proposal is a forward flow. #520 declines to match arbitrary past sessions, and
-  # re-asking on every view of a year of training is how a read-only integration gets itself
-  # rate-limited -- which is the one failure this page cannot render honestly.
-  it 'stops looking once a session is a day old' do
+  # Absence and lateness are different, which is #520's rule and the reason `STILL_ARRIVING`
+  # still exists after #560 took its other job away. For a session from last March there is
+  # no upload on its way, so "nothing yet" is a hedge borrowed from a case that does not
+  # apply, and silence is the honest rendering.
+  it 'says nothing at all about an old session with nothing overlapping it' do
     connect(@account_id)
     old = trained_session(@account_id, started_at: Time.now - (30 * 3600))
-    record(old, [activity(starts: Time.now - (30 * 3600))])
+    record(old, [activity(starts: Time.now - (30 * 3600) - 7200, minutes: 30)])
 
-    refute_includes last_response.body, 'Nothing from Withings yet'
+    refute_includes last_response.body, 'Nothing from Withings'
     refute_includes last_response.body, 'Was that this session?'
+  end
+
+  # **And the widening #560 asks for.** The old 24-hour bound was there to stop browsing a
+  # year of training becoming a year of API calls; a page view makes none now, so a stored
+  # activity is offered whatever the session's age. This is the reporting account's case
+  # exactly: an activity from yesterday, overlapping a session that has passed a day old,
+  # sitting unproposed for no reason but the clock.
+  it 'still proposes a stored activity that overlaps a session from yesterday' do
+    connect(@account_id)
+    started_at = Time.now - (30 * 3600)
+    old = trained_session(@account_id, started_at:)
+    record(old, [activity(starts: started_at + 360, minutes: 45)])
+
+    assert_includes last_response.body, 'Was that this session?'
   end
 end
 
@@ -442,12 +541,12 @@ describe 'the epochs Withings sends' do
   # Turned into instants on the way in, so that no reader has to remember to convert and
   # none of them can forget.
   it 'are stored as instants' do
-    account_id = login
-    connect(account_id)
+    @account_id = login
+    connect(@account_id)
     starts = Time.now - 3600
-    record(trained_session(account_id), [activity(starts:)])
+    record(trained_session(@account_id), [activity(starts:)])
 
-    assert_in_delta starts, stored(account_id).first[:started_at], 1
+    assert_in_delta starts, stored(@account_id).first[:started_at], 1
   end
 end
 
@@ -579,18 +678,175 @@ describe 'what the app is allowed to ask Withings to do' do
     connect(@account_id)
   end
 
-  # The app reads; the watch is the instrument. #520. Asserted over a real page view rather
-  # than over the module, because the route is where a write would be added by accident.
+  # The app reads; the watch is the instrument. #520. Asserted over the route rather than
+  # over the module, because the route is where a write would be added by accident.
   it 'never asks Withings to write anything' do
-    workout_id = trained_session(@account_id)
+    @workout_id = trained_session(@account_id)
     actions = []
     answering = lambda do |_path, **form|
       actions << form[:action]
       { 'series' => [] }
     end
-    Tectonic::Withings.stub(:post, answering) { get "/workouts/#{workout_id}" }
+    Tectonic::Withings.stub(:post, answering) { press_check }
 
     assert_equal %w[getworkouts], actions.uniq
+  end
+end
+
+# Pressing check, which since #560 is the one thing on a record page that calls Withings.
+module PressingCheck
+  include MatchingTheWatch
+
+  def a_session_to_ask_about
+    @account_id = login
+    connect(@account_id)
+    @started_at = Time.now - 3600
+    @workout_id = trained_session(@account_id, started_at: @started_at)
+  end
+end
+
+describe 'a lifter asking Withings about one session' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include PressingCheck
+
+  before { a_session_to_ask_about }
+
+  it 'asks Withings, which nothing else on the page does' do
+    asked = calls_while { press_check }
+
+    assert_equal 1, asked
+  end
+
+  it 'stores what came back' do
+    check_now([activity(starts: @started_at)])
+
+    assert_equal 1, stored(@account_id).length
+  end
+
+  # The point of pressing it. The proposal is on the page a press lands on, not on a page
+  # the lifter has to think to reload.
+  it 'proposes the activity it just fetched, on the page it lands on' do
+    check_now([activity(starts: @started_at)])
+
+    assert_includes last_response.body, 'Was that this session?'
+  end
+
+  # A press is a question, and a question is owed an answer. Without this the page after a
+  # fetch that found nothing is byte for byte the page before it.
+  it 'says it checked, so an empty answer is not a silently identical page' do
+    check_now([])
+
+    assert_includes last_response.body, 'Checked just now'
+  end
+end
+
+describe 'a press Withings never answered' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include PressingCheck
+
+  before { a_session_to_ask_about }
+
+  # The trap. Withings signals rate limiting as body status 601 over HTTP 200, and
+  # `Withings.answered` folds that into the same nil as a revoked token -- so a throttled
+  # press arrives looking exactly like an empty one. Reporting it as "nothing arrived" would
+  # assert something about an afternoon the app never managed to ask about.
+  it 'says Withings could not be reached rather than that nothing arrived' do
+    check_now(nil)
+
+    assert_includes last_response.body, 'could not be reached'
+    refute_includes last_response.body, 'Checked just now'
+  end
+
+  # The old unreachable box offered no dismiss, on the grounds that dismissing answers a
+  # question the app had failed to ask. That reasoning does not survive the fetch moving
+  # behind a press: this is the box about the session with a note about a press on it, and
+  # "stop asking about this one" is the lifter's to say either way.
+  it 'still lets the session be dismissed' do
+    check_now(nil)
+
+    assert_includes last_response.body, 'withings/dismiss'
+  end
+end
+
+describe 'a press nobody is entitled to make' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include PressingCheck
+
+  before { a_session_to_ask_about }
+
+  # A write behind a post, so it takes a token like the yes and the no beside it.
+  it 'is refused without a CSRF token' do
+    asked = calls_while { post "/workouts/#{@workout_id}/withings/check" }
+
+    assert_equal 0, asked
+    refute_equal 302, last_response.status
+  end
+
+  # Somebody else's session is somebody else's, and a fetch against it would be this
+  # account's token asked about a window it has no business knowing.
+  it 'cannot be made against a session belonging to somebody else' do
+    stranger, = strangers_workout
+    asked = calls_while { post "/workouts/#{stranger}/withings/check" }
+
+    assert_equal 0, asked
+  end
+
+  # The outcome rides back in the query string, so what reaches the page is whatever is in a
+  # URL. It is matched against a fixed pair rather than printed.
+  it 'says nothing about a checked value nobody recognises' do
+    get "/workouts/#{@workout_id}?checked=<script>alert(1)</script>"
+
+    refute_includes last_response.body, 'alert(1)'
+    refute_includes last_response.body, 'Checked just now'
+  end
+end
+
+# **The central claim of #560.** A record page is a page about a session, and until now
+# opening one inside the 24-hour window put a Withings request with a ten-second timeout in
+# front of the render -- so the slowest thing on the page was somebody else's service, and
+# the number of calls the app made was however many times a lifter reloaded.
+#
+# Counted at `Withings.post`, which is the one door every request goes through, rather than
+# at `Withings.workouts`: a count at the method the page happens to call today would keep
+# passing if the page started calling a different one tomorrow.
+describe 'what an ordinary view of a record page costs' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include AskingWithings
+
+  before do
+    @account_id = login
+    connect(@account_id)
+  end
+
+  it 'asks Withings for nothing at all' do
+    workout_id = trained_session(@account_id)
+
+    asked = calls_while { get "/workouts/#{workout_id}" }
+
+    assert_equal 0, asked
+  end
+
+  # Including the case the old window existed for: a session finished ten minutes ago is
+  # exactly the one that used to fetch on every view.
+  it 'asks for nothing even for a session that has only just finished' do
+    workout_id = trained_session(@account_id, started_at: Time.now - 600, minutes: 5)
+
+    asked = calls_while { get "/workouts/#{workout_id}" }
+
+    assert_equal 0, asked
+  end
+
+  # And a reload is a reload. Three views used to be three fetches.
+  it 'asks for nothing however many times the page is opened' do
+    workout_id = trained_session(@account_id)
+
+    asked = calls_while { 3.times { get "/workouts/#{workout_id}" } }
+
+    assert_equal 0, asked
   end
 end
 

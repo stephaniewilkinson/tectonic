@@ -76,89 +76,103 @@ class Tectonic < Roda
     # asked for as well -- and one at 00:20 needs yesterday. A day each way covers both and
     # costs one request either way.
     MARGIN_DAYS = 1
-    # How long after a session ends this keeps asking Withings about it.
+    # How long after a session ends the app is still willing to say an upload may be coming.
     #
-    # #520 requires that the page look again each time it is opened, because the watch's
-    # upload is seconds to minutes behind -- so it cannot be a one-shot. It does not follow
-    # that it should be forever. A session that ended yesterday with nothing overlapping it
-    # has nothing coming, and re-asking on every view of a year of training turns browsing
-    # history into a few hundred API calls -- which is how a read-only integration gets
-    # itself rate-limited, and a throttled fetch is the one failure this page cannot render
-    # honestly (see `Withings.workouts`).
+    # **This was `LOOKS_BACK`, and it bounded something else entirely.** It was how long the
+    # record page kept *asking Withings* about a session, and the argument for having a bound
+    # at all was rate limiting: `proposal` fetched on every view inside the window, so without
+    # one, browsing a year of training was a few hundred API calls -- which is how a read-only
+    # integration gets itself throttled, and a throttled fetch is the one failure this page
+    # cannot render honestly (see `Withings.workouts`).
     #
-    # A day rather than an hour because a lifter who taps finish and reads the record the
-    # next morning is ordinary, and the proposal should still be there. Past it the page
-    # goes quiet rather than saying anything: an old session with no match has nothing to
-    # say, and #520's whole complaint about "no activity found" is that it is a claim.
+    # **That argument is gone, because #560 removed its cause rather than its symptom.** A
+    # page view now reads stored rows and calls nobody; a lifter who wants Withings asked
+    # presses a control that asks it. Browsing a year of training is a year of indexed queries
+    # and no requests whatever, so there is nothing left for a 24-hour bound to protect -- and
+    # proposing from stored activities now applies to a session of any age. That widening is
+    # not hypothetical: on the reporting account an activity from yesterday, overlapping a
+    # session for 43 of its 49 minutes, sat unproposed purely because the session had passed a
+    # day old. It is offered now, on the next page view, with no fetch and no backfill.
     #
-    # It is also the seam a backfill would widen. #520 declines one outright -- "matching an
-    # arbitrary past session is the hard version of this problem and this flow avoids it
-    # entirely" -- so this is the forward flow and only the forward flow.
+    # What the number still governs is a *sentence*. "Nothing from Withings yet" is a claim
+    # about lateness, and lateness has a shelf life: closing a workout in the Withings app
+    # starts an upload that lands on their servers seconds to minutes later, so for a session
+    # that has just finished the claim is true and the advice is worth giving. For a session
+    # from last March there is no upload on its way, absent really is absent, and the honest
+    # rendering is silence rather than a hedge borrowed from a case that does not apply --
+    # which is the distinction `standing` used to keep and this constant now keeps alone.
     #
-    # **And it has now been widened, on purpose.** `withings:backfill` reverses #520's scope
-    # -- the owner was asked and chose to -- and a session from last March with a proposal
-    # waiting on it has to be answerable. What is widened is *which sessions may show a
-    # question*, and not what this constant actually governs, which is how long the app keeps
-    # asking Withings. Past a day the page still makes no call whatever: it reads the
-    # proposal the backfill already wrote and renders that, or it says nothing at all. See
-    # `standing` below, and 043.
-    LOOKS_BACK = 24 * 60 * 60
+    # A day rather than an hour, unchanged and for the unchanged reason: a lifter who taps
+    # finish and reads the record the next morning is ordinary, and the prompt should be
+    # there when they do.
+    STILL_ARRIVING = 24 * 60 * 60
 
     module_function
 
     # What the record page should say about Withings, or nil where it should say nothing.
     #
+    # **It calls nobody.** That is the whole of #560 and it replaces the reasoning that used
+    # to sit here, which was #520's: *"the page looks again each time it is opened"*, because
+    # the watch's upload is seconds to minutes behind a lifter tapping finish. The observation
+    # was right and the implementation put somebody else's service, with a ten-second timeout,
+    # in front of an ordinary page render -- so the slowest thing on a record page was
+    # Withings, and the number of requests the app made was however many times a session got
+    # looked at. Lateness is now handled by a control the lifter presses (see `check`), and
+    # what this does is read rows already stored, with one indexed query and no network.
+    #
     # Four answers, and they are four rather than two because the differences between them
-    # are the substance of #520:
+    # are the substance of #520 and #560:
     #
-    #   :matched  -- the lifter said yes; the watch's numbers are the session's numbers
-    #   :proposed -- something overlaps, with a sentence saying how much
-    #   :waiting  -- Withings answered and had nothing *yet*, which is not the same as never
-    #   :unreachable -- Withings did not answer, which is not the same as nothing
+    #   :matched   -- the lifter said yes; the watch's numbers are the session's numbers
+    #   :proposed  -- a stored activity overlaps, with a sentence saying how much
+    #   :waiting   -- nothing of Withings' is stored around this session, and it is recent
+    #                 enough that an upload may still be on its way
+    #   :elsewhere -- activities *are* stored around this session and none of them overlaps
+    #                 it, so something was recorded and it was not this
     #
-    # The last two are one state in any implementation that folds them, and folding them is
-    # the trap: `Withings.answered` turns a rate-limit (status 601, delivered as HTTP 200
-    # like every other Withings error) into the same nil as a revoked token, so a throttled
-    # fetch and an empty one are indistinguishable by the time the answer gets here. They
-    # are told apart by nil against `[]` and never by counting rows, because a page that
-    # renders a throttle as "no activity" is lying about a thing that exists.
+    # The last two were one state, `:waiting`, and folding them was the bug #560 reports: the
+    # page told a lifter whose watch had recorded two activities that morning that nothing had
+    # arrived, and advised them to check back in a minute for a thing that had already come
+    # and was not theirs. Telling them apart costs one count, which `nearby` does.
+    #
+    # `:unreachable` used to be here too and is no longer a state of the page, because the
+    # page no longer asks: a request that was never answered is an outcome of a press and is
+    # reported as one. The trap it guarded is not gone and has moved to `check` -- Withings
+    # signals a rate limit as body status 601 over HTTP 200, so `Withings.answered` folds a
+    # throttle into the same nil as a revoked token, and a page that rendered that as "no
+    # activity" would be lying about a thing that exists.
     def proposal(account_id:, workout:, timing:)
       found = matched(workout[:id])
       return { state: :matched, activity: found } if found
       return nil if workout[:withings_dismissed_at] || !WithingsConnection.connected?(account_id)
 
       window = interval(timing)
-      return nil unless window
-      return standing(account_id, workout[:id], window) unless recent?(window.last)
-      return { state: :unreachable } unless fetched?(account_id, window)
-
-      propose(account_id, window, workout[:id])
+      window && propose(account_id, window, workout[:id])
     end
 
-    # The proposal a backfill left for a session too old for the forward flow to ask about.
+    # Is there already an unanswered proposal against this session, and what does it say.
     #
-    # One indexed read and no network at all, which is the constraint that makes widening the
-    # window safe: browsing a year of training must not become a year of API calls. The
-    # backfill did the asking, once, in a rake task that could afford to; this only renders
-    # what it concluded.
+    # **This is the backfill's question now, and only the backfill's.** It used to be the
+    # record page's other path: a session older than the window the page would fetch for got
+    # whatever the backfill had written down, and a newer one got a live overlap computed by
+    # `candidates`. Two paths to one answer, and they did not agree -- `standing` took the
+    # first row it found while `candidates` and `best` scored them, so a session with a
+    # written proposal and a second overlapping activity could be offered one activity on the
+    # record and the other on /workouts/withings, depending only on its age.
     #
-    # Nil where there is no proposal, and nil is the whole of what an old session with
-    # nothing waiting says. **It deliberately does not say "nothing from Withings yet".**
-    # That sentence is the forward flow's, and it is true there -- the watch's upload is
-    # seconds to minutes behind, so a fetch that found nothing has found nothing *yet*. For a
-    # session from last March there is no upload on its way. Absent really is absent, and the
-    # honest rendering of it is silence rather than a hedge borrowed from a case that does
-    # not apply. The run that made the proposals is where the absences get counted and said
-    # out loud, because that is the one place a total is meaningful.
-    # One query and one spelling of "is there an unanswered proposal on this session", which
-    # the backfill also asks before it offers one -- two spellings of it would eventually
-    # disagree about whether a dismissed proposal counts, and the disagreement would show up
-    # as a session offered a second activity while the first was still on screen.
+    # #560 collapsed that. A page view reads stored rows whatever the session's age, so
+    # `candidates` covers every session `standing` used to cover -- every row this can return
+    # overlaps the window, because the backfill only ever proposes rows `candidates` handed
+    # it -- and `propose` prefers a written proposal outright, so the record page and the
+    # review list name the same activity. What is left here is the idempotency check
+    # `WithingsBackfill.offer` makes before it writes: one query and one spelling of "is there
+    # an unanswered proposal on this session", because two spellings would eventually disagree
+    # about whether a dismissed proposal counts, and the disagreement would show up as a
+    # session offered a second activity while the first was still on screen.
     def standing(account_id, workout_id, window)
       row = DB[:withings_workouts].where(account_id:, proposed_workout_id: workout_id,
                                          workout_id: nil, dismissed_at: nil).first
-      row && { state: :proposed, activity: row, overlap: overlap(row, window),
-               span: window.last - window.first, because: because(row, window) }
+      row && offered(row, window)
     end
 
     # The activity a session has already been matched to, or nil. Read on every record page,
@@ -178,10 +192,50 @@ class Tectonic < Roda
       [started_at, ended_at]
     end
 
-    def recent?(ended_at) = Time.now - ended_at < LOOKS_BACK
+    def still_arriving?(ended_at) = Time.now - ended_at < STILL_ARRIVING
+
+    # Asking Withings about one session, because the lifter asked. #560.
+    #
+    # **The only thing on a record page that makes a request.** #560 was opened because the
+    # box said "check back in a minute" and offered no way to check -- the re-fetch existed,
+    # on every page view, and was completely undiscoverable, so the likeliest answer to a
+    # prompt meaning "try again shortly" was the button that silences it for good. Moving the
+    # fetch behind a press makes it discoverable and, in the same move, takes it off the
+    # thirty other page views that never wanted it.
+    #
+    # Three outcomes, because a lifter who has deliberately pressed a button is owed an
+    # answer about what came back rather than a silently identical page:
+    #
+    #   :answered       -- Withings replied, and whatever it sent is now stored
+    #   :unreachable    -- Withings did not reply, so nothing has been learned either way
+    #   :nothing_to_ask -- no interval or no connection, so there was no question to put
+    #
+    # `:unreachable` is the trap #520 wrote `:unreachable` into the page for, in its proper
+    # place: Withings delivers a rate limit as body status 601 over HTTP 200, exactly like a
+    # revoked token and every other error they have, and `Withings.answered` folds the lot
+    # into nil. A press that was throttled and a press that found nothing are the same shape
+    # by the time they reach here, and they are told apart by that nil and never by counting
+    # rows -- rendering a throttle as "nothing arrived" would assert something about the
+    # lifter's afternoon on the strength of a request nobody answered.
+    #
+    # `:nothing_to_ask` is unreachable from the box, which only draws the form where there is
+    # a window and a connection. It exists because a post is a post: a hand-made one, or one
+    # from a page left open across a disconnect, must say nothing rather than report a
+    # failure that never happened.
+    def check(account_id:, workout:, timing:)
+      window = interval(timing)
+      return :nothing_to_ask unless window && WithingsConnection.connected?(account_id)
+      return :nothing_to_ask if matched(workout[:id])
+
+      fetched?(account_id, window) ? :answered : :unreachable
+    end
 
     # Ask Withings what it has around this session and store it. True where it answered --
     # including where it answered with nothing -- and false where it did not.
+    #
+    # Reached only from `check`, which is to say only from a press. It used to be reached
+    # from `proposal`, which is to say from every view of every record page inside a
+    # 24-hour window; see `STILL_ARRIVING` for why that is no longer so.
     #
     # Deliberately does not touch `account_withings.synced_at`. That column is the resume
     # cursor for the measurement poll (#518, #472), and stamping it from a workout fetch
@@ -237,13 +291,64 @@ class Tectonic < Roda
         hr_max: data['hr_max']&.to_i }
     end
 
-    # The best candidate with the sentence that explains it, or the waiting state.
+    # The candidate to offer with the sentence that explains it, or the honest description of
+    # having none. No age test in front of it: an overlap is an overlap whether the session
+    # was trained this morning or in March, and since nothing here fetches there is no longer
+    # a reason to decline to look. See `STILL_ARRIVING`.
+    #
+    # **A proposal somebody already wrote down wins outright**, ahead of scoring. The backfill
+    # records its pick in `proposed_workout_id` and /workouts/withings lists that row, so
+    # scoring afresh here could name a different activity for the same session on the two
+    # screens -- a lifter answering "yes" in one place about a recording the other place was
+    # not offering. There is at most one such row per session, because `WithingsBackfill.offer`
+    # refuses to write a second while the first is unanswered, so "the one that was written
+    # down" is never ambiguous.
+    #
+    # And nothing at all for an old session with nothing overlapping. That is not the same
+    # silence as "there is nothing to say": it is the refusal to say *"nothing yet"* about a
+    # session whose watch upload, if there were one, arrived and was filed months ago.
     def propose(account_id, window, workout_id = nil)
-      pick = best(candidates(account_id, window, workout_id), window)
-      return { state: :waiting } unless pick
+      rows = candidates(account_id, window, workout_id)
+      pick = rows.find { |row| row[:proposed_workout_id] } || best(rows, window)
+      return offered(pick, window) if pick
+      return nil unless still_arriving?(window.last)
 
-      { state: :proposed, activity: pick, overlap: overlap(pick, window),
-        span: window.last - window.first, because: because(pick, window) }
+      around = nearby(account_id, window, workout_id)
+      around.positive? ? { state: :elsewhere, nearby: around } : { state: :waiting }
+    end
+
+    # One activity offered for one session, in the shape the page and the review list both
+    # read. One spelling of it, because the two paths into it -- scored here, written down by
+    # the backfill -- are the pair #560 found disagreeing, and a second literal hash is how
+    # they would come to disagree again.
+    def offered(row, window)
+      { state: :proposed, activity: row, overlap: overlap(row, window),
+        span: window.last - window.first, because: because(row, window) }
+    end
+
+    # How many unanswered activities Withings has around this session without being it.
+    #
+    # This exists to tell one sentence from another, which is half of #560. `:waiting` said
+    # *"nothing from Withings yet -- check back in a minute"* for two situations that are not
+    # alike: Withings had nothing for these days, where the watch's upload may genuinely be
+    # behind and "yet" is true; and Withings had activities and none of them overlapped this
+    # session, where something was recorded, it was simply not this one, and checking back is
+    # advice that will never pay off. The reporting account is in the second case and was
+    # being told the first.
+    #
+    # The span is the one a fetch would have stored -- the session's days with `MARGIN_DAYS`
+    # either side -- so the count answers "what did asking about this session bring back",
+    # which is the question the sentence puts.
+    #
+    # Counted over the same unanswered scope as `candidates` rather than over every row, so
+    # the sentence stays true in the case that would otherwise quietly falsify it: an activity
+    # that *does* overlap but has been claimed by another session or refused already is not
+    # something this session may be offered, and counting it would produce "3 activities, none
+    # of them overlapping" about a set containing one that does.
+    def nearby(account_id, window, workout_id = nil)
+      from = (window.first.to_date - MARGIN_DAYS).to_time
+      to = (window.last.to_date + MARGIN_DAYS + 1).to_time
+      unanswered(account_id, workout_id).where { (started_at < to) & (ended_at > from) }.count
     end
 
     # Everything that could still be this session: unclaimed, un-refused, and overlapping.
@@ -266,10 +371,21 @@ class Tectonic < Roda
     # the ordinary case the moment a backfill and the forward flow overlap on one session.
     def candidates(account_id, window, workout_id = nil)
       opened, closed = window
+      unanswered(account_id, workout_id).where { (started_at < closed) & (ended_at > opened) }
+                                        .order(:started_at).all
+    end
+
+    # Everything this session is still allowed to be offered, before the overlap gate: not
+    # claimed, not refused, and not already promised to somebody else's session.
+    #
+    # One spelling, shared by `candidates` and `nearby`, on the same argument
+    # `WithingsProposals.outstanding` makes for its own: the count and the list have to mean
+    # the same thing by "still a question", and two copies of a four-part filter drift on
+    # exactly the clause nobody is watching. Here that drift would read as "2 activities, none
+    # of them this session" printed over a box offering one of them.
+    def unanswered(account_id, workout_id = nil)
       DB[:withings_workouts].where(account_id:, workout_id: nil, dismissed_at: nil)
                             .where { (proposed_workout_id =~ nil) | (proposed_workout_id =~ workout_id) }
-                            .where { (started_at < closed) & (ended_at > opened) }
-                            .order(:started_at).all
     end
 
     # The one to propose. Highest score, and the nearest start where two score the same.

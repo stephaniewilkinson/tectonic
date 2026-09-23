@@ -20,7 +20,7 @@ require_relative '../lib/tectonic/withings_backfill'
 module Backfilling
   include MatchingTheWatch
 
-  # Far enough back that the forward flow has long stopped asking about it -- LOOKS_BACK is a
+  # Far enough back that the record page would never call it recent -- `STILL_ARRIVING` is a
   # day -- and recent enough that the walk is two or three years rather than a decade.
   MONTHS_AGO = 300 * 24 * 60 * 60
 
@@ -403,8 +403,9 @@ describe 'the record of a session a backfill proposed a match for' do
 
   before { already_backfilled }
 
-  # The seam #528 named: LOOKS_BACK is 24 hours and this session is months old. What is
-  # widened is which sessions may show a question, not how long the app keeps asking.
+  # The seam #528 named, and since #560 there is no seam left to name: age decides nothing
+  # about whether a session may show a question, only whether the box may say an upload might
+  # still be on its way. A months-old session with a proposal against it is offered it.
   it 'asks the question even though the session is months old' do
     get "/workouts/#{@workout_id}"
 

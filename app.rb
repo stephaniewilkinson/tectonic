@@ -1392,6 +1392,33 @@ class Tectonic < Roda
                                      external_id: r.params['activity'].to_s)
             r.redirect answered_from(workout_id, r.params['back'])
           end
+          # Asking Withings, because the lifter asked. #560.
+          #
+          # **The only thing in this app that calls Withings from a record page.** Until now
+          # `proposal` fetched on every view inside a 24-hour window, so an ordinary page
+          # render waited on somebody else's service with a ten-second timeout, and the app
+          # made a request every time a session was looked at. The box said "check back in a
+          # minute" and offered no control, which is #560's actual complaint: the re-fetch
+          # was real and invisible, so the only button on screen was the irreversible one.
+          #
+          # A post rather than a get, and behind check_csrf! with the two answers above,
+          # because it writes -- what Withings sends is stored -- and because a get would put
+          # an API call behind a link a browser may prefetch.
+          #
+          # It redirects rather than rendering, which is the pattern the two answers beside
+          # it already take: the record page is the address of this question, and a lifter
+          # who reloads after pressing check should reload a page rather than re-ask
+          # Withings. What came back is carried in the query string, the same way #529's
+          # rerounded count is and for the same reason -- this app has no flash of its own.
+          # It is only an outcome and never content: the page re-derives what to say from the
+          # rows the fetch has just stored, so a bookmarked `?checked=answered` can claim
+          # nothing that is not independently true.
+          r.post 'check' do
+            check_csrf!
+            timing = Timing.session(@workout, WorkoutSet.where(workout_id:).order(:id).all.map(&:values))
+            outcome = WithingsWorkouts.check(account_id: @account_id, workout: @workout, timing:)
+            r.redirect "/workouts/#{workout_id}?checked=#{outcome}"
+          end
         end
         r.get('edit') { workout_form('workouts/edit') }
         r.is do
@@ -1426,14 +1453,28 @@ class Tectonic < Roda
           # stamps are columns on the sets this page has just fetched, which is the whole
           # reason the timing lives on the set rather than in a table beside it.
           @timing = Timing.session(@workout, @sets.map(&:values))
-          # And what the watch says about the same session, if anything (#520). Asked on
-          # every render rather than once at finish, because closing a workout in Withings
-          # starts an upload that reaches their servers seconds to minutes later -- so a
-          # lifter who taps finish immediately would be told there was nothing, about a
-          # thing that is merely late. It answers nil for a session there is nothing to say
-          # about, which is most of them, and the page draws nothing at all in that case.
+          # And what the watch says about the same session, if anything (#520, #560).
+          #
+          # Read from rows already stored, in one indexed query, with no request to Withings
+          # at all. It used to fetch here -- the upload a watch starts when a workout is
+          # closed reaches their servers seconds to minutes later, so a page that asked once
+          # at finish would be asking too early -- and #560 settled that lateness is a reason
+          # to offer a control, not a reason to put a ten-second timeout in front of every
+          # view of every session. The control is the post above.
+          #
+          # It answers nil for a session there is nothing to say about, which is most of
+          # them, and the page draws nothing at all in that case.
           @withings = WithingsWorkouts.proposal(account_id: @account_id, workout: @workout,
                                                 timing: @timing)
+          # And whether the lifter has just pressed check, which is the one thing about this
+          # box the stored rows cannot say. A press that Withings never answered leaves the
+          # database exactly as it was, so without this the page after it would be identical
+          # to the page before it -- somebody asking a question and being handed back the
+          # same screen, which is the silence #560 objects to in its other half.
+          #
+          # Read against a fixed set rather than printed, so the only thing a hand-typed
+          # value can do is say nothing.
+          @withings_checked = CHECK_OUTCOMES.include?(r.params['checked']) ? r.params['checked'] : nil
           view 'workouts/show'
         end
       end
@@ -1873,6 +1914,16 @@ class Tectonic < Roda
 
     @session_summary ||= SessionSummary.of(@workout, @sets.map(&:values), @timing)
   end
+
+  # What a press of check is allowed to have concluded. #560.
+  #
+  # The outcome travels back from the post in the query string, so the value reaching the
+  # record page is whatever is in a URL -- a hand-typed one, a stale bookmark, a link
+  # somebody was sent. Matched against this rather than rendered, so the worst an invented
+  # value can do is leave the line off. `nothing_to_ask` is absent on purpose: it is a real
+  # outcome of `WithingsWorkouts.check` and it has nothing to report, so it falls through to
+  # the same silence as a value nobody recognises.
+  CHECK_OUTCOMES = %w[answered unreachable].freeze
 
   # Where an answer about a session sends the lifter next.
   #
