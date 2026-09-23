@@ -247,26 +247,56 @@
     </div>
   </div>
 <%- elsif matched_activity %>
-  <%# Matched. The length and the two ends are already on the lines above, preferring the
-      watch and saying so, so what is left here is what only the watch has: the heart rate
-      it carried across the session, and how hard it judged the work to be.
+  <%# Matched: everything a match is now worth. #571.
 
-      Each figure is absent rather than zero where the watch did not record it. A watch with
-      no optical sensor, or one worn loosely, reports no heart rate at all, and a 0 bpm
-      average printed under a session would be a reading rather than a gap.
+      This block used to be the leftovers. The length and the two ends sat on the lines above
+      taken from the watch and labelled as its, per #520's rule that the watch is right where
+      the two disagree, so what was left down here was a heart rate and a calorie count.
+      #571 reversed that rule on the reporting account's own evidence -- their watch starts
+      late and runs long, calling a 46 minute session an hour -- and the session's length and
+      its two ends are the taps again. Which makes this block the whole of what answering
+      "yes, that was this session" now buys.
+
+      It is still plainly worth buying, and that is worth saying rather than assuming.
+      Nothing in this app can know that a session sat at 128 bpm and touched 164. There is no
+      arithmetic over taps, weights or reps that produces it, no second source to derive it
+      from, and it is the one number here that describes what the training cost the lifter
+      rather than what they did. A match is how it gets onto the page.
+
+      **The heart rate says three figures now where it said two.** The low was stored on
+      every fetch since 042 and shown nowhere, and an average without its range cannot tell
+      intervals from a grind -- see `watch_heart_rate` in app.rb, which does the choosing,
+      including the part about a figure being absent rather than zero where the watch's
+      sensor recorded nothing.
+
+      **The watch's own recording keeps a line, deliberately down here.** It is real, it is
+      stored, and it is the interval the overlap was computed from, so a lifter looking at
+      their watch saying an hour is owed the reconciliation rather than left wondering where
+      the number went -- and the gap between the two lines is now legible instead of hidden,
+      which on this data is information about the watch. What it must never be again is the
+      figure labelled as the session, so it is named as the watch's recording, kept out of
+      the block above, and given its span in brackets rather than as a headline.
 
       Named as the watch's throughout -- "your watch", not "measured" on its own -- because
       the whole of the page's honesty here is that a reader can always tell which instrument
-      a number came from. %>
+      a number came from. That was #528's principle and #571 does not touch it; what changed
+      is which instrument gets to answer "how long did this take". %>
   <p class="mt-2 text-sm text-gray-500">
     Matched to your watch
-    <%- if matched_activity[:hr_average] %>
+    <%- if watch_heart_rate %>
       <span aria-hidden="true">&middot;</span>
-      <%= matched_activity[:hr_average] %> bpm average<%- if matched_activity[:hr_max] %>, <%= matched_activity[:hr_max] %> peak<%- end %>
+      <%= watch_heart_rate %>
     <%- end %>
     <%- if matched_activity[:calories] %>
       <span aria-hidden="true">&middot;</span>
       <%= matched_activity[:calories].to_i %> kcal
     <%- end %>
+  </p>
+  <p class="mt-1 text-sm text-gray-500">
+    Your watch&rsquo;s own recording ran
+    <%== render('workouts/_clock_time', locals: { at: matched_activity[:started_at] }) %>
+    to
+    <%== render('workouts/_clock_time', locals: { at: matched_activity[:ended_at] }) %>
+    (<%= Timing.phrase(watch_seconds) %>).
   </p>
 <%- end %>

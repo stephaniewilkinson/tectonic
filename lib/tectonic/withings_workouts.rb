@@ -181,12 +181,21 @@ class Tectonic < Roda
     # Four answers, and they are four rather than two because the differences between them
     # are the substance of #520 and #560:
     #
-    #   :matched   -- the lifter said yes; the watch's numbers are the session's numbers
+    #   :matched   -- the lifter said yes, so what only the watch knows can be shown
     #   :proposed  -- a stored activity overlaps, with a sentence saying how much
     #   :waiting   -- nothing of Withings' is stored around this session, and it is recent
     #                 enough that an upload may still be on its way
     #   :elsewhere -- activities *are* stored around this session and none of them overlaps
     #                 it, so something was recorded and it was not this
+    #
+    # `:matched` used to be described here as *"the watch's numbers are the session's
+    # numbers"*, which was #520's rule and is no longer true of the page. #571 reversed it on
+    # the reporting account's own data -- a watch that starts late and runs long, calling a 46
+    # minute session an hour -- so the session's length and its two ends are the lifter's taps
+    # whether or not a match exists, and a match contributes the heart rate, the calories and
+    # its own recording's span, all of it labelled as the watch's. Nothing about *matching*
+    # changed: this still gates on overlap, still scores on it, and still hands the judgement
+    # to the lifter. What changed is what a yes is allowed to do to the figures afterwards.
     #
     # The last two were one state, `:waiting`, and folding them was the bug #560 reports: the
     # page told a lifter whose watch had recorded two activities that morning that nothing had
