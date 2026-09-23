@@ -19,10 +19,52 @@ require 'date'
 #
 # Reported as workout 28: created 2026-08-30, trained 2026-08-31, twelve completed sets filed a
 # day early with no way to move them.
+#
+# The second half of it was the write path, and it outlived the fix above by a month. The form
+# value became right; what it renders is `%m/%d/%Y`, and that string went straight into the
+# update, where Sequel typecast it with `Date.parse` -- which reads day-first. A session trained
+# on 2 September posted `09/02/2026` and was stored as 9 February, sets and all.
+#
+# It only bites when both halves are <= 12, so on the first twelve days of a month and not on
+# the other nineteen. This file is why that reached production: every date here was built as
+# `Date.today - 21`, so the specs asked the ambiguous question for about eleven days in thirty
+# and the safe one the rest of the time, and which one they asked was not visible in the file.
+# The dates below are written out instead -- one whose day is <= 12 and one whose day is not --
+# so both cases are asked on every run of every day.
 module KeepingTheDate
+  # A day of the month spelled month-first, which is the whole of the ambiguity: 09/02 is
+  # 2 September to this form and 9 February to a day-first reader, and both are real dates,
+  # so nothing raises and there is nothing for anybody to notice.
+  #
+  # Methods rather than constants, which is not a style choice: a constant on an included
+  # module is not in scope inside a `describe` block, so it would be looked for at the top
+  # level and raise NameError from every spec here.
+  def ambiguous = Date.new(2026, 9, 2)
+
+  # And a day past the 12th, which cannot be read as a month, so a day-first parser has no
+  # second reading available and lands on the right date by accident. Here to pin the half
+  # that was always passing -- a fix that broke it would otherwise show up as nothing.
+  def unambiguous = Date.new(2026, 9, 23)
+
+  # Read off the app rather than spelled again here. These specs are about the round trip
+  # surviving whatever the form writes, not about which format it writes -- one literal
+  # below pins that, and everything else goes through the constant, so changing it would
+  # change what these post rather than leave the suite testing a string nothing sends.
+  def form_date = Tectonic::Workout::FORM_DATE
+
   def a_session_on(account_id, date, name: 'Squat day')
     Tectonic::Workout.insert(account_id:, date:, name:)
   end
+
+  # The new-session half of the same form: no id, so the route inserts rather than updates.
+  def create(date:, name: 'Squat day')
+    post '/workouts', { 'id' => '', 'date' => date, 'name' => name,
+                        '_csrf' => token_for('/workouts/new') }
+  end
+
+  # The row `create` just wrote. By account rather than across the table, so a stranger's
+  # session left behind by another spec cannot be the one this reads back.
+  def newest_workout = Tectonic::Workout.where(account_id: @account_id).reverse(:id).first.id
 
   def edit_page(workout_id)
     get "/workouts/#{workout_id}/edit"
@@ -53,44 +95,174 @@ describe 'the date the edit page opens with' do
 
   before do
     @account_id = login
-    @trained_on = Date.today - 21
+    @trained_on = ambiguous
     @workout = a_session_on(@account_id, @trained_on)
   end
 
   # The bug, at its source. Everything below follows from this one value being wrong.
   it 'is the day it was trained, not today' do
-    assert_includes edit_page(@workout), "value=\"#{@trained_on.strftime('%m/%d/%Y')}\""
+    assert_includes edit_page(@workout), "value=\"#{@trained_on.strftime(form_date)}\""
   end
 
   it 'is not today' do
-    refute_includes edit_page(@workout), "value=\"#{Date.today.strftime('%m/%d/%Y')}\""
+    refute_includes edit_page(@workout), "value=\"#{Date.today.strftime(form_date)}\""
+  end
+
+  # The one literal in this file, and the reason every spec below it needs writing: this is
+  # month-first, deliberately, for a US reader -- and `09/02/2026` is also a perfectly good
+  # 9 February to anything reading it day-first, which Ruby's `Date.parse` does.
+  it 'is month first, which is the whole of the ambiguity' do
+    assert_includes edit_page(@workout), 'value="09/02/2026"'
   end
 end
 
-# What the wrong value cost, which is the part a lifter would actually notice.
-describe 'renaming a session from three weeks ago' do
+# What the wrong value cost, which is the part a lifter would actually notice: the name is
+# edited, the date rides back untouched, and the session moves anyway.
+describe 'renaming a session without touching its date' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include KeepingTheDate
+
+  before { @account_id = login }
+
+  # Posting the form back unchanged is what a browser does when somebody edits the name. The
+  # date is read off the rendered input rather than spelled here, because a spec that supplies
+  # its own string is testing that string and not the round trip.
+  def assert_renaming_leaves_it_on(trained_on)
+    workout = a_session_on(@account_id, trained_on)
+
+    save(workout, date: date_in_form(workout))
+
+    assert_equal trained_on, date_of(workout)
+  end
+
+  # The half that was live. 2 September renders as `09/02/2026`, and a day-first parser reads
+  # that as 9 February without raising, because both readings are real dates.
+  it 'leaves a session trained on the second of the month where it was' do
+    assert_renaming_leaves_it_on(ambiguous)
+  end
+
+  # The half that always passed. 23 is not a month, so there is only one reading available and
+  # even a guess lands on it. Named on its own so that a green run means both readings were
+  # asked for, rather than whichever one the calendar handed this particular week.
+  it 'leaves a session trained on the twenty-third of the month where it was' do
+    assert_renaming_leaves_it_on(unambiguous)
+  end
+
+  it 'still renames it' do
+    workout = a_session_on(@account_id, ambiguous)
+
+    save(workout, date: ambiguous.strftime(form_date), name: 'Heavy squats')
+
+    assert_equal 'Heavy squats', Tectonic::Workout[workout].name
+  end
+end
+
+# The same string, on the other route out of the same form. The insert carried the identical
+# bug and had nothing watching it: a session written for the 2nd was filed on 9 February the
+# moment it was created, before anybody had lifted anything in it.
+describe 'writing a session for a day the calendar can read two ways' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include KeepingTheDate
+
+  before { @account_id = login }
+
+  it 'files it on the day that was typed' do
+    create(date: ambiguous.strftime(form_date))
+
+    assert_equal ambiguous, date_of(newest_workout)
+  end
+
+  it 'files a day past the twelfth on the day that was typed too' do
+    create(date: unambiguous.strftime(form_date))
+
+    assert_equal unambiguous, date_of(newest_workout)
+  end
+end
+
+# A date this form cannot have written, which is a hand-made post, an autofill, or a browser
+# filling the box from somebody else's locale. The old behaviour was to hand it to Sequel and
+# accept whatever came back; the whole point of #440's second half is that the app does not
+# guess at this.
+#
+# `31/12/2026` is the shape a European browser's autofill puts in the box: a perfectly good
+# date read day-first, and no date at all read month-first, since there is no thirty-first
+# month. It is the one reading the app must not quietly take.
+describe 'saving a date the form could not have written' do
   include Rack::Test::Methods
   include RouteOwnership
   include KeepingTheDate
 
   before do
     @account_id = login
-    @trained_on = Date.today - 21
-    @workout = a_session_on(@account_id, @trained_on)
+    @workout = a_session_on(@account_id, ambiguous)
   end
 
-  # Posting the form back unchanged is what a browser does when somebody edits the name. It
-  # used to carry today's date along with it and move the session.
-  it 'leaves it where it was' do
-    save(@workout, date: date_in_form(@workout))
+  it 'leaves the session on the day it was already on' do
+    save(@workout, date: '31/12/2026')
 
-    assert_equal @trained_on, date_of(@workout)
+    assert_equal ambiguous, date_of(@workout)
   end
 
-  it 'still renames it' do
-    save(@workout, date: @trained_on.strftime('%m/%d/%Y'), name: 'Heavy squats')
+  it 'does not keep the rest of the edit either' do
+    save(@workout, date: '31/12/2026', name: 'Heavy squats')
 
-    assert_equal 'Heavy squats', Tectonic::Workout[@workout].name
+    assert_equal 'Squat day', Tectonic::Workout[@workout].name
+  end
+
+  # Refused, not crashed. An unrescued typecast reaches a lifter as a 500, which reads as the
+  # server having fallen over rather than as the app declining what was typed.
+  it 'sends the lifter back to the form rather than to an error page' do
+    save(@workout, date: 'the second of September')
+
+    assert_equal 302, last_response.status
+    assert_equal "/workouts/#{@workout}/edit", last_response.headers['location']
+  end
+end
+
+# The insert half of the same refusal. Both routes out of this form read the date the same
+# way, so both decline the same values -- a new session refused on one and written with a
+# guessed date on the other would be the bug back in half the app.
+describe 'writing a new session with a date the form could not have written' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include KeepingTheDate
+
+  before { @account_id = login }
+
+  it 'writes nothing and sends the lifter back to the form' do
+    create(date: 'the second of September')
+
+    assert_equal 0, Tectonic::Workout.where(account_id: @account_id).count
+    assert_equal '/workouts/new', last_response.headers['location']
+  end
+end
+
+# And says so, because a form that comes back looking exactly as it was left is a form that
+# has silently thrown away what was typed into it. A refusal nobody is told about is the same
+# shape of failure as the wrong date: the lifter carries on believing the save happened.
+describe 'being told the date was refused' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include KeepingTheDate
+
+  before do
+    @account_id = login
+    @workout = a_session_on(@account_id, ambiguous)
+    save(@workout, date: 'the second of September')
+  end
+
+  it 'says why when the form comes back' do
+    assert_includes edit_page(@workout), 'That date could not be read'
+  end
+
+  # Once, not on every reload afterwards. The notice is about a save that has just failed, and
+  # one still on the page ten minutes later describes nothing the lifter can see.
+  it 'says it once' do
+    edit_page(@workout)
+
+    refute_includes edit_page(@workout), 'That date could not be read'
   end
 end
 
