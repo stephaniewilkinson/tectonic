@@ -3,6 +3,7 @@
 require 'date'
 require_relative '../tool'
 require_relative 'support'
+require_relative 'freshness'
 require_relative '../../body_readings'
 
 class Tectonic < Roda
@@ -34,9 +35,22 @@ class Tectonic < Roda
       # **Nothing here says what the number should be.** No target composition, no opinion on
       # a direction. Same split as block_progress: report the figure, the sample size and the
       # uncertainty, and leave the judgement to whoever is reading.
+      #
+      # **The scale is read before the table is** (#533), which is what makes "the most recent
+      # weigh-in" mean the most recent one taken rather than the most recent one that happened
+      # to have been fetched. A composition reading is the figure a lifter is most likely to
+      # quote at a number of days' distance, so answering it out of a table nothing has filled
+      # since Tuesday is the version of this tool that is wrong most quietly.
       class BodyComposition < Tool
         DEFAULT_BAND_DAYS = 90
         BAND_DAYS = (7..730)
+
+        # What a hole in the window does to *this* answer. Two things, and they are different
+        # from the trend's: the weigh-in reported may not be the latest one taken, and the
+        # band -- which is the clause #519 wrote this tool for -- is measured over however
+        # many weigh-ins arrived rather than over however many there were.
+        GAP_RISK = 'So the weigh-in below may not be the most recent one taken, and the band on the ' \
+                   'percentage is measured over fewer weigh-ins than were actually recorded.'
 
         tool_name 'body_composition'
 
@@ -59,19 +73,24 @@ class Tectonic < Roda
           required: [], additionalProperties: false
         )
 
+        # The fetch goes first, because the rows it writes are rows this query has to see --
+        # and because "the latest weigh-in" read out of a table a fetch is about to add to is
+        # a sentence that is true of the table and false of the lifter.
         def self.perform(context:, arguments:)
+          fresh = Freshness.checked(context, risk: GAP_RISK)
           on = arguments[:on] ? Resolver.parse_date(arguments[:on], on: context.today) : context.today
           days = band_days(arguments)
           rows = BodyReadings.of_metrics(context.health_metrics, BodyReadings::COMPOSITION,
                                          from: on - days, to: on, source: arguments[:source])
-          return empty(on) if rows.empty?
+          return empty(on, fresh) if rows.empty?
 
-          answer(on, days, rows)
+          answer(on, days, rows, fresh)
         end
 
-        def self.answer(on, days, rows)
+        def self.answer(on, days, rows, fresh)
           instruments = BodyReadings.by_source(rows).map { |source, group| instrument(source, group, days) }
-          ok(summary(on, instruments), structured: { on: on.to_s, band_days: days, instruments: })
+          ok(Freshness.told(summary(on, instruments), fresh),
+             structured: { on: on.to_s, band_days: days, instruments:, freshness: fresh })
         end
 
         # Clamped rather than refused, on exercise_history's rule for `limit`: a caller who
@@ -123,21 +142,28 @@ class Tectonic < Roda
                         measured_over_days: days)
         end
 
-        def self.empty(on)
-          ok("No body composition readings on or before #{on}. A weigh-in has to have " \
-             'arrived from a scale or been recorded by hand before there is anything to ' \
-             'read back.',
-             structured: { on: on.to_s, instruments: [] })
+        # "A weigh-in has to have arrived" is the sentence the freshness note completes: it
+        # says a reading has to arrive without saying whether one was prevented from arriving,
+        # and a grant withdrawn last month is exactly a weigh-in that was taken and did not
+        # arrive.
+        def self.empty(on, fresh)
+          ok(Freshness.told(["No body composition readings on or before #{on}. A weigh-in has to have " \
+                             'arrived from a scale or been recorded by hand before there is anything to ' \
+                             'read back.'], fresh),
+             structured: { on: on.to_s, instruments: [], freshness: fresh })
         end
 
         # The prose, because plenty of clients render only the text -- #262 -- and because a
         # percentage is the single figure in this app most likely to be lifted out of a
         # sentence and quoted on its own. Everything that qualifies it is in the same line.
+        #
+        # Lines rather than a finished string, so Freshness.told can put a warning about the
+        # window in front of the figures instead of under them.
         def self.summary(on, instruments)
           ["Body composition as of #{on}, by instrument:",
            *instruments.map { |view| line(view) },
            '  Each line is one weigh-in. A percentage compared against one taken at a ' \
-           'different bodyweight is two different measurements, not a change.'].join("\n")
+           'different bodyweight is two different measurements, not a change.']
         end
 
         def self.line(view)

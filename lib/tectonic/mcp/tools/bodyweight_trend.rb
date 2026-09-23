@@ -3,6 +3,7 @@
 require 'date'
 require_relative '../tool'
 require_relative 'support'
+require_relative 'freshness'
 require_relative '../../body_readings'
 
 class Tectonic < Roda
@@ -32,9 +33,24 @@ class Tectonic < Roda
       # numbers, which is the assistant's job and not the app's -- Goal's own comment makes
       # the same argument about pounds divided by weeks, and bodyweight is the number a person
       # is most likely to have already decided how to feel about.
+      #
+      # **And it reads the scale before it reads the table** (#533), which matters more here
+      # than in the two tools beside it. A trend is the one answer in this app that is made
+      # out of the *shape* of a window rather than out of any single row, so it is the one an
+      # incomplete window corrupts invisibly: every reading is real, the mean is arithmetically
+      # correct, and the number is wrong. Freshness is what refuses to let that be reported as
+      # though the window were whole.
       class BodyweightTrend < Tool
         DEFAULT_DAYS = 90
         DEFAULT_METRIC = 'weight'
+
+        # What a hole in the window does to *this* answer. Worth spelling out in the sentence
+        # rather than left to a flag, because a rolling mean over a window missing three days
+        # is indistinguishable from one over a whole window -- same shape, same band, same
+        # confident change -- and a reader has no way to arrive at the doubt on their own.
+        GAP_RISK = 'A rolling mean over a window with a gap in it looks exactly like one over a whole ' \
+                   'window and is a different number, so the change and the rate below may be ' \
+                   'describing the missing readings rather than the lifter.'
 
         tool_name 'bodyweight_trend'
 
@@ -61,23 +77,34 @@ class Tectonic < Roda
           required: [], additionalProperties: false
         )
 
+        # The fetch goes first, before the window is worked out, because the rows it writes
+        # are rows this query has to see: a trend computed and *then* refreshed would smooth
+        # over a window that is one fetch out of date, which is the exact error this tool
+        # spends the rest of its length refusing to make.
         def self.perform(context:, arguments:)
           metric = (arguments[:metric] || DEFAULT_METRIC).to_s.strip
+          fresh = Freshness.checked(context, risk: GAP_RISK)
           from, to = bounds(context, arguments)
           rows = BodyReadings.in_window(context.health_metrics, metric:, from:, to:, source: arguments[:source])
-          return empty(metric, from, to) if rows.empty?
+          return empty(metric, from, to, fresh) if rows.empty?
 
-          answer(metric, from, to, rows, arguments)
+          answer(metric, [from, to], rows, arguments, fresh)
         end
 
         # `asked_from` and `asked_to` are the window the caller named, which is not the window
         # each instrument actually covers -- that one is on every instrument, because "28
         # readings" over four days and over four months are different claims.
-        def self.answer(metric, from, to, rows, arguments)
+        #
+        # The window arrives as the pair it was computed as rather than as two arguments,
+        # which is not elegant and is the smaller of two evils: the alternative is working the
+        # dates out a second time in here, and two calls to `bounds` is two places for a
+        # default window to be read against two different todays.
+        def self.answer(metric, window, rows, arguments, fresh)
+          from, to = window
           instruments = BodyReadings.by_instrument(rows).map { |key, group| instrument(key, group, arguments) }
-          ok(summary(metric, from, to, instruments),
+          ok(Freshness.told(summary(metric, from, to, instruments), fresh),
              structured: { metric:, asked_from: from.to_s, asked_to: to.to_s,
-                           window_days: smoothing(arguments), instruments: })
+                           window_days: smoothing(arguments), instruments:, freshness: fresh })
         end
 
         # Ninety days unless asked otherwise, which is long enough for a bodyweight trend to
@@ -151,21 +178,30 @@ class Tectonic < Roda
             change_exceeds_day_to_day: (band && change ? change.abs > band : nil) }
         end
 
-        def self.empty(metric, from, to)
-          ok("No #{metric} readings between #{from} and #{to}, so there is no trend to " \
-             'report. A trend needs several readings across the window; one reading is a ' \
-             'morning, not a direction.',
-             structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments: [] })
+        # Empty and why it might be empty, which are two different sentences. A window with no
+        # readings in it reads identically whether the lifter stopped weighing themselves or
+        # the connection stopped delivering, and only the second of those is something to do
+        # something about.
+        def self.empty(metric, from, to, fresh)
+          ok(Freshness.told(["No #{metric} readings between #{from} and #{to}, so there is no trend to " \
+                             'report. A trend needs several readings across the window; one reading is ' \
+                             'a morning, not a direction.'], fresh),
+             structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments: [],
+                           freshness: fresh })
         end
 
         # The prose, because many clients render only the text (#262) -- and because this is
         # the tool where the text and the payload disagreeing would matter most. A sentence
         # carrying the change without the band is the misreading #519 is about, so the band is
         # in every line that has one.
+        #
+        # Lines rather than a finished string, so Freshness.told can lead with its note where
+        # the window may have a hole in it. A caveat about the shape of the window printed
+        # under the change it qualifies is one an assistant has already summarised past.
         def self.summary(metric, from, to, instruments)
           ["#{metric} trend, #{from} to #{to}, by instrument:",
            *instruments.map { |view| line(view) },
-           '  Whether that direction is the right one is not something these numbers say.'].join("\n")
+           '  Whether that direction is the right one is not something these numbers say.']
         end
 
         def self.line(view)
