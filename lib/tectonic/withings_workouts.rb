@@ -54,13 +54,71 @@ class Tectonic < Roda
   # when that session was trained, and guessing would produce exactly the silent mismatch
   # #520 refuses.
   module WithingsWorkouts
-    # What Withings' integer means. 16 is "Lift weights" and 17 is "Fitness", which are the
-    # two a barbell session plausibly gets tagged as.
+    # Which of Withings' categories look like a barbell session: 16, "Lift weights", and 17,
+    # "Calisthenics" -- the two a barbell session plausibly gets tagged as.
     #
     # **Scoring only.** Nothing filters on this. A lifter who tapped "Other", or whose watch
     # guessed, still lifted, and a category test that excluded them would turn a confident
     # guess into a missing feature.
-    LIFTING = { 16 => 'Lift weights', 17 => 'Fitness' }.freeze
+    #
+    # **Ids and no names since #568**, which is the one change here and the point of it. This
+    # used to be a hash carrying both the decision and the two names, and #568 needs a name for
+    # every category Withings has rather than for these two -- so the names moved to
+    # `CATEGORIES` and this kept the decision. Had the table been added beside this one with
+    # its own copies of 16 and 17, there would be two answers to "what is 17 called" and,
+    # sooner or later, two answers to "does 17 count as lifting", which is the question
+    # `CATEGORY_BONUS` is the whole weight of.
+    LIFTING = [16, 17].freeze
+    # What Withings' category integer is called. #568.
+    #
+    # **Data with a source.** These ids are not guessable and not derivable from anything in
+    # this app: they are Withings', published with the category field of Measure v2 -
+    # Getworkouts. The reference at developer.withings.com renders its tables client-side and
+    # cannot be read as text, so this was transcribed from two independent mirrors of that
+    # table -- `github.com/asymmetricia/withings` (enum/workouttype) and the raw list in
+    # `github.com/tomcolaa/nokiaHealthAPI`, the second dating from when this was the Nokia
+    # Health API -- which agree id for id over everything below.
+    #
+    # **Only what both mirrors agree on.** Three ids they do not are left out rather than
+    # guessed: 193 and 194, where one has hockey and ice hockey and the other has them the
+    # other way round, and 186, which both call "Base" -- a word Withings shows nowhere a
+    # lifter can see. A wrong name is worse than no name here, because the lifter is being
+    # asked to recognise their own afternoon in it; all three fall through to `called`, which
+    # prints the id and claims nothing.
+    #
+    # The spellings are ours. Both mirrors carry "Staking", "Pilate" and "Vollyball", and this
+    # is a string shown on a page, where a provider's typo reads as the app's.
+    #
+    # **It decides nothing.** Nothing scores off this, nothing filters on it, and no reader of
+    # it may ask whether a category counts as lifting -- that is `LIFTING` above, and one
+    # question with two tables to answer it from is how the two come to disagree.
+    CATEGORIES = {
+      1 => 'Walk', 2 => 'Run', 3 => 'Hiking', 4 => 'Skating', 5 => 'BMX', 6 => 'Bicycling',
+      7 => 'Swimming', 8 => 'Surfing', 9 => 'Kitesurfing', 10 => 'Windsurfing',
+      11 => 'Bodyboard', 12 => 'Tennis', 13 => 'Table tennis', 14 => 'Squash',
+      15 => 'Badminton', 16 => 'Lift weights', 17 => 'Calisthenics', 18 => 'Elliptical',
+      19 => 'Pilates', 20 => 'Basketball', 21 => 'Soccer', 22 => 'Football', 23 => 'Rugby',
+      24 => 'Volleyball', 25 => 'Water polo', 26 => 'Horse riding', 27 => 'Golf', 28 => 'Yoga',
+      29 => 'Dancing', 30 => 'Boxing', 31 => 'Fencing', 32 => 'Wrestling',
+      33 => 'Martial arts', 34 => 'Skiing', 35 => 'Snowboarding', 187 => 'Rowing',
+      188 => 'Zumba', 191 => 'Baseball', 192 => 'Handball', 195 => 'Climbing',
+      196 => 'Ice skating'
+    }.freeze
+    # How many of the activities around a session the box names one by one. #568.
+    #
+    # Three, because the box is read on a phone under the session it is about, and the realistic
+    # case is two or three -- a walk and a ride, or a lift the watch split in two. A lifter
+    # whose watch recorded ten things that day is not served by ten lines pushing the controls
+    # off the screen; they are served by the three nearest the session and a count of the rest,
+    # which is enough to tell whether their lift is in there and enough to say the box is not
+    # hiding anything.
+    #
+    # Nearest by start rather than earliest in the window, which is the same measure `best`
+    # breaks its ties with and for the same reason: an activity's distance from the first set
+    # is what makes it a plausible recording of this session, so a cap that kept the earliest
+    # three would drop the one from ten minutes afterwards -- the one most likely to be the
+    # lift, filed against the wrong clock -- in favour of three from the previous morning.
+    NAMED = 3
     # How much being tagged as lifting is worth, expressed in the same units as the overlap
     # ratio so the two can simply be added.
     #
@@ -133,7 +191,11 @@ class Tectonic < Roda
     # The last two were one state, `:waiting`, and folding them was the bug #560 reports: the
     # page told a lifter whose watch had recorded two activities that morning that nothing had
     # arrived, and advised them to check back in a minute for a thing that had already come
-    # and was not theirs. Telling them apart costs one count, which `nearby` does.
+    # and was not theirs. Telling them apart costs one query, which `nearby` makes.
+    #
+    # `:elsewhere` carries what was recorded rather than how much of it, which is #568: the
+    # rows `nearby` already selected, capped at `NAMED` and paired with the session's own two
+    # ends so the box can show the mismatch instead of asserting it. See `elsewhere`.
     #
     # `:unreachable` used to be here too and is no longer a state of the page, because the
     # page no longer asks: a request that was never answered is an outcome of a press and is
@@ -314,7 +376,7 @@ class Tectonic < Roda
       return nil unless still_arriving?(window.last)
 
       around = nearby(account_id, window, workout_id)
-      around.positive? ? { state: :elsewhere, nearby: around } : { state: :waiting }
+      around.empty? ? { state: :waiting } : elsewhere(around, window)
     end
 
     # One activity offered for one session, in the shape the page and the review list both
@@ -326,7 +388,15 @@ class Tectonic < Roda
         span: window.last - window.first, because: because(row, window) }
     end
 
-    # How many unanswered activities Withings has around this session without being it.
+    # The unanswered activities Withings has around this session without being it.
+    #
+    # **The rows themselves since #568, and it used to be `.count` of them.** The query was
+    # always this query -- it selected the rows and threw them away to keep a number -- and the
+    # number turned out to be the whole complaint: *"Withings has 2 activities around this
+    # session"* tells a lifter something happened and leaves them unable to check it, or to
+    # notice that one of the two is plainly their lift filed against the wrong clock. Handing
+    # back what was already selected costs nothing at the database and is the difference
+    # between an assertion and evidence. Still one statement, and still no request to Withings.
     #
     # This exists to tell one sentence from another, which is half of #560. `:waiting` said
     # *"nothing from Withings yet -- check back in a minute"* for two situations that are not
@@ -337,18 +407,70 @@ class Tectonic < Roda
     # being told the first.
     #
     # The span is the one a fetch would have stored -- the session's days with `MARGIN_DAYS`
-    # either side -- so the count answers "what did asking about this session bring back",
-    # which is the question the sentence puts.
+    # either side -- so what comes back answers "what did asking about this session bring
+    # back", which is the question the sentence puts.
     #
-    # Counted over the same unanswered scope as `candidates` rather than over every row, so
-    # the sentence stays true in the case that would otherwise quietly falsify it: an activity
-    # that *does* overlap but has been claimed by another session or refused already is not
-    # something this session may be offered, and counting it would produce "3 activities, none
+    # Read over the same unanswered scope as `candidates` rather than over every row, so the
+    # sentence stays true in the case that would otherwise quietly falsify it: an activity that
+    # *does* overlap but has been claimed by another session or refused already is not
+    # something this session may be offered, and listing it would produce "3 activities, none
     # of them overlapping" about a set containing one that does.
+    #
+    # In time order, because a list of things that happened to somebody's day is read in the
+    # order they happened whatever order the cap picks them in.
     def nearby(account_id, window, workout_id = nil)
       from = (window.first.to_date - MARGIN_DAYS).to_time
       to = (window.last.to_date + MARGIN_DAYS + 1).to_time
-      unanswered(account_id, workout_id).where { (started_at < to) & (ended_at > from) }.count
+      unanswered(account_id, workout_id).where { (started_at < to) & (ended_at > from) }
+                                        .order(:started_at).all
+    end
+
+    # Everything the box needs to say what was recorded instead. #568.
+    #
+    # The count is the whole set and `nearby` is the part that gets named, so the sentence can
+    # say "5 activities" over three lines and a "2 more" without the view doing arithmetic on a
+    # truncated list to find out what it is missing. `session` is the interval the overlap was
+    # actually tested against, carried here rather than left for the page to fetch again from
+    # `@timing`: the box asserts that none of these touches the session, and the two clock
+    # times it prints as evidence have to be the two the assertion was made from.
+    def elsewhere(rows, window)
+      named = rows.min_by(NAMED) { |row| (row[:started_at] - window.first).abs }
+      { state: :elsewhere, count: rows.length, session: window,
+        nearby: named.sort_by { |row| row[:started_at] } }
+    end
+
+    # What to call an activity where a lifter has to recognise it. Withings' name for the
+    # category where they publish one; the id itself where they do not.
+    #
+    # **The fallback invents nothing**, which is the point of having one. The reporting
+    # account's second activity is category 6, and before #568 the app could not name it at
+    # all; the temptation at that discovery is to write "Activity" or "Other" over every id the
+    # table is missing, which reads as a name and is not one -- a lifter would take "Other" for
+    # something they had tapped in Health Mate. "Withings category 306" is plainly the app
+    # saying it does not know, and it carries the one thing that makes the gap fixable: the
+    # number to look up.
+    def called(category)
+      return 'An activity Withings did not name' unless category
+
+      CATEGORIES[category] || "Withings category #{category}"
+    end
+
+    # Which day an activity sat on, said against the session rather than against today.
+    #
+    # Nil where they share a day, because "today" beside a clock time is noise; a phrase only
+    # where the day differs, which inside `MARGIN_DAYS` is almost always the one either side.
+    #
+    # **Relative to the session and never to now**, which is what keeps it true on an old
+    # record: "yesterday" printed on a session from March would be a claim about this morning.
+    # Both stamps are naive and written by this process in one zone -- the assumption this
+    # module's header sets out -- so the difference between them is read in that zone and holds
+    # wherever the reader is, which a date printed on its own would not.
+    def day_apart(at, window)
+      days = (at.to_date - window.first.to_date).to_i
+      return nil if days.zero?
+
+      side = days.negative? ? 'before' : 'after'
+      days.abs == 1 ? "the day #{side}" : "#{days.abs} days #{side}"
     end
 
     # Everything that could still be this session: unclaimed, un-refused, and overlapping.
@@ -407,7 +529,7 @@ class Tectonic < Roda
     # session scores a tenth, whatever else it has going for it.
     def score(row, window)
       (overlap(row, window) / (window.last - window.first).to_f) +
-        (LIFTING.key?(row[:category]) ? CATEGORY_BONUS : 0)
+        (LIFTING.include?(row[:category]) ? CATEGORY_BONUS : 0)
     end
 
     def overlap(row, window)
@@ -417,8 +539,15 @@ class Tectonic < Roda
     # The score in one sentence, which is what propose-and-confirm actually needs. A number
     # between nought and one and a quarter is not something a lifter can agree or disagree
     # with; "these overlap for 48 of 52 minutes" is, and it is the same fact.
+    #
+    # **The category is named here only where it scored**, which is why this reads `LIFTING`
+    # and not the whole of `CATEGORIES` now that there is a whole of `CATEGORIES` to read.
+    # This sentence is the score said in words -- overlap, and the quarter for looking like
+    # lifting -- so "and Withings called it bicycling" under an offer would name a label that
+    # contributed nothing and read as though it had. The box that names every category is
+    # #568's, and there the name is the fact rather than a term of the sum.
     def because(row, window)
-      said = LIFTING[row[:category]]
+      said = called(row[:category]) if LIFTING.include?(row[:category])
       phrase = "overlaps this session for #{Timing.phrase(overlap(row, window))} " \
                "of its #{Timing.phrase((window.last - window.first).to_i)}"
       said ? "#{phrase}, and Withings called it #{said.downcase}" : phrase

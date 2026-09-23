@@ -297,6 +297,230 @@ describe 'the activities that sentence is allowed to count' do
   end
 end
 
+# The detail #568 asks for. #560's sentence is true -- something was recorded and it was not
+# this session -- and a number on its own is not something a lifter can check, recognise or
+# act on: which two, when, and was one of them this lift filed against the wrong clock.
+#
+# What is pinned here is the sentence itself, word for word, for a known pair of activities.
+# An assertion that some words appear somewhere on a page would have passed happily on the
+# sentence that prompted the complaint.
+module WhatArrivedInstead
+  include MatchingTheWatch
+
+  # A session at a fixed time of day rather than "an hour ago", so that "the day before" is a
+  # property of the fixture rather than of the clock the suite happens to run on. Today's
+  # date, because the box only appears while an upload could still be coming -- STILL_ARRIVING.
+  def a_session_at_ten_past_one
+    @account_id = login
+    connect(@account_id)
+    @started_at = clock_on(Date.today, 13, 10)
+    @workout_id = trained_session(@account_id, started_at: @started_at, minutes: 38)
+  end
+
+  # Built off the date rather than by subtracting 86_400 from a stamp, which lands on the day
+  # before last twice a year: the hour a clock change removes is exactly the hour this would
+  # otherwise borrow, and the spec would fail in October with nothing wrong with the app.
+  def clock_on(date, hour, minute) = date.to_time + (hour * 3600) + (minute * 60)
+
+  # Yesterday's two, which is the reporting account's own case: the watch's idea of a lift,
+  # and a ride in the evening. Category 6 is the one the two-entry scoring table could not
+  # name at all.
+  def yesterday_pair
+    [activity(id: 'lift', category: 16, starts: clock_on(Date.today - 1, 13, 13), minutes: 65),
+     activity(id: 'ride', category: 6, starts: clock_on(Date.today - 1, 21, 17), minutes: 66)]
+  end
+
+  # The box as a lifter reads it: list markers kept, tags out, runs of whitespace closed up,
+  # from its first word to its last. Whole rather than in fragments, because the complaint is
+  # about what the box *says* and the parts of a sentence are not the sentence.
+  #
+  # A tag becomes a space, so a full stop written hard against a closing `</time>` -- which is
+  # a full stop against a clock time on the page -- comes out of that with a space in front of
+  # it. It is put back, because the alternative is an expectation containing "20:48 UTC ."
+  # which would read as the thing being asserted rather than as an artefact of reading it.
+  def box_says
+    text = last_response.body.gsub('<li>', ' • ').gsub(/<[^>]+>/, ' ').gsub('&mdash;', '—')
+    text.split.join(' ').gsub(' .', '.')[/Withings has .*?uploading this one\./]
+  end
+
+  # How _clock_time.erb prints an instant where no JavaScript has localised it. The four
+  # clock times in these sentences are the fixture's own, read the way the page reads them;
+  # every other word is pinned.
+  def shown(date, hour, minute) = clock_on(date, hour, minute).utc.strftime('%H:%M UTC')
+end
+
+describe 'the activities a session did not match' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include WhatArrivedInstead
+
+  before { a_session_at_ten_past_one }
+
+  it 'names them, times them, and says when the session itself ran' do
+    record(@workout_id, yesterday_pair)
+    yesterday = Date.today - 1
+
+    assert_equal ['Withings has 2 activities around this session, and none of them overlaps it:',
+                  "• Lift weights — the day before, #{shown(yesterday, 13, 13)} " \
+                  "to #{shown(yesterday, 14, 18)}",
+                  "• Bicycling — the day before, #{shown(yesterday, 21, 17)} " \
+                  "to #{shown(yesterday, 22, 23)}",
+                  "This session ran #{shown(Date.today, 13, 10)} to #{shown(Date.today, 13, 48)}.",
+                  'So something was recorded and it was not this session. Checking again will',
+                  'only help if your watch has not finished uploading this one.'].join(' '),
+                 box_says
+  end
+end
+
+describe 'which day an activity is said to be on' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include WhatArrivedInstead
+
+  before { a_session_at_ten_past_one }
+
+  # Nothing at all where it shares the session's day: "today" beside a clock time is noise,
+  # and it is a word that would be wrong on a record read back in March besides.
+  it 'says no day for one from the session own day' do
+    record(@workout_id, [activity(id: 'walk', category: 1, starts: clock_on(Date.today, 7, 0),
+                                  minutes: 30)])
+
+    assert_includes box_says, "• Walk — #{shown(Date.today, 7, 0)} to #{shown(Date.today, 7, 30)}"
+    refute_includes box_says, 'the day'
+  end
+end
+
+describe 'a category the scoring table never had a word for' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include WhatArrivedInstead
+
+  # The reporting account's second activity is category 6, and the whole naming table was
+  # `{ 16 => ..., 17 => ... }` because scoring only ever asked whether a row looked like
+  # lifting. A box that cannot name what it is listing is the complaint again in a new place.
+  it 'is named from the table Withings publishes' do
+    a_session_at_ten_past_one
+    record(@workout_id, [yesterday_pair.last])
+
+    assert_includes box_says, '• Bicycling — the day before,'
+  end
+
+  # And an id that table does not carry prints as an id. "Other" or "Activity" would read as
+  # something the lifter had tapped in Health Mate, which is inventing a name for a row.
+  it 'prints the id where Withings has published no name' do
+    a_session_at_ten_past_one
+    record(@workout_id, [activity(id: 'odd', category: 306, starts: clock_on(Date.today - 1, 9, 0),
+                                  minutes: 30)])
+
+    assert_includes box_says, '• Withings category 306 — the day before,'
+  end
+end
+
+describe 'a watch that recorded ten things that day' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include WhatArrivedInstead
+
+  before { a_session_at_ten_past_one }
+
+  # A box under a session on a phone, not a log. Ten lines would push the controls below the
+  # fold and be a second way of being unreadable -- but three of ten shown in silence would
+  # be the same withholding #568 is about, so the rest are counted.
+  def crowd(count) = (1..count).map { |n| walk(n) }
+
+  def walk(number)
+    activity(id: "a-#{number}", category: 1, minutes: 20,
+             starts: clock_on(Date.today - 1, 6, 0) + (number * 3600))
+  end
+
+  it 'names three of them and counts the rest' do
+    record(@workout_id, crowd(10))
+
+    assert_includes box_says, 'Withings has 10 activities around this session'
+    assert_equal 3, box_says.scan('• Walk').length
+    assert_includes box_says, '• and 7 more around this session'
+  end
+
+  # The three are the three nearest the session, which is the same measure `best` breaks its
+  # ties with: an activity from twenty minutes after the last set is the one most likely to
+  # be this lift filed against a clock that disagrees, and it must not be what falls off.
+  it 'keeps the one nearest the session rather than the ones read first' do
+    record(@workout_id, crowd(9) + [activity(id: 'close', category: 6, minutes: 20,
+                                             starts: @started_at + 3600)])
+
+    assert_includes box_says, '• Bicycling'
+  end
+end
+
+describe 'what listing the activities costs' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include WhatArrivedInstead
+
+  before { a_session_at_ten_past_one }
+
+  # #560's central claim, held over the box that now says more. Detail comes from rows that
+  # are already stored, so a page that names two activities makes exactly as many requests as
+  # one that names none.
+  it 'asks Withings for nothing at all' do
+    record(@workout_id, yesterday_pair)
+
+    asked = calls_while { get "/workouts/#{@workout_id}" }
+
+    assert_equal 0, asked
+    assert_includes box_says, '• Lift weights'
+  end
+end
+
+describe 'what the app calls a Withings category' do
+  # One table for names and another for what counts as lifting, because one table doing both
+  # is how "is 17 lifting" and "what is 17 called" come to be answered from the same place
+  # and then drift.
+  it 'uses the name Withings publishes' do
+    assert_equal 'Bicycling', Tectonic::WithingsWorkouts.called(6)
+  end
+
+  # This app called 17 "Fitness". Withings calls it Calisthenics, and the string is shown to
+  # a lifter as the watch's own word for what they did -- so it has to be the watch's word.
+  it 'calls 17 what Withings calls it rather than what this app used to' do
+    assert_equal 'Calisthenics', Tectonic::WithingsWorkouts.called(17)
+  end
+end
+
+describe 'a category Withings has published no name for' do
+  # Withings adds categories, and three of the published ids are deliberately absent because
+  # the two mirrors of their table disagree about them. Either way the honest answer is the
+  # number, which is also the one thing that makes the gap fixable.
+  it 'is the id and nothing more' do
+    assert_equal 'Withings category 306', Tectonic::WithingsWorkouts.called(306)
+  end
+
+  it 'is said plainly where Withings sent no category at all' do
+    assert_equal 'An activity Withings did not name', Tectonic::WithingsWorkouts.called(nil)
+  end
+end
+
+describe 'the category a proposal sentence names' do
+  include MatchingTheWatch
+
+  # That sentence is the score said in words, so it names the tag only where the tag scored
+  # the quarter. "Withings called it bicycling" under an offer would name a label that
+  # contributed nothing to the offer and read as though it had.
+  it 'leaves out one that scored nothing' do
+    riding = row(starts_offset: 2, minutes: 48, category: 6)
+
+    assert_equal 'overlaps this session for 48m of its 52m',
+                 Tectonic::WithingsWorkouts.because(riding, window)
+  end
+
+  it 'names one that scored, in Withings own word for it' do
+    bodyweight = row(starts_offset: 2, minutes: 48, category: 17)
+
+    assert_equal 'overlaps this session for 48m of its 52m, and Withings called it calisthenics',
+                 Tectonic::WithingsWorkouts.because(bodyweight, window)
+  end
+end
+
 describe 'a fetch that came back empty' do
   include Rack::Test::Methods
   include RouteOwnership
