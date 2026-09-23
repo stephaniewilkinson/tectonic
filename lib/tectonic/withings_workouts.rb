@@ -94,6 +94,14 @@ class Tectonic < Roda
     # It is also the seam a backfill would widen. #520 declines one outright -- "matching an
     # arbitrary past session is the hard version of this problem and this flow avoids it
     # entirely" -- so this is the forward flow and only the forward flow.
+    #
+    # **And it has now been widened, on purpose.** `withings:backfill` reverses #520's scope
+    # -- the owner was asked and chose to -- and a session from last March with a proposal
+    # waiting on it has to be answerable. What is widened is *which sessions may show a
+    # question*, and not what this constant actually governs, which is how long the app keeps
+    # asking Withings. Past a day the page still makes no call whatever: it reads the
+    # proposal the backfill already wrote and renders that, or it says nothing at all. See
+    # `standing` below, and 043.
     LOOKS_BACK = 24 * 60 * 60
 
     module_function
@@ -120,10 +128,37 @@ class Tectonic < Roda
       return nil if workout[:withings_dismissed_at] || !WithingsConnection.connected?(account_id)
 
       window = interval(timing)
-      return nil unless window && recent?(window.last)
+      return nil unless window
+      return standing(account_id, workout[:id], window) unless recent?(window.last)
       return { state: :unreachable } unless fetched?(account_id, window)
 
-      propose(account_id, window)
+      propose(account_id, window, workout[:id])
+    end
+
+    # The proposal a backfill left for a session too old for the forward flow to ask about.
+    #
+    # One indexed read and no network at all, which is the constraint that makes widening the
+    # window safe: browsing a year of training must not become a year of API calls. The
+    # backfill did the asking, once, in a rake task that could afford to; this only renders
+    # what it concluded.
+    #
+    # Nil where there is no proposal, and nil is the whole of what an old session with
+    # nothing waiting says. **It deliberately does not say "nothing from Withings yet".**
+    # That sentence is the forward flow's, and it is true there -- the watch's upload is
+    # seconds to minutes behind, so a fetch that found nothing has found nothing *yet*. For a
+    # session from last March there is no upload on its way. Absent really is absent, and the
+    # honest rendering of it is silence rather than a hedge borrowed from a case that does
+    # not apply. The run that made the proposals is where the absences get counted and said
+    # out loud, because that is the one place a total is meaningful.
+    # One query and one spelling of "is there an unanswered proposal on this session", which
+    # the backfill also asks before it offers one -- two spellings of it would eventually
+    # disagree about whether a dismissed proposal counts, and the disagreement would show up
+    # as a session offered a second activity while the first was still on screen.
+    def standing(account_id, workout_id, window)
+      row = DB[:withings_workouts].where(account_id:, proposed_workout_id: workout_id,
+                                         workout_id: nil, dismissed_at: nil).first
+      row && { state: :proposed, activity: row, overlap: overlap(row, window),
+               span: window.last - window.first, because: because(row, window) }
     end
 
     # The activity a session has already been matched to, or nil. Read on every record page,
@@ -203,8 +238,8 @@ class Tectonic < Roda
     end
 
     # The best candidate with the sentence that explains it, or the waiting state.
-    def propose(account_id, window)
-      pick = best(candidates(account_id, window), window)
+    def propose(account_id, window, workout_id = nil)
+      pick = best(candidates(account_id, window, workout_id), window)
       return { state: :waiting } unless pick
 
       { state: :proposed, activity: pick, overlap: overlap(pick, window),
@@ -222,9 +257,17 @@ class Tectonic < Roda
     # decoration. Inside a virtual row block a bare `started_at` resolves to the *local
     # variable* where one is in scope and to the column where none is, so naming the locals
     # after the columns would compare each column to itself and match everything.
-    def candidates(account_id, window)
+    #
+    # **An activity already offered to a different session is not a candidate for this one.**
+    # A backfill can leave a proposal against a session from March, and offering the same
+    # activity here as well would be one recording asking two sessions to claim it -- with
+    # only one of them able to, since `workout_id` is unique, so the loser's yes would
+    # silently do nothing. The session it was offered to is still allowed to see it, which is
+    # the ordinary case the moment a backfill and the forward flow overlap on one session.
+    def candidates(account_id, window, workout_id = nil)
       opened, closed = window
       DB[:withings_workouts].where(account_id:, workout_id: nil, dismissed_at: nil)
+                            .where { (proposed_workout_id =~ nil) | (proposed_workout_id =~ workout_id) }
                             .where { (started_at < closed) & (ended_at > opened) }
                             .order(:started_at).all
     end

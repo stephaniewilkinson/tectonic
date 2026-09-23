@@ -108,7 +108,20 @@ class Tectonic < Roda
     # level. Returning a short array would make it *look* like an answer, and a caller would
     # render "no activity" about a request that was never served. An empty array means
     # Withings said there was nothing; nil means Withings did not say.
-    def workouts(token, from:, to:)
+    # `pause` is seconds to wait before asking for the *next* page, and it is nought here
+    # because the caller this was written for is a page view that wants one window and
+    # usually one page. A backfill is the other caller and passes a real number: a walk over
+    # a decade is a few hundred of these in a row, and Withings ask not to be polled more
+    # than once every ten minutes per user while the commonly cited application ceiling is
+    # 120 requests a minute. A serial walk with a second between pages is nowhere near
+    # either; the same walk with no pause at all is a tight loop against somebody else's
+    # service, and the way that ends is status 601 -- which arrives as HTTP 200 and is
+    # indistinguishable, by the time it reaches a caller, from an afternoon with nothing in
+    # it. Cheaper to wait than to be unable to tell.
+    #
+    # Nothing sleeps before the first page or after the last: the pause belongs between two
+    # requests, and a run of one request should cost what one request costs.
+    def workouts(token, from:, to:, pause: 0)
       gathered = []
       offset = 0
       loop do
@@ -119,6 +132,7 @@ class Tectonic < Roda
         return gathered unless body['more']
 
         offset = body['offset'].to_i
+        sleep pause if pause.positive?
       end
     end
 

@@ -75,7 +75,7 @@ describe 'the title on a page you are signed in for' do
     ['/', '/start', '/workouts', '/workouts/new', "/workouts/#{@workout}",
      "/workouts/#{@workout}/edit", "/workouts/#{@workout}/session", "/workouts/#{@workout}/sets",
      "/workouts/#{@workout}/sets/#{@set}", '/exercises', '/exercises/new', "/exercises/#{@exercise}",
-     "/exercises/#{@exercise}/edit", '/settings',
+     "/exercises/#{@exercise}/edit", '/settings', '/workouts/withings',
      '/connections', '/volume'].each { |path| assert_page_title(path) }
   end
 

@@ -640,3 +640,105 @@ def report_library_collisions(added)
   puts '  each of those keeps its own movement; the library row is there for everyone else'
 end
 
+# Reading a lifter's Withings history once, and offering what it finds to the sessions they
+# have already logged.
+#
+# **This reverses a decision #520 wrote down.** That issue declines historical matching in so
+# many words -- "matching an arbitrary past session is the hard version of this problem and
+# this flow avoids it entirely" -- and the forward flow was built on that basis. The owner was
+# asked afterwards and chose to have the hard version as well, as a second piece standing on
+# the first. Deliberate, then, rather than an oversight, and what it reverses is the scope
+# alone: every pairing is still a proposal, and the lifter still answers it.
+#
+# A task rather than anything that runs by itself, for two reasons and both are hard limits.
+# `Withings::TIMEOUT` is ten seconds a call, so a walk over a decade can occupy a thread for
+# minutes -- fine in a terminal, and not something to do inside a Puma worker that somebody's
+# page view is queued behind. And it is deliberately nowhere near `preDeployCommand`, which
+# runs before every single deploy: a release that reached out to Withings would fail whenever
+# Withings had a bad afternoon, on a step whose job is to migrate a database.
+#
+# DRY_RUN=1 previews a run without writing, the same convention exercises:merge uses. It is
+# not an estimate -- it is the real walk inside a transaction that always rolls back, so the
+# numbers it prints are the numbers a real run would produce. It still makes the API calls,
+# because there is no way to report on a history without reading it.
+#
+# The policy -- how far back to walk, which activity belongs to which session, what counts as
+# already answered -- is Tectonic::WithingsBackfill, in lib, and is specced there. This prints.
+namespace :withings do
+  desc 'Import past Withings workouts and propose matches: rake withings:backfill ACCOUNT_ID=1 SINCE=2023 DRY_RUN=1'
+  task :backfill do
+    backfill_withings
+  end
+end
+
+def backfill_withings
+  require_relative 'lib/tectonic/workouts'
+  require_relative 'lib/tectonic/withings_backfill'
+  account_id = account_id_from(Tectonic::Workout)
+  since = backfill_since
+  dry_run = !ENV.fetch('DRY_RUN', nil).nil?
+  puts "Reading Withings history for account #{account_id}#{" from #{since}" if since}#{' (DRY_RUN)' if dry_run}..."
+  report_backfill(Tectonic::WithingsBackfill.run(account_id:, since:, dry_run:))
+end
+
+# The operator's bound, checked here rather than inside the policy, because a year typed
+# wrongly is an argument problem and the answer to it is to say so and stop. `SINCE=23` is a
+# plausible typo that would otherwise walk from the year 23 to this one, which is two
+# thousand requests to Withings before anybody could intervene.
+def backfill_since
+  given = ENV.fetch('SINCE', nil)
+  return nil unless given
+
+  year = given.to_i
+  abort "SINCE wants a four-digit year, not #{given.inspect}." unless year.between?(2000, Date.today.year)
+
+  year
+end
+
+# What the run did, in the four numbers a lifter actually needs afterwards. Two of them are
+# refusals to match, and they are reported rather than swallowed because a run that proposed
+# nothing and a run that found nothing are different afternoons with the same silence.
+def report_backfill(report)
+  abort 'No Withings connection on that account. Connect one in settings first.' if report[:state] == :disconnected
+  abort 'No stamped sessions to match against, so a history has nothing to be offered to.' if
+    report[:state] == :no_sessions
+
+  announce_walk(report)
+  announce_proposals(report)
+  puts 'DRY_RUN: nothing written. Run it again without DRY_RUN to keep these proposals.' if report[:dry_run]
+end
+
+# What came back, and -- loudly -- whether all of it did.
+#
+# A walk that stopped part way must never read as a finished one. Withings signal rate
+# limiting as body status 601 and deliver it over HTTP 200, exactly like every other error
+# they have, so a throttled fetch reaches this process as nil and would otherwise print as a
+# tidy zero. On stderr, and naming the year it stopped at, because the remedy is to wait and
+# run it again rather than to conclude that 2021 was a quiet year.
+def announce_walk(report)
+  years = report[:years]
+  span = years.empty? ? 'no years' : "#{years.last}-#{years.first}"
+  puts "Walked #{years.length} year(s) (#{span}): #{report[:found]} activity(ies) from Withings."
+  return if report[:complete]
+
+  warn "INCOMPLETE: Withings stopped answering at #{report[:stopped_at]}, so that year and everything " \
+       'before it was never read. That is usually rate limiting (status 601), which arrives looking ' \
+       'like success. Wait a few minutes and run this again; nothing already answered is re-proposed.'
+end
+
+# The pairing, and the two kinds of nothing.
+#
+# "No activity from your watch" is said plainly and without the forward flow's hedge. On the
+# record page a session minutes old that has no activity is told to check back in a minute,
+# because the watch's upload really is seconds to minutes behind. For a session from last
+# March there is no upload on its way: absent is absent, and saying "yet" about it would be a
+# promise nothing is going to keep.
+def announce_proposals(report)
+  puts "#{report[:proposed]} new proposal(s) waiting for an answer at /workouts/withings."
+  puts "#{report[:already_waiting]} session(s) already had one, and were left alone." if
+    report[:already_waiting].positive?
+  puts "#{report[:without_activity]} session(s) have no activity from your watch -- nothing was recorded " \
+       'for them, which is an answer rather than something still to come.'
+  puts "#{report[:activities_without_session]} activity(ies) the watch recorded match no session logged here."
+end
+
