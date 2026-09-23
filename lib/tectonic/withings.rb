@@ -126,18 +126,63 @@ class Tectonic < Roda
     #
     # Nothing sleeps before the first page or after the last: the pause belongs between two
     # requests, and a run of one request should cost what one request costs.
+    # A ceiling on the pages one window will follow, for the reason WithingsMeasures gives for
+    # its own: `more` is a loop condition a provider controls, and a loop a provider controls
+    # needs a bound that we control. Far above any real year -- Withings pages workouts in the
+    # hundreds and nobody trains that often.
+    #
+    # Exhausting it returns nil rather than what arrived, which is the same answer this method
+    # gives for any other failure to be told the whole window. A short list would be read as
+    # the complete one -- the backfill would stamp a year it had not finished, and a record
+    # page would offer a candidate from a set that was never fully looked at.
+    MAX_PAGES = 20
+
     def workouts(token, from:, to:, pause: 0)
       gathered = []
       offset = 0
-      loop do
+      MAX_PAGES.times do
         body = workout_page(token, from, to, offset)
         return nil unless body
 
         gathered.concat(Array(body['series']))
-        return gathered unless body['more']
+        return gathered unless more?(body)
 
-        offset = body['offset'].to_i
-        sleep pause if pause.positive?
+        offset = paused(body, pause)
+      end
+      report("more than #{MAX_PAGES} pages", MEASURE_V2_PATH)
+    end
+
+    # Where the next page starts, after the wait that belongs between two requests. The two
+    # are one step rather than two lines because the pause is part of asking for the next
+    # page, not a thing done on its own.
+    def paused(body, pause)
+      sleep pause if pause.positive?
+      body['offset'].to_i
+    end
+
+    # Whether Withings says there is another page.
+    #
+    # **`0` is truthy in Ruby**, which is the whole reason this is a method rather than the
+    # bare `body['more']` that stood here. Withings documents `more` as a number and has been
+    # observed returning a boolean, so a quiet year answering `more: 0` read as "there is
+    # more", the offset it came with was `0`, and the loop asked for the same page until
+    # something killed it -- a pinned Puma thread on a record page, or a rake task in a tight
+    # loop against somebody else's service.
+    #
+    # WithingsMeasures worked this out first and wrote its own copy. Two copies of one
+    # provider quirk is how they came to disagree, so there is one now and the other defers
+    # to it.
+    # Every shape it has been seen in, rather than the two somebody remembered. A number is
+    # a count and `0` means no; a boolean means itself; absent means no. Writing this as
+    # `flag == true || flag.to_i.positive?` -- which is what stood in WithingsMeasures --
+    # raises on a literal `false`, because `false` has no `to_i`. That never fired only
+    # because the two callers had each been fed a different half of the possibilities.
+    def more?(body)
+      flag = body['more']
+      case flag
+      when Numeric then flag.positive?
+      when String then flag.to_i.positive?
+      else flag ? true : false
       end
     end
 

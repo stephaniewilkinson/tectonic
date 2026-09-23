@@ -594,3 +594,50 @@ describe 'what the app is allowed to ask Withings to do' do
   end
 end
 
+# A loop condition somebody else controls, in the two ways it can fail to end. Found live by
+# review: it pinned a Puma thread behind a record page and hammered Withings until something
+# killed the process.
+describe 'a window Withings says is finished with a number' do
+  # `0` is truthy in Ruby, and Withings documents `more` as a number. A quiet year answering
+  # `more: 0` therefore read as "there is another page", came with `offset: 0`, and the loop
+  # asked for the same page until something killed it -- a pinned Puma thread behind a record
+  # page, or a rake task hammering somebody else's service. The specs above only ever fed it
+  # `true` and `false`, which is how it survived.
+  it 'stops when Withings says there are no more with a number rather than a boolean' do
+    asked = 0
+    answering = lambda do |_path, **_form|
+      asked += 1
+      raise 'asked for the same page far too many times' if asked > 5
+
+      { 'series' => [{ 'id' => 1 }], 'more' => 0, 'offset' => 0 }
+    end
+    found = Tectonic::Withings.stub(:post, answering) do
+      Tectonic::Withings.workouts('access-1', from: Date.today, to: Date.today)
+    end
+
+    assert_equal 1, asked, 'a quiet window was read as having another page'
+    found_ids = found.map { |page| page['id'] }
+
+    assert_equal [1], found_ids
+  end
+end
+
+# And the bound, for the case the check above cannot catch: a provider that keeps saying there
+# is more and keeps handing back the same offset. A loop somebody else ends needs a stop of our
+# own, which is the argument WithingsMeasures already made for its own ceiling.
+describe 'a provider that never says it is finished' do
+  it 'gives up rather than following it forever' do
+    asked = 0
+    answering = lambda do |_path, **_form|
+      asked += 1
+      { 'series' => [{ 'id' => asked }], 'more' => 1, 'offset' => 0 }
+    end
+    found = Tectonic::Withings.stub(:post, answering) do
+      Tectonic::Withings.workouts('access-1', from: Date.today, to: Date.today)
+    end
+
+    assert_equal Tectonic::Withings::MAX_PAGES, asked
+    assert_nil found, 'a window that was never fully read was handed back as though it were whole'
+  end
+end
+
