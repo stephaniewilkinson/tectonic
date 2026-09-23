@@ -247,20 +247,34 @@
     Vibration is asked for and ignored where it is not supported -- iOS Safari implements none
     of navigator.vibrate -- which is why the beep is the primary and the buzz is the addition.
 
-    A wake lock is held while a bell is pending, and only then. Without one the phone dims and
-    locks partway through a three-minute rest and the beep arrives to a sleeping page. It is
-    not held while the clock is merely counting with nothing to ring: that state lasts from
-    one set to the next all session, and forcing the screen on for the whole of a workout to
-    time a rest nobody asked to be told about is a battery cost with nothing on the other side
-    of it. #514 did not move that line, and it is worth saying so, because the clock counting
-    up no longer distinguishes the two states on screen -- the wake lock follows the bell,
-    which is the thing that needs the page awake, and never the clock. Requested
-    inside a try because the API is absent on older Safari and refuses when the page is not
-    visible, and neither is a reason to fail to time a rest.
+    **There is no wake lock, and there was one until #556.** It was held while a bell was
+    pending and dropped when the bell rang, on the argument that the phone dims and locks
+    partway through a three-minute rest and the beep arrives to a sleeping page. That argument
+    has not been shown wrong. It has been outweighed, by the numbers this account actually
+    trains on: the phone's auto-lock is five minutes, and the longest rest anything here asks
+    for is 3:30 -- the highest rest_seconds on any lift of any programme, and the highest
+    planned_rest_seconds on any set, are both 210. The lock was holding a screen open against
+    a sleep that was not coming, every rest of every session, and holding a screen on is one of
+    the few things a phone does that shows up in the battery by the end of a session. #556 was
+    two bugs in that code and neither of them needed fixing in the end, which is the better
+    outcome of the two: there is no bug in code that is not there.
+
+    **What it cost, written down here rather than found out.** Two cases, and the first is the
+    real one. iOS Low Power Mode forces auto-lock to thirty seconds and greys the setting out,
+    so a phone low on charge at the end of a long session genuinely can sleep mid-rest -- and
+    with the page suspended its timer stops, so the bell does not ring late, it does not ring
+    at all. That is the known price of this change and it is paid by the session most likely
+    to be the one that needed the timer. The second is smaller and is on this bar: 5:00 is one
+    of the four durations, +30 winds a bell past it, and a bell at or beyond the auto-lock is
+    the same sleeping page the lock existed to prevent -- reachable by tapping, but not by
+    anything this account's programmes prescribe. If either of these starts costing rests, the
+    thing to bring back is a lock taken while a bell is pending, and #556 is the argument about
+    how to take it exactly once.
 
     **The honest limit, from the issue:** none of this can reach a phone whose screen is off
     and locked. A web page gets no timer that survives that, so the buzz in your pocket is
-    what a native app is for and this does not pretend otherwise. %>
+    what a native app is for and this does not pretend otherwise -- which is now also the
+    answer for the phone that dims mid-rest, rather than a thing this file argues with. %>
 <script>
   (function () {
     var bar = document.getElementById('rest-timer');
@@ -309,7 +323,7 @@
     // the time. The reconciliation it exists for is at readCue.
     var startedAt = 0, bell = null, suggested = 0, kind = '', sourceWord = '';
     var seenAt = '', armedFor = '';
-    var rang = false, lock = null, audio = null, ringing = [];
+    var rang = false, audio = null, ringing = [];
 
     function spell(seconds) {
       var whole = Math.abs(Math.round(seconds));
@@ -346,16 +360,6 @@
       ringing.forEach(function (tone) { try { tone.stop(); } catch (error) { /* already done */ } });
       ringing = [];
       if (navigator.vibrate) { navigator.vibrate(0); }
-    }
-
-    function hold() {
-      if (!navigator.wakeLock) { return; }
-      navigator.wakeLock.request('screen').then(function (sentinel) { lock = sentinel; })
-        .catch(function () { /* refused or unsupported; the timer runs either way */ });
-    }
-
-    function release() {
-      if (lock) { lock.release().catch(function () {}); lock = null; }
     }
 
     // Three states, not two. The bar is away; or it is counting the rest with no bell set,
@@ -411,7 +415,6 @@
         beep();
         if (navigator.vibrate) { navigator.vibrate([300, 500, 300, 500, 300, 500, 300]); }
         announce.textContent = 'Rest over.';
-        release();
       }
     }
 
@@ -438,9 +441,6 @@
       sourceLabel.textContent = word || '';
       announce.textContent = '';
       show('running');
-      // The lock follows the bell, so a bell that is already spent does not hold the screen
-      // awake for a beep that has been and gone.
-      if (rang) { release(); } else { hold(); }
       tick();
     }
 
@@ -474,7 +474,6 @@
       bell = null;
       rang = false;
       announce.textContent = '';
-      release();
       show('counting');
     }
 
@@ -576,7 +575,6 @@
       if (!tapped) { return; }
       silence();
       if (tapped.hasAttribute('data-rest-dismiss')) {
-        release();
         show('none');
       } else if (tapped.hasAttribute('data-rest-step')) {
         // Winds the bell rather than the clock. Nothing here can move the number on the
