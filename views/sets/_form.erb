@@ -11,10 +11,12 @@
   <%== csrf_tag(@action) %>
   <fieldset>
     <div class="space-y-5">
-      <select id="exercise_id" name="exercise_id"
-             class="<%= field_style %> mt-2 block w-full py-1.5 pr-10 text-gray-900 sm:text-sm sm:leading-6">
-        <%== render('sets/_exercise_options') %>
-      </select>
+      <%# The movement, which used to be the select this now wraps. #525 is the whole of why
+          it moved into a partial of its own: the control is a search box over the same
+          options, the select is still underneath it carrying the value, and the argument for
+          that arrangement -- including why there is no search endpoint and no htmx on this
+          page -- runs longer than the rest of this form put together. %>
+      <%== render('sets/_exercise_picker') %>
       <%# step="5" was wrong here in two different ways, one per copy. With no value and no
           min the new-set form counted fives from zero, so it took 135 and 140 and refused
           137 outright; the edit form counted them from the row's own weight, so a set at
