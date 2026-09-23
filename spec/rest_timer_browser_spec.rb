@@ -340,3 +340,119 @@ describe 'the rest timer against the poll' do
   end
 end
 
+# The wake lock that is not there any more. #556.
+#
+# The timer used to hold the screen awake while a bell was pending, and the argument for it is
+# in the partial along with the argument for taking it out: this account's longest rest is
+# 3:30 and its phone locks at five minutes, so the lock was holding a screen open against a
+# sleep that was not coming, and charging a battery for it. What that leaves behind is a thing
+# worth pinning, because it is exactly the kind of thing that grows back -- the API is two
+# lines to call, the next person reading the beep code will think of it, and nothing about a
+# green suite would notice.
+#
+# So the page is given a wake lock whose books can be read, and the assertion is that the
+# timer never opens them. A count is used rather than a grep of the partial because what is
+# being asserted is about the running timer and not about the text of a file: a call that
+# arrived through a helper, a library or a copy of this bar somewhere else would be the same
+# bug and would pass a grep.
+#
+# It is installed after the page has loaded, which is not a compromise: the old code looked
+# navigator.wakeLock up at the moment it wanted one -- as any code doing this would, since the
+# whole point of the guard around it is that the API may be absent -- so nothing here can have
+# been read at load time, and the session screen is never reloaded, so the fake is still in
+# place for every tap a spec makes.
+#
+# **The fake is not needed to make a missing API observable.** Headless Firefox does carry
+# navigator.wakeLock, so a real request would have been made and would have gone nowhere a
+# spec could see it: a sentinel is a fact about the browser with nothing readable on it, and
+# no assertion in Selenium can ask whether a screen is about to dim. The books are what make
+# the request countable at all.
+module WatchingTheWakeLock
+  BOOKS = <<~JS
+    window.restLocks = { requested: 0 };
+    Object.defineProperty(navigator, 'wakeLock', {
+      configurable: true,
+      value: {
+        request: function () {
+          window.restLocks.requested++;
+          return Promise.resolve({ release: function () { return Promise.resolve(); } });
+        }
+      }
+    });
+  JS
+
+  # Installed, and then proved. Every spec below asserts an absence, and an absence asserted
+  # against a fake that quietly failed to take is an assertion about nothing at all -- it would
+  # pass just as happily against a timer holding a lock on every set. So one request is made
+  # here by hand, the books are checked to have caught it, and the count is put back to zero:
+  # what follows is then a reading the page could have failed.
+  def watch_the_wake_lock
+    page.execute_script(BOOKS)
+    page.execute_script("navigator.wakeLock.request('screen');")
+
+    assert_equal 1, locks_asked_for, 'the fake wake lock did not take, so an absence proves nothing'
+
+    page.execute_script('window.restLocks.requested = 0;')
+  end
+
+  def locks_asked_for = page.evaluate_script('window.restLocks.requested')
+end
+
+# Every state the lock used to be taken in, and it is not taken in any of them. The count is
+# read after a tap that is itself waited for, so there is no absence being asserted before the
+# thing it is about could have happened: the bell's own word on screen is the proof that the
+# timer reached the state, and the count is the claim about it.
+describe 'the rest timer and the phone it is on' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include RestingBrowser
+  include WatchingTheWakeLock
+
+  before do
+    session_with_a_set
+    watch_the_wake_lock
+  end
+
+  it 'asks for no wake lock when a bell is set' do
+    start_a_rest_of '3:00'
+
+    assert_equal 180, seconds_in(bell_text), 'the bell was never set, so this spec is about nothing'
+    assert_equal 0, locks_asked_for, 'the timer is holding the screen awake again'
+  end
+
+  # Where a fix for #556 would have put one, and the reason this spec is worth its Firefox: the
+  # bell rings, the rest is stretched past the clock with +30, and the bell is live again. That
+  # is the state the old lock was missing and the state a reinstated one would be added for.
+  it 'asks for none when a rung bell is wound back out past the clock' do
+    start_a_rest_of '1:00'
+    2.times { find('[data-rest-step="-30"]').click }
+
+    assert_match(/\A\+/, bell_text, 'the bell never rang, so there is nothing to re-arm')
+
+    2.times { find('[data-rest-step="30"]').click }
+
+    assert_match(%r{\A/}, bell_text, 'the bell is not ahead of the clock, so it is not re-armed')
+    assert_equal 0, locks_asked_for, 'the timer is holding the screen awake again'
+  end
+end
+
+# And the one rest nobody taps for, which is the one most likely to be reasoned about
+# separately: a length the block wrote arms the bell on its own, with no tap on this bar at
+# all.
+describe 'a prescribed rest and the phone it is on' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include RestingBrowser
+  include WatchingTheWakeLock
+
+  it 'asks for no wake lock when the block arms the bell itself' do
+    session_prescribing(300)
+    watch_the_wake_lock
+    all('button', text: 'Done').last.click
+
+    assert has_css?('#rest-timer [data-rest-steps]', visible: true, wait: 5)
+    assert_equal 300, seconds_in(bell_text), 'the bell was never set, so this spec is about nothing'
+    assert_equal 0, locks_asked_for, 'the timer is holding the screen awake again'
+  end
+end
+
