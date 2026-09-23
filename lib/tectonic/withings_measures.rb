@@ -236,9 +236,11 @@ class Tectonic < Roda
       [groups, false]
     end
 
-    # `more` is documented as a number and has been observed as a boolean, so both are read
-    # rather than picking one and finding out in production that the loop ran once.
-    def more?(body) = body['more'] == true || body['more'].to_i.positive?
+    # Deferred to `Withings.more?` rather than kept as a second copy. This module worked the
+    # quirk out first and wrote its own answer; the workouts loop wrote a different one, took
+    # the bare `body['more']` -- and `0` is truthy in Ruby, so a quiet window looped forever.
+    # Two copies of one provider quirk is exactly how they came to disagree.
+    def more?(body) = Withings.more?(body)
 
     # One weigh-in: several numbers taken at one moment, which is why they share a `grpid` and
     # a date. Stored as separate rows because they are separate metrics, and joined back up by
