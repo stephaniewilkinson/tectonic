@@ -37,6 +37,28 @@ class Tectonic < Roda
   # refresh that failed, which is `WithingsConnection.token` returning nil, and that is the
   # only path here that reports :revoked.
   #
+  # ## Two watermarks, because a read has two different things to say about itself
+  #
+  # `synced_at` means *everything up to here has been read*, and only a window that arrived
+  # whole may move it. That is right, and on its own it left a first read with nothing to
+  # show for a refusal: the first read reaches back a year, a year is the widest and most
+  # expensive request this app makes, and a request refused partway stored its rows and moved
+  # nothing -- so the next read asked for the same year, and the one after that. The window
+  # never narrowed, and the request likeliest to be throttled was the one retried forever
+  # (#557).
+  #
+  # The second, `measures_read_back_to`, says *how far back* -- which is a different claim and
+  # needs a different column, exactly as the backfill keeps `workouts_backfilled_at` off
+  # `synced_at`. Together they describe one stretch of time: from the reach forward to
+  # `synced_at`, every reading has been fetched. A read asks for that stretch's near end and
+  # then walks backwards behind it, and each piece that arrives whole moves one watermark or
+  # the other without either of them claiming anything the other has not earned.
+  #
+  # What none of it does is stamp `synced_at` on a truncated read. A read that stopped has not
+  # read everything up to anywhere, and saying it has would trade a slow loop for readings
+  # that go missing with nothing to show it -- which is the failure `:incomplete` exists to
+  # report rather than hide.
+  #
   # The distinction that matters most is between a fetch that failed and a window that was
   # genuinely empty. Both store nothing. Only one of them means "you have not weighed
   # yourself", and reporting the other that way is the class of lie the schema draws a column
@@ -107,6 +129,32 @@ class Tectonic < Roda
     # weigh-ins is not what anybody reads beside their training, and because an unbounded first
     # call is a lot of pages to fetch while somebody waits.
     BACKFILL = 365 * 24 * 60 * 60
+
+    # How much of that window one request is allowed to ask for.
+    #
+    # A year in a single request is the cheapest way to read a year and the most expensive
+    # thing to have refused. Withings answers a wide window a page at a time, and a page that
+    # fails partway leaves the rows that did arrive in the table with nothing anywhere saying
+    # which part of the window they are -- because the answer carries no order this app may
+    # rely on. The published reference documents `more` and `offset` and says nothing
+    # whatever about whether measure groups come back newest or oldest first; implementers
+    # report having seen both, and at least one client sorts them itself rather than trust
+    # it. So a truncated answer to a wide request cannot be turned into a resume point
+    # without guessing which end it holds, and guessing wrong does not cost a slow loop -- it
+    # costs a window silently skipped, which is the failure this module is built to avoid.
+    #
+    # Asking for the year a piece at a time replaces the guess with an arrangement. Each
+    # piece is a window this app chose the ends of, so a piece that arrived whole is whole
+    # whichever order it arrived in, and a piece that was refused is retried at a quarter of
+    # the cost rather than the year being retried at all of it. That is the whole of #557's
+    # fix: the ability to record progress comes from the boundaries being ours.
+    #
+    # A quarter, rather than a month or a half. Narrow enough that a refusal costs a quarter
+    # of the work instead of all of it, wide enough that a year is four requests rather than
+    # twelve -- and a quarter of daily weigh-ins is about ninety measure groups, comfortably
+    # inside the hundreds Withings pages at, so the ordinary piece is one request and `more`
+    # never fires within it at all.
+    STEP = BACKFILL / 4
 
     # How stale the last fetch has to be before a read triggers another one.
     #
@@ -185,47 +233,185 @@ class Tectonic < Roda
       collect(account_id, token, row, now)
     end
 
-    # Where a window starts: a week behind the last success, or a year back on the first run.
+    # Where the window that ends *now* starts: a week behind the last success, or a step back
+    # where there has been no success to work from.
+    #
+    # Never further back than a step, whichever of the two it is. A window ending now is the
+    # one whose arrival moves `synced_at`, and a step is as much as one request may ask for,
+    # so capping it here is what keeps that claim to a single piece: it arrives whole or it
+    # does not, and there is no case where half of it arrived and the resume point has to
+    # guess which half. Everything older than the cap is not skipped -- it is read behind this
+    # window, by the walk that records how far back it has got.
+    #
+    # The two callers this reads differently for are a first read, which used to start a year
+    # back and now starts a step back with the rest of the year behind it, and a connection
+    # nobody has read in longer than a step, which gets the same treatment for the same
+    # reason.
     def since(synced_at, now)
-      synced_at ? synced_at - OVERLAP : now - BACKFILL
+      [synced_at ? synced_at - OVERLAP : now - BACKFILL, now - STEP].max
     end
 
-    # The window, stored, and `synced_at` moved only if the whole of it arrived.
+    # The window, in pieces, stored, and each watermark moved only by a piece that arrived
+    # whole.
     #
-    # A short read still writes what it got. The rows are idempotent and the resume point has
-    # not moved, so the next fetch asks for the same window again and loses nothing -- and in
-    # the meantime the lifter who asked has this morning's weigh-in, which is what they asked
-    # for. What it must not do is claim the window is complete, hence :incomplete.
+    # The walk stops at the first piece Withings does not answer in full, rather than trying
+    # the rest. A refusal is what a short answer usually is -- status 601 arrives inside an
+    # ordinary 200 -- and carrying on past one spends requests during the exact minutes the
+    # provider is asking to be left alone. What did arrive is stored either way: the rows are
+    # idempotent, the pieces that finished are written down, and the lifter who asked has this
+    # morning's weigh-in, which is what they asked for.
     #
-    # The failures carry the *old* `synced_at` rather than nil, because "we could not reach
-    # Withings and the last thing we read was on Tuesday" is a sentence somebody can act on
-    # and "we could not reach Withings" on its own is not.
+    # What it must not do is call the window complete, hence :incomplete -- a hole earlier in
+    # the year is still a hole, and the reading tools say so.
+    #
+    # The failures carry the resume point as it stands *after* the walk rather than nil,
+    # because "we could not reach Withings and the last thing we read was on Tuesday" is a
+    # sentence somebody can act on and "we could not reach Withings" on its own is not.
     def collect(account_id, token, row, now)
-      groups, whole = pages(token, since(row[:synced_at], now), now)
-      return Fetch.new(:unreachable, 0, row[:synced_at]) if groups.nil?
-
-      stored = DB.transaction { groups.sum { |group| store_group(account_id, group) } }
-      return Fetch.new(:incomplete, stored, row[:synced_at]) unless whole
-
-      DB[:account_withings].where(account_id:).update(synced_at: now)
-      Fetch.new(:stored, stored, now)
+      asked = windows(row, now)
+      read = walk(account_id, token, row, asked, now)
+      Fetch.new(outcome(read), read.sum { |stored, _| stored.to_i }, resumed(asked, read, row, now))
     end
 
-    # Every page of the window, and whether that really was every page.
+    # Each piece in turn, newest first, stopping at the first that did not arrive whole.
+    def walk(account_id, token, row, asked, now)
+      read = []
+      asked.each do |window|
+        read << read_window(account_id, token, row, window, now)
+        break unless read.last.last
+      end
+      read
+    end
+
+    # One piece: its pages, its rows and its watermark, all three together or none of them.
     #
-    # Withings answers a wide window a page at a time and says so with `more`, handing back the
-    # `offset` to resume from. Reading only the first page would keep the newest readings and
-    # drop the older end of the window without saying anything, which on a first fetch is most
-    # of the year.
+    # The write is one transaction with the rows it is a claim about, so a watermark can never
+    # outlive the readings it says have been fetched -- a process killed between the two would
+    # otherwise leave this account permanently missing a quarter nothing will ask for again.
+    def read_window(account_id, token, row, window, now)
+      from, to = window
+      groups, whole = pages(token, from, to)
+      return [nil, false] if groups.nil?
+
+      DB.transaction do
+        stored = groups.sum { |group| store_group(account_id, group) }
+        record(account_id, row, window, now) if whole
+        [stored, whole]
+      end
+    end
+
+    # Every window one fetch will ask for, newest first and meeting end to end.
+    #
+    # The first ends now, which is what lets it move `synced_at` when it arrives: everything
+    # between its start and this instant has genuinely been read. Behind it come the pieces of
+    # the year this account has not got back to yet, walked backwards, so a fetch cut short has
+    # done the part worth having -- the recent readings are the ones a lifter reads, and the
+    # recent end is what earns the fifteen-minute floor and the cheap window that follows from
+    # it. The backfill walks its years newest first on the same argument.
+    #
+    # They meet end to end because a gap between two pieces is a fortnight nobody ever reads,
+    # and nothing downstream could see it: the rows that did arrive are real and a chart drawn
+    # from them looks exactly like a chart of a whole year.
+    #
+    # Ordinarily this is one window a week wide and nothing else. An account whose year is
+    # behind it has nowhere further back to go, so the steady state costs one request, which is
+    # what it cost before.
+    def windows(row, now)
+      stepped(since(row[:synced_at], now), now) + stepped(now - BACKFILL, reached(row, now))
+    end
+
+    # A span, cut into pieces no wider than a step, newest first. Empty where there is no span
+    # left to ask about, which is how an account with its year behind it asks for nothing
+    # extra. The bound on the loop is this app's own arithmetic rather than a provider's, so
+    # unlike the page loop it does not need a ceiling: `to` falls by a step each time round.
+    def stepped(from, to)
+      pieces = []
+      while to > from
+        pieces << [[to - STEP, from].max, to]
+        to -= STEP
+      end
+      pieces
+    end
+
+    # How far back this account has been read, which is where the walk behind the current
+    # window picks up.
+    #
+    # Null only on a connection that has never finished a piece of anything, and then the walk
+    # begins where the current window begins -- a step back, with the rest of the year behind
+    # it. Every completed piece writes this column, so a connection with any success at all
+    # has a real instant here and 046 gave one to the connections that predate it.
+    def reached(row, now) = row[:measures_read_back_to] || since(row[:synced_at], now)
+
+    # What a piece that arrived whole is allowed to claim.
+    #
+    # `synced_at` for the piece that ends now, and this is the line #557 turns on. It is not a
+    # truncated read stamped as though it were whole: this piece arrived entirely, its end is
+    # this instant, and everything still unread is older than its start because this app chose
+    # that start -- not because of any assumption about which end of an answer Withings sends
+    # first. Everything up to here really has been read, which is exactly what the column says.
+    def record(account_id, row, window, now)
+      from, to = window
+      stamp = { measures_read_back_to: begins(row, from) }
+      stamp[:synced_at] = now if to == now
+      DB[:account_withings].where(account_id:).update(stamp)
+    end
+
+    # Where the stretch of readings that have genuinely been read begins, once this piece is
+    # part of it.
+    #
+    # Ordinarily where it began before. A window starting a week behind the last success
+    # overlaps what was already read, so the stretch grows at the top and its far end stays
+    # wherever the walk has got back to -- which is why a steady-state read every quarter of an
+    # hour does not drag this column forward over a year it has already fetched.
+    #
+    # It begins *here* where this piece does not touch that stretch at all: a connection nobody
+    # has read in longer than a step leaves a gap between its last success and a window capped
+    # at a step, and nothing has fetched that gap. Keeping the old far end would be claiming
+    # the gap as read, which is the silent version of the failure this whole file is arranged
+    # against. So the stretch restarts here and the walk behind it reads back down through the
+    # gap, a piece at a time, at the cost of re-reading a year it has already got -- which the
+    # unique index makes free of consequence and which is the cheaper of the two mistakes.
+    def begins(row, from)
+      reached = row[:measures_read_back_to]
+      return from unless reached && row[:synced_at] && from <= row[:synced_at]
+
+      [reached, from].min
+    end
+
+    # :stored only where every piece arrived whole, and :unreachable only where not one of
+    # them was answered at all -- the distinction the whole module turns on, now that a fetch
+    # is several requests. A first piece that answered and a second that did not is a window
+    # with part of it in hand, whatever the counts are: an empty quarter that arrived is an
+    # answer, and a quarter that was refused is not.
+    def outcome(read)
+      return :stored if read.all? { |_, whole| whole }
+      return :unreachable if read.none? { |stored, _| stored }
+
+      :incomplete
+    end
+
+    # Where the resume point stands when the walk is over: this instant if the piece ending
+    # now arrived whole, and otherwise exactly where it was.
+    def resumed(asked, read, row, now)
+      _from, to = asked.first
+      _stored, whole = read.first
+      whole && to == now ? now : row[:synced_at]
+    end
+
+    # Every page of one piece of the window, and whether that really was every page.
+    #
+    # Withings answers a window wider than a page at a time and says so with `more`, handing
+    # back the `offset` to resume from. Reading only the first page would drop the rest of the
+    # piece without saying anything.
     #
     # Nil for the groups only where the *first* page failed, because then there is nothing to
     # be partially right about. A later page failing returns what did arrive and false, and the
-    # caller above is what refuses to call that a complete window.
-    def pages(token, startdate, now)
+    # caller above is what refuses to call that a complete piece.
+    def pages(token, startdate, enddate)
       groups = []
       offset = nil
       MAX_PAGES.times do
-        body = Withings.measures(token, meastypes: MEASTYPES, startdate:, enddate: now, offset:)
+        body = Withings.measures(token, meastypes: MEASTYPES, startdate:, enddate:, offset:)
         return [groups.empty? ? nil : groups, false] unless body
 
         groups.concat(body['measuregrps'] || [])
