@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative '../clock'
+require_relative '../db'
 require_relative '../workouts'
 require_relative '../exercises'
 require_relative '../sets'
@@ -101,6 +102,17 @@ class Tectonic < Roda
 
       def program_lifts
         ProgramLift.where(program_day_id: program_days.select(:id))
+      end
+
+      # The measurements this account's instruments have reported. #519.
+      #
+      # A dataset rather than a model, because 041's table has no model: nothing in the app
+      # has needed to treat a reading as an object, and one row of it is four columns and a
+      # timestamp. The scoping guarantee at the top of this file is what matters here and it
+      # is the same one -- a tool is handed this and has no way to widen it, so another
+      # lifter's bodyweight is unreachable rather than merely unqueried.
+      def health_metrics
+        DB[:health_metrics].where(account_id: @account_id)
       end
 
       # Whether the token carries a given scope; the tool base class checks this before

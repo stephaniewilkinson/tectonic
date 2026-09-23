@@ -265,6 +265,7 @@ tool cheap; see "Adding a tool".
 | Logging training | `create_exercise`, `create_workout`, `update_workout`, `create_set`, `complete_set`, `update_set`, `delete_set`, `rate_workout` |
 | Reading it back | `list_exercises`, `list_workouts`, `get_workout`, `exercise_history` |
 | Aiming at something | `set_goal`, `block_progress` |
+| What the scale said | `health_readings`, `bodyweight_trend`, `body_composition` |
 | Writing a plan | `list_programs`, `get_program`, `create_program`, `add_program_week`, `add_program_day`, `update_program_day`, `add_program_lift`, `update_program_lift`, `delete_program_lift`, `generate_program_week` |
 | The connector contract | `search`, `fetch` (handles are `exercise:`, `workout:`, `program:`) |
 | Who am I | `whoami` |
@@ -276,6 +277,15 @@ half-written. Everything after that is per-object, because revising a plan is: c
 this lift, move that day, add a week like the last one. `generate_program_week` turns a
 written week into real sessions with their warmup ramps, and is idempotent on the
 program day, so running it twice changes nothing.
+
+The three scale tools are read-only and stay that way: a measurement comes from an
+instrument, and the connector's job is to report it honestly rather than to record one.
+Each reports per source and unit and never averages across them — a scale's body-fat
+figure and a caliper's are different measurements wearing one name — and each returns a
+summary with its sample size by default, because a year of readings is hundreds of rows
+that say one thing. Derived figures carry their uncertainty: "27.9%, day-to-day variation
+around ±1.5%" rather than a bare number, so nobody reads a difference the instrument
+cannot resolve as progress. They compute no goal weight, no target rate, and no verdict.
 
 The endpoint is a plain Rack app mounted at `/mcp` in `config.ru`, entirely outside
 Roda's sessions, CSRF, and assets. It uses the `mcp` gem (pinned to `1.2.0`) and is
