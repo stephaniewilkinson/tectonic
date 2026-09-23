@@ -48,6 +48,65 @@
     <%== render('workouts/_session_body') %>
   </div>
 
+  <%# A way to put a lift on this session, which until #578 this screen had nowhere at all.
+
+      The screenshot on that issue is a session reading "0 of 0 sets" offering "finish workout"
+      and "Add a note" and nothing else. The link to /sets/new existed on the record page and
+      on the set list -- both a page away -- so the gym floor screen was built on the
+      assumption that a session already has sets in it, which is true of every session a
+      programme wrote lifts onto and false of every other kind. A programme day with nothing
+      written on it still gets a session generated for it, and `login_destination` lands a
+      lifter on that session's screen the moment they sign in on the day. Empty, it was a
+      screen you could only finish or annotate.
+
+      **Always, rather than only when the session is empty**, and that is the judgement in
+      #578 rather than a failure to notice how spare this screen is.
+
+      A control that appeared on an empty session would be a control that vanished the instant
+      it had been used -- the session is no longer empty, so the door out of it closes behind
+      the first lift, at precisely the moment a lifter who has just written one movement in by
+      hand wants to write the second. It would also be page furniture that comes and goes as
+      the session changes under a poll, which is the thing the RPE footer below is placed the
+      way it is to avoid. The empty session is not a separate case needing a separate control;
+      it is the degenerate end of one need, which is that the session in the app should be able
+      to become the session that is actually happening.
+
+      The panels already answer the smaller half of this: each carries "Add a set" of the
+      movement it is about (#496). What none of them can offer is a movement this session does
+      not have yet, and that is a real decision made on the floor -- the rack is taken, a lift
+      is added on a whim, the day was written empty. Distinct words for the distinct thing: a
+      lift is what a panel is (session_lifts), so "Add a lift" is the one this makes, and #338
+      is the reason the two must not both be called "Add a set" -- a list of this page's
+      controls already reads "Done, button" a dozen times over.
+
+      **Outside #session-body, which is where the care in #578 is owed.** Every Done tap sends
+      back a lift panel and the poll sends back all of them, both into that region; a link
+      rendered in there would be replaced on every tap -- or, where the response does not carry
+      it, quietly removed from the page on the first one. Out here htmx never touches it. That
+      is the same placement, and the same sentence, as the RPE footer, the rest timer, the
+      nudge and the offline banner below.
+
+      In the flow rather than pinned, unlike those four. The foot of this screen already stacks
+      four fixed things that know each other's heights, and a fifth would be either a
+      recalculation of all of them or a control sitting on top of a Done button. Nothing here
+      is worth that: this is read once, at the start of a session or on a whim in the middle of
+      one, and it is never the thing a thumb is aiming at between sets.
+
+      Below the panels and above the note, which is the order the two already argue for. The
+      note's own comment puts it below the panels because the panels are what the screen is
+      for; this belongs above it for the same reason, being an action on the session's contents
+      rather than an annotation about them.
+
+      `return_to=session` is the other half of not being a dead end. The form redirects to the
+      set it has just written, whose only way onwards is the record page, which is two taps
+      from the session somebody is standing in the middle of -- so reached from here it comes
+      back here instead. A fixed word rather than a path, so that nothing a request says can
+      decide where a redirect goes. %>
+  <a href="/workouts/<%= @workout[:id] %>/sets/new?return_to=session"
+     class="<%= button_style %> mt-4 flex min-h-11 w-full items-center justify-center border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50">
+    Add a lift
+  </a>
+
   <%# Below the session rather than above it, and outside #session-body. #452.
 
       Outside because #session-body is replaced on every Done tap and every fifteen-second

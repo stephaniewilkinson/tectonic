@@ -47,6 +47,31 @@
 <%- session_lifts.each_with_index do |lift, position| %>
   <%== render('workouts/_lift_panel', locals: { lift:, position: }) %>
 <%- end %>
+<%# Why the screen is empty, in one sentence. #578.
+
+    "0 of 0 sets" above is true and reads as a page that has not finished loading. The lifter
+    on that issue had no way to tell a session with nothing written for it from a session whose
+    panels had failed to arrive -- which on a screen that polls every fifteen seconds and is
+    used on gym signal is not a paranoid reading, it is the likelier one.
+
+    It says nothing has been written, and stops there. Saying *why* nothing has been written --
+    "your programme has no lifts on this day" -- would need a query into program_lifts to tell
+    an empty programme day from a session made by hand or lifted down to nothing, and
+    spec/query_count_spec.rb holds this page to ten. It would also be a guess: a programme day
+    that does have lifts, on a session somebody emptied, would be told a confident lie. What is
+    true in every case is the sentence, and beneath it the control that ends it.
+
+    Inside #lift-panels rather than beside it, which is the one placement that keeps it honest.
+    The poll replaces this element's innerHTML whenever the session changes, so a set written
+    from another tab or by an assistant arrives as a panel *in place of* this sentence. Outside
+    it, the panel would come back and the sentence would stay, leaving the screen claiming
+    nothing is written directly above the lift that is.
+
+    w-full because this is a flex item in the panel scroller, which would otherwise size it to
+    its text and leave the paragraph hanging in the middle of the column. %>
+<%- if session_lifts.empty? %>
+  <p class="mt-6 w-full text-sm text-gray-500">Nothing is written for this session.</p>
+<%- end %>
 </div>
 
 <%# No copy of the rating scale here, and now for a second reason on top of the first.
