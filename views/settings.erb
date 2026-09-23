@@ -351,6 +351,127 @@
       <p class="mt-2 text-xs text-gray-500">
         Disconnecting stops the app asking for more. Measurements already read stay where they are.
       </p>
+      <%# Importing the history a lifter already has, one year per press. #558.
+
+          Until this, the forward flow was the only half of the matching anybody could reach:
+          finish a session, close it in Withings, open the record, answer the question. Every
+          session logged before today could only get a proposal from `rake withings:backfill`,
+          which is a shell with the production database in reach -- so a lifter could not
+          import their own history at all, which is the one thing a history import is for.
+
+          **A year per press, and the boundedness is the feature.** The reason the whole walk
+          is a rake task is that `Withings::TIMEOUT` is ten seconds a call and a decade is a
+          hundred calls; one year is one call in the ordinary case, which is the same request
+          the record page has made on every view of a fresh session since #520. So the press
+          costs what a page view costs, and the years before it wait for the next press rather
+          than for a background worker -- which would be a second paid service on Render, the
+          infrastructure #458 declined and #518 declined again.
+
+          **It says what it will do before it is pressed**, which is the whole reason the
+          button carries a year rather than the word "Import". A control that silently spends
+          a minute talking to somebody else's server, on a phone, with nothing moving, is
+          indistinguishable from one that has crashed -- and a lifter who presses it twice has
+          made two years' worth of requests to a provider whose rate limit is the one failure
+          this app cannot see coming.
+
+          The three states below are three because they are different facts, not three
+          renderings of one. Nothing logged here is a reason there is nothing to import;
+          everything imported is a reason to stop pressing; and a year waiting is an offer. %>
+      <%- if @withings[:state] == :live %>
+        <%# What the last press did, in the four numbers `report_backfill` prints, plus the
+            two it cannot: which year this was, and whether there is another.
+
+            **A press Withings refused is not a press that found nothing.** Withings signal
+            rate limiting as status 601 inside an ordinary HTTP 200, and `Withings.workouts`
+            answers nil for a year it could not read -- so a throttled year arrives here
+            looking exactly like a quiet one. Rendering it as a tidy row of zeroes would tell
+            a lifter that 2021 held no training and send them on to 2020, and the year they
+            were actually refused would never be asked for again. It gets its own colour, its
+            own sentence, and the same year stays on the button. %>
+        <%- if @withings_imported %>
+          <%- if @withings_imported['state'] == 'refused' %>
+            <p role="status" class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm
+                                    text-gray-700">
+              Withings did not answer for <%= @withings_imported['year'] %>, so nothing was imported and
+              nothing about that year has been decided. That is usually their rate limit, which
+              looks like an ordinary answer from here. Wait a few minutes and press again &mdash;
+              it will ask for the same year.
+            </p>
+          <%- elsif @withings_imported['state'] == 'imported' %>
+            <p role="status" class="mt-4 rounded-md border border-sky-800 bg-sky-50 px-3 py-2 text-sm
+                                    text-gray-700">
+              <%= @withings_imported['year'] %>: <%= @withings_imported['found'] %>
+              activit<%= @withings_imported['found'] == 1 ? 'y' : 'ies' %> from your watch.
+              <%# The pairing failed rather than found nothing, which #555 can still cause: a
+                  proposal left on a session that was matched to something else collides with
+                  the unique index the next time a different activity is picked for it. The
+                  activities are stored and the year is done; what could not be finished is
+                  the matching, and saying so is the difference between a bug and a lie. %>
+              <%- if @withings_imported['pairing'] == 'stalled' %>
+                They are saved, but the matching could not be finished &mdash; a proposal from an
+                earlier run is stuck on a session that has since been answered elsewhere. Nothing
+                was lost; answering what is already waiting below usually clears it.
+              <%- else %>
+                <%= @withings_imported['proposed'] %>
+                new proposal<%= 's' unless @withings_imported['proposed'] == 1 %> to answer.
+                <%- if @withings_imported['already_waiting'].to_i.positive? %>
+                  <%= @withings_imported['already_waiting'] %>
+                  session<%= 's' unless @withings_imported['already_waiting'] == 1 %> already had one and
+                  <%= @withings_imported['already_waiting'] == 1 ? 'was' : 'were' %> left alone.
+                <%- end %>
+                <%# These last two count the whole account rather than this year, and the
+                    sentence says so rather than letting a lifter assume otherwise. `pair`
+                    offers every stored activity to every session each time it runs -- which
+                    is what makes a second press a no-op rather than a second queue -- so the
+                    sessions with nothing include every year nobody has fetched yet. A lifter
+                    four presses in would otherwise read "31 sessions have nothing" as a
+                    verdict on 2022, when most of those 31 are simply years away from having
+                    been asked about. %>
+                <%= @withings_imported['without_activity'] %>
+                session<%= 's' unless @withings_imported['without_activity'] == 1 %> logged here still
+                <%= @withings_imported['without_activity'] == 1 ? 'has' : 'have' %> no activity from your watch,
+                counting the years you have not imported yet.
+                <%= @withings_imported['activities_without_session'] %>
+                activit<%= @withings_imported['activities_without_session'] == 1 ? 'y' : 'ies' %> your watch
+                recorded match no session logged here.
+              <%- end %>
+              <%# Whether to press again, and whether to stop, which are two different sentences
+                  and a lifter needs both. A page that only ever said "there is more" would
+                  never tell anybody they had finished. %>
+              <%- if @withings_imported['more'] %>
+                There is more history to fetch &mdash; <%= @withings_imported['more'] %> and earlier.
+              <%- else %>
+                That was the last year; your history is fully imported.
+              <%- end %>
+            </p>
+          <%- end %>
+        <%- end %>
+        <p class="mt-4 text-sm text-gray-700">
+          <%- if @withings_import[:state] == :no_sessions %>
+            Nothing has been logged here yet, so there is nothing for your watch&rsquo;s history to
+            be matched against. Log a session and this will offer to import the years around it.
+          <%- elsif @withings_import[:state] == :nothing_left %>
+            Your history has been imported back to <%= @withings_import[:earliest] %>, the year of your
+            earliest logged set. There is nothing older to fetch, and sessions you finish from
+            now on are matched on their own record.
+          <%- else %>
+            <strong class="font-semibold">Import your history one year at a time.</strong>
+            Pressing this reads <%= @withings_import[:year] %> from Withings and offers what it finds to
+            the sessions you logged that year; the years before it wait for the next press.
+            <%= @withings_import[:years_left] %> year<%= 's' unless @withings_import[:years_left] == 1 %> to go,
+            back to <%= @withings_import[:earliest] %>. It usually takes a second or two, and longer for
+            a year you trained a lot in &mdash; the page will wait for it.
+          <%- end %>
+        </p>
+        <%- if @withings_import[:state] == :ready %>
+          <form method="post" action="/settings/withings/import" class="mt-3">
+            <%== csrf_tag('/settings/withings/import') %>
+            <button type="submit"
+                    class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                           text-gray-900 hover:bg-lime-600">Import <%= @withings_import[:year] %></button>
+          </form>
+        <%- end %>
+      <%- end %>
       <%# The review list's permanent address. #534.
 
           /workouts/withings had nothing at all pointing at it: a lifter who ran the backfill,

@@ -21,9 +21,19 @@ Metrics/ClassLength:
 # about how a lift may be written are long, and splitting it to satisfy a line count would
 # put related rules in two files, which is the thing it exists to prevent. Same reasoning as
 # ClassLength above, applied to the one module it matters for.
+# WithingsBackfill is the second, and it is long for the same kind of reason: it is the one
+# walk over a lifter's Withings history, and both the things that drive it -- the rake task
+# that reads a decade and the settings button that reads a year (#558) -- go through the same
+# fetch, the same storage and the same pairing. Splitting it to satisfy a line count would put
+# "which years to ask for" in one file and "what to do with a year that did not answer" in
+# another, and the second walker is precisely how the `more` bug in #553 came about: one
+# caller learned that Withings can answer `more: 0` and the other did not. The module is also
+# most of comment by volume, because the provider's behaviour is not guessable from its
+# documentation and every trap in it has been paid for once already.
 Metrics/ModuleLength:
   Exclude:
     - "lib/tectonic/mcp/tools/program_writer.rb"
+    - "lib/tectonic/withings_backfill.rb"
 
 AllCops:
   NewCops: enable

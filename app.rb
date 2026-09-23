@@ -35,10 +35,18 @@ require_relative 'lib/tectonic/withings'
 require_relative 'lib/tectonic/withings_connection'
 require_relative 'lib/tectonic/withings_measures'
 require_relative 'lib/tectonic/withings_workouts'
-# The proposals a backfill left, which this app reads and never makes: `withings:backfill`
-# is a rake task precisely because walking years of history ten seconds a call is not
-# something to do inside a Puma thread. Nothing here requires that module.
+# The proposals a backfill left, which this app reads. #534.
 require_relative 'lib/tectonic/withings_proposals'
+# And the walk that makes them, which this app now reaches in one place and one shape only:
+# `WithingsBackfill.slice`, one year per press, from the settings page. #558.
+#
+# The old note here said nothing in the app required this module, and the reason it gave
+# still holds for everything but the slice: walking years of history at ten seconds a call
+# is not something to do inside a Puma thread, so `run` -- the whole-history walk the rake
+# task drives -- is still unreachable from a request and must stay that way. What changed is
+# that "a decade in one request" and "one year in one request" were being treated as the
+# same objection, and only the first of them is true. See the module's own notes.
+require_relative 'lib/tectonic/withings_backfill'
 require_relative 'lib/tectonic/progress_chart'
 require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
@@ -552,6 +560,52 @@ class Tectonic < Roda
         r.redirect Withings.authorize_url(withings_redirect_uri, state)
       end
 
+      # Importing one year of history, which is the whole of #558. A press, a year, a report.
+      #
+      # ## Why this may sit on the request path at all
+      #
+      # Everything about this integration that says "not in a Puma thread" is an argument
+      # about a *decade*: `Withings::TIMEOUT` is ten seconds a call, and a walk from today
+      # back to a lifter's first session is a hundred of them with pauses in between. One
+      # year is one call in the ordinary case -- `Withings.workouts` follows `more`/`offset`
+      # within the year, and a year of lifting is one page -- so the request this makes is
+      # the same shape as the one the record page has made on every view of a fresh session
+      # since #520. What is bounded is not the wait but the work: the year is fetched, stored,
+      # paired and reported, and the years before it are left for the next press.
+      #
+      # The budget it is bounded against is `RACK_TIMEOUT_SERVICE_TIMEOUT`, twenty seconds,
+      # which config.ru puts around every request in this app. A year is one page for any
+      # plausible amount of training and `Withings.workouts` sleeps a second between pages, so
+      # an ordinary press is a second or two and a year busy enough to page a dozen times is
+      # the only thing that could reach the ceiling. If it ever does, the failure is the safe
+      # one by construction: the store happens after the whole year has answered, so a press
+      # cut off mid-walk has written nothing and moved no cursor, and the same press can
+      # simply be made again. The alternative -- dropping the pause to fit more pages in --
+      # trades a slow press for status 601, which is the one failure this app cannot see.
+      #
+      # The two alternatives #558 lists were both refused here. A guarded background thread
+      # is real concurrency in a process that has none, and the failure it introduces -- a
+      # deploy killing a run mid-walk -- is invisible from the page that started it. A slice
+      # on an arbitrary page view is smaller still and makes somebody's workouts list pay for
+      # a decade they did not ask to import, silently, with no way to tell a slow page from a
+      # slow phone. A press is the one shape where the person waiting is the person who asked.
+      #
+      # ## Post, redirect, get, and the report carried across it
+      #
+      # The same shape as every other save on this page, so a reload cannot re-import a year.
+      # The report rides in the session the way the connect/disconnect notice does -- there is
+      # no flash here but Rodauth's -- and it is written with string keys on purpose: the
+      # session's serializer is JSON, so symbols go in and strings come out, and a view
+      # comparing `report[:state]` against a symbol would silently render nothing at all.
+      r.post 'withings/import' do
+        check_csrf!
+        session['withings.import'] = carried(WithingsBackfill.slice(account_id: @account_id))
+        # To the section, not the top of the page: what the lifter is waiting to read is the
+        # report next to the button they pressed. #529's argument for the four saves, and the
+        # opposite of the disconnect below, whose whole news is the notice at the top.
+        r.redirect '/settings#wearables'
+      end
+
       # Disconnecting forgets the tokens and keeps the measurements: they are a record of what
       # the lifter weighed, which stays true whether or not the app may still ask for more.
       r.post 'withings/disconnect' do
@@ -666,6 +720,22 @@ class Tectonic < Roda
         # Withings on this page beyond how to start, and should not pay a query to be told
         # nothing.
         @withings_waiting = WithingsProposals.waiting_count(@account_id) unless @withings[:state] == :absent
+        # What a press of Import would read next, and what the last press found. #558.
+        #
+        # Asked before the button is drawn rather than after it is pressed, because a control
+        # that spends a minute talking to somebody else's server has to say what it is going
+        # to do first: "Import" that silently reads a year is worse than a sentence naming the
+        # year. Two reads of one connection row and one aggregate over the lifter's sets,
+        # which is what it costs to be able to say "2023 next, four years to go".
+        #
+        # Paid only where the control will render, which is where the connection is live: a
+        # permission that has expired has a Reconnect in front of it and nothing to import
+        # through until somebody uses it, and an account with no connection at all is told how
+        # to start and nothing else.
+        @withings_import = WithingsBackfill.pending(@account_id) if @withings[:state] == :live
+        # Taken out of the session as it is read, the same as the notice below, so a reload
+        # does not re-announce a year imported ten minutes ago as though it had just happened.
+        @withings_imported = session.delete('withings.import')
         # And how many assistants this account has let in, for the AI agents section. #529.
         #
         # The section is a signpost to /connections rather than a second copy of it, so this is
@@ -2294,6 +2364,22 @@ class Tectonic < Roda
   # otherwise ask Withings to redirect somewhere the registration does not list. #472.
   def withings_redirect_uri
     "#{MCP::Config.public_base_url}/withings/callback"
+  end
+
+  # An import report, in the shape that survives the round trip through the session. #558.
+  #
+  # The session's serializer is JSON, so a hash of symbols goes in and a hash of strings
+  # comes out -- `{ state: :refused }` is read back as `{ 'state' => 'refused' }`. A view
+  # written against the symbols would compare a string to a symbol, find nothing equal, and
+  # render the branch for a state that never happened: no error, no missing page, just a
+  # press that says nothing. So the conversion happens here, once, where the report is
+  # written, rather than being a rule every reader has to remember.
+  #
+  # Nils are dropped: `more` is nil when there is no more history to fetch, and a key whose
+  # value is nil is the same to the view as a key that is absent, while carrying it costs a
+  # cookie four bytes it has no use for.
+  def carried(report)
+    report.compact.to_h { |key, value| [key.to_s, value.is_a?(Symbol) ? value.to_s : value] }
   end
 
   # Back to settings with something to say. The callback has four outcomes a lifter can tell
