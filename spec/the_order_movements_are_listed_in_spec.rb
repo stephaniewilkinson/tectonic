@@ -22,9 +22,9 @@ Tectonic::Exercise.load_library
 module MovementOrder
   # The account's own movements, deliberately not in alphabetical order as they go in --
   # otherwise insertion order and name order agree and the spec asks nothing. `incline curl`
-  # is lower case on purpose: this database is built with the C collation, which sorts every
-  # capital ahead of every lower-case letter, so a name typed the way a lifter types one is
-  # what tells an ordering that folds case from one that does not.
+  # is lower case on purpose: the order sorts under `COLLATE "C"`, which files every capital
+  # ahead of every lower-case letter, so a name typed the way a lifter types one is what tells
+  # an ordering that folds case from one that does not.
   TYPED_IN = ['Zercher Curl', 'Machine Row', 'incline curl', 'Cable Fly'].freeze
   BY_NAME = ['Cable Fly', 'incline curl', 'Machine Row', 'Zercher Curl'].freeze
 
@@ -80,6 +80,12 @@ describe 'the order the movement picker offers movements in' do
   # written in. That order groups squats with squats and presses with presses, which is real,
   # but nothing on screen draws it -- the picker renders one flat group of fifty-four under
   # one heading -- so it is an order only the source file can see.
+  #
+  # Ruby's own sort is the expectation, which is a stronger claim than it looks: String#<=>
+  # compares bytes, and it can only agree with what Postgres did if the query named a
+  # collation instead of inheriting the cluster's. This spec passed on a C-locale laptop and
+  # failed on an en_US.UTF-8 CI runner -- `Zercher Squat` above `Z Press` -- which is how the
+  # `COLLATE "C"` in library_first_by_name came to be there.
   it 'sorts the library by name too' do
     library = options_in(set_form, 'Library')
 

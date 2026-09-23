@@ -84,14 +84,28 @@ class Tectonic < Roda
       # ideas of which row that is. Postgres sorts false before true, so `account_id IS NOT
       # NULL` puts the library on top.
       #
-      # Folded to lower case because a Postgres database built with the C collation sorts every
-      # capital ahead of every lower-case letter, and the names in this table are typed by
-      # hand: a lifter whose own `cable fly` is filed below `Zercher Squat` has been handed
-      # back the same unreadable list this exists to fix. The id breaks a tie between two rows
-      # folding to one name, so the list cannot reshuffle itself between two page views.
+      # Folded to lower case because a database built with the C collation sorts every capital
+      # ahead of every lower-case letter, and the names in this table are typed by hand: a
+      # lifter whose own `cable fly` is filed below `Zercher Squat` has been handed back the
+      # same unreadable list this exists to fix.
+      #
+      # **And the collation is named rather than inherited, which CI had to teach me.** What
+      # "alphabetical" means to Postgres is a property of the cluster the database was created
+      # on: this laptop's is C, so it sorts by byte and puts `Z Press` above `Zercher Squat`,
+      # while the Actions runner's is en_US.UTF-8, which weighs the space below the letters and
+      # puts them the other way up. Same code, same rows, two different lists -- which is
+      # precisely the unpredictable order this whole change is against, one level down. `COLLATE
+      # "C"` over a folded name is the one rule every Postgres agrees on, so the list a lifter
+      # reads is the list the specs assert and neither depends on how somebody ran initdb. The
+      # price is that a name with an accent in it sorts after the plain ASCII ones; the movement
+      # list is English barbell names, and a locale that reshuffles under a database restore is
+      # the worse of the two.
+      #
+      # The id breaks a tie between two rows folding to one name, so the list cannot reshuffle
+      # itself between two page views.
       def library_first_by_name
         order(Sequel.~(Sequel[:exercises][:account_id] => nil),
-              Sequel.function(:lower, Sequel[:exercises][:name]),
+              Sequel.lit('lower(exercises.name) COLLATE "C"'),
               Sequel[:exercises][:id])
       end
     end
