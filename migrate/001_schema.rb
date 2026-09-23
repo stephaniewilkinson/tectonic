@@ -12,6 +12,13 @@
 # today. They use CURRENT_TIMESTAMP here, which is what the declaration was reaching for
 # and what makes this file produce the same schema everywhere.
 #
+# That correction reached every database built from this file and no database that predates
+# it, because a database already carrying this schema is stamped at this version rather than
+# rebuilt from it -- so production kept its frozen defaults for three more years. 048 is the
+# migration that finally carries the fix to them, and drops both `created_on` columns on the
+# way: a schema correction living only in a squashed baseline reaches nothing that predates
+# the squash. This file is left exactly as it was, since it has run everywhere it is going to.
+#
 # The tables are grouped only to keep each definition readable; they run in the order
 # called below, which is the order the foreign keys require.
 # The optional metadata dynamic client registration (RFC 7591) records, all free-form

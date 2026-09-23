@@ -33,7 +33,7 @@ module TwoADay
   def login
     email = "#{SecureRandom.hex}@example.com"
     password = 'pw12345678'
-    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password), created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
     get '/login'
     post '/login', { login: email, password:, '_csrf' => last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1] }
     @account_id = DB[:accounts].where(email:).get(:id)
@@ -279,7 +279,7 @@ describe 'what the two generated sessions carry' do
   it 'differs in nothing a lifter can see' do
     sessions = Tectonic::ProgramGenerator.new(two_day_program).generate(1).sort_by(&:id)
     first, second = sessions
-    ignored = %i[id program_day_id created_on created_at]
+    ignored = %i[id program_day_id created_at]
 
     assert_equal %w[Squat Walk], sessions.map { |session| session.program_day.focus }.sort
     assert_equal first.values.except(*ignored), second.values.except(*ignored)

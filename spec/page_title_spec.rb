@@ -24,7 +24,7 @@ module PageTitle
 
   def sign_in
     email = "#{SecureRandom.hex}@example.com"
-    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create('pw12345678'), created_on: Time.now)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create('pw12345678'))
     get '/login'
     post '/login', { login: email, password: 'pw12345678',
                      '_csrf' => last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1] }

@@ -444,8 +444,15 @@
               <%- end %>
               <%# Whether to press again, and whether to stop, which are two different sentences
                   and a lifter needs both. A page that only ever said "there is more" would
-                  never tell anybody they had finished. %>
-              <%- if @withings_imported['more'] %>
+                  never tell anybody they had finished.
+
+                  And which direction the next press goes, which is #566. "2024 and earlier"
+                  is true of a walk working backwards and false of a press filling the years
+                  since an old course of presses stopped -- there everything earlier is already
+                  read, and the work left is above what was read rather than below it. %>
+              <%- if @withings_imported['more'] && @withings_imported['catching_up'] %>
+                More recent years have still not been read &mdash; <%= @withings_imported['more'] %> is next.
+              <%- elsif @withings_imported['more'] %>
                 There is more history to fetch &mdash; <%= @withings_imported['more'] %> and earlier.
               <%- else %>
                 That was the last year; your history is fully imported.
@@ -453,21 +460,52 @@
             </p>
           <%- end %>
         <%- end %>
+        <%# The offer, and since #566 it has to be able to describe a hole as well as a run.
+            The read history is two numbers now -- the oldest year read and the newest -- and
+            the years still to read are the two gaps either side of them.
+
+            The old sentence assumed one unbroken run backwards and so could only ever count
+            downwards: "3 years to go, back to 2024". A lifter who pressed Import through 2023,
+            reached 2019 and came back in 2026 had read 2019 to 2023 and nothing since, and
+            there was no sentence on this page that could say so -- which is exactly why the
+            page said their history was complete instead. So the unread years above what has
+            been read get named outright, and the count points forwards when everything older
+            is already done, because "back to" is the wrong direction for work that runs the
+            other way. %>
         <p class="mt-4 text-sm text-gray-700">
           <%- if @withings_import[:state] == :no_sessions %>
             Nothing has been logged here yet, so there is nothing for your watch&rsquo;s history to
             be matched against. Log a session and this will offer to import the years around it.
           <%- elsif @withings_import[:state] == :nothing_left %>
             Your history has been imported back to <%= @withings_import[:earliest] %>, the year of your
-            earliest logged set. There is nothing older to fetch, and sessions you finish from
-            now on are matched on their own record.
+            earliest logged set, and forward to this year. There is nothing left to fetch, and
+            sessions you finish from now on are matched on their own record.
           <%- else %>
             <strong class="font-semibold">Import your history one year at a time.</strong>
+            <%- if @withings_import[:unread_from] %>
+              <%- if @withings_import[:imported_from] == @withings_import[:imported_to] %>
+                Imported so far: <%= @withings_import[:imported_to] %>.
+              <%- else %>
+                Imported so far: <%= @withings_import[:imported_from] %> through <%= @withings_import[:imported_to] %>.
+              <%- end %>
+              <%- if @withings_import[:unread_from] == @withings_import[:unread_to] %>
+                <%= @withings_import[:unread_to] %> has not been read.
+              <%- elsif @withings_import[:unread_to] == @withings_import[:unread_from] + 1 %>
+                <%= @withings_import[:unread_from] %> and <%= @withings_import[:unread_to] %> have not been read.
+              <%- else %>
+                <%= @withings_import[:unread_from] %> to <%= @withings_import[:unread_to] %> have not been read.
+              <%- end %>
+            <%- end %>
             Pressing this reads <%= @withings_import[:year] %> from Withings and offers what it finds to
-            the sessions you logged that year; the years before it wait for the next press.
+            the sessions you logged that year; the rest wait for the next press.
             <%= @withings_import[:years_left] %> year<%= 's' unless @withings_import[:years_left] == 1 %> to go,
-            back to <%= @withings_import[:earliest] %>. It usually takes a second or two, and longer for
-            a year you trained a lot in &mdash; the page will wait for it.
+            <%- if @withings_import[:older_left].positive? %>
+              back to <%= @withings_import[:earliest] %>.
+            <%- else %>
+              up to this year.
+            <%- end %>
+            It usually takes a second or two, and longer for a year you trained a lot in &mdash;
+            the page will wait for it.
           <%- end %>
         </p>
         <%- if @withings_import[:state] == :ready %>
