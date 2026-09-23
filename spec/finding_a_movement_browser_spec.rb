@@ -39,8 +39,9 @@ module FindingAMovement
     DB[:accounts].where(email:).get(:id)
   end
 
-  # The account's own movements, in the order the route reads them (`order(:id)`), so the
-  # first of them is what an untouched new-set form posts.
+  # The account's own movements. Which of them leads is decided by the order the route reads
+  # in (#551) and by the library sitting above them, so what an untouched form posts is asked
+  # of the model in `first_movement` rather than assumed to be either of these two.
   def a_workout_to_log(account_id)
     @own = { OWN_ROW => DB[:exercises].insert(name: OWN_ROW, account_id:),
              'Cable Fly' => DB[:exercises].insert(name: 'Cable Fly', account_id:) }
@@ -54,9 +55,10 @@ module FindingAMovement
     @workout_id
   end
 
-  # A set already logged against Cable Fly -- second of the account's own movements and not
-  # the first option of anything, so a picker that forgot its selection shows up as a move
-  # rather than as a coincidence.
+  # A set already logged against Cable Fly, which is not the first movement the picker offers
+  # -- the library group is drawn above the account's own and this file seeds it -- so a picker
+  # that forgot its selection shows up as a move rather than as a coincidence. The describe
+  # that leans on that says so out loud rather than trusting this sentence.
   def a_set_to_edit
     account_id = a_lifter
     @workout_id = a_workout_to_log(account_id)
@@ -82,6 +84,13 @@ module FindingAMovement
 
   def headings = all('#exercise-listbox [role="presentation"] > span').map(&:text)
 
+  # One offered movement as the pair a spec can still read after the list has closed over it:
+  # a Selenium element reports no text while it is hidden, and choosing a movement hides it.
+  def offered_row(index)
+    row = all('#exercise-listbox [role="option"]')[index]
+    [row.text, row['data-exercise-id']]
+  end
+
   # What the form will actually post, which is the select and never the search box.
   def submitted_exercise_id = page.evaluate_script("document.getElementById('exercise_id').value")
 
@@ -92,7 +101,7 @@ module FindingAMovement
   # changed the order the movements are read in, and then agree with nothing.
   def first_movement
     account_id = DB[:workouts].where(id: @workout_id).get(:account_id)
-    Tectonic::Exercise.visible_to(account_id).order(:id).first.id
+    Tectonic::Exercise.visible_to(account_id).library_first_by_name.first.id
   end
 end
 
@@ -218,13 +227,23 @@ describe 'picking a movement from the keyboard' do
   end
 
   # And the arrows walk on from there.
+  #
+  # Which movement that lands on is read off the list rather than named here. It used to be
+  # named -- 'Pendlay Row', the second of four library rows in insertion order -- and #551
+  # sorting the list alphabetically made it 'Landmine Row', which is a fact about the order
+  # and not about the arrow key this spec is here for. Written down, the name would have to
+  # be rewritten by hand every time the order moved; read off the page, the claim is the one
+  # actually being made: one press of Down goes to whatever the list is showing second, and
+  # the select underneath follows it. The order itself is pinned in
+  # spec/the_order_movements_are_listed_in_spec.rb, which is where an argument about it
+  # belongs.
   it 'walks past it with the arrows' do
     type 'row'
+    second_name, second_id = offered_row(1)
     search_box.send_keys(:arrow_down, :enter)
 
-    assert_equal 'Pendlay Row', search_box.value
-    assert_equal DB[:exercises].where(account_id: nil, name: 'Pendlay Row').get(:id).to_s,
-                 submitted_exercise_id
+    assert_equal second_name, search_box.value
+    assert_equal second_id, submitted_exercise_id
   end
 
   # Nothing matching means nothing to commit, so Enter closes rather than doing nothing at
@@ -285,7 +304,14 @@ describe 'the edit form opening on the movement the set is on' do
 
   # The case nobody thinks to test and everybody does: a lifter here to fix a weight, who
   # never touches the picker at all. The set must not move.
+  #
+  # The refute is the premise rather than the point, and it is here because without it this
+  # spec would pass on a picker that had forgotten its selection entirely: a form that posts
+  # its first movement is indistinguishable from one that posts the right one, on a set that
+  # happens to be on the first movement. sets_spec makes the same argument at length.
   it 'saves the set on the same movement when the picker is never touched' do
+    refute_equal first_movement, @own['Cable Fly']
+
     fill_in 'weight', with: '45'
     click_button 'Save'
 

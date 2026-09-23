@@ -1041,7 +1041,12 @@ class Tectonic < Roda
         end
       end
       r.get do
-        @exercises = Exercise.visible_to(@account_id).order(:id)
+        # The same order the set form's picker is in, and for the same reason (#551): this is
+        # the other screen that is a list of every movement, and a table somebody scrolls to
+        # find `Overhead Press` in is no better served by insertion order than a menu is. The
+        # Source column is where the library/own split shows here, which is what makes the
+        # library sitting above the account's own readable rather than arbitrary.
+        @exercises = Exercise.visible_to(@account_id).library_first_by_name
         # The stated maxes, in one query rather than one per row. #411 keeps the training
         # maxes visible when the programme screens go, on the grounds that "squat at 80%" is
         # only meaningful beside "squat max 191, set 31 Aug" -- and this is the page every
@@ -1099,7 +1104,10 @@ class Tectonic < Roda
         end
 
         r.on 'sets' do
-          @exercises = Exercise.visible_to(@account_id).order(:id)
+          # The list the picker is built out of, in the order #551 argues for on the model.
+          # Worth knowing at this call site: the first row is what an untouched new-set form
+          # posts, so this line chooses the default as well as the order.
+          @exercises = Exercise.visible_to(@account_id).library_first_by_name
           r.get('new') { view('sets/new') }
 
           # The movement has to be one this account may select. The barbell flag was
@@ -1448,7 +1456,13 @@ class Tectonic < Roda
           # always done for the same reason.
           @sets = WorkoutSet.where(workout_id:).order(:id).all
           @lifts = @sets.group_by { |set| set[:exercise_id] }
-          @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+          # Ordered before it is keyed, because a Ruby hash keeps the order it was filled in
+          # and the panel's "lifted a different movement" menu is drawn by walking these
+          # values. It is the fourth list of movements a lifter picks from and the one they
+          # are holding mid-session, so leaving it in insertion order while the set forms went
+          # alphabetical (#551) would be the same complaint on the screen it matters most on.
+          # An ORDER BY over eighty-odd rows costs nothing the page can measure.
+          @exercises = Exercise.visible_to(@account_id).library_first_by_name.as_hash(:id)
           # How long it took, off the rows already loaded (#281). No query of its own: the
           # stamps are columns on the sets this page has just fetched, which is the whole
           # reason the timing lives on the set rather than in a table beside it.
@@ -2163,7 +2177,9 @@ class Tectonic < Roda
 
   def load_session(workout_id)
     @sets = WorkoutSet.where(workout_id:).order(:id).all
-    @exercises = Exercise.visible_to(@account_id).as_hash(:id)
+    # Ordered for the same reason the route above orders it: the swap menu in each panel is
+    # this hash walked in order, and #551 is about which order that is.
+    @exercises = Exercise.visible_to(@account_id).library_first_by_name.as_hash(:id)
     # The rests this lifter has named, in one query beside the movements, on the same argument
     # #234 makes for loading those once: a set row asks for its rest and a session has a dozen
     # of them. Keyed by movement, which is what movement_rest reads (#456, 039).
