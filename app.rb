@@ -1418,27 +1418,55 @@ class Tectonic < Roda
     end
   end
 
-  # Where a login lands, in the order a lifter would ask for it: a session written for
-  # today, failing that the form for writing one, failing that the first-run page.
+  # Where a login lands, in the order a lifter would ask for it: a session written for today
+  # and not yet finished, failing that the record of the one that was, failing that the form
+  # for writing one, failing that the first-run page.
   #
-  # Today's session opens on the gym floor screen rather than on the record page. Someone
-  # opening the app on a day they have training written is about to lift, and the session
-  # screen is the one that ticks a set off with a thumb; the record page reads a session
-  # back afterwards and is a tap away from the session anyway. A session already finished
-  # is not treated as a different case: "fully completed" is a guess about intent -- a set
-  # can still be added, corrected or rated, and all three happen on that same screen --
-  # and second-guessing it would mean asking the sets table on every login to arrive
-  # somewhere a lifter can reach in one tap regardless.
+  # A session still to do opens on the gym floor screen rather than on the record page.
+  # Someone opening the app on a day they have training written is about to lift, and the
+  # session screen is the one that ticks a set off with a thumb; the record page reads a
+  # session back afterwards and is a tap away from the session anyway. That argument covers
+  # a session nobody has started and a session halfway through alike, which is why neither
+  # is asked anything further here: a plan written for this evening and a session with four
+  # of ten sets ticked are both somebody about to lift.
   #
-  # `date` is a timestamp, so the day is compared on the cast the way Calendar.by_day
-  # does. An equality against a Time would match nothing but a session written at exactly
-  # midnight. Two sessions may share a day and nothing forbids it, so the lowest id wins:
-  # the one written first.
+  # A session the lifter has *finished* is the one case it does not cover, and #523 is what
+  # that cost. Train in the morning, tap finish, come back at nine at night, and the app put
+  # you back on the gym floor -- where the nudge, finding a session that last moved eleven
+  # hours ago, asks whether you are still training. Every login, for the rest of the day.
+  # That bar is silenced in `quiet_cue` below, which is the half that put the words on the
+  # screen; this is the half that took you to the screen, and it is wrong on its own terms
+  # too -- a page whose whole job is ticking sets off with a thumb is the wrong answer to
+  # "show me the day I have already trained".
   #
-  # Two queries rather than one. One could answer both by ordering on "is this dated
-  # today", but no index covers that expression, so it would sort every workout the
-  # account owns; these are both a LIMIT 1 lookup and the second only runs on the days
-  # the first finds nothing.
+  # This used to say that a finished session "is not treated as a different case", because
+  # "fully completed" is a guess about intent -- a set can still be added, corrected or
+  # rated -- and answering it would mean asking the sets table on every login. Both halves
+  # of that are still true and neither is what is asked here. `finished_at` is not a count
+  # of ticked sets; it is the lifter saying they were done, through the control at the top
+  # of the session screen (#218), through the nudge, or through SessionClose.sweep on the
+  # line above -- which has already backfilled the sessions they walked away from by the
+  # time this line chooses. It is a column on a row already in hand, so nothing is being
+  # second-guessed and no second table is being asked. And the record page is still one tap
+  # from the session screen, so adding, correcting or rating a set afterwards costs exactly
+  # the tap the old note was protecting.
+  #
+  # Two sessions may share a day and nothing forbids it, so an unfinished one wins over a
+  # finished one whatever their ids: a lifter who trained this morning and has an evening
+  # session written is coming back for the evening session, not for the morning's record.
+  # Where two are unfinished the lowest id wins, the one written first, which is the order
+  # a day is written in. Where every one is finished the last to be finished wins -- the
+  # session they have just come out of, rather than whichever was typed first.
+  #
+  # `date` is a timestamp, so the day is compared on the cast the way Calendar.by_day does.
+  # An equality against a Time would match nothing but a session written at exactly midnight.
+  #
+  # The day's sessions are fetched rather than picked by a LIMIT 1, because the rule above
+  # reads all of them and a day holds one or two; two LIMIT 1 lookups would be two round
+  # trips to answer a question one row set answers. `mine.empty?` is still a query of its
+  # own and still only runs on the days the first comes back with nothing: one query could
+  # answer both by ordering on "is this dated today", but no index covers that expression,
+  # so it would sort every workout the account owns.
   # Whether to ask the browser where this account is, decided once at sign-in. #349.
   #
   # The browser knows the answer exactly -- `Intl.DateTimeFormat().resolvedOptions().timeZone`
@@ -1473,11 +1501,21 @@ class Tectonic < Roda
     # rather than at this moment. Like the line above, it cannot raise into the request.
     SessionClose.sweep(account_id)
     mine = Workout.where(account_id:)
-    today = mine.where(Sequel.cast(:date, :date) => on).order(:id).first
-    return "/workouts/#{today.id}/session" if today
+    today = mine.where(Sequel.cast(:date, :date) => on).order(:id).all
+    return todays_screen(today) if today.any?
     return '/workouts/new' unless mine.empty?
 
     '/start'
+  end
+
+  # Which of today's sessions a login opens, and on which screen. Its own method because it is
+  # the one judgement on this path -- everything around it is housekeeping and fallbacks -- and
+  # because the argument for it is the long comment above rather than these four lines.
+  def todays_screen(sessions)
+    unfinished = sessions.find { |workout| !workout.finished? }
+    return "/workouts/#{unfinished.id}/session" if unfinished
+
+    "/workouts/#{sessions.max_by(&:finished_at).id}"
   end
 
   # Where the connector actually is, built from the two values the app is served under rather
@@ -1661,10 +1699,32 @@ class Tectonic < Roda
   # When this session last did anything, and how long to leave it before asking whether it is
   # over. #410. Both computed server-side off the rows already in hand, so the browser is
   # told a fact rather than asked to work one out.
+  #
+  # Silent on a session the lifter has already finished, which is the half of #523 that puts
+  # the words in the issue's title on the screen. The cue is filled in on first paint on
+  # purpose -- a session left open this morning should be asked about the moment it is opened
+  # rather than twenty minutes later -- but that stamp is read by a clock that only knows how
+  # long ago the last set was, so a session finished at nine in the morning and looked at
+  # again that evening raised the bar the instant it painted: "Nothing logged for 11h. Still
+  # training?" There is nothing to ask. `finished_at` is the lifter having already answered
+  # this exact question, by the control at the top of the screen, by this very bar, or by
+  # SessionClose.sweep answering on their behalf six hours after they left -- and a question
+  # re-asked after it has been answered reads as an app that was not listening.
+  #
+  # Empty rather than unrendered, and the same emptiness a session with nothing lifted gets:
+  # the script reads the cue on every swap and draws nothing when it carries no stamp, so one
+  # shape of "there is no quiet to measure here" covers both without the bar's markup or its
+  # clock having to learn a second case.
+  #
+  # It stays silent for the rest of that session, including after a correction tapped into a
+  # finished session -- which is deliberate. The bar exists to close sessions nobody closed;
+  # this one is closed. A lifter who carries on training says so with the finish control at
+  # the top of the screen, which re-stamps, and that is a statement rather than a guess.
   def quiet_cue(oob: false)
     rows = @sets.map(&:values)
+    last_at = (SessionClose.ends_at(rows)&.to_f unless @workout.finished?)
     render('workouts/_quiet_cue',
-           locals: { oob:, last_at: SessionClose.ends_at(rows)&.to_f, quiet_after: SessionClose.quiet_after(rows) })
+           locals: { oob:, last_at:, quiet_after: SessionClose.quiet_after(rows) })
   end
 
   # Where the nudge sits: above the rest timer, because the two are true at once. A rest that

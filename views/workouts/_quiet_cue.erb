@@ -19,8 +19,13 @@
     to restart from it. It is also filled in on first paint, so arriving at a session left open
     this morning is asked about immediately rather than in another twenty minutes.
 
-    Empty only where nothing has been lifted at all. A session with no completed set has no
-    quiet to measure and nothing to close, and the script draws nothing.
+    Empty where there is no quiet worth measuring, which is two sessions rather than one. A
+    session with no completed set has no quiet to measure and nothing to close. A session the
+    lifter has finished has plenty of quiet and nothing left to ask about: open this evening
+    the session you trained this morning and the bar used to appear on first paint saying
+    "nothing logged for 11h, still training?" -- which is #523, and the sentence its title is
+    quoting. Both arrive here as a cue with no stamp on it, and the script draws nothing for
+    either.
 
     `oob` is a local with a default so the two callers read the same way _rest_cue's do: the
     session view renders this plainly on first paint, the complete route renders it with
