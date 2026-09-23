@@ -41,6 +41,75 @@ class Tectonic < Roda
       where(account_id:).exclude(account_id: nil)
     end
 
+    # A dataset method rather than a class method beside the two scopes above, because every
+    # caller wants it *after* `visible_to`, and a class method cannot be chained onto the
+    # dataset another class method returned. `Exercise.library_first_by_name` still works:
+    # dataset_module defines the class method too.
+    dataset_module do
+      # The order a person reads a list of movements in: the library first, then the account's
+      # own, each of them alphabetical. #551.
+      #
+      # What this replaces is `id`, which is insertion order wearing a number -- a fact about
+      # the app rather than about the lifter. It mattered less while this list was a <select>
+      # somebody scrolled past; since #549 the same list is what a typeahead filters, so the
+      # order it is in is what a lifter reads at first glance and the whole of what a lifter
+      # who types nothing ever sees. The job of a default order is to be predictable -- you
+      # know roughly where `Bench Press` will be before you look -- and "whatever order the
+      # rows were created in" is the one property an order can have that nobody can predict.
+      #
+      # **Most-recently-used would be a better guess and is deliberately not what this is.**
+      # The data is here: `sets.completed_at` says what this account actually trains, and
+      # mid-session the four lifts of the current block are what a thumb is reaching for. But a
+      # recency order moves under the lifter between sessions, so where a movement sits can
+      # never be learned, and mid-session it promotes the lift that was just finished over the
+      # one coming next -- it is a guess about intent dressed as a fact about the list. This
+      # app reports what an account has and leaves the judgements to a reader. Nothing here
+      # forecloses it: recency is a layer over a baseline, and alphabetical is the baseline it
+      # would have to argue against.
+      #
+      # Alphabetising the library too is the arguable half, so: `LIBRARY` is curated, grouped
+      # by movement pattern in the source with the squats together and the presses together,
+      # and that ordering is thrown away here. It is thrown away because nothing renders it --
+      # the picker draws one flat group of fifty-four rows under the heading "Library", so
+      # `Anderson Squat` sitting between `Tempo Squat` and `Safety Bar Squat` reads as noise to
+      # everyone who has not read the constant -- and because it has already half decayed,
+      # later additions having been appended to the end where an accessory lift now follows
+      # `Z Press`. An order only the source can see is not an order the screen has.
+      #
+      # The library/own split is part of the sort rather than something the view does
+      # afterwards, which is what keeps "the first movement" meaning one thing.
+      # _exercise_options renders the library above the account's own and the picker reads its
+      # groups off that markup, so an untouched new-set form posts the first library movement;
+      # sorting the same way here means the dataset and the template cannot hold two different
+      # ideas of which row that is. Postgres sorts false before true, so `account_id IS NOT
+      # NULL` puts the library on top.
+      #
+      # Folded to lower case because a database built with the C collation sorts every capital
+      # ahead of every lower-case letter, and the names in this table are typed by hand: a
+      # lifter whose own `cable fly` is filed below `Zercher Squat` has been handed back the
+      # same unreadable list this exists to fix.
+      #
+      # **And the collation is named rather than inherited, which CI had to teach me.** What
+      # "alphabetical" means to Postgres is a property of the cluster the database was created
+      # on: this laptop's is C, so it sorts by byte and puts `Z Press` above `Zercher Squat`,
+      # while the Actions runner's is en_US.UTF-8, which weighs the space below the letters and
+      # puts them the other way up. Same code, same rows, two different lists -- which is
+      # precisely the unpredictable order this whole change is against, one level down. `COLLATE
+      # "C"` over a folded name is the one rule every Postgres agrees on, so the list a lifter
+      # reads is the list the specs assert and neither depends on how somebody ran initdb. The
+      # price is that a name with an accent in it sorts after the plain ASCII ones; the movement
+      # list is English barbell names, and a locale that reshuffles under a database restore is
+      # the worse of the two.
+      #
+      # The id breaks a tie between two rows folding to one name, so the list cannot reshuffle
+      # itself between two page views.
+      def library_first_by_name
+        order(Sequel.~(Sequel[:exercises][:account_id] => nil),
+              Sequel.lit('lower(exercises.name) COLLATE "C"'),
+              Sequel[:exercises][:id])
+      end
+    end
+
     # A nil account_id marks a shared library exercise, visible to everyone; any
     # other value is a single account's own.
     def library?

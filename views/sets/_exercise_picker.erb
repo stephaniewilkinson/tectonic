@@ -60,13 +60,13 @@
     are read off the optgroups, so the markup that draws them stays in one place, and a
     group with nothing matching in it disappears along with its heading.
 
-    Within a group the order is the select's own, which is the order the route asks for
-    (`order(:id)`). Ranking matches by how well they match would read better on a flat list
-    and cannot be done without dissolving the groups, and the groups are worth more: eight
-    matches under two headings is a shorter question than eight matches in relevance order.
-    That the underlying order is insertion rather than alphabetical is a fair complaint and
-    not this change's to fix -- sets_spec leans on it deliberately, and moving it is a
-    separate argument about a default.
+    Within a group the order is the select's own, which is the order the route asks for --
+    alphabetical since #551, where the argument for it lives (`Exercise.library_first_by_name`).
+    Ranking matches by how well they match would read better on a flat list and cannot be done
+    without dissolving the groups, and the groups are worth more: eight matches under two
+    headings is a shorter question than eight matches in relevance order. What the ranking
+    would have bought is mostly bought by the filter itself, since four letters is usually the
+    difference between eighty-four rows and two.
 
     Matching is every whitespace-separated term appearing somewhere in the name, folded to
     lowercase. Substrings rather than prefixes, because the word a lifter reaches for is

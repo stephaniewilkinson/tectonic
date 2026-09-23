@@ -47,9 +47,16 @@ module SetForm
   end
 
   def menu_choice(body)
-    options = body.scan(/<option[^>]*>/)
-    (options.find { |option| option.include?('selected') } || options.first)[/value="([^"]*)"/, 1]
+    selected = body.scan(/<option[^>]*>/).find { |option| option.include?('selected') }
+    selected ? option_value(selected) : menu_default(body)
   end
+
+  # What a browser posts for a menu with nothing marked in it: the first option. Named
+  # rather than left inside menu_choice because it is the thing the specs below have to
+  # be sure a set is *not* already on -- see account_with_a_logged_set.
+  def menu_default(body) = option_value(body.scan(/<option[^>]*>/).first)
+
+  def option_value(option) = option[/value="([^"]*)"/, 1]
 
   def own_exercise(account_id, name)
     DB[:exercises].insert(name: "#{name} #{SecureRandom.hex(4)}", account_id:)
@@ -62,14 +69,29 @@ module SetForm
     own_exercise(DB[:accounts].where(email:).get(:id), 'Secret')
   end
 
-  # A signed-in account with a workout, two movements, and a completed warmup set on
-  # the second of them -- second so that the first option of the exercise menu is
-  # never the one the set is already on, and an unmarked menu shows up as a move.
+  # A signed-in account with a workout, two movements, and a completed warmup set on the one
+  # the exercise menu would never have posted by itself.
+  #
+  # That last clause is the entire reason this helper exists, and it used to be spelled
+  # "the second of them", back when the menu came out of the database in insertion order.
+  # The specs it feeds open the edit form and post it back the way a browser does, and a
+  # browser posts the selected option or, failing that, the first one. So "saving the form
+  # leaves the set where it was" can only ever fail -- can only be a test of anything -- while
+  # the set's movement and the menu's first option are different rows. Put the set on the
+  # movement that sorts first and the spec keeps passing whether or not the form marks
+  # anything selected, which is worse than it failing, because nothing says so.
+  #
+  # It is therefore stated in terms of the order the menu is actually in rather than the order
+  # rows happen to have been written in (#551, `Exercise.library_first_by_name`): the set goes
+  # on `Machine Row` and the spare is `Cable Fly`, which sorts ahead of it whether or not the
+  # shared library is seeded in front of both. And the arrangement is asserted below rather
+  # than left to this comment, so that the next change to the ordering breaks a spec by name
+  # instead of quietly emptying two.
   def account_with_a_logged_set
     account_id = login
     workout = own_workout(account_id)
-    other = own_exercise(account_id, 'Machine Row')
-    exercise = own_exercise(account_id, 'Cable Fly')
+    other = own_exercise(account_id, 'Cable Fly')
+    exercise = own_exercise(account_id, 'Machine Row')
     set = DB[:sets].insert(workout_id: workout, exercise_id: exercise, weight: 100, reps: 5,
                            is_warmup: true, is_completed: true)
     [workout, set, exercise, other]
@@ -96,6 +118,19 @@ describe 'saving the set edit form' do
     save_form(@workout, @set, 'weight' => '105')
 
     assert_equal @exercise, DB[:sets].where(id: @set).get(:exercise_id)
+  end
+
+  # The premise the spec above stands on, asserted rather than assumed. It tests the test:
+  # an edit form that stopped marking the movement the set is on would post the menu's first
+  # option and move the set, and this file can only notice that while those are two different
+  # rows. Whether they are is decided by the order the movement list is read in, which is a
+  # product decision somebody is entitled to revisit -- so it is pinned here, where revisiting
+  # it fails a spec that says what went wrong, instead of leaving two specs above passing
+  # without asking anything.
+  it 'is editing a set whose movement the menu would not have posted by itself' do
+    get "/workouts/#{@workout}/sets/#{@set}/edit"
+
+    refute_equal @exercise.to_s, menu_default(last_response.body)
   end
 end
 
