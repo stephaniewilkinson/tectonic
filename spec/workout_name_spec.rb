@@ -32,13 +32,13 @@ describe 'what a workout is called' do
   end
 
   it 'is saved off the form, and cleared by clearing the field' do
-    post '/workouts', { date: Date.today.strftime('%m/%d/%Y'), name: '  Evening walk  ', id: '',
+    post '/workouts', { date: Date.today.strftime(Tectonic::Workout::FORM_DATE), name: '  Evening walk  ', id: '',
                         '_csrf' => token_for('/workouts/new') }
     workout = Tectonic::Workout.where(account_id: @account_id).order(:id).last
 
     assert_equal 'Evening walk', workout.name
 
-    post '/workouts', { date: Date.today.strftime('%m/%d/%Y'), name: '  ', id: workout.id.to_s,
+    post '/workouts', { date: Date.today.strftime(Tectonic::Workout::FORM_DATE), name: '  ', id: workout.id.to_s,
                         '_csrf' => token_for('/workouts/new') }
 
     assert_nil workout.refresh.name

@@ -1382,13 +1382,20 @@ class Tectonic < Roda
         # bad day can be taken back off without leaving an empty paragraph behind.
         note = Workout.clean_note(r.params['note'])
         # And the date, read with the format the form wrote it in rather than handed to
-        # Sequel to guess at. #440.
+        # Sequel to guess at. #440, #524.
         #
-        # The form renders `%m/%d/%Y` for a US reader, and a string bound to a date column is
-        # typecast by `Date.parse`, which reads day-first. So a session trained on 2 September
-        # posted `09/02/2026` and was stored as 9 February, dragging its completed sets with
-        # it -- silently, and only when both halves are <= 12, so on the first twelve days of a
-        # month and not the rest of it.
+        # The form posts ISO since #524, because the field is a `type="date"` input, so the
+        # guess and the parse would now land on the same day. They did not before: the form
+        # rendered `%m/%d/%Y` for a US reader, a string bound to a date column is typecast by
+        # `Date.parse`, which reads a slashed date day-first, and a session trained on
+        # 2 September posted `09/02/2026` and was stored as 9 February, dragging its completed
+        # sets with it -- silently, and only when both halves are <= 12, so on the first twelve
+        # days of a month and not the rest of it.
+        #
+        # Read through the constant rather than left to the typecast anyway. What arrives here
+        # is whatever was posted, and a hand-made post or a browser with no date input owes us
+        # nothing; `Date.parse` is the thing that took a string it could not read as intended
+        # and returned a confident answer, and it is no safer for the form having improved.
         #
         # Refused rather than stored as something else, on the same terms as the time zone on
         # the settings form: a value the app cannot read is a reason to decline the save and
@@ -2281,19 +2288,25 @@ class Tectonic < Roda
   # Declining a save and sending the lifter back to the form holding it. #440.
   #
   # Only a date reaches here, and only a date nothing can read as one -- the input is
-  # `required` and driven by a datepicker, so in practice this is a hand-made post, an
-  # autofill, or a browser that filled the box from a different locale. That last one is
-  # exactly the case worth refusing out loud rather than guessing at, because guessing is
-  # what put sessions seven months from where they were trained.
+  # `required` and is a native date control since #524, which posts ISO or posts nothing, so
+  # in practice this is a hand-made post, an autofill, or a browser old enough to have
+  # rendered that input as a text box and let somebody type into it in their own locale. That
+  # last one is exactly the case worth refusing out loud rather than guessing at, because
+  # guessing is what put sessions seven months from where they were trained.
   #
   # A redirect rather than a re-render, which costs the name and the note that were typed
   # alongside the bad date. Re-rendering would keep them, at the price of the form learning to
   # read its values back out of params -- a second source for every field on it, to save
-  # retyping on a path a lifter using the datepicker cannot reach. The same trade the settings
-  # form makes, and `settings_with` above is the same three lines.
+  # retyping on a path a lifter whose browser draws the picker cannot reach. The same trade
+  # the settings form makes, and `settings_with` above is the same three lines.
+  #
+  # The sentence names the order the app reads rather than the order the box shows, and those
+  # are two different things now: a `type="date"` input displays in the device's locale, so
+  # telling somebody what their own phone is already drawing would be no help to the one
+  # person who can see this -- whose browser is not drawing it.
   def back_to_the_form(page)
     session['workout.notice'] =
-      'That date could not be read, so nothing was saved. Dates go in as month/day/year, ' \
+      'That date could not be read, so nothing was saved. Dates go in as year-month-day, ' \
       "like #{Date.today.strftime(Workout::FORM_DATE)}."
     request.redirect page
   end

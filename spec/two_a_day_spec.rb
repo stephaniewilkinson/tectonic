@@ -49,9 +49,11 @@ module TwoADay
   end
 
   # The new-workout form as it actually posts: an empty id, which is what tells the route
-  # this is a new session rather than a reschedule of one, and a bare %m/%d/%Y date.
+  # this is a new session rather than a reschedule of one, and the date in the format the
+  # form writes. Read off the app rather than spelled here, so the day this changes -- as it
+  # did in #524, when the field became a native date input -- it changes here too.
   def create_workout(on)
-    post '/workouts', { 'id' => '', 'date' => on.strftime('%m/%d/%Y'),
+    post '/workouts', { 'id' => '', 'date' => on.strftime(Tectonic::Workout::FORM_DATE),
                         '_csrf' => token_for('/workouts/new', '/workouts') }
     last_response.headers['location'][%r{/workouts/(\d+)/}, 1].to_i
   end
@@ -179,14 +181,16 @@ describe "editing one of a day's two sessions" do
   # Rescheduling posts back to /workouts with the id filled in, which is the same route
   # that creates one. Moving the evening session must not take the morning one with it.
   #
-  # The date is the second of the second because that day reads the same whichever way
-  # round the two numbers are taken, and the two branches of this one route do not take
-  # them the same way. Creating hands the string to Postgres, which is month-first, so
-  # 01/02/2030 is January 2; rescheduling assigns it to the model, which typecasts it in
-  # Ruby, and Ruby reads it day-first as February 1. That disagreement is real and it is
-  # not this test's business, so this picks a date it cannot turn on.
+  # The date was the second of the second because that day read the same whichever way round
+  # the two numbers were taken, and the two branches of this one route did not take them the
+  # same way: creating handed the string to Postgres, which read it month-first, and
+  # rescheduling assigned it to the model, which let Ruby read it day-first. #530 gave both
+  # branches one parser and #524 gave the form a format with one reading, so the disagreement
+  # this was dodging no longer exists. ISO here, which is what the date input posts, and the
+  # day is kept as it was -- a spec that changes two things at once is a spec that can pass
+  # for a new reason.
   it 'moves only the session that was edited' do
-    post '/workouts', { 'id' => @evening.to_s, 'date' => '02/02/2030',
+    post '/workouts', { 'id' => @evening.to_s, 'date' => '2030-02-02',
                         '_csrf' => token_for('/workouts/new', '/workouts') }
 
     assert_equal Date.new(2030, 2, 2), DB[:workouts].where(id: @evening).get(:date).to_date
