@@ -42,6 +42,11 @@ module RestingBrowser
 
   def clock_text = find('[data-rest-clock]', visible: :all).text
 
+  # The word beside the clock, which is where the length and the overshoot moved when #514
+  # stopped the clock changing direction. "/ 3:00" while the bell is ahead, "+0:42" once it
+  # has gone.
+  def bell_text = find('[data-rest-bell]', visible: :all).text
+
   # Capybara's waiting matchers are what keep these from being sleeps: the assertion blocks
   # until htmx has swapped the panel in and the script has read the cue.
   def finish_a_set
@@ -54,12 +59,14 @@ module RestingBrowser
     click_button label
   end
 
-  # The clock as a signed number of seconds, so a count past zero reads as negative and the
-  # direction of travel can be asserted rather than the text compared.
+  # A MM:SS reading as a number of seconds, so the direction of travel can be asserted rather
+  # than the text compared. It used to return a signed number, because the clock ran backwards
+  # and then forwards through zero and the sign was how a spec could tell which side of the
+  # rest it was reading. #514 left one direction, so there is one sign; the glyph the bell's
+  # word wears is asserted where it is the point, and stripped here where it is not.
   def seconds_in(text)
-    sign = text.start_with?('+') ? -1 : 1
-    minutes, seconds = text.delete('+').split(':').map(&:to_i)
-    sign * ((minutes * 60) + seconds)
+    minutes, seconds = text.gsub(%r{[+/]}, '').strip.split(':').map(&:to_i)
+    (minutes * 60) + seconds
   end
 end
 
@@ -95,8 +102,10 @@ describe 'the rest timer arming' do
   end
 end
 
-# Counting is not counting down. Nothing is going to happen at any particular number until
-# somebody names one, so the durations stay on offer and the clock stays silent.
+# Counting is not counting down, and after #514 it is never counting down. Nothing is going to
+# happen at any particular number until somebody names one, so the durations stay on offer and
+# the clock stays silent -- and when somebody does name one, the clock goes on exactly as it
+# was and the bar grows a bell.
 describe 'the rest timer before a length is chosen' do
   include Minitest::Capybara::Behaviour
   include BrowserSpec
@@ -111,11 +120,30 @@ describe 'the rest timer before a length is chosen' do
     refute has_css?('#rest-timer [data-rest-steps]', visible: true)
   end
 
-  it 'turns into a countdown on a tap and shows the time it was given' do
+  it 'says nothing beside the clock while there is no bell to say anything about' do
+    finish_a_set
+
+    refute has_css?('#rest-timer [data-rest-bell]', visible: true)
+  end
+
+  # #514. A tapped duration used to turn the display into a countdown; now it sets a bell and
+  # the clock carries on climbing. This is the branch the decision explicitly extended to --
+  # the offer was stopwatch-by-default-countdown-if-you-tap, and it was turned down.
+  it 'sets a bell on a tap and leaves the clock climbing' do
     start_a_rest_of '1:00'
 
     assert has_css?('#rest-timer [data-rest-steps]', visible: true)
-    assert_operator seconds_in(clock_text), :<=, 60
+    assert_operator seconds_in(clock_text), :<, 5
+    assert_equal 60, seconds_in(bell_text)
+  end
+
+  # The length has to be readable, or a climbing number is a stopwatch with a secret: the
+  # lifter tapped 1:00 and has no way back to which of the four it was.
+  it 'says the length it is going to ring at' do
+    start_a_rest_of '2:00'
+
+    assert_match(%r{\A/}, bell_text)
+    assert_equal 120, seconds_in(bell_text)
   end
 end
 
@@ -128,26 +156,38 @@ describe 'the rest timer counting' do
 
   before { session_with_a_set }
 
-  it 'actually counts down' do
+  it 'actually counts, and it counts upward' do
     start_a_rest_of '5:00'
     first = clock_text
     sleep 2.5
 
-    refute_equal first, clock_text, 'the countdown never moved'
-    assert_operator seconds_in(clock_text), :<, seconds_in(first)
+    refute_equal first, clock_text, 'the clock never moved'
+    assert_operator seconds_in(clock_text), :>, seconds_in(first)
   end
 
-  # Past zero it counts up rather than stopping, which is the half that keeps it honest: a
-  # timer that stops at 0:00 implies the rest ended there, when what happened is that you
-  # took another forty seconds.
-  it 'counts up past zero rather than stopping' do
+  # The bell is a moment, not a countdown, so the number beside the clock holds still while
+  # the clock climbs towards it.
+  it 'holds the bell still while the clock climbs' do
+    start_a_rest_of '5:00'
+    named = bell_text
+    sleep 2.5
+
+    assert_equal named, bell_text
+  end
+
+  # Past the bell it goes on counting rather than stopping, which is the half that keeps it
+  # honest: a timer that stops at the bell implies the rest ended there, when what happened is
+  # that you took another forty seconds. The overshoot is the bell's word now, because a
+  # climbing number with a grey tint on it does not say "that has gone" on its own.
+  it 'says the bell has gone, and goes on counting' do
     start_a_rest_of '1:00'
     # Wound down to a second out rather than waited out, so the spec costs two seconds and
     # not sixty. The step buttons are the same path a lifter uses.
     2.times { find('[data-rest-step="-30"]').click }
     sleep 2
 
-    assert_match(/\A\+/, clock_text)
+    assert_match(/\A\+/, bell_text)
+    assert_operator seconds_in(clock_text), :>, 0
   end
 end
 
@@ -158,18 +198,23 @@ describe 'the rest timer under a thumb' do
 
   before { session_with_a_set }
 
-  it 'takes thirty seconds off when asked' do
+  # The steps wind the bell, not the clock. Nothing on this bar can take thirty seconds off
+  # the rest you have actually had, which is what the clock reads -- so these assert the bell
+  # moved and, in the first one, that the clock did not.
+  it 'rings thirty seconds sooner when asked' do
     start_a_rest_of '5:00'
+    standing = seconds_in(clock_text)
     find('[data-rest-step="-30"]').click
 
-    assert_operator seconds_in(clock_text), :<=, 271
+    assert_equal 270, seconds_in(bell_text)
+    assert_operator seconds_in(clock_text), :>=, standing
   end
 
-  it 'adds thirty seconds when asked' do
+  it 'rings thirty seconds later when asked' do
     start_a_rest_of '1:00'
     find('[data-rest-step="30"]').click
 
-    assert_operator seconds_in(clock_text), :>, 60
+    assert_equal 90, seconds_in(bell_text)
   end
 
   it 'goes away when dismissed' do
@@ -177,6 +222,29 @@ describe 'the rest timer under a thumb' do
     find('[data-rest-dismiss]').click
 
     refute timer.visible?
+  end
+end
+
+describe 'a bell wound back and forth past the clock' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include RestingBrowser
+
+  before { session_with_a_set }
+
+  # Winding back up past the elapsed time is a rest that is running again, so the bell
+  # re-arms -- and the word beside the clock goes back from an overshoot to a length at the
+  # same moment, which is the visible half of it. Before #514 the same fact showed up as the
+  # clock changing direction, which is the behaviour that is gone.
+  it 'goes back to naming a length once it is ahead of the clock again' do
+    start_a_rest_of '1:00'
+    2.times { find('[data-rest-step="-30"]').click }
+
+    assert_match(/\A\+/, bell_text)
+
+    find('[data-rest-step="30"]').click
+
+    assert_match(%r{\A/}, bell_text)
   end
 end
 
@@ -198,19 +266,33 @@ describe 'the rest the programme prescribed' do
     assert has_css?('#rest-timer', visible: true, wait: 5)
   end
 
-  it 'counts down from the prescribed length with no second tap' do
+  it 'sets the bell at the prescribed length with no second tap' do
     session_prescribing(300)
     finish_the_working_set
 
     assert has_css?('#rest-timer [data-rest-steps]', visible: true)
-    assert_operator seconds_in(clock_text), :<=, 300
-    assert_operator seconds_in(clock_text), :>, 290
+    assert_equal 300, seconds_in(bell_text)
   end
 
-  # It starts on its own, so its button is never seen -- and without the word beside the clock
-  # a lifter would watch a countdown with nothing saying whether the block asked for it or the
-  # app worked it out.
-  it 'says whose number it is counting, beside the clock' do
+  # The whole of #514, in the one place it was most wrong. A movement carrying a prescribed
+  # rest used to open the bar at 3:00 falling, on every single set, so the stopwatch #395 was
+  # reopened to provide was the one thing a lifter on a written programme never saw. The
+  # prescription is still honoured -- it is a bell at 5:00 rather than a clock that starts
+  # there.
+  it 'still starts the clock at nothing and climbs' do
+    session_prescribing(300)
+    finish_the_working_set
+
+    assert_operator seconds_in(clock_text), :<, 5
+    sleep 2.5
+
+    assert_operator seconds_in(clock_text), :>, 0
+  end
+
+  # It arms on its own, so its button is never seen -- and without the word beside the clock a
+  # lifter would watch a bell with nothing saying whether the block asked for that length or
+  # they tapped it themselves.
+  it 'says whose number it is ringing at, beside the clock' do
     session_prescribing(300)
     finish_the_working_set
 
@@ -253,7 +335,8 @@ describe 'the rest timer against the poll' do
     sleep 2
 
     assert has_css?('#rest-timer [data-rest-steps]', visible: true)
-    assert_operator seconds_in(clock_text), :<, before
+    assert_operator seconds_in(clock_text), :>, before
+    assert_equal 300, seconds_in(bell_text), 'the poll moved the bell'
   end
 end
 
