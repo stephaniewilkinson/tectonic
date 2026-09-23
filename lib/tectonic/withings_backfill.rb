@@ -141,21 +141,25 @@ class Tectonic < Roda
     # that found nothing -- that is a lie about a year the lifter then never presses for
     # again. So a nil never advances the cursor and never renders as a total.
     #
-    # ## What it does not do: stamp the rake task's watermark
+    # ## What it does not do: stamp `workouts_backfilled_at`
     #
-    # Deliberately, and #554 is the reason. `attempt` stamps `workouts_backfilled_at`
-    # whenever the years it *chose* to walk all answered, and a slice walks a narrowed range
-    # by construction -- so routing this through `run(since:)` would stamp the watermark
-    # after the first press, `resumed_year` would raise the floor to this year, and every
-    # later press (and every later rake run) would believe the decade behind it had been
-    # read. One press, a claim of completeness, and the history silently lost.
+    # When this was written the reason was #554 -- `attempt` stamped that instant whenever the
+    # years it *chose* to walk all answered, so a press routed through `run(since:)` would
+    # have stamped it after one year and every later run would have believed the decade behind
+    # it was read. That is fixed: only a walk that reached the earliest stamped set stamps it
+    # now, and this method could safely call `run` without lying about anything.
     #
-    # That is worked around rather than fixed here, because #554 is open and its fix is a
-    # change to what the *task* records. The way round it is to not use that path at all:
-    # `slice` calls `fetch_year`, `store_all` and `pair` directly and keeps its own cursor,
-    # `workouts_imported_year` (045), which says which year was read rather than claiming
-    # everything older was. The two cursors never write each other, so a press cannot make
-    # the task skip a year and the task cannot make a press skip one.
+    # It still does not stamp, for a reason of its own that outlives #554. **A course of
+    # presses can span calendar years.** Each press reads one year and the next reads the year
+    # before, so a lifter who started pressing in 2023 and finished in 2026 has read 2023 down
+    # to their first session and has never once been offered 2024 or 2025 -- and an instant
+    # stamped at the end of that course would claim exactly those two years. What a press can
+    # honestly write is the year it read, which is `workouts_imported_year` and which `advance`
+    # only ever moves backwards.
+    #
+    # It also still calls `fetch_year`, `store_all` and `pair` directly rather than routing
+    # through `run(since:)`, because those three are the whole of the walk and a second
+    # expression of the logic around them is how the `more` bug in #553 came about.
     def slice(account_id:, pause: PAUSE)
       token = WithingsConnection.token(account_id)
       return { state: :disconnected } unless token
@@ -192,11 +196,18 @@ class Tectonic < Roda
     # Tectonic's own data -- a year before the first logged session holds nothing that could
     # ever be proposed to anything.
     #
-    # It deliberately does not consult `workouts_backfilled_at`. Reading it would let #554
-    # tell a lifter their history was imported when five years of it were never fetched, and
-    # the two ways of being wrong here are not symmetrical: a cursor behind the truth costs
-    # one request to a year already stored, and `WithingsWorkouts.store` makes re-storing an
-    # activity a no-op, while a cursor ahead of the truth loses that year in silence.
+    # It reads `workouts_imported_year` and not `workouts_backfilled_at`, and now that #554 is
+    # fixed that is a choice about which question is being asked rather than a defence against
+    # a column that lied. "Which year does the next press read" is answered by how far back
+    # the reading has got, and the instant answers a different question -- when a walk last
+    # reached the bottom -- which this has no use for. The cursor is also the one a narrowed
+    # rake run writes, so a lifter who imported 2025 and 2024 from a terminal is offered 2023
+    # here rather than being charged for the same two years again.
+    #
+    # The two ways of being wrong here are still not symmetrical, and that is what decides
+    # every close call in this module: a cursor behind the truth costs one request to a year
+    # already stored, and `WithingsWorkouts.store` makes re-storing an activity a no-op, while
+    # a cursor ahead of the truth loses that year in silence.
     def next_year(account_id, floor)
       candidate = imported_year(account_id)&.pred || Date.today.year
       candidate < floor ? nil : candidate
@@ -221,12 +232,28 @@ class Tectonic < Roda
       { state: :imported, year:, found:, more: next_year(account_id, floor) }.merge(offered(account_id))
     end
 
-    # How far back the presses have read. Its own column and emphatically not the task's
-    # watermark or the measurement poll's `synced_at`: three readers with different ideas of
-    # what "up to date" means, and a cursor shared between two of them is how a year goes
-    # quietly unread. See 045, and 043 before it.
+    # How far back this account's history has been read, by whichever route read it.
+    #
+    # 045 added it for the presses alone and said in as many words that the rake task would
+    # never write it, because at the time the task's own watermark could be stamped for an
+    # account with five unread years behind it and the button could not afford to believe
+    # anything the task wrote. #554 closed that, and with the task no longer able to claim a
+    # history it did not read there is no reason left for two private opinions of one number:
+    # a year read from a terminal is a year read, and a lifter should not be asked to press
+    # Import for it. Still emphatically not the measurement poll's `synced_at`, which is a
+    # different question about different data -- see 043.
+    #
+    # **`LEAST`, so the cursor only ever moves backwards.** The presses walk down a year at a
+    # time and would never move it forward on their own, but a task run narrowed with SINCE
+    # reads the recent years and nothing else, and writing its floor in flat would drag the
+    # cursor up over years somebody has already read -- handing them back to the button as
+    # though nobody had ever fetched them. Postgres ignores NULLs inside `LEAST`, so the first
+    # write on a row that has never read anything is the year itself, and the arithmetic
+    # happens in the database rather than in a read-then-write this module would have to hold
+    # a lock across.
     def advance(account_id, year)
-      DB[:account_withings].where(account_id:).update(workouts_imported_year: year)
+      DB[:account_withings].where(account_id:)
+                           .update(workouts_imported_year: Sequel.function(:least, :workouts_imported_year, year))
     end
 
     # The pairing, with the one exception #555 describes kept off a lifter's screen.
@@ -257,14 +284,89 @@ class Tectonic < Roda
       # Reporting a failure must never become a second one, on the request path least of all.
     end
 
-    # Walk, then pair, then stamp -- and pair even where the walk failed part way, because
-    # the years that did answer are worth offering and the report says plainly that the rest
-    # were never read. What a partial run must not do is *claim* to be complete, which is why
-    # the watermark below is stamped on `complete` alone.
+    # Walk, then write down what was read, then pair -- and pair even where the walk failed
+    # part way, because the years that did answer are worth offering and the report says
+    # plainly that the rest were never read.
+    #
+    # The two numbers `settle` works out are reported as well as written down, because the
+    # other half of #554 is that nothing ever *said* a narrowed run had left years behind: the
+    # task printed a completed walk and the operator had no way to tell that from a walk of
+    # the whole history. `read_back_to` and `earliest` together are that sentence.
     def attempt(account_id, token, years, pause)
       walked = walk(account_id, token, years, pause)
-      stamp(account_id) if walked[:complete]
-      walked.merge(pair(account_id)).merge(years:, state: :walked)
+      settled = settle(account_id, years, walked)
+      walked.merge(pair(account_id)).merge(years:, state: :walked, **settled)
+    end
+
+    # What a walk leaves written down, which #554 is the story of getting wrong.
+    #
+    # It used to be one line -- `stamp(account_id) if walked[:complete]` -- and the word doing
+    # the damage was `complete`, which means "every year I chose to walk answered" and was
+    # being read as "every year back to the first session has been read". Those are the same
+    # sentence only for a walk that chose the whole history. `rake withings:backfill
+    # ACCOUNT_ID=1 SINCE=2024` for a lifter whose earliest stamped set is 2019 completes in
+    # two years, stamped an instant whose own meaning is "everything older than this has been
+    # read", and every default run afterwards floored at `[2019, 2026].max`. 2019 through 2023
+    # were never read and no later run would ever have read them. The task reported a
+    # completed walk, because from its own point of view it had completed one.
+    #
+    # So the walk now writes down **what it actually read** rather than the fact that it
+    # finished, and the two things it can honestly say about itself turn out to be two
+    # different facts about one claim:
+    #
+    #   `workouts_imported_year` -- how far back this account's history has been read.
+    #   `workouts_backfilled_at` -- when a read last reached the bottom of it.
+    #
+    # ## Why that is two columns and not one, having looked hard at making it one
+    #
+    # 045 added the year cursor for the import button and the obvious tidy answer to #554 is
+    # to delete the instant and keep it: one column, one meaning, nothing to confuse. It does
+    # not work, and the reason is worth writing down so nobody spends the afternoon on it
+    # again. A year on its own cannot say **when** it was written, and the resume needs that:
+    # a walk that read 2019 through 2023 in 2023 has said nothing whatever about 2024 and
+    # 2025, so a task resuming from the year alone must either re-walk the whole history every
+    # single run -- a request per year, forever, for a saving the instant used to buy -- or
+    # skip years nobody has read, which is the bug it was sent to fix. An instant on its own
+    # cannot say **how far back**, which is #554 exactly. The two facts are genuinely two.
+    #
+    # What they are not is two watermarks for two jobs. Both routes into this module read
+    # years and both write the cursor, so a walk from the terminal and a press on the settings
+    # page now agree about how far back the history has been read instead of each keeping a
+    # private opinion of it -- a lifter who ran the task does not then get asked to press
+    # Import for the years it already fetched.
+    #
+    # ## Why the cursor cannot raise the task's floor, though the instant can
+    #
+    # `workouts_imported_year` is a floor of what *has* been read and says nothing at all
+    # about the years above it being fresh. Using it to raise the walk's floor would be the
+    # same mistake in the other direction: a cursor of 2019 written in 2023 would have a 2026
+    # run start at 2019 and stop... at 2019, having never asked about the three years since.
+    # The instant is the only thing here that carries a date, so it is the only thing that can
+    # say a *recent* year has been covered -- and it can only say that because it is now
+    # stamped by a walk that reached the bottom, which is the change #554 asked for.
+    def settle(account_id, years, walked)
+      floor = first_session_year(account_id)
+      lowest = lowest_read(years, walked)
+      return { read_back_to: nil, earliest: floor } unless lowest
+
+      advance(account_id, lowest)
+      stamp(account_id) if floor && lowest <= floor
+      { read_back_to: lowest, earliest: floor }
+    end
+
+    # The oldest year that actually answered, or nil where none did.
+    #
+    # The years are contiguous and descending, so a walk that ran out at `stopped_at` read
+    # every year above it and that year not at all -- `stopped_at + 1` rather than
+    # `stopped_at`, because the difference between them is a year of training and this module
+    # exists to stop that difference being lost. A walk refused in the very first year it
+    # asked about has read nothing, and "read nothing" is not a year: it is nil, and nothing
+    # is written down at all.
+    def lowest_read(years, walked)
+      return years.last if walked[:complete]
+      return nil if walked[:stopped_at] == years.first
+
+      walked[:stopped_at] + 1
     end
 
     # A year at a time, newest first, stopping at the first year Withings does not answer.
@@ -306,10 +408,15 @@ class Tectonic < Roda
 
     # Which years to ask about, newest first, or nil where there is nothing to match against.
     #
-    # A previous *complete* walk moves the floor up to its own year: everything older than a
-    # completed walk has already been read and stored, and re-reading a decade to write the
-    # same rows again is a hundred requests for nothing. Its own year and not the year after,
-    # because the walk happened part way through it.
+    # A previous walk that **reached the earliest stamped set** moves the floor up to the year
+    # it ran in: everything older than such a walk has already been read and stored, and
+    # re-reading a decade to write the same rows again is a request a year for nothing. Its
+    # own year and not the year after, because the walk happened part way through it.
+    #
+    # It is `workouts_backfilled_at` and not `workouts_imported_year` that raises this floor,
+    # and the two are not interchangeable here: the cursor is a floor of what has been read
+    # and carries no date, so it cannot say anything about the years since it was written. See
+    # `settle`, where the distinction is argued at length and where #554 came from.
     #
     # SINCE overrides both bounds rather than being folded into them with `max`. An operator
     # naming a year is making a claim this module cannot check -- that the interesting
@@ -337,10 +444,19 @@ class Tectonic < Roda
 
     def resumed_year(account_id) = WithingsConnection.of(account_id)&.fetch(:workouts_backfilled_at, nil)&.year
 
-    # The backfill's own high-water mark, and **not `synced_at`**, which belongs to the
-    # measurement poll. Stamping that one from a workout fetch would tell the poll it had
-    # already read a window of bodyweights nobody has fetched, and those readings would never
-    # arrive -- silently, with nothing raised and a fortnight simply missing from a chart.
+    # The instant a read last reached the bottom of this lifter's history, which is the whole
+    # of what "everything older than this has been read" is entitled to mean.
+    #
+    # Stamped by `settle` and nowhere else, and only where the oldest year the walk read sits
+    # at or below the year of the earliest stamped set. A SINCE below that floor still stamps
+    # -- an operator naming 2015 for a lifter who started in 2019 has read every year that
+    # could hold a matchable session, and refusing them the stamp would make every later run
+    # re-read the same decade for nothing. A SINCE above it never stamps, which is #554.
+    #
+    # And **not `synced_at`**, which belongs to the measurement poll. Stamping that one from a
+    # workout fetch would tell the poll it had already read a window of bodyweights nobody has
+    # fetched, and those readings would never arrive -- silently, with nothing raised and a
+    # fortnight simply missing from a chart.
     def stamp(account_id)
       DB[:account_withings].where(account_id:).update(workouts_backfilled_at: Time.now)
     end

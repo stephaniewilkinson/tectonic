@@ -713,6 +713,7 @@ def report_backfill(report)
     report[:state] == :no_sessions
 
   announce_walk(report)
+  announce_unread(report)
   announce_proposals(report)
   puts 'DRY_RUN: nothing written. Run it again without DRY_RUN to keep these proposals.' if report[:dry_run]
 end
@@ -733,6 +734,22 @@ def announce_walk(report)
   warn "INCOMPLETE: Withings stopped answering at #{report[:stopped_at]}, so that year and everything " \
        'before it was never read. That is usually rate limiting (status 601), which arrives looking ' \
        'like success. Wait a few minutes and run this again; nothing already answered is re-proposed.'
+end
+
+# And whether the walk reached the bottom of this lifter's history, which is a different
+# question from whether it finished. #554: a run narrowed with SINCE finishes every year it
+# asked for and can still be years short of the earliest logged session, and until this line
+# the only thing printed about that run was a tidy report of a completed walk. It no longer
+# leaves the account claiming those years were read -- but an operator who meant to import
+# everything and typed a year by habit deserves to be told, rather than finding out never.
+def announce_unread(report)
+  earliest = report[:earliest]
+  read_back_to = report[:read_back_to]
+  return unless earliest && read_back_to && read_back_to > earliest
+
+  warn "#{earliest}-#{read_back_to - 1} has never been read for this account: this run started at " \
+       "#{read_back_to}. Nothing has been recorded as read that was not, so running this again " \
+       'without SINCE walks those years.'
 end
 
 # The pairing, and the two kinds of nothing.
