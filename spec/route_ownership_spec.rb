@@ -84,12 +84,14 @@ module RouteOwnership
   end
 end
 
-# The dates here are `%m/%d/%Y` because that is what the workout form posts and, since #440,
-# the only thing the route reads. They used to be ISO, which the form has never written and
-# which only worked because the old route handed the string to `Date.parse` and took whatever
-# came back -- the same guess that was storing 2 September as 9 February. These two specs are
-# about who may move a workout rather than about how a date is spelled, so they now spell it
-# the way the page they stand for does.
+# The dates here are ISO because that is what the workout form posts and, since #440, the only
+# thing the route reads. They were ISO once before, back when the route handed the string to
+# `Date.parse` and took whatever came back -- the same guess that was storing 2 September as
+# 9 February -- and #530 moved them to `%m/%d/%Y` on the grounds that a spec standing in for a
+# page should post what that page posts, which was month-first at the time. #524 made the field
+# a `type="date"` input, which posts ISO and nothing else, so the same rule moves them back.
+# These two specs are about who may move a workout rather than about how a date is spelled, and
+# they spell it the way the page they stand for does.
 describe 'workout rescheduling is owner-only' do
   include Rack::Test::Methods
   include RouteOwnership
@@ -99,7 +101,7 @@ describe 'workout rescheduling is owner-only' do
     workout_id, = strangers_workout
     before = DB[:workouts].where(id: workout_id).get(:date)
 
-    post '/workouts', { id: workout_id.to_s, date: '01/01/2030', '_csrf' => token_for('/workouts/new') }
+    post '/workouts', { id: workout_id.to_s, date: '2030-01-01', '_csrf' => token_for('/workouts/new') }
 
     assert_equal before, DB[:workouts].where(id: workout_id).get(:date)
   end
@@ -108,7 +110,7 @@ describe 'workout rescheduling is owner-only' do
     account_id = login
     workout_id = own_workout(account_id)
 
-    post '/workouts', { id: workout_id.to_s, date: '01/01/2030', '_csrf' => token_for('/workouts/new') }
+    post '/workouts', { id: workout_id.to_s, date: '2030-01-01', '_csrf' => token_for('/workouts/new') }
 
     assert_equal Date.new(2030, 1, 1), DB[:workouts].where(id: workout_id).get(:date).to_date
   end
@@ -190,7 +192,7 @@ describe 'state-changing posts require a CSRF token' do
   end
 
   it 'refuses a workout post with no token' do
-    post '/workouts', { date: '01/01/2030' }
+    post '/workouts', { date: '2030-01-01' }
     assert_equal 403, last_response.status
   end
 

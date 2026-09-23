@@ -78,29 +78,44 @@ class Tectonic < Roda
       end
     end
 
-    # How the workout form writes a date, and the only thing that reads one back. #440.
+    # How the workout form writes a date, and the only thing that reads one back. #440, #524.
     #
-    # The form shows a US reader a month-first date, which is a deliberate choice and the
-    # format the Flowbite datepicker on that input is configured for. The cost of it is that
-    # `09/02/2026` is two dates, and which one it is depends entirely on who is reading:
+    # ISO, because the field is a `type="date"` input and that is the only thing one of those
+    # will render or post. It is also the one spelling of a date that means the same thing to
+    # every reader of it: year, then month, then day, in one order, with no locale in the
+    # question.
+    #
+    # It used to be `%m/%d/%Y`, month-first for a US reader and the format the Flowbite
+    # datepicker on that input was configured for. The cost of that was that `09/02/2026` is
+    # two dates, and which one it is depends entirely on who is reading:
     #
     #     Date.parse('09/02/2026')                  # => 2026-02-09
     #     Date.strptime('09/02/2026', '%m/%d/%Y')   # => 2026-09-02
     #
-    # Sequel typecasts a string bound to a date column with `Date.parse`, which reads
-    # day-first. So the value the form rendered for 2 September came back and was stored as
-    # 9 February, and the session's completed sets went with it -- the same damage #440 was
-    # opened about, surviving in the write path after the read path was fixed. It only bites
-    # when both halves are <= 12, which is the first twelve days of any month, which is why
-    # it reached production and sat there.
+    # Sequel typecasts a string bound to a date column with `Date.parse`, which reads a
+    # slashed date day-first. So the value the form rendered for 2 September came back and was
+    # stored as 9 February, and the session's completed sets went with it -- the damage #440
+    # was opened about, arriving by a second route. It only bit when both halves were <= 12,
+    # which is the first twelve days of any month, which is why it reached production and sat
+    # there. #530 stopped it by parsing with the format the form wrote; #524 stopped the form
+    # writing an ambiguous one at all. `Date.parse('2026-09-02')` and the strptime below now
+    # agree, and there is no second reading for them to disagree about.
     #
-    # The format is a constant rather than a literal in each of the two places because the
-    # two places are a renderer and a parser of the same string. Written out twice they can
-    # drift, and the failure when they drift is this one again: no error, a stored date seven
-    # months from the one that was shown.
-    FORM_DATE = '%m/%d/%Y'
+    # The format stays a constant rather than a literal in each of the two places, and that is
+    # the part worth keeping whatever the format is: the two places are a renderer and a
+    # parser of the same string, and written out twice they can drift. The failure when they
+    # drift is the one above -- no error, a stored date seven months from the one that was
+    # shown -- so changing the display format has to change what is parsed, in the same edit.
+    FORM_DATE = '%Y-%m-%d'
 
     # That string back into a date, or nil where it is not one.
+    #
+    # Still checked, now that the form posts something unambiguous, because what a browser
+    # posts is not the only thing that arrives here. A hand-made post, an autofill, or a
+    # browser that has never heard of `type="date"` and fell back to a text box all reach this
+    # route with whatever they were holding, and `required` is a client-side promise that the
+    # server is not entitled to believe. Belt and braces rather than dead code: the braces are
+    # the input, and this is the belt.
     #
     # Nil rather than a raised exception, and nil rather than a guess. `Date.parse` would take
     # almost anything and be confidently wrong about some of it, which is the bug above.
@@ -111,8 +126,11 @@ class Tectonic < Roda
     # same reason: a value nothing can resolve is refused where it arrives rather than stored
     # and misread by every reader afterwards.
     #
-    # `strptime` rather than a regex and three integers: it rejects 02/30/2026 and 13/01/2026
-    # on the calendar's terms, which is the check a regex would have to grow into.
+    # `strptime` rather than `Date.iso8601` or a regex and three integers. It rejects
+    # 2026-02-30 and 2026-13-01 on the calendar's terms, which is the check a regex would have
+    # to grow into, and unlike `iso8601` it reads exactly the one shape this form writes --
+    # `20260902` and `2026-W36-3` are both good ISO 8601 and neither is a thing this field can
+    # have produced.
     def self.date_from_form(raw)
       Date.strptime(raw.to_s.strip, FORM_DATE)
     rescue Date::Error

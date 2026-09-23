@@ -9,7 +9,8 @@ require 'securerandom'
 # accents rode in with the templates they came from and survived for years because
 # neither one is loud: Tailwind UI's indigo sat on the two set checkboxes and painted
 # nothing at all, since @tailwindcss/forms is not loaded and a native checkbox takes no
-# tint from `text-*`; Flowbite's blue only appeared while the date field had focus. A
+# tint from `text-*`; Flowbite's blue only appeared while the date field had focus, and the
+# input it came in on was replaced by a native one in #524. A
 # wrong token breaks no page and fails no other spec, which is how the indigo lasted,
 # so the classes are asserted against the rendered HTML rather than looked at. The
 # `accent-*` assertions are the ones that stand for something on screen; the `text-*`
@@ -82,22 +83,27 @@ describe 'the date field on the new workout form' do
     get '/workouts/new'
   end
 
-  # This one does reach the screen: focus it and the border changes colour, and it was
+  # This one does reach the screen: focus it and the ring changes colour, and it was
   # the only field in the app that changed to blue rather than lime.
   #
   # sky-800 since #333, which took every focus ring off lime -- lime-500 is 1.98:1 on white
-  # against the 3:1 an indicator is asked for. This field does not go through field_style,
-  # so it kept the old colour after that change and was once again the only one that
-  # differed; #368 brought it back into line. What the spec is really holding is that it
-  # matches the rest, so it now names the colour the rest of them use.
-  it 'rings and borders like every other field on focus' do
+  # against the 3:1 an indicator is asked for. This field did not go through field_style, so
+  # it kept the old colour after that change and was once again the only one that differed;
+  # #368 named the colour on the field itself to bring it back into line. Since #524 it goes
+  # through the helper like every other input, which is the form the fix should always have
+  # taken and could not while the rest of the input was Flowbite's shape -- so the assertion
+  # is on the helper's ring rather than on a copy of its colour, and the field cannot drift
+  # off the others again without taking all eleven with it.
+  it 'rings like every other field on focus' do
     assert_includes classes_of(input('date')), 'focus:ring-sky-800'
-    assert_includes classes_of(input('date')), 'focus:border-sky-800'
+    assert_includes classes_of(input('date')), 'focus:ring-inset'
     refute_includes last_response.body, 'blue-500'
   end
 
   # Tailwind's CDN defaults darkMode to media, so these were live on a phone set to dark
-  # and drew one grey input in the middle of a page layout.erb keeps at bg-gray-100.
+  # and drew one grey input in the middle of a page layout.erb keeps at bg-gray-100. The
+  # markup they rode in on is gone with the datepicker, and this stays to say they do not
+  # come back with the next thing copied out of somebody's example.
   it 'carries no dark variants for a theme that does not exist' do
     tokens = classes_of(input('date'))
 

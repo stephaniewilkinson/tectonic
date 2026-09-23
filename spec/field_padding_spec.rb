@@ -18,8 +18,10 @@ module Fields
     last_response.body.scan(CONTROL).flatten.map(&:split)
   end
 
-  # A control styled by the shared helper, which is what this rule is about. The date field
-  # on the workout form is Flowbite's own shape and is deliberately not one of these.
+  # A control styled by the shared helper, which is what this rule is about. The date field on
+  # the workout form used to be excluded here, on the grounds that it was Flowbite's own shape
+  # rather than this app's; #524 replaced it with a native date input on field_style, so it is
+  # simply one of these now and the rule reaches it without anything being said.
   def shared_controls(path)
     controls_on(path).select { |classes| classes.include?('rounded-md') && classes.include?('shadow-sm') }
   end
