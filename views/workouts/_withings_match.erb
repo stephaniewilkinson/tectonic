@@ -1,0 +1,126 @@
+<%# Was this session the thing your watch recorded? #520.
+
+    On the record and not on the session screen, which is what #520 settled: the session
+    screen is for lifting, and by the time there is anything to match the lifting is done.
+    It also means the question survives a lifter who taps finish and puts the phone away --
+    it is on a page they come back to rather than a moment they have to catch.
+
+    **Four states, and telling them apart is the substance of the ticket.** A page with two
+    -- match or nothing -- would say "no activity" about a fetch that was rate-limited and
+    about an upload that lands in ninety seconds, and both of those are claims the app
+    cannot support. See lib/tectonic/withings_workouts.rb: `answered` folds Withings' 601
+    into the same nil as a revoked token, so the distinction has to be carried deliberately
+    or it is lost.
+
+    Nothing at all where there is nothing to ask. A session that was never matched and has
+    been dismissed, one on an account with no Withings connection, and one old enough that
+    nothing is coming all render no markup whatever -- which is the property that keeps the
+    prompt worth reading on the session where it does appear. %>
+<%- if @withings && @withings[:state] == :proposed %>
+  <%# The proposal. A question with the evidence attached, not an announcement.
+
+      The sentence is the whole of why this is confirmable. A lifter cannot agree or
+      disagree with a score of 1.05; they can agree with "overlaps this session for 48m of
+      its 52m", which is the same fact said in a way that can be checked against a memory of
+      the afternoon. #520 is explicit that an overlap in time is good evidence and not proof
+      -- a dog walk at 18:00 and a lift at 18:30 both touch the window, and the watch may
+      have called either one strength training -- so the evidence is shown and the judgement
+      is the lifter's.
+
+      Yes is the lime fill the app uses for work that was done; no is the plain bordered
+      button, because refusing is not a lesser version of confirming, it is the other
+      answer, and a greyed-out-looking control would read as the one you are not meant to
+      press. %>
+  <div class="mt-4 rounded-md border border-gray-300 bg-amber-50 px-4 py-3">
+    <p class="text-sm text-gray-900">
+      Withings recorded an activity
+      <%== render('workouts/_clock_time', locals: { at: @withings[:activity][:started_at] }) %>
+      to
+      <%== render('workouts/_clock_time', locals: { at: @withings[:activity][:ended_at] }) %>.
+      Was that this session?
+    </p>
+    <p class="mt-1 text-xs text-gray-600">It <%= @withings[:because] %>.</p>
+    <div class="mt-3 flex items-center gap-2">
+      <form method="post" action="/workouts/<%= @workout[:id] %>/withings/match">
+        <%== csrf_tag("/workouts/#{@workout[:id]}/withings/match") %>
+        <input type="hidden" name="activity" value="<%= @withings[:activity][:external_id] %>">
+        <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                      text-gray-900 hover:bg-lime-600">Yes, that was this session</button>
+      </form>
+      <%# Dismissing carries the activity it was shown with, so "no" can be recorded about
+          both things at once: this session is answered, and this activity is not a lift the
+          lifter logged. Without the id the second half would be guessed. %>
+      <form method="post" action="/workouts/<%= @workout[:id] %>/withings/dismiss">
+        <%== csrf_tag("/workouts/#{@workout[:id]}/withings/dismiss") %>
+        <input type="hidden" name="activity" value="<%= @withings[:activity][:external_id] %>">
+        <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 bg-white px-3
+                                      text-sm font-medium text-gray-700 hover:bg-gray-50">No</button>
+      </form>
+    </div>
+  </div>
+<%- elsif @withings && @withings[:state] == :waiting %>
+  <%# **Late is not absent**, and this sentence is the whole reason the state exists.
+
+      Closing a workout in the Withings app starts an upload; their servers get it seconds
+      to minutes later, and only then is there anything here to fetch. A lifter who taps
+      finish and reads this page immediately is in the ordinary case, not an edge one -- and
+      "no activity found" would be a lie about a thing that is merely on its way. It is the
+      same distinction 041 draws by storing `measured_at` apart from when a row appeared.
+
+      The dismiss button is here rather than only on the proposal, and that is what keeps
+      #520's "do not nag" honest for the commonest case of all: a lifter who simply did not
+      wear the watch for this session has nothing to confirm and would otherwise be told to
+      check back in a minute every time they opened the page. It posts no activity id,
+      because there is no activity -- the refusal is about the session. %>
+  <div class="mt-4 rounded-md border border-gray-300 bg-white px-4 py-3">
+    <p class="text-sm text-gray-700">
+      Nothing from Withings yet &mdash; check back in a minute.
+    </p>
+    <form method="post" action="/workouts/<%= @workout[:id] %>/withings/dismiss" class="mt-3">
+      <%== csrf_tag("/workouts/#{@workout[:id]}/withings/dismiss") %>
+      <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 bg-white px-3
+                                    text-sm font-medium text-gray-700 hover:bg-gray-50">Don&rsquo;t ask
+        about this session</button>
+    </form>
+  </div>
+<%- elsif @withings && @withings[:state] == :unreachable %>
+  <%# The trap, given its own sentence.
+
+      Withings signals rate limiting as body status 601 and delivers it as HTTP 200, exactly
+      like a revoked token and exactly like every other error they have -- so a fetch that
+      was throttled arrives here looking identical to one that found nothing. Rendering it
+      as "no activity" would be the app asserting something about the lifter's afternoon on
+      the strength of a request that was never answered.
+
+      No dismiss button. Dismissing answers a question, and this state is the app admitting
+      it has not managed to ask one. %>
+  <div class="mt-4 rounded-md border border-gray-300 bg-white px-4 py-3">
+    <p class="text-sm text-gray-700">
+      Withings could not be reached just now, so there is nothing to say about this session
+      yet. Reload in a minute.
+    </p>
+  </div>
+<%- elsif matched_activity %>
+  <%# Matched. The length and the two ends are already on the lines above, preferring the
+      watch and saying so, so what is left here is what only the watch has: the heart rate
+      it carried across the session, and how hard it judged the work to be.
+
+      Each figure is absent rather than zero where the watch did not record it. A watch with
+      no optical sensor, or one worn loosely, reports no heart rate at all, and a 0 bpm
+      average printed under a session would be a reading rather than a gap.
+
+      Named as the watch's throughout -- "your watch", not "measured" on its own -- because
+      the whole of the page's honesty here is that a reader can always tell which instrument
+      a number came from. %>
+  <p class="mt-2 text-sm text-gray-500">
+    Matched to your watch
+    <%- if matched_activity[:hr_average] %>
+      <span aria-hidden="true">&middot;</span>
+      <%= matched_activity[:hr_average] %> bpm average<%- if matched_activity[:hr_max] %>, <%= matched_activity[:hr_max] %> peak<%- end %>
+    <%- end %>
+    <%- if matched_activity[:calories] %>
+      <span aria-hidden="true">&middot;</span>
+      <%= matched_activity[:calories].to_i %> kcal
+    <%- end %>
+  </p>
+<%- end %>

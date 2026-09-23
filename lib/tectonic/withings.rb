@@ -36,6 +36,18 @@ class Tectonic < Roda
     def self.endpoint = ENV.fetch('WITHINGS_API_ENDPOINT', 'https://wbsapi.withings.net')
 
     TOKEN_PATH = '/v2/oauth2'
+    # Where the measurement services live. One path, many actions -- `getmeas` for a
+    # bodyweight, `getworkouts` for an activity -- which is Withings' shape rather than
+    # ours: the path says which service and the body says which method.
+    MEASURE_PATH = '/v2/measure'
+    # What `getworkouts` must be asked for by name.
+    #
+    # This is the part of the endpoint that is not guessable from its documentation. Without
+    # `data_fields` the answer carries ids, category and timestamps and *nothing else* -- no
+    # error, no empty keys, simply an activity with no measurements in it. A caller that
+    # assumed the heart rate would be there would find nil on every row and have no way to
+    # tell that from a watch that recorded none.
+    WORKOUT_FIELDS = 'calories,effduration,hr_average,hr_min,hr_max'
     # What #472 settled: metrics for weight and body composition, activity for sleep and
     # workouts. Deliberately *not* `user.info`, which requires a contract with Withings and
     # fails the whole authorisation without one.
@@ -76,13 +88,61 @@ class Tectonic < Roda
                        client_id:, client_secret: secret, refresh_token:)
     end
 
+    # Every activity the watch recorded across a range of civil days, oldest page first. #520.
+    #
+    # `startdateymd`/`enddateymd` rather than the epoch pair the rest of this module deals
+    # in, because that is what this action takes: civil dates, `Y-m-d`, and the answer comes
+    # back with epochs in it. The published spec marks `startdateymd`, `enddateymd` *and*
+    # `lastupdate` all required; they are in fact mutually exclusive, and sending the third
+    # alongside the first two is refused. Only the date pair is sent here -- `lastupdate` is
+    # the resume cursor a poller would want, and nothing here polls.
+    #
+    # **Paged, and the loop is not optional.** Withings answers a window wider than one page
+    # with `more: true` and an `offset` to send back, and a caller that read the first page
+    # and stopped would silently lose every activity after the twentieth-odd. Worse, it
+    # would lose them at exactly the moment a lifter had had a busy fortnight.
+    #
+    # Nil for a failure of any page rather than the pages gathered so far, and that nil is
+    # load-bearing: `answered` folds Withings' rate-limit status (601) into the same nil as a
+    # revoked token, so a throttled fetch is indistinguishable from an empty one at this
+    # level. Returning a short array would make it *look* like an answer, and a caller would
+    # render "no activity" about a request that was never served. An empty array means
+    # Withings said there was nothing; nil means Withings did not say.
+    def workouts(token, from:, to:)
+      gathered = []
+      offset = 0
+      loop do
+        body = workout_page(token, from, to, offset)
+        return nil unless body
+
+        gathered.concat(Array(body['series']))
+        return gathered unless body['more']
+
+        offset = body['offset'].to_i
+      end
+    end
+
+    def workout_page(token, from, to, offset)
+      post(MEASURE_PATH, token:, action: 'getworkouts', data_fields: WORKOUT_FIELDS,
+                         startdateymd: from.strftime('%Y-%m-%d'),
+                         enddateymd: to.strftime('%Y-%m-%d'), offset:)
+    end
+
     # One POST, and the two ways it can fail folded into one nil.
     #
     # The `status` check is the half that is easy to miss: Withings answers 200 with a
     # non-zero status for an expired token, a bad secret and a revoked grant alike, so a
     # caller trusting the HTTP status would store the error body as though it were tokens.
-    def post(path, **form)
-      response = HTTP.timeout(TIMEOUT).post("#{endpoint}#{path}", form:)
+    #
+    # `token` is optional because the two oldest callers here are the token endpoint itself,
+    # which authenticates with the client secret in the form and has no bearer to offer. The
+    # data endpoints do: Withings takes the access token as an Authorization header, and
+    # putting it in the form instead -- which their older documentation still shows -- writes
+    # a live credential into any request log that records a body.
+    def post(path, token: nil, **form)
+      client = HTTP.timeout(TIMEOUT)
+      client = client.auth("Bearer #{token}") if token
+      response = client.post("#{endpoint}#{path}", form:)
       return report("HTTP #{response.status}", path) unless response.status.success?
 
       answered(JSON.parse(response.body.to_s), path)
