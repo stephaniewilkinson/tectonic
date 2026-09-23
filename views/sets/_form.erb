@@ -9,6 +9,18 @@
 <%- @action = "/workouts/#{@workout.id}/sets/#{@set ? @set.id : 'new'}" %>
 <form action="<%= @action %>" method="post">
   <%== csrf_tag(@action) %>
+  <%# Which screen this form was opened from, carried through the post. #578.
+
+      A hidden field rather than a query string on the action, because csrf_tag binds a token
+      to the path it is given and a form whose action and whose token disagreed about the path
+      would be refused outright -- a failure that reads as "Save does nothing".
+
+      The value is echoed rather than taken from the request, but it can only ever be the one
+      word the route recognises: back_to_session? compares against a literal and every other
+      answer is ignored. Nothing a link can say decides where the redirect goes. %>
+  <%- if @return_to_session %>
+    <input type="hidden" name="return_to" value="session">
+  <%- end %>
   <fieldset>
     <div class="space-y-5">
       <%# The movement, which used to be the select this now wraps. #525 is the whole of why

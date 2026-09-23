@@ -1135,7 +1135,12 @@ class Tectonic < Roda
           # Worth knowing at this call site: the first row is what an untouched new-set form
           # posts, so this line chooses the default as well as the order.
           @exercises = Exercise.visible_to(@account_id).library_first_by_name
-          r.get('new') { view('sets/new') }
+          # Which screen this form was opened from, so that it can put the lifter back on it.
+          # #578, and `back_to_session?` carries the argument.
+          r.get('new') do
+            @return_to_session = back_to_session?(r)
+            view('sets/new')
+          end
 
           # The movement has to be one this account may select. The barbell flag was
           # already read through visible_exercise, but the id itself went in unchecked,
@@ -1143,13 +1148,20 @@ class Tectonic < Roda
           # its name back wherever that set appeared.
           r.post 'new' do
             check_csrf!
+            # The two redirects below used to name the form's own path and nothing else, which
+            # is right for a form opened from the record page and loses the way home for one
+            # opened from the gym floor screen (#578). A refusal has to bounce back to the form
+            # *as it was opened* -- a mistyped rep count should not also cost the lifter the
+            # link back to the session they are standing in the middle of.
+            form = "/workouts/#{workout_id}/sets/new"
+            form += '?return_to=session' if back_to_session?(r)
             exercise = visible_exercise(r.params['exercise_id'])
-            r.redirect "/workouts/#{workout_id}/sets/new" unless exercise
+            r.redirect form unless exercise
             # required on the input is the browser's rule and stops at the browser. A post
             # with no rep count in it reaches here, and sets_measures_one_way refuses a row
             # measured in reps that has none -- unrescued, so a 500 rather than a refusal.
             # Every set this form makes is measured in reps, which is the column default.
-            r.redirect "/workouts/#{workout_id}/sets/new" if r.params['reps'].to_s.strip.empty?
+            r.redirect form if r.params['reps'].to_s.strip.empty?
 
             # No timed guard on is_commanded here, unlike the edit form: every set this form
             # makes is counted in reps, which is the column default and is the same reason
@@ -1159,6 +1171,12 @@ class Tectonic < Roda
                                        is_commanded: !r.params['is_commanded'].nil?,
                                        is_completed: r.params['is_completed'] || false, workout_id:,
                                        is_barbell: exercise.barbell?)
+            # Back to the gym floor screen where the form was opened from it, and to the set
+            # otherwise. The set page is the right landing for a form opened from the record --
+            # it is a confirmation of what was just written, and the record is one tap away --
+            # and it is the wrong one for a lifter who is mid-session: its only way onwards is
+            # the record, which is two taps from the session. #578.
+            r.redirect "/workouts/#{workout_id}/session" if back_to_session?(r)
             r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
           end
 
@@ -2328,6 +2346,22 @@ class Tectonic < Roda
 
     WorkoutSet.where(id: set_id, workout_id:).first
   end
+
+  # Whether the new-set form was opened from the gym floor screen, and should therefore put
+  # the lifter back on it. #578.
+  #
+  # **A fixed word rather than a path, and that is the whole of the design.** The obvious
+  # shape for this is a `return` parameter carrying where to go, and the obvious shape is an
+  # open redirect: a link mailed to somebody, or a form posted from another origin, would then
+  # choose which page this app sends them to after a write it performed on their behalf. There
+  # is exactly one screen that needs bringing back to, so the parameter names it rather than
+  # describes it, and anything else the request says is ignored rather than followed.
+  #
+  # Read from params rather than from the referrer, which is the other obvious shape and is
+  # worse in a quieter way: a browser that suppresses Referer -- a privacy setting, a
+  # redirect chain, an iOS reader mode -- would silently land the lifter somewhere else, and
+  # the failure would look like the app forgetting rather than like a header not arriving.
+  def back_to_session?(request) = request.params['return_to'].to_s == 'session'
 
   # The movement a form asked for, looked up only among the ones this account may
   # select -- its own and the shared library -- so a set can never be pointed at a
