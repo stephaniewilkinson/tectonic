@@ -42,6 +42,15 @@ module Backfilling
     end
   end
 
+  # The same walk, made in an earlier calendar year. Both clocks, because the walk reads one
+  # to choose its years and writes the other into the watermark, and a run that chose 2023's
+  # years and stamped 2026 would be a fixture describing a thing that cannot happen.
+  def walked_in(year, account_id, answer, **)
+    Date.stub(:today, Date.new(year, 6, 1)) do
+      Time.stub(:now, Time.new(year, 6, 1, 12, 0, 0)) { backfill(account_id, answer, **) }
+    end
+  end
+
   # The forms that actually went over the wire, for the assertions about how the history is
   # walked rather than about what comes out of it.
   def asked_for(account_id, **)
@@ -80,6 +89,11 @@ module Backfilling
   # column the import button keeps, which is the point: there is one answer to "how far back"
   # and both entry points write it. #554.
   def read_back_to(account_id) = connection(account_id)[:workouts_imported_year]
+
+  # And how far forward, which is the other end of the same claim and the hole #566 was.
+  # "Read back to 2019" says nothing whatever about 2024 having been read, and a walk that
+  # wrote only the one number left the button retiring years nobody had ever asked about.
+  def read_through(account_id) = connection(account_id)[:workouts_imported_through_year]
 
   # A session in a named year rather than "a while ago", because the claims below are about
   # a walk that stops several years short of the earliest one and a relative stamp would make
@@ -225,6 +239,51 @@ describe 'a walk that finished' do
   it 'starts the next run at the year it got to' do
     assert_equal years_from(Date.today.year), asked_for(@account_id)
   end
+
+  # Both ends, because the claim has two. A walk records how far back it got *and* that it got
+  # there from this year, and without the second number the button reading the same cursor has
+  # no way to tell "everything from 2019 to 2023" from "everything from 2019 to now". #566.
+  it 'writes down that it read through to this year as well as how far back it got' do
+    assert_equal @at.year, read_back_to(@account_id)
+    assert_equal Date.today.year, read_through(@account_id)
+  end
+end
+
+describe 'a whole history walked from a terminal in an earlier year' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  # The rake task's version of #566. The walk really did read everything, and the calendar
+  # then moved on -- so "read back to 2019" is still true and "there is nothing left to read"
+  # has quietly stopped being true, and only the second number can tell them apart.
+  before do
+    @account_id = login
+    connect(@account_id)
+    @earliest = Date.today.year - 7
+    @workout_id = session_from(@earliest)
+    walked_in(Date.today.year - 3, @account_id, answering)
+  end
+
+  it 'leaves the import button offering the years that have happened since' do
+    assert_equal Date.today.year - 2, Tectonic::WithingsBackfill.pending(@account_id)[:year]
+  end
+
+  # And the task itself already floors a later run at the year the stamp was written in, so
+  # the two entry points agree about which years are still unread rather than one of them
+  # walking years the other has retired.
+  it 'leaves a later run of the task walking the same years' do
+    assert_equal years_from(Date.today.year - 3), asked_for(@account_id)
+  end
+
+  # The years it read are contiguous with the years the task would walk again, so the second
+  # run widens one range rather than recording a second one nothing could describe.
+  it 'joins what a later run reads onto what it already had' do
+    backfill(@account_id, answering)
+
+    assert_equal @earliest, read_back_to(@account_id)
+    assert_equal Date.today.year, read_through(@account_id)
+  end
 end
 
 describe 'a walk the operator narrowed to the recent years' do
@@ -343,7 +402,8 @@ describe 'a narrowed walk for a lifter who has already read further back than it
     connect(@account_id)
     @earliest = Date.today.year - 3
     @workout_id = session_from(@earliest)
-    DB[:account_withings].where(account_id: @account_id).update(workouts_imported_year: @earliest)
+    DB[:account_withings].where(account_id: @account_id)
+                         .update(workouts_imported_year: @earliest, workouts_imported_through_year: @earliest)
     backfill(@account_id, answering, since: Date.today.year)
   end
 

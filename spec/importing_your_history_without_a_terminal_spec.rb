@@ -45,6 +45,27 @@ module ImportingHistory
     @found = activity(starts: @at + 60, minutes: 48)
   end
 
+  # The same lifter with seven years behind them, which is what #566 needs: a history long
+  # enough that a course of presses can finish inside one calendar year and still leave
+  # several years of calendar standing above where it stopped.
+  def lifter_with_a_long_history
+    @account_id = login
+    connect(@account_id)
+    @at = Time.new(this_year - 7, 6, 15, 10, 0, 0)
+    @workout_id = session_in(this_year - 7, @account_id)
+    @found = activity(starts: @at + 60, minutes: 48)
+  end
+
+  # A course of presses made in an earlier calendar year, which is the whole shape of #566.
+  #
+  # Moving the clock rather than writing the cursor by hand, because what is being asserted is
+  # that a course of *ordinary presses* leaves a state the page can still read honestly years
+  # later -- and a fixture that wrote the columns itself would be asserting against this
+  # module's idea of them rather than against what pressing the button actually does.
+  def pressed_in(year, times)
+    Date.stub(:today, Date.new(year, 6, 1)) { times.times { press(answering(@found)) } }
+  end
+
   # The press itself, with whatever Withings was going to answer stubbed out. `nil` is the
   # answer that means "Withings did not say"; `[]` is the one that means it said nothing.
   def press(answer = answering)
@@ -313,6 +334,179 @@ describe 'a press that meets the stranded proposal #555 describes' do
 
     assert_equal this_year, imported_year(@account_id)
     assert_equal 1, DB[:withings_workouts].where(account_id: @account_id).count
+  end
+end
+
+# #566, which is the import button's own hole and predates the cursor being shared.
+#
+# A cursor is one number and it answers one question: how far back the reading got. The page
+# was reading it as the answer to a second question as well -- whether everything above it had
+# been read -- and that is true for exactly as long as it takes the calendar to move on. A
+# lifter who pressed Import through 2023 and stopped at 2019 was told in 2026 that their
+# history was fully imported, while 2024 and 2025 had never been asked about and never would
+# be, because the cursor sits below them and only ever moves further down.
+describe 'a lifter who imported their whole history and came back some years later' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include ImportingHistory
+
+  before do
+    lifter_with_a_long_history
+    pressed_in(this_year - 3, 5)
+    get '/settings'
+  end
+
+  # The failure in one line. Five presses in an earlier year read that year down to the
+  # earliest stamped set, so the cursor is at the floor -- and the floor is the one place a
+  # single number is read as "there is nothing left", whatever the calendar has done since.
+  it 'is offered the years that happened after the course of presses ended' do
+    assert_includes last_response.body, "Import #{this_year - 2}</button>"
+    refute_includes last_response.body, 'imported back to'
+  end
+
+  # The wording is part of the fix. A sentence built around a single unbroken run backwards
+  # cannot say this at all, and a page that cannot say it can only stay quiet about years
+  # nobody has read.
+  it 'names the years nobody has read rather than claiming the history is complete' do
+    assert_includes last_response.body, "#{this_year - 2} to #{this_year} have not been read."
+  end
+
+  it 'says what it has read, now that the read range is two numbers rather than one' do
+    assert_includes last_response.body, "Imported so far: #{this_year - 7} through #{this_year - 3}."
+  end
+
+  # "Back to" is the wrong direction for work that runs forwards. Everything older has been
+  # read, so what is left is the years since, and the count has to stop pointing at the floor.
+  it 'counts the years left forwards, because there is nothing older left to read' do
+    assert_includes last_response.body, '3 years to go,'
+    assert_includes last_response.body, 'up to this year.'
+    refute_includes last_response.body, "back to #{this_year - 7}"
+  end
+end
+
+describe 'a course of presses interrupted in one year and resumed in another' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include ImportingHistory
+
+  # Two presses and then nothing for three years, which leaves the gap in the middle rather
+  # than at the top: unread years above what was read and unread years below it.
+  before do
+    lifter_with_a_long_history
+    pressed_in(this_year - 3, 2)
+    get '/settings'
+  end
+
+  # Newest first is the order this module already keeps, and between the two gaps it still
+  # holds: the years above the read range are the newer ones, so they go first.
+  it 'offers the newest unread year rather than carrying on below where it stopped' do
+    assert_includes last_response.body, "Import #{this_year - 2}</button>"
+  end
+
+  it 'says both what has been read and what has not' do
+    assert_includes last_response.body, "Imported so far: #{this_year - 4} through #{this_year - 3}."
+    assert_includes last_response.body, "#{this_year - 2} to #{this_year} have not been read."
+  end
+
+  # Six: three above the read range and three below it. A count that only looked downwards
+  # would say three and be wrong by exactly the years #566 is about.
+  it 'counts every year still to go, on both sides of what it has read' do
+    assert_includes last_response.body, '6 years to go,'
+    assert_includes last_response.body, "back to #{this_year - 7}."
+  end
+end
+
+describe 'how the page names a gap of one year and a gap of two' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include ImportingHistory
+
+  before { lifter_with_a_long_history }
+
+  it 'says one year has not been read' do
+    pressed_in(this_year - 1, 1)
+    get '/settings'
+
+    assert_includes last_response.body, "#{this_year} has not been read."
+  end
+
+  it 'names both of them when there are two' do
+    pressed_in(this_year - 2, 1)
+    get '/settings'
+
+    assert_includes last_response.body, "#{this_year - 1} and #{this_year} have not been read."
+  end
+
+  # A press reads one year, so a range of one year is the ordinary state after the first
+  # press and "2025 through 2025" is a sentence nobody writes.
+  it 'names a read of a single year as one year rather than a range of it' do
+    pressed_in(this_year - 1, 1)
+    get '/settings'
+
+    assert_includes last_response.body, "Imported so far: #{this_year - 1}."
+  end
+end
+
+describe 'pressing import to catch up the years since an old course of presses' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include ImportingHistory
+
+  before do
+    lifter_with_a_long_history
+    pressed_in(this_year - 3, 5)
+  end
+
+  # Upward through the gap rather than downward from this year, which is the one thing two
+  # numbers can record: a range that stays in one piece. Reading this year first would leave
+  # two disjoint pieces and no honest way to write the second one down.
+  it 'reads the oldest unread year first, so what has been read stays in one piece' do
+    asked = []
+    press_recording(asked)
+
+    assert_equal [this_year - 2], asked
+  end
+
+  it 'says the recent years are still unread rather than offering the history below' do
+    press(answering(@found))
+
+    assert_includes last_response.body, "#{this_year - 1} is next"
+    refute_includes last_response.body, 'and earlier'
+  end
+
+  # And a press in the gap must claim the year it read and not the years above it, which is
+  # the same mistake #566 is, made one year at a time.
+  it 'does not claim the years above the one it just read' do
+    press(answering(@found))
+    get '/settings'
+
+    assert_includes last_response.body, "Import #{this_year - 1}</button>"
+  end
+end
+
+describe 'the last of the years an old course of presses left behind' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include ImportingHistory
+
+  before do
+    lifter_with_a_long_history
+    pressed_in(this_year - 3, 5)
+    3.times { press(answering(@found)) }
+  end
+
+  # Only now, and this is the claim the page could not previously make honestly: the history
+  # is read from the earliest stamped set through to this year, both ends of it written down.
+  it 'says the history is complete, once there is genuinely nothing left either way' do
+    assert_includes last_response.body, 'That was the last year; your history is fully imported.'
+    refute_match(%r{<form[^>]*action="/settings/withings/import"}, last_response.body)
+  end
+
+  it 'says so again on the page after it, rather than only in the report' do
+    get '/settings'
+
+    assert_includes last_response.body, "imported back to #{this_year - 7}"
+    assert_includes last_response.body, 'and forward to this year'
   end
 end
 
