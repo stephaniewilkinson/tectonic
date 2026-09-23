@@ -1,0 +1,89 @@
+<%# Every proposal the backfill left, in one place. #520's scope, reversed deliberately.
+
+    ## Why this screen exists at all
+
+    #520 put the question on the workout record and that is still where it belongs for a
+    session finished ten minutes ago: the lifter is already looking at it, and the proposal
+    is about the thing they just did. The backfill breaks the assumption underneath that,
+    which is that proposals arrive one at a time. A first run over a few years can leave
+    eighty of them, and answering eighty from the record pages means finding eighty days in
+    a list that is ordered by date and says nothing about which of them have a question
+    waiting. That is a feature nobody gets to the end of, and a half-answered backfill is
+    worse than none: the proposals that were never looked at sit there looking answered.
+
+    ## What it is not
+
+    It is not a second way to match. The two forms below post to the same two routes the
+    record page posts to, which run the same `confirm` and `dismiss` -- so a yes here and a
+    yes there are the same write, and there is one place where a match is made.
+
+    The wording and the evidence are shared with the record page in the only way that
+    matters: `because` composes the sentence, once, in lib. What is written out again here
+    is the markup around it, because the two screens answer different questions -- that one
+    asks "was this activity this session" about the session you are looking at, and this one
+    asks "which of these eighty are right" -- and forcing one template to do both would make
+    a partial with a mode flag in it.
+
+    ## Nothing here is a live fetch
+
+    The route reads rows the backfill already wrote. Opening this page asks Withings nothing,
+    which is what keeps it safe to leave open and reload. %>
+<div class="px-4 sm:px-6 lg:px-8">
+  <h1 class="text-3xl font-semibold text-gray-900">Matches from your watch</h1>
+  <%- if @proposals.empty? %>
+    <%# **Absent is absent here.** The record page tells a session minutes old to check back
+        in a minute, because the watch's upload really is seconds to minutes behind. This
+        page is about history, where there is no upload on its way, so it says there is
+        nothing waiting and does not promise anything is coming. %>
+    <p class="mt-2 text-sm text-gray-700">
+      Nothing is waiting for an answer. Proposals appear here after a backfill runs, and
+      disappear as you answer them.
+    </p>
+  <%- else %>
+    <p class="mt-2 text-sm text-gray-700">
+      <%= @proposals.length %> session<%= 's' unless @proposals.length == 1 %> from your history
+      overlap something your watch recorded. Each one is a guess &mdash; say which are right.
+    </p>
+    <ul class="mt-6 divide-y divide-gray-200">
+      <%- @proposals.each do |proposal| %>
+        <li class="py-4">
+          <%# The session first and as a link, because the question cannot be answered from
+              the times alone: "the 14th of March, 18:02 to 18:50" is only recognisable to
+              somebody who can go and look at what was lifted that day. %>
+          <p class="text-sm font-semibold text-gray-900">
+            <a href="/workouts/<%= proposal[:workout][:id] %>" class="hover:underline">
+              <%= proposal[:workout][:date].strftime('%b %d, %Y') %>
+            </a>
+          </p>
+          <p class="mt-1 text-sm text-gray-700">
+            Withings recorded an activity
+            <%== render('workouts/_clock_time', locals: { at: proposal[:activity][:started_at] }) %>
+            to
+            <%== render('workouts/_clock_time', locals: { at: proposal[:activity][:ended_at] }) %>.
+            Was that this session?
+          </p>
+          <p class="mt-1 text-xs text-gray-600">It <%= proposal[:because] %>.</p>
+          <div class="mt-3 flex items-center gap-2">
+            <%# `back` is what returns the lifter here rather than to the record they have
+                not asked to see. It names a destination the route already knows rather than
+                carrying a URL, so a forged form cannot redirect anybody anywhere. %>
+            <form method="post" action="/workouts/<%= proposal[:workout][:id] %>/withings/match">
+              <%== csrf_tag("/workouts/#{proposal[:workout][:id]}/withings/match") %>
+              <input type="hidden" name="activity" value="<%= proposal[:activity][:external_id] %>">
+              <input type="hidden" name="back" value="proposals">
+              <button type="submit" class="<%= button_style %> min-h-11 bg-lime-500 px-3 text-sm font-semibold
+                                            text-gray-900 hover:bg-lime-600">Yes</button>
+            </form>
+            <form method="post" action="/workouts/<%= proposal[:workout][:id] %>/withings/dismiss">
+              <%== csrf_tag("/workouts/#{proposal[:workout][:id]}/withings/dismiss") %>
+              <input type="hidden" name="activity" value="<%= proposal[:activity][:external_id] %>">
+              <input type="hidden" name="back" value="proposals">
+              <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 bg-white px-3
+                                            text-sm font-medium text-gray-700 hover:bg-gray-50">No</button>
+            </form>
+          </div>
+        </li>
+      <%- end %>
+    </ul>
+  <%- end %>
+</div>
