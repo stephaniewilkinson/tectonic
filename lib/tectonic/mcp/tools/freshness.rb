@@ -73,15 +73,45 @@ class Tectonic < Roda
         # it is about to give, which differs enough between a count, a rolling mean and a
         # single weigh-in to be worth each of them saying in its own words.
         #
-        # Called whatever `source` the caller named. A request for the caliper's readings does
-        # not need the scale read, but the rule "the account's measurements are made current
-        # when they are read" is one rule rather than one with an exception in it, and the
-        # exception is the kind that is quietly wrong later -- a filter chooses what to report,
-        # not whether what is reported is up to date.
-        def checked(context, risk: nil)
+        # Not called where the caller has asked for readings the scale cannot have written.
+        #
+        # This started as one rule with no exception in it -- read the scale whenever anybody
+        # reads the numbers, because a filter chooses what to report rather than whether what
+        # is reported is current -- and that argument is still the right one for a filter that
+        # *includes* Withings. It stops being right for one that excludes it. A request for the
+        # caliper's readings cannot be answered differently by anything the scale says, so the
+        # call is not a cheap habit, it is a call that could not have changed the answer.
+        #
+        # And it is not free in the way an exception-free rule assumes. Withings refuses a
+        # caller that asks too often, and refuses it as a non-zero status inside an ordinary
+        # 200 -- which `answered` folds into the same nil as a withdrawn grant. So a call spent
+        # where it could not help is a call closer to the one refusal this module cannot tell
+        # apart from a dead connection. The staleness floor bounds how often that happens; it
+        # does not make a pointless call worth making.
+        #
+        # Silent rather than explained: `:not_asked` carries no note, because a sentence about
+        # how fresh the scale is would be a caveat about an instrument the caller has just said
+        # they are not reading from.
+        def checked(context, risk: nil, source: nil)
+          return NOT_ASKED if elsewhere?(source)
+
           view = describe(read(context.account_id))
           view.merge(note: note(view, risk))
         end
+
+        # Whether the caller has filtered to something the scale did not write. Blank is not a
+        # filter -- it is the ordinary case, everything, which includes Withings and therefore
+        # wants the read.
+        def elsewhere?(source)
+          named = source.to_s.strip
+          !named.empty? && named != WithingsMeasures::SOURCE
+        end
+
+        # `readings_may_be_missing` is false rather than absent, and it is true to say so: no
+        # read was attempted, so nothing about these rows is missing *because a fetch failed*.
+        # Whatever wrote them is as complete as it ever was.
+        NOT_ASKED = { outcome: 'not_asked', last_read_at: nil,
+                      readings_may_be_missing: false, note: nil }.freeze
 
         # The fetch, and nothing it can do escapes this method.
         #

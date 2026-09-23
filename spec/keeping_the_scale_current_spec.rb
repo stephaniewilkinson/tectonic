@@ -310,3 +310,51 @@ describe 'an account with no scale connected' do
   end
 end
 
+# A filter that excludes the scale. #545.
+#
+# The rule everywhere above is that reading the numbers reads the scale first, and that rule
+# is right for every filter that *includes* Withings. It is wrong for one that excludes it:
+# nothing the scale says can change an answer about readings the scale did not write, so the
+# call could not have helped -- and Withings refuses a caller that asks too often, in a way
+# this app cannot tell from a withdrawn grant. A call that could not have helped is a call
+# closer to that refusal for nothing.
+describe 'a tool call filtered to readings the scale did not write' do
+  include Rack::Test::Methods
+  include CurrentScale
+
+  before do
+    a_connected_lifter
+    daily(@token.account_id, [81.2, 81.5], source: 'manual')
+  end
+
+  it 'does not read the scale' do
+    answering(page([a_weigh_in])) { ask('health_readings', source: 'manual') }
+
+    assert_empty @asked, 'a request for readings Withings did not write still called Withings'
+  end
+
+  it 'still answers with the readings that were asked for' do
+    ask('health_readings', source: 'manual')
+
+    assert_equal 2, only_instrument['readings']
+    refute failed?
+  end
+
+  # Silent rather than explained. A sentence about how fresh the scale is would be a caveat
+  # about an instrument the caller has just said they are not reading from.
+  it 'says nothing about the scale either way' do
+    ask('health_readings', source: 'manual')
+
+    assert_equal 'not_asked', freshness['outcome']
+    refute freshness['readings_may_be_missing']
+    refute_includes prose, 'scale'
+  end
+
+  # The half that must not regress: a filter naming Withings is not a filter that excludes it.
+  it 'still reads the scale when the filter names it' do
+    answering(page([a_weigh_in])) { ask('health_readings', source: 'withings') }
+
+    refute_empty @asked, 'a request for the scale\'s own readings declined to read the scale'
+  end
+end
+

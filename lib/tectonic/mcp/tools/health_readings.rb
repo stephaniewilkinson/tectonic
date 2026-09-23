@@ -75,7 +75,7 @@ class Tectonic < Roda
         # the table as it was a moment before the readings it triggered arrived.
         def self.perform(context:, arguments:)
           metric = named(arguments)
-          fresh = Freshness.checked(context, risk: GAP_RISK)
+          fresh = Freshness.checked(context, risk: GAP_RISK, source: arguments[:source])
           from, to = bounds(context, arguments)
           rows = BodyReadings.in_window(context.health_metrics, metric:, from:, to:, source: arguments[:source])
           return empty(context, metric, from, to, fresh) if rows.empty?
