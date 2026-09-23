@@ -46,9 +46,44 @@ class Tectonic < Roda
     # rather than filtered later, because a list that showed an answered proposal would invite
     # somebody to answer it again -- and the second answer would silently do nothing, since
     # `confirm` refuses a session that is already matched.
-    def unanswered(account_id)
+    def unanswered(account_id) = outstanding(account_id).all
+
+    # How many questions are still open, which is what a doorway to this screen needs to know
+    # before it can decide whether to exist. #534.
+    #
+    # A count rather than `waiting(account_id).length`, and the difference is not tidiness.
+    # `waiting` loads every proposal, then every session behind them, then every set stamp of
+    # every one of those sessions, and reduces the lot to sentences -- three queries and a
+    # timing calculation per row, to answer a question whose answer is a number. Asking it
+    # that way from the workouts list would make browsing training pay for a screen the lifter
+    # has not opened.
+    #
+    # `except` is for the record page, which asks a narrower question: not "how many are
+    # waiting" but "how many are waiting *besides the one I am looking at*". Without it the
+    # prompt on a backfilled session would count itself and tell a lifter with one question
+    # left that there was one elsewhere. A session in the forward flow is not in this set at
+    # all -- its activity has no `proposed_workout_id`, because nothing wrote one down -- so
+    # passing its id is simply a no-op there rather than a special case to remember.
+    def waiting_count(account_id, except: nil)
+      rows = outstanding(account_id)
+      rows = rows.exclude(proposed_workout_id: except) if except
+      rows.count
+    end
+
+    # The one spelling of "still a question", as a dataset rather than as rows, so that the
+    # list and the count cannot come to disagree about what counts as waiting. Two spellings
+    # would drift on exactly the case that is hardest to notice: a badge saying three while
+    # the screen behind it lists two, which reads as a bug in the screen rather than in the
+    # badge and sends somebody looking in the wrong place.
+    #
+    # These three conditions are also written into an index in 044, and Postgres will only
+    # reach for it where it can prove this predicate implies that one. So this is not merely
+    # where the filter is kept tidy -- it is the thing the index is matched against, and a
+    # condition added here that is not there turns the count back into a scan of every
+    # activity the account owns, silently and with every spec still passing.
+    def outstanding(account_id)
       DB[:withings_workouts].where(account_id:, workout_id: nil, dismissed_at: nil)
-                            .exclude(proposed_workout_id: nil).all
+                            .exclude(proposed_workout_id: nil)
     end
 
     # Scoped by account as well as by id, so a proposal whose session somehow belongs to

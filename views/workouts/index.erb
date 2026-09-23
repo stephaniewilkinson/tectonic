@@ -9,6 +9,53 @@
     </div>
   </div>
 
+  <%# The way in to the backfill's review list. #534.
+
+      ## Why the doorway is here and not in the nav
+
+      /workouts/withings has worked since #532 and nothing has ever linked to it, so the only
+      way to reach it is to have just run `withings:backfill` with the output still on screen.
+      A lifter who ran it, shut the terminal and came back on Sunday had no route to their own
+      questions.
+
+      The nav was the obvious home and is the wrong one. It is seven links on purpose, it
+      already wraps to two rows between 640 and 840px, and an eighth would be carried on every
+      page by every lifter -- including everyone who owns no watch -- to point at a screen
+      that is empty except for the few days after a backfill. Making that entry conditional
+      trades one problem for a worse one: people learn where things are by position, and a nav
+      entry that comes and goes shifts every entry after it, so `settings` is fourth on
+      Tuesday and fifth on Sunday.
+
+      This page is where the questions already live. Every one of them is about a session in
+      the list below, it is the page somebody opens when they sit down to deal with their
+      training, and a line at the top of a page's own content is not a landmark anybody
+      navigates by -- so it can appear and vanish without costing anyone their bearings. The
+      screen's *permanent* address, the one that is the same whether or not anything is
+      waiting, is the Withings block in settings, beside the connection that produces these
+      questions in the first place.
+
+      ## Why it says nothing when nothing is waiting
+
+      Because there is nothing to say. This is a queue, not a destination: an empty one needs
+      no door, and a line reading "no matches are waiting" would be the clutter the nav entry
+      was rejected for, moved somewhere cheaper.
+
+      ## The tint is the record page's, deliberately
+
+      amber-50 inside a gray-300 border is exactly what `_withings_match` draws around the
+      same question on a single session. The two screens are one queue seen from two angles,
+      and a lifter who has answered one of these on a record should recognise this on sight as
+      the same thing rather than read it as a second chore. %>
+  <%- if @withings_waiting.positive? %>
+    <div class="mt-4 rounded-md border border-gray-300 bg-amber-50 px-4 py-3">
+      <p class="text-sm text-gray-900">
+        Your watch may have recorded <%= @withings_waiting %> of the sessions below.
+        <a href="/workouts/withings" class="font-semibold underline">Say which are
+          right</a> &mdash; or answer them one at a time on the sessions themselves.
+      </p>
+    </div>
+  <%- end %>
+
   <%# Written sessions are only worth a heading of their own once there are some, so an
       account that has never generated a week sees the list it always saw. %>
   <%- unless @upcoming.empty? %>

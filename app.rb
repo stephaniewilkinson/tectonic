@@ -630,6 +630,20 @@ class Tectonic < Roda
         # here that no longer buys anything. #472.
         @withings = WithingsConnection.status(@account_id)
         @withings_configured = Withings.configured?
+        # And how many matches are waiting on an answer, which is what makes the review list
+        # findable by somebody who did not just run a rake task. #534.
+        #
+        # Here rather than in the nav, because this is the screen's *permanent* address and a
+        # permanent address must not move: the Withings block is where a lifter already comes
+        # to reason about the watch, and a link that sits inside it is in the same place
+        # whether or not there is anything behind it. The timely prompt -- the one that
+        # catches somebody who was not looking for it -- is on /workouts.
+        #
+        # Asked only where the block will render a link, which is only where there is a
+        # connection. An account that has never connected a watch is told nothing about
+        # Withings on this page beyond how to start, and should not pay a query to be told
+        # nothing.
+        @withings_waiting = WithingsProposals.waiting_count(@account_id) unless @withings[:state] == :absent
         # Read once and taken out of the session, the same shape the exercise page uses, so a
         # reload does not re-announce a connection made ten minutes ago.
         @notice = session.delete('settings.notice')
@@ -1335,6 +1349,26 @@ class Tectonic < Roda
                                   .partition { |workout| workout.status(@today) == :planned }
         @upcoming = planned.reverse
         @workouts = history
+        # And whether a backfill left questions nobody has answered. #534.
+        #
+        # This is the doorway to /workouts/withings, and it is here rather than in the nav on
+        # purpose. The nav is seven links, deliberately, and it already wraps to two rows
+        # between 640 and 840px -- an eighth pointing at a screen that is empty except for the
+        # few days after a backfill would be paid for on every page by every lifter, including
+        # the ones who own no watch. A link that appeared and vanished from the nav would be
+        # worse again: people learn where things are by position, and an entry that comes and
+        # goes moves every entry after it.
+        #
+        # This page is where the questions' own subject matter lives -- they are all about
+        # sessions in the list below -- and it is where somebody goes on a Sunday to deal with
+        # their training. A line at the top of a page's own content appearing and disappearing
+        # costs nobody their bearings, because nothing else moves relative to anything a
+        # lifter navigates by.
+        #
+        # A count rather than the list: see `waiting_count`, and 044 for the index that makes
+        # it one read of a tiny partial index rather than a scan of every activity the account
+        # owns. That cost matters precisely because this page has nothing to do with Withings.
+        @withings_waiting = WithingsProposals.waiting_count(@account_id)
         view 'workouts/index'
       end
       r.post do
@@ -1684,6 +1718,25 @@ class Tectonic < Roda
   # `https://elsewhere.example` would bounce the lifter off the app, still logged in.
   def answered_from(workout_id, back)
     back.to_s == 'proposals' ? '/workouts/withings' : "/workouts/#{workout_id}"
+  end
+
+  # How many other sessions are waiting on the same question. #534.
+  #
+  # The record page's prompt and the review list are one queue seen from two angles, and
+  # until this line nothing on either side said so. A lifter answering a backfilled session
+  # from its record had no way to know that ninety more were waiting somewhere else, so the
+  # obvious reading of the prompt -- one stray question about one old Tuesday -- was wrong in
+  # a way the page itself made plausible.
+  #
+  # Called from the proposal branch of the partial and nowhere else, which is what keeps it
+  # off the record pages that have nothing to ask: most of them. A memo rather than a
+  # variable set in the route for the same reason -- the route would pay for it on every view
+  # of every session, to answer a question the page usually does not put.
+  #
+  # `except` is the session on screen. Its own proposal is in the waiting set when a backfill
+  # left it, so counting it would say "1 other" to somebody looking at the only one left.
+  def questions_elsewhere
+    @questions_elsewhere ||= WithingsProposals.waiting_count(@account_id, except: @workout[:id])
   end
 
   # The Withings activity this session has been matched to, or nil. #520.
