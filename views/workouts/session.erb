@@ -80,6 +80,20 @@
   <%== render('workouts/_rpe_help') %>
 <%- end %>
 
+<%# And whether any of the above is reaching the server at all. #516.
+
+    Out here with the rest timer and the RPE footer, for the third time and for the same
+    reason -- #session-body is replaced on every Done tap and every fifteen-second poll --
+    though it bites differently here. What is at risk is not a countdown or an open
+    disclosure but a report about the requests that swap this region: a banner living inside
+    the thing it reports on would be replaced by every request that succeeded and left alone
+    by every request that failed, which is the right answer for the wrong reason and stops
+    being the right answer the moment anything else on the page swaps.
+
+    Before the rest timer rather than after it because this is the one message that explains
+    why the rest timer never started. %>
+<%== render('workouts/_offline_banner') %>
+
 <%# The rest timer and the element the server cues it through. #281.
 
     Out here with the RPE footer and for the identical reason, which is worth stating rather
