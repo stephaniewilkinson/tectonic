@@ -256,19 +256,21 @@ class Tectonic < Roda
                            .update(workouts_imported_year: Sequel.function(:least, :workouts_imported_year, year))
     end
 
-    # The pairing, with the one exception #555 describes kept off a lifter's screen.
+    # The pairing, with the last thing that can raise out of it kept off a lifter's screen.
     #
-    # A proposal whose session was matched to a *different* activity is never cleared, so a
-    # later run can pick a second activity for that session and the `UPDATE` in `offer` hits
-    # the unique index on `proposed_workout_id`. From a rake task that is a stack trace after
-    # the API budget is already spent; from a button it is a 500 on the settings page of
-    # somebody who pressed Import, with the year they just paid for looking like it failed.
+    # **#555 is fixed rather than caught now**, and this stays for what the fix cannot reach.
+    # What it was written for was a proposal nobody could answer holding a session's slot
+    # under the unique index on `proposed_workout_id`: `offer` gives those up before it writes
+    # and guards the write on the session id as well as on the row, so a single walk no longer
+    # meets one. Two walks at once still can -- both can read no row and both can write, and
+    # an index is the only thing that can settle that, which is what an index is for.
     #
-    # It is caught rather than fixed, because the fix belongs to #555 and is a change to what
-    # `outstanding` counts -- guarding `offer` here would be the second half of that fix
-    # living somewhere nobody would think to look for it. What is bought instead is honesty:
-    # the activities are stored and committed, the cursor has moved, and the report says the
-    # matching could not be finished rather than reporting four zeroes as though it had.
+    # So the rescue is no longer standing in for a bug; it is standing in front of a race this
+    # process cannot see the other half of. What it buys is unchanged and is the reason it is
+    # a rescue rather than a retry: the activities are stored and committed, the cursor has
+    # moved, and the report says the matching could not be finished rather than reporting four
+    # zeroes as though it had. Pressing Import again re-pairs, because pairing is the part of
+    # this module that is free to repeat.
     def offered(account_id)
       pair(account_id)
     rescue Sequel::UniqueConstraintViolation => e
@@ -484,9 +486,12 @@ class Tectonic < Roda
     # keeps a re-run from quietly swapping a waiting proposal for a different activity
     # between the lifter reading the page and answering it.
     #
-    # The write names `proposed_workout_id: nil` in its filter as well, so an offer that
-    # appeared underneath this one -- another run, a half-open session -- is refused rather
-    # than overwritten.
+    # `reclaim` first, because `standing` can only see a proposal that is still a question and
+    # a dead one holds the session's slot just as firmly. See #555: an activity claimed by
+    # another session, or refused, while it was still carrying this session's proposal is
+    # invisible to the check above and fatal to the write below, since `proposed_workout_id`
+    # is unique. Giving it up here is what turns a walk that died at the index into a walk
+    # that offers the session the recording it can still answer.
     def offer(account_id, session, claimed)
       window = session[:window]
       return :already_waiting if WithingsWorkouts.standing(account_id, session[:id], window)
@@ -495,9 +500,41 @@ class Tectonic < Roda
       return :without_activity unless pick
 
       claimed << pick[:id]
-      DB[:withings_workouts].where(id: pick[:id], proposed_workout_id: nil)
-                            .update(proposed_workout_id: session[:id])
-      :proposed
+      WithingsWorkouts.reclaim(account_id, session[:id])
+      wrote?(pick[:id], session[:id]) ? :proposed : :already_waiting
+    end
+
+    # The write, guarded on both halves of what the unique index protects, and reported on by
+    # what it actually did rather than by having been reached. #555.
+    #
+    # `proposed_workout_id: nil` is the guard on the **row**: an offer that appeared
+    # underneath this one -- another run, a half-open session -- is refused rather than
+    # overwritten. The `NOT EXISTS` is the guard on the **value**, which was missing: nothing
+    # asked whether some other row already held this session's id, so a walk that met one
+    # found out from Postgres, as an exception, out of `pair` and `attempt` and `run`, with
+    # the year's requests already spent. After `reclaim` the only row that can still be
+    # holding the slot is a live proposal written by a concurrent walk, and this declines to
+    # it rather than raising at it.
+    #
+    # It is a narrower window and not a closed one: two transactions can both read no row and
+    # both write, and the index is what catches that -- which is what the index is for, and
+    # why the rescue in `offered` stays.
+    #
+    # The subquery is not scoped to the account on purpose, unlike every other read in this
+    # module. What it is standing in front of is a unique index over the whole table, so the
+    # question it has to ask is the index's question and not this lifter's.
+    #
+    # And the count is read, because a write that changed nothing is not a proposal made. The
+    # report's four numbers are what a lifter uses to decide whether an import worked, and
+    # until now the only one of them that could not be trusted was the one they read first.
+    # `:already_waiting` rather than a fourth state: every way of getting here means some
+    # proposal is in place for this session or for this activity, which is what that word
+    # already says, and a fourth number would need a fifth sentence on two screens to explain
+    # a case that means the same thing as the third.
+    def wrote?(activity_id, workout_id)
+      held = DB[:withings_workouts].where(proposed_workout_id: workout_id).exists
+      DB[:withings_workouts].where(id: activity_id, proposed_workout_id: nil).exclude(held)
+                            .update(proposed_workout_id: workout_id).positive?
     end
 
     # The scoring is the forward flow's, entire: the same overlap gate, the same ratio, the

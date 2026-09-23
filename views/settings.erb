@@ -402,15 +402,22 @@
                                     text-gray-700">
               <%= @withings_imported['year'] %>: <%= @withings_imported['found'] %>
               activit<%= @withings_imported['found'] == 1 ? 'y' : 'ies' %> from your watch.
-              <%# The pairing failed rather than found nothing, which #555 can still cause: a
-                  proposal left on a session that was matched to something else collides with
-                  the unique index the next time a different activity is picked for it. The
-                  activities are stored and the year is done; what could not be finished is
-                  the matching, and saying so is the difference between a bug and a lie. %>
+              <%# The pairing failed rather than found nothing.
+
+                  It was #555 that put this branch here, and #555 is fixed: a proposal left on
+                  a session answered elsewhere held that session's slot under the unique index,
+                  and the next run to pick a different activity for it collided. Those are given
+                  up before the write now, and the write is guarded on the session as well as on
+                  the row, so what is left for this sentence is the case an index exists for --
+                  two imports running at once, each seeing a free slot and each writing it.
+
+                  Rare enough that it is worth a sentence rather than a screen, and the sentence
+                  says what is true of it: the activities are stored and the year is done, only
+                  the matching stopped. Saying so is the difference between a bug and a lie. %>
               <%- if @withings_imported['pairing'] == 'stalled' %>
-                They are saved, but the matching could not be finished &mdash; a proposal from an
-                earlier run is stuck on a session that has since been answered elsewhere. Nothing
-                was lost; answering what is already waiting below usually clears it.
+                They are saved, but the matching could not be finished &mdash; something else was
+                writing proposals at the same moment. Nothing was lost: the next import offers
+                everything stored to every session again, this year included.
               <%- else %>
                 <%= @withings_imported['proposed'] %>
                 new proposal<%= 's' unless @withings_imported['proposed'] == 1 %> to answer.

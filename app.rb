@@ -1380,11 +1380,26 @@ class Tectonic < Roda
         # to match the lifting is done. It also means the question survives a lifter who
         # taps finish and pockets the phone, because it is on a page they come back to.
         r.on 'withings' do
+          # **A yes that changed no row is not a yes**, and this used to redirect as though
+          # it were. #555: `confirm` answers with how many rows it linked and the answer can
+          # be nought -- a session matched from somewhere else while this page sat open, a
+          # form naming an activity that has since been claimed or refused -- and throwing
+          # that number away made every one of those look exactly like a success. On the
+          # review list it looked like one twice over, because a queue with one fewer row on
+          # it reads the same whether the answer took or whether the question went away.
+          #
+          # So a yes that linked something goes back where it was given, which for a sitting
+          # at /workouts/withings is the list, and a yes that linked nothing goes to the
+          # session's own record. That is not a punishment and it is not an error page: it is
+          # the one page that can render what actually happened to this session, whether that
+          # is the match somebody else made -- "Matched to your watch", with the numbers -- or
+          # a question still standing because nothing has answered it. An error would claim
+          # something went wrong, and nothing did; the question was simply already answered.
           r.post 'match' do
             check_csrf!
-            WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout.id,
-                                     external_id: r.params['activity'].to_s)
-            r.redirect answered_from(workout_id, r.params['back'])
+            linked = WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout.id,
+                                              external_id: r.params['activity'].to_s)
+            r.redirect(linked.positive? ? answered_from(workout_id, r.params['back']) : "/workouts/#{workout_id}")
           end
           r.post 'dismiss' do
             check_csrf!

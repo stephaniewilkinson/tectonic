@@ -46,6 +46,15 @@ class Tectonic < Roda
     # rather than filtered later, because a list that showed an answered proposal would invite
     # somebody to answer it again -- and the second answer would silently do nothing, since
     # `confirm` refuses a session that is already matched.
+    #
+    # **That last clause was the bug rather than the reassurance**, and #555 is what it cost.
+    # It reads the two answered states off the *activity* and says nothing whatever about the
+    # session, so a proposal naming a session that was matched to some other recording was
+    # neither confirmed nor refused, appeared here, and offered a Yes that `confirm` then
+    # refused for exactly the reason quoted -- a row the lifter could tap for ever without
+    # changing anything. A proposal has two ends and either of them being answered ends the
+    # question; `outstanding` now reads both, which is what makes the sentence above true
+    # instead of merely confident.
     def unanswered(account_id) = outstanding(account_id).all
 
     # How many questions are still open, which is what a doorway to this screen needs to know
@@ -81,9 +90,40 @@ class Tectonic < Roda
     # where the filter is kept tidy -- it is the thing the index is matched against, and a
     # condition added here that is not there turns the count back into a scan of every
     # activity the account owns, silently and with every spec still passing.
+    #
+    # ## The fourth condition, and why it is safe to add to a predicate the index defines
+    #
+    # The three above ask whether the *activity* has been answered and never whether the
+    # session it names has. #555: a backfill proposes an activity to a session, the lifter
+    # matches that session to a second recording from its own record page, and the proposal is
+    # left unclaimed, un-refused and pointing at a question that was settled months ago. It
+    # was counted on the workouts list, counted beside the connection in settings, and listed
+    # here with a Yes on it that `confirm` refuses every time it is pressed.
+    #
+    # So a proposal whose session already belongs to some activity is not waiting for
+    # anything, and the exclusion says so. Adding a condition *narrows* what this returns,
+    # which is the direction the index tolerates: the predicate above still implies 044's, and
+    # Postgres applies this one to the handful of rows that survive it. Dropping one of the
+    # three would be the change that silently costs a scan.
+    #
+    # It is also the second half of a pair. `WithingsWorkouts.confirm` withdraws these at the
+    # moment the session is answered, so nothing new arrives in this state; this is what keeps
+    # the queue honest about the rows stranded before that shipped, which no answer will ever
+    # visit again. A filter and a cure rather than one or the other, because the filter alone
+    # leaves a dead row holding a unique slot and the cure alone cannot reach into the past.
     def outstanding(account_id)
       DB[:withings_workouts].where(account_id:, workout_id: nil, dismissed_at: nil)
                             .exclude(proposed_workout_id: nil)
+                            .exclude(proposed_workout_id: matched_sessions(account_id))
+    end
+
+    # The sessions this account has already matched to something. Scoped to the account like
+    # everything else here, though `withings_workouts.workout_id` is unique across the table
+    # and a session belongs to one lifter: the scope costs nothing, keeps the subquery on the
+    # same index as its parent, and means a reader does not have to prove the cross-account
+    # case is impossible before believing the line.
+    def matched_sessions(account_id)
+      DB[:withings_workouts].where(account_id:).exclude(workout_id: nil).select(:workout_id)
     end
 
     # Scoped by account as well as by id, so a proposal whose session somehow belongs to
