@@ -72,10 +72,21 @@
         <li class="py-4">
           <%# The session first and as a link, because the question cannot be answered from
               the times alone: "the 14th of March, 18:02 to 18:50" is only recognisable to
-              somebody who can go and look at what was lifted that day. %>
+              somebody who can go and look at what was lifted that day.
+
+              The day it was trained rather than the day it was written for, which is the rule
+              everywhere else in the app -- Workout#performed_or_planned_on. It matters more
+              here than on most screens: this row is asking a lifter to remember an afternoon,
+              and the times beside the date are the watch's, so a heading from the programme
+              would date the evidence by a day nobody was in the gym. The list is sorted by
+              the same reading, in WithingsProposals.waiting, and the two go together -- a row
+              labelled with one date and placed by another is a queue in no order at all.
+
+              Free of a query per row: `waiting` fetches these sessions `with_performed_on`,
+              so the stamp is a column on the row and the fallback never fires here. %>
           <p class="text-sm font-semibold text-gray-900">
             <a href="/workouts/<%= proposal[:workout][:id] %>" class="hover:underline">
-              <%= proposal[:workout][:date].strftime('%b %d, %Y') %>
+              <%= proposal[:workout].performed_or_planned_on.strftime('%b %d, %Y') %>
             </a>
           </p>
           <p class="mt-1 text-sm text-gray-700">

@@ -3,6 +3,9 @@
 require_relative 'db'
 require_relative 'timing'
 require_relative 'withings_workouts'
+# For the sessions themselves, which are model rows here rather than hashes since #572 --
+# see `sessions_for` for what that buys and what it costs.
+require_relative 'workouts'
 
 class Tectonic < Roda
   # Every proposal a backfill has left, read back for the one screen that lists them.
@@ -30,16 +33,41 @@ class Tectonic < Roda
   module WithingsProposals
     module_function
 
-    # The proposals waiting for an answer, newest session first, each with the session it is
-    # about and the sentence that explains it. Newest first because a session from last month
-    # is one somebody can still remember well enough to judge, and the confident answers are
-    # worth getting out of the way before the archaeology.
+    # The proposals waiting for an answer, most recently *trained* session first, each with the
+    # session it is about and the sentence that explains it. Newest first because a session
+    # from last month is one somebody can still remember well enough to judge, and the
+    # confident answers are worth getting out of the way before the archaeology.
+    #
+    # ## Trained rather than planned, and why the order had to move with the date
+    #
+    # This sorted on `workouts.date` until #572, which is the day a session was *written for*.
+    # For a generated block that is a decision made weeks ahead, and the reporting account
+    # trains up to three days away from it -- so the queue was ordered by a column that is not
+    # a record of anything that happened, and the sentence beside each row asks the lifter to
+    # remember something that did. The date printed on the row moved to
+    # `Workout#performed_or_planned_on` in the same change, and these two could not have been
+    # separated: a list labelled with one date and sorted by another is worse than one that is
+    # merely wrong, because the rows then sit in an order nothing on the screen accounts for --
+    # the 23rd above the 24th, with no way to tell it from a bug in the list.
+    #
+    # **The order the questions arrive in therefore changed**, and that is the point rather
+    # than a consequence to be apologised for. The argument for newest-first is an argument
+    # about memory, and memory is of training: what a lifter can answer quickly is the session
+    # they actually did on Wednesday, not the one a programme had pencilled in for Friday. A
+    # queue ordered by the plan interleaves recent training with old training wherever
+    # anybody trained off-plan, which is exactly where the questions are hardest.
+    #
+    # Sorted here rather than in SQL because the date is a reading of two columns rather than
+    # one -- `performed_on` where there is one and the plan where there is not -- and the rows
+    # are already all in hand and already filtered by `offered`. An ORDER BY that reproduced
+    # the fallback would be a second spelling of the rule, free to drift from the method every
+    # screen dates a session with.
     def waiting(account_id)
       rows = unanswered(account_id)
       sessions = sessions_for(account_id, rows)
       stamps = stamps_for(sessions.keys)
       rows.filter_map { |row| offered(row, sessions[row[:proposed_workout_id]], stamps) }
-          .sort_by { |offer| offer[:workout][:date] }.reverse
+          .sort_by { |offer| offer[:workout].performed_or_planned_on }.reverse
     end
 
     # Offered, and neither confirmed nor refused. The two answered states are excluded here
@@ -128,8 +156,35 @@ class Tectonic < Roda
 
     # Scoped by account as well as by id, so a proposal whose session somehow belongs to
     # somebody else renders as nothing at all rather than as a stranger's date.
+    #
+    # ## Model rows, and `with_performed_on` in the same breath
+    #
+    # These were plain `DB[:workouts]` hashes until #572, which is what left this screen the
+    # last one in the app dating a session by the day it was written for: a hash has no
+    # `performed_or_planned_on` to call, so the list and the template had no way to ask the
+    # question every other page asks. `Workout` rows have it, and that is the whole reason
+    # they are worth the model layer here -- the rule is written once, on the method, and this
+    # screen reads it rather than restating it.
+    #
+    # `with_performed_on` is not optional decoration on that. `performed_on` answers from the
+    # row where the query selected it and otherwise goes and fetches the stamp itself, one
+    # session at a time -- so the same fallback that is harmless on a record page is an N+1
+    # here, where there is a row per proposal and a date on every one of them. It was already
+    # sprung once, in exercise history, at a hundred queries on a large account with nothing
+    # failing to say so. The extra column is a correlated subquery on a query this screen was
+    # making anyway, so eighty proposals cost exactly what one does, and
+    # spec/dating_a_session_by_when_it_happened_spec.rb counts to make sure they still do.
+    #
+    # It is `min(completed_at)` twice over on the face of it -- once here and once inside
+    # `stamps_for`, which loads every stamp of every one of these sessions for the interval
+    # arithmetic. That is deliberate rather than overlooked: the two answers are wanted in
+    # different shapes, one as a column on the row and one as a list to measure a window from,
+    # and deriving the date from the stamps instead would be this module computing
+    # `performed_or_planned_on` for itself -- a second spelling of the rule, on the one screen
+    # whose whole bug was having its own reading of the date.
     def sessions_for(account_id, rows)
-      DB[:workouts].where(account_id:, id: rows.map { |row| row[:proposed_workout_id] }).to_hash(:id)
+      Workout.where(account_id:, id: rows.map { |row| row[:proposed_workout_id] })
+             .with_performed_on.to_hash(:id)
     end
 
     # One row of the list, or nil where it cannot be rendered honestly. A session whose sets

@@ -2,6 +2,7 @@
 
 require_relative 'spec_helper'
 require_relative 'route_ownership_spec' # reuses its account/login helpers; idempotent require
+require_relative 'query_count_spec' # and the tally that says whether a list reads per row
 require 'rack/test'
 require 'securerandom'
 require 'date'
@@ -22,6 +23,15 @@ require 'date'
 module SessionDates
   PLANNED = Date.new(2026, 9, 25)   # a Friday: what the programme wrote
   PERFORMED = Date.new(2026, 9, 23) # a Wednesday: when it was actually lifted
+
+  # A second session whose two dates disagree the other way about: written for the Monday
+  # before the one above and trained the Thursday after it. One session cannot show that a
+  # list is ordered by the wrong date -- any order of one row is every order of it -- and two
+  # that merely differ cannot either, because plan order and training order would agree and
+  # the list would look right whichever it used. These two are deliberately in opposite orders
+  # under the two readings, so the review list can only satisfy one of them.
+  OTHER_PLANNED = Date.new(2026, 9, 21)   # a Monday: written first, and trained last
+  OTHER_PERFORMED = Date.new(2026, 9, 24) # a Thursday
 
   # A movement of this account's own, so nothing here depends on the shared library.
   def a_movement(account_id)
@@ -44,6 +54,50 @@ module SessionDates
                                                             trained_on.day, 18, 0, 0))
     end
     [workout_id, exercise_id, set_ids.first]
+  end
+
+  # A session with a question waiting on it: written for one day, trained on another, and an
+  # activity the watch recorded inside the hour it was really trained. Written straight into
+  # the tables rather than through a backfill, because what is being set up is the state a
+  # backfill leaves and not the walk that leaves it -- and **nothing here calls Withings**,
+  # which a walk would have to be stubbed to avoid.
+  #
+  # The activity starts a minute in and ends a minute short, so it sits inside the session
+  # rather than straddling it -- an overlap nobody would call ambiguous, which is what these
+  # claims want: they are about the date on a question, not about which question is asked.
+  def a_question_waiting(account_id, written_for: PLANNED, trained_on: PERFORMED, watch: 'w-1')
+    opened = Time.new(trained_on.year, trained_on.month, trained_on.day, 18, 0, 0)
+    workout_id = a_trained_hour(account_id, written_for:, opened:)
+    DB[:withings_workouts].insert(account_id:, external_id: watch, category: 16,
+                                  started_at: opened + 60, ended_at: opened + 2940,
+                                  proposed_workout_id: workout_id)
+    workout_id
+  end
+
+  # The session underneath it, whose two stamps are fifty minutes apart rather than
+  # `a_session`'s two at one instant. A proposal is only listed where the session has an
+  # interval for the activity to overlap: `WithingsWorkouts.interval` refuses a window whose
+  # two ends are the same moment, and `WithingsProposals.offered` drops a row whose evidence
+  # it cannot state. That is also why the untrained fallback the rest of this file guards has
+  # no case of its own on this screen -- a session nobody has trained has no interval, so it
+  # never reaches the list at all, and there is nothing there to fall back from.
+  def a_trained_hour(account_id, written_for:, opened:)
+    workout_id = DB[:workouts].insert(account_id:, date: written_for)
+    exercise_id = a_movement(account_id)
+    [opened, opened + 3000].each do |at|
+      DB[:sets].insert(workout_id:, exercise_id:, weight: 155, reps: 5, is_warmup: false,
+                       is_completed: true, completed_at: at)
+    end
+    workout_id
+  end
+
+  # An account with `count` of them, each a day further back than the last, for the claim
+  # about what a queue costs to draw rather than what it says.
+  def questions_waiting(account_id, count)
+    Array.new(count) do |index|
+      a_question_waiting(account_id, written_for: PLANNED + index,
+                                     trained_on: PERFORMED - index, watch: "w-#{index}")
+    end
   end
 
   # Every date a page writes out for a person to read, and nothing else.
@@ -175,6 +229,81 @@ describe 'a session listed among others it was trained before' do
 
   it 'is not dated in exercise history with the day it was written for' do
     refute_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 25, 2026'
+  end
+end
+
+# The seventh rendering, and the one #572 could not fix from a template. The two lists above
+# are model rows a view dates; this one is a list `WithingsProposals.waiting` builds itself, so
+# the date on the row and the order of the rows are both its decision and both were the stored
+# one. A lifter meets these questions here, one after another, about sessions they have to
+# recognise well enough to answer -- so a row headed with a day they did not train is a row
+# they have to reconstruct before they can say yes to it.
+describe 'a session the watch has a question waiting about' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionDates
+
+  before do
+    @account_id = login
+    a_question_waiting(@account_id)
+  end
+
+  it 'is listed on the review list with the day it was trained' do
+    assert_includes dates_on('/workouts/withings'), 'Sep 23, 2026'
+  end
+
+  it 'is not listed on the review list with the day it was written for' do
+    refute_includes dates_on('/workouts/withings'), 'Sep 25, 2026'
+  end
+end
+
+# And the order, which is not a side effect of the date but the other half of the same claim.
+# A list labelled with one date and sorted by another is worse than one that is wrong about
+# both, because the rows are then in an order nothing on screen explains: two questions dated
+# the 23rd and the 24th, with the 23rd above. The queue is a sitting somebody works down, and
+# the order that makes it one is the order they trained -- most recent first, because the
+# sessions somebody can still remember are the ones they can answer quickly, and the
+# archaeology is better met at the end than at the start.
+describe 'the order the review list asks its questions in' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionDates
+
+  before do
+    @account_id = login
+    a_question_waiting(@account_id)
+    a_question_waiting(@account_id, written_for: SessionDates::OTHER_PLANNED,
+                                    trained_on: SessionDates::OTHER_PERFORMED, watch: 'w-2')
+  end
+
+  # Asserted as the whole sequence rather than as "the 24th is present", because what is
+  # wrong when this regresses is the relationship between the rows and not any one of them.
+  it 'asks first about the session trained most recently' do
+    assert_equal ['Sep 24, 2026', 'Sep 23, 2026'], dates_on('/workouts/withings')
+  end
+end
+
+# The hazard the date on a list carries with it. `performed_on` answers from the row where the
+# query selected it and otherwise goes and fetches it one session at a time, so a date drawn
+# per row is an N+1 waiting for a loop to put it in -- which is exactly what this screen is.
+# #572 found the same trap already sprung in exercise history, at a hundred queries on a large
+# account, and nothing failed while it was.
+describe 'what the review list costs to draw its dates' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionDates
+  include QueryCount
+
+  # Separate accounts rather than one that grows, like query_count_spec: the small case must
+  # not be measured against a plan cache the large case warmed.
+  it 'costs the same for twelve questions as for one' do
+    questions_waiting(login, 1)
+    one = queries_while { get '/workouts/withings' }
+    questions_waiting(login, 12)
+    twelve = queries_while { get '/workouts/withings' }
+
+    assert_equal one, twelve, "the review list costs #{twelve} queries with twelve questions " \
+                              "waiting and #{one} with one, so it is reading per proposal"
   end
 end
 
