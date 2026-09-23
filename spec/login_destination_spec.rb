@@ -25,12 +25,23 @@ module LandingAfterLogin
     last_response.headers['location']
   end
 
-  # A session with everything in it lifted, which is what a training day looks like by
-  # the evening.
-  def finish(workout)
+  # A session with everything in it lifted and nothing said about whether it is over, which
+  # is what a session looks like between sets -- and what one looks like three hours later
+  # to anybody counting ticked boxes. That is the distinction #523 turns on, so the two
+  # helpers are named for it.
+  def lifted(workout, at: Time.now)
     exercise_id = Tectonic::Exercise.insert(account_id: workout.account_id, name: "L#{SecureRandom.hex(4)}")
     Tectonic::WorkoutSet.insert(workout_id: workout.id, exercise_id:, weight: 225, reps: 5,
-                                is_warmup: false, is_completed: true)
+                                is_warmup: false, is_completed: true, completed_at: at)
+    workout
+  end
+
+  # And the lifter saying they are done, which is the only thing `finished_at` means: the
+  # control at the top of the session screen, the nudge, or SessionClose.sweep stamping it
+  # on their behalf hours after they left. Stamped at the last set the way the latter two do.
+  def finished(workout, at: Time.now)
+    lifted(workout, at:)
+    workout.update(finished_at: at)
     workout
   end
 end
@@ -80,17 +91,84 @@ describe 'signing in on a day that has a session written' do
     assert_equal "/workouts/#{workouts.last.id}/session", land(email, password)
   end
 
-  it 'picks the one written first when two share the day' do
+  it 'picks the one written first when two are still to do' do
     email, password, workouts = account_with(Time.now, Time.now)
     assert_equal "/workouts/#{workouts.map(&:id).min}/session", land(email, password)
   end
 
-  # A finished session is still today's session. Every set is lifted, but a set can be
-  # added, corrected or rated afterwards, and all three happen on this screen.
+  # Every set ticked is not the same statement as "I am done", and only the second one is
+  # worth acting on: three of ten done is "I stopped early" and "I am between sets" written
+  # identically, so a session nobody has closed is a session still under way. A set can be
+  # added, corrected or rated here, and all three happen on this screen.
   it 'lands there even when every set in it is already lifted' do
     email, password, workouts = account_with(Time.now)
-    finish(workouts.first)
+    lifted(workouts.first)
     assert_equal "/workouts/#{workouts.first.id}/session", land(email, password)
+  end
+end
+
+# #523: the app told a lifter they were still training every time they signed in, because
+# any session dated today sent them to the gym floor whether or not it was over.
+describe 'signing in after the day is trained' do
+  include Rack::Test::Methods
+  include LandingAfterLogin
+
+  # The record, which is where somebody asking about a day they have already trained is
+  # going. It is one tap from the session screen, so a set added or corrected afterwards
+  # costs a tap rather than being shut out.
+  it 'lands on the record of a session finished earlier today' do
+    email, password, workouts = account_with(Time.now)
+    finished(workouts.first, at: Time.now - (11 * 60 * 60))
+    assert_equal "/workouts/#{workouts.first.id}", land(email, password)
+  end
+
+  # The sweep runs on this very path, immediately above the lookup, so a session abandoned
+  # this morning is closed by the time the destination is chosen -- and the lifter who never
+  # tapped finish lands where the one who did lands.
+  it 'lands on the record of a session the sweep closed on the way in' do
+    email, password, workouts = account_with(Time.now)
+    lifted(workouts.first, at: Time.now - (8 * 60 * 60))
+    assert_equal "/workouts/#{workouts.first.id}", land(email, password)
+  end
+
+  # A session finished yesterday is not today's session at all, and a day with training
+  # written for it and nothing done is still a day to lift.
+  it 'lands on the gym floor for today when yesterday was finished' do
+    email, password, workouts = account_with(Date.today - 1, Time.now)
+    finished(workouts.first, at: Time.now - (24 * 60 * 60))
+    assert_equal "/workouts/#{workouts.last.id}/session", land(email, password)
+  end
+end
+
+# Nothing forbids two sessions on one day, and the old rule took the lowest id, which is
+# arbitrary the moment there is a second one. A lifter who has trained this morning and has
+# an evening session written is coming back for the evening session.
+describe 'signing in on a day with two sessions written for it' do
+  include Rack::Test::Methods
+  include LandingAfterLogin
+
+  it 'lands on the evening session when the morning one is finished' do
+    email, password, workouts = account_with(Time.now, Time.now)
+    finished(workouts.first, at: Time.now - (11 * 60 * 60))
+    assert_equal "/workouts/#{workouts.last.id}/session", land(email, password)
+  end
+
+  # And the same day from the other end: both done, so the record shown is the session they
+  # have just come out of. Written twice with the finishes the other way round, because one
+  # of them on its own is passed by "lowest id wins" and the other by "highest id wins", and
+  # the rule is neither: the stamp decides, and the ids are there to be ignored.
+  it 'lands on the record of the last one finished when both are done' do
+    email, password, workouts = account_with(Time.now, Time.now)
+    finished(workouts.first, at: Time.now - (30 * 60))
+    finished(workouts.last, at: Time.now - (9 * 60 * 60))
+    assert_equal "/workouts/#{workouts.first.id}", land(email, password)
+  end
+
+  it 'lands on the record of the last one finished when the later-written one is the later one' do
+    email, password, workouts = account_with(Time.now, Time.now)
+    finished(workouts.first, at: Time.now - (9 * 60 * 60))
+    finished(workouts.last, at: Time.now - (30 * 60))
+    assert_equal "/workouts/#{workouts.last.id}", land(email, password)
   end
 end
 

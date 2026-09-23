@@ -11,7 +11,7 @@ require 'securerandom'
 # once something is running: whether the bar actually appears, and whether the two buttons on
 # it do what they say.
 module SessionNudge
-  def an_account_with_a_quiet_session(ago: 45 * 60)
+  def an_account_with_a_quiet_session(ago: 45 * 60, finished: nil)
     email = "#{SecureRandom.hex}@gmail.com"
     password = SecureRandom.hex
     visit '/'
@@ -20,12 +20,12 @@ module SessionNudge
     fill_in 'password', with: password
     click_on 'Sign up'
     account_id = DB[:accounts].where(email:).get(:id)
-    [account_id, a_quiet_session(account_id, ago:)]
+    [account_id, a_quiet_session(account_id, ago:, finished:)]
   end
 
-  def a_quiet_session(account_id, ago:)
+  def a_quiet_session(account_id, ago:, finished: nil)
     exercise_id = DB[:exercises].insert(name: "Back Squat #{SecureRandom.hex(4)}", account_id:)
-    workout_id = DB[:workouts].insert(account_id:, date: Date.today)
+    workout_id = DB[:workouts].insert(account_id:, date: Date.today, finished_at: finished)
     DB[:sets].insert(workout_id:, exercise_id:, weight: 155, reps: 5, is_warmup: false,
                      is_completed: true, is_barbell: true, planned_rest_seconds: 180,
                      completed_at: Time.now - ago)
@@ -57,6 +57,26 @@ describe 'arriving at a session that has been quiet for three quarters of an hou
   # lifter who has been talking to somebody recognises it immediately.
   it 'says how long it has been quiet' do
     assert_text(/Nothing logged for \d+m/)
+  end
+end
+
+# The sentence #523 is titled after, in the place a lifter actually read it. A session
+# finished this morning and opened again in the evening is eleven hours quiet, so the clock
+# raised the bar the instant the page painted -- asking a question the lifter had answered
+# by tapping finish. The server now sends no stamp for a session that is over, and with
+# nothing to count from the bar never appears.
+describe 'a session the lifter has already finished' do
+  include Capybara::DSL
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include SessionNudge
+
+  it 'is never asked whether it is still training' do
+    ago = 11 * 60 * 60
+    _account_id, workout_id = an_account_with_a_quiet_session(ago:, finished: Time.now - ago)
+    visit "/workouts/#{workout_id}/session"
+
+    refute_text 'Still training?'
   end
 end
 

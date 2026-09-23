@@ -251,6 +251,38 @@ describe 'the session screen' do
   end
 end
 
+# And says nothing at all on a session that is over, which is #523. The cue is read by a
+# clock that only knows how long ago the last set was, so a session finished at nine in the
+# morning and opened again that evening raised the bar the instant it painted: "Nothing
+# logged for 11h. Still training?" -- a question the lifter had already answered.
+describe 'the session screen once the session is over' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include SessionClosing
+
+  it 'says nothing about quiet on a session the lifter has finished' do
+    account_id = login
+    workout_id = a_session(account_id, ago: 11 * 60 * 60, finished: Time.now - (11 * 60 * 60))
+
+    get "/workouts/#{workout_id}/session"
+
+    assert_match(/id="quiet-cue"[^>]*data-last-at=""/, last_response.body)
+  end
+
+  # The same session after SessionClose.sweep closed it rather than the lifter, which is the
+  # commoner half: the phone went in a bag and the finish control was never tapped. The
+  # stamp is a stamp either way and the bar has nothing left to ask about.
+  it 'says nothing about quiet on a session the sweep closed' do
+    account_id = login
+    workout_id = a_session(account_id, ago: 8 * 60 * 60)
+    Tectonic::SessionClose.sweep(account_id)
+
+    get "/workouts/#{workout_id}/session"
+
+    assert_match(/id="quiet-cue"[^>]*data-last-at=""/, last_response.body)
+  end
+end
+
 # The nudge is about the session rather than about the tap, so it is sent on every tap --
 # including an un-complete, which the rest cue deliberately stays silent about. Taking a
 # mis-tap back is still the session moving, and the quiet has to restart from it.
@@ -269,6 +301,21 @@ describe 'the cue after a tap' do
          { 'HTTP_HX_REQUEST' => 'true' }
 
     assert_match(/id="quiet-cue" hx-swap-oob="true"/, last_response.body)
+  end
+
+  # A correction tapped into a session that is already over is still a tap, and the cue still
+  # comes back -- carrying nothing. Otherwise fixing a weight on last night's session at
+  # breakfast would arm the question again on a session closed twelve hours ago. #523.
+  it 'comes back empty when the session was already finished' do
+    account_id = login
+    workout_id = a_session(account_id, ago: 45 * 60, finished: Time.now)
+    set_id = DB[:sets].where(workout_id:).order(:id).get(:id)
+    path = "/workouts/#{workout_id}/sets/#{set_id}/complete"
+
+    post path, { '_csrf' => token_for_form("/workouts/#{workout_id}/session", path) },
+         { 'HTTP_HX_REQUEST' => 'true' }
+
+    assert_match(/id="quiet-cue" hx-swap-oob="true"[^>]*data-last-at=""/, last_response.body)
   end
 end
 
