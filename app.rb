@@ -35,6 +35,10 @@ require_relative 'lib/tectonic/withings'
 require_relative 'lib/tectonic/withings_connection'
 require_relative 'lib/tectonic/withings_measures'
 require_relative 'lib/tectonic/withings_workouts'
+# The proposals a backfill left, which this app reads and never makes: `withings:backfill`
+# is a rake task precisely because walking years of history ten seconds a call is not
+# something to do inside a Puma thread. Nothing here requires that module.
+require_relative 'lib/tectonic/withings_proposals'
 require_relative 'lib/tectonic/progress_chart'
 require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
@@ -946,6 +950,19 @@ class Tectonic < Roda
       # onto the page. New as well as edit: a date the app cannot read is declined the same
       # way on both, and the one that silently said nothing would be the worse of the two.
       r.get('new') { workout_form('workouts/new') }
+      # Every proposal the backfill left, in one column. #520, reversed.
+      #
+      # Above `r.on String` because that one matches any remaining segment and would take
+      # "withings" for a workout id, redirect to /workouts, and leave this route dead with
+      # nothing to say why.
+      #
+      # It reads rows the backfill already wrote and asks Withings nothing, which is the
+      # property that makes it safe to open: a review screen that fetched would be one page
+      # view standing on a hundred API calls.
+      r.get('withings') do
+        @proposals = WithingsProposals.waiting(@account_id)
+        view('workouts/withings')
+      end
       r.on String do |workout_id|
         @workout = Workout[workout_id]
         # One ownership gate for every nested workout route: a workout that does
@@ -1252,13 +1269,13 @@ class Tectonic < Roda
             check_csrf!
             WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout.id,
                                      external_id: r.params['activity'].to_s)
-            r.redirect "/workouts/#{workout_id}"
+            r.redirect answered_from(workout_id, r.params['back'])
           end
           r.post 'dismiss' do
             check_csrf!
             WithingsWorkouts.dismiss(account_id: @account_id, workout_id: @workout.id,
                                      external_id: r.params['activity'].to_s)
-            r.redirect "/workouts/#{workout_id}"
+            r.redirect answered_from(workout_id, r.params['back'])
           end
         end
         r.get('edit') { workout_form('workouts/edit') }
@@ -1653,6 +1670,20 @@ class Tectonic < Roda
     return [] unless @workout.finished?
 
     @session_summary ||= SessionSummary.of(@workout, @sets.map(&:values), @timing)
+  end
+
+  # Where an answer about a session sends the lifter next.
+  #
+  # Back to the record by default, which is where the question was asked and where the
+  # matched numbers now are. The one exception is the review list, which exists to answer a
+  # backfill's worth of proposals in a sitting: sending somebody to a record page after each
+  # one would make a hundred answers into a hundred trips back.
+  #
+  # A fixed pair of destinations and never the parameter itself, because a redirect that
+  # echoed a value from a form is an open redirect -- a link that posts here with a back of
+  # `https://elsewhere.example` would bounce the lifter off the app, still logged in.
+  def answered_from(workout_id, back)
+    back.to_s == 'proposals' ? '/workouts/withings' : "/workouts/#{workout_id}"
   end
 
   # The Withings activity this session has been matched to, or nil. #520.
