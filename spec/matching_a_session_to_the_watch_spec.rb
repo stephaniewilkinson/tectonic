@@ -36,10 +36,15 @@ module MatchingTheWatch
 
   # What `getworkouts` answers with, once `data_fields` has been asked for. Epoch integers
   # for the two ends, which is Withings' shape and the reason the columns are instants.
+  #
+  # `model` is on the response whether or not anything asked for it -- it is not a
+  # `data_field` -- so it is out here beside `category` rather than under `data`, which is
+  # the distinction 050 rests on. 59 is what Withings' own table calls an Activite Steel HR
+  # Sport Edition, and the number is stored rather than that name.
   def activity(id: 'w-1', starts: Time.now - 3600, minutes: 50, category: 16, **extra)
     { 'id' => id, 'category' => category, 'timezone' => 'America/New_York',
       'attrib' => 0, 'startdate' => starts.to_i, 'enddate' => (starts + (minutes * 60)).to_i,
-      'modified' => starts.to_i,
+      'modified' => starts.to_i, 'model' => 59,
       'data' => { 'calories' => 310.5, 'effduration' => 2400, 'hr_average' => 128,
                   'hr_min' => 61, 'hr_max' => 164 } }.merge(extra)
   end
@@ -407,12 +412,27 @@ describe 'a category the scoring table never had a word for' do
 
   # And an id that table does not carry prints as an id. "Other" or "Activity" would read as
   # something the lifter had tapped in Health Mate, which is inventing a name for a row.
+  #
+  # 533 rather than 306, which this asserted until #579. 306 was the worked example of an
+  # unnameable id and it is "Indoor walk" -- the mirrors #568 transcribed from were missing
+  # it, so the spec encoded the gap as though it were Withings'. 533 is a number inside the
+  # published range that the published table genuinely skips.
   it 'prints the id where Withings has published no name' do
     a_session_at_ten_past_one
-    record(@workout_id, [activity(id: 'odd', category: 306, starts: clock_on(Date.today - 1, 9, 0),
+    record(@workout_id, [activity(id: 'odd', category: 533, starts: clock_on(Date.today - 1, 9, 0),
                                   minutes: 30)])
 
-    assert_includes box_says, '• Withings category 306 — the day before,'
+    assert_includes box_says, '• Withings category 533 — the day before,'
+  end
+
+  # The other half of the same correction, on the page rather than on the constant: 306 is a
+  # category a lifter can be shown a name for and was being shown a number for.
+  it 'names the indoor walk it used to print a number for' do
+    a_session_at_ten_past_one
+    record(@workout_id, [activity(id: 'indoors', category: 306, starts: clock_on(Date.today - 1, 9, 0),
+                                  minutes: 30)])
+
+    assert_includes box_says, '• Indoor walk — the day before,'
   end
 end
 
@@ -480,19 +500,47 @@ describe 'what the app calls a Withings category' do
     assert_equal 'Bicycling', Tectonic::WithingsWorkouts.called(6)
   end
 
-  # This app called 17 "Fitness". Withings calls it Calisthenics, and the string is shown to
-  # a lifter as the watch's own word for what they did -- so it has to be the watch's word.
-  it 'calls 17 what Withings calls it rather than what this app used to' do
-    assert_equal 'Calisthenics', Tectonic::WithingsWorkouts.called(17)
+  # 17 is "Fitness", which is what Withings' own OpenAPI document says and what 042's comment
+  # has said since the table landed. This spec asserted "Calisthenics" -- the name both of the
+  # community mirrors #568 transcribed from carry -- so the wrong name was pinned here as well
+  # as stored in the constant, and the repo contradicted itself in three places rather than
+  # two. #579 read the primary source; the method is in the comment on `CATEGORIES`.
+  #
+  # The string is shown to a lifter as the watch's own word for what they did, so it has to be
+  # the watch's word and not a mirror's guess at it.
+  it 'calls 17 what Withings calls it rather than what a mirror called it' do
+    assert_equal 'Fitness', Tectonic::WithingsWorkouts.called(17)
+  end
+
+  # 193 and 194 were left out entirely because the mirrors had them the other way round. They
+  # are the right way round here, from the source, and the order is the whole content of it.
+  it 'tells hockey from ice hockey, in the order Withings publishes them' do
+    assert_equal 'Hockey', Tectonic::WithingsWorkouts.called(193)
+    assert_equal 'Ice hockey', Tectonic::WithingsWorkouts.called(194)
+  end
+
+  # A real tag that a lifter can tap, and the one word `called` may never invent for an id it
+  # does not recognise -- which is why it mattered that it was missing.
+  it 'names the category Withings actually calls Other' do
+    assert_equal 'Other', Tectonic::WithingsWorkouts.called(36)
   end
 end
 
 describe 'a category Withings has published no name for' do
-  # Withings adds categories, and three of the published ids are deliberately absent because
-  # the two mirrors of their table disagree about them. Either way the honest answer is the
-  # number, which is also the one thing that makes the gap fixable.
+  # Withings allocate ids as they add activities and do not reuse retired ones, so the
+  # published table has gaps in it -- there is no 37 through 127, and no 533. The honest
+  # answer for one of those is the number, which is also the one thing that makes the gap
+  # fixable if it ever turns out not to be a gap.
+  #
+  # This asserted 306 until #579, on the strength of a table transcribed from mirrors that
+  # were missing it. 306 is "Indoor walk", which is why the example had to move.
   it 'is the id and nothing more' do
-    assert_equal 'Withings category 306', Tectonic::WithingsWorkouts.called(306)
+    assert_equal 'Withings category 533', Tectonic::WithingsWorkouts.called(533)
+  end
+
+  # The id the fallback used to be demonstrated with, named.
+  it 'is not what happens to 306, which Withings does publish' do
+    assert_equal 'Indoor walk', Tectonic::WithingsWorkouts.called(306)
   end
 
   it 'is said plainly where Withings sent no category at all' do
@@ -513,11 +561,25 @@ describe 'the category a proposal sentence names' do
                  Tectonic::WithingsWorkouts.because(riding, window)
   end
 
+  # Downcased, because it is read mid-sentence. 17 is in `LIFTING` exactly as it was before
+  # #579 -- correcting its name moved no id -- so what changed here is the word and nothing
+  # about which activities score the quarter.
   it 'names one that scored, in Withings own word for it' do
     bodyweight = row(starts_offset: 2, minutes: 48, category: 17)
 
-    assert_equal 'overlaps this session for 48m of its 52m, and Withings called it calisthenics',
+    assert_equal 'overlaps this session for 48m of its 52m, and Withings called it fitness',
                  Tectonic::WithingsWorkouts.because(bodyweight, window)
+  end
+
+  # The correction the sentence must not have swallowed: 17 still scores, whatever it is
+  # called. A rename that quietly dropped it out of `LIFTING` would show up as a lift losing
+  # to a walk, months later, with nothing on screen to say why.
+  it 'still counts 17 as looking like lifting under its corrected name' do
+    bodyweight = row(starts_offset: 2, minutes: 48, category: 17)
+
+    assert_includes Tectonic::WithingsWorkouts::LIFTING, 17
+    assert_in_delta 0.25, Tectonic::WithingsWorkouts.score(bodyweight, window) -
+                          Tectonic::WithingsWorkouts.score(bodyweight.merge(category: 6), window), 0.001
   end
 end
 
@@ -817,6 +879,54 @@ describe 'storing what Withings sent' do
     record(@workout_id, [activity.merge('data' => {})])
 
     assert_nil stored(@account_id).first[:hr_average]
+  end
+end
+
+# 050, and #579's accounting for why it is worth a column: `model` arrives on every response
+# without being asked for and was thrown away on every fetch, so nothing here could say which
+# instrument recorded a session. It is out at the top level of the workout object rather than
+# under `data`, which is what makes it free -- no `data_field`, no extra request, no scope.
+describe 'which device recorded the activity' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include MatchingTheWatch
+
+  before do
+    @account_id = login
+    connect(@account_id)
+    @workout_id = trained_session(@account_id)
+  end
+
+  it 'is kept rather than discarded with the rest of the response' do
+    record(@workout_id, [activity])
+
+    assert_equal 59, stored(@account_id).first[:model]
+  end
+
+  # An activity somebody typed into the Withings app has no instrument to name, and Withings
+  # number their models from 1 -- so nil is the answer and 0 would be a model nobody owns.
+  it 'is nothing rather than zero where there was no device' do
+    record(@workout_id, [activity.merge('model' => nil)])
+
+    assert_nil stored(@account_id).first[:model]
+  end
+
+  # The integer and not a name for it. Resolving 59 to "Activite Steel HR Sport Edition" on
+  # the way in would freeze today's reading of somebody else's growing list into stored rows,
+  # which is the argument 042 already made about `category`.
+  it 'is the number Withings sent rather than a name for it' do
+    record(@workout_id, [activity])
+
+    assert_kind_of Integer, stored(@account_id).first[:model]
+  end
+
+  # A re-fetch is Withings' to overwrite here, unlike the lifter's answer: a watch replaced
+  # between one fetch and the next is new information and the upsert should take it.
+  it 'keeps up with a device that changed between fetches' do
+    record(@workout_id, [activity])
+    record(@workout_id, [activity.merge('model' => 1058)])
+
+    assert_equal 1058, stored(@account_id).first[:model]
   end
 end
 

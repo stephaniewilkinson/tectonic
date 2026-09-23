@@ -78,15 +78,46 @@ class Tectonic < Roda
     # All of them come back from one call, so there is no cheaper subset to ask for: a scale
     # that measures body composition measures all of it in one stand.
     #
-    # Deliberately absent: height, which is not a measurement of training and does not change;
-    # blood pressure and heart rate, which #472 puts with the rest of `user.activity` under a
-    # later ticket. A type this table does not name is skipped rather than stored under its
-    # number, because a metric called "91" is a row nothing will ever read on purpose.
+    # ## 11, and what it is honestly worth
+    #
+    # **This used to say heart rate was deferred to a later ticket**, with blood pressure,
+    # "with the rest of `user.activity`". #579 read Withings' own scope table and found that
+    # sentence wrong on both halves: `Measure - Getmeas` is under `user.metrics`, which this
+    # account already holds, and type 11 is in the Basic biomarker pack, which is the tier this
+    # app is on. There was never a later ticket's worth of work in it. It is one line, it rides
+    # the request `MEASTYPES` already builds, and it needs no migration, because 041 made
+    # `health_metrics.metric` free text precisely so that a new reading is a line in a hash.
+    #
+    # **What it will actually yield here is probably nothing, and that is not a reason to leave
+    # it out.** Withings' reference says of type 11, in these words, *"Heart Pulse (bpm) - only
+    # for BPM and scale devices"* -- it is a pulse the instrument takes while it is taking some
+    # other reading, off a blood-pressure monitor's cuff or a scale's footpads. The reporting
+    # account has no scale at all; its bodyweights are typed into the Withings app by hand, and
+    # a typed weight carries no pulse. So this may well never produce a single row on this
+    # account, and nothing downstream may read an empty `standing_hr` as a statement about
+    # anybody's heart. It is here because it costs nothing to ask for and starts collecting on
+    # its own the day a device that produces it is stood on, which is the whole of the case.
+    #
+    # **`standing_hr` rather than `resting_hr`**, which is the name the honesty turns on. This
+    # is a pulse taken during a measurement -- standing on a scale, or sitting with a cuff on
+    # -- and not a resting heart rate in the sense anybody means by that, which is taken lying
+    # still and is a different number. It is not a workout heart rate either; those live on
+    # `withings_workouts` with the activity they were measured over, and a name that let the
+    # two be read together would put a set of squats and a weigh-in in one series.
+    #
+    # A type this table does not name is skipped rather than stored under its number, because a
+    # metric called "91" is a row nothing will ever read on purpose. Still deliberately absent:
+    # height, which is not a measurement of training and does not change (#518); blood pressure
+    # types 9 and 10, which are a pair of numbers that only mean anything together and which no
+    # reader here has a use for; and everything in the Total biomarker pack, which #579
+    # declines on the grounds that an unentitled field comes back absent rather than refused,
+    # and a value that cannot be told from silence is worse than no value.
     METRICS = {
       1 => %w[weight kg],
       5 => %w[lean_mass kg],
       6 => ['fat_ratio', '%'],
       8 => %w[fat_mass kg],
+      11 => %w[standing_hr bpm],
       76 => %w[muscle_mass kg],
       77 => %w[hydration kg],
       88 => %w[bone_mass kg]
