@@ -2,7 +2,7 @@
 
     #281 shipped as measurement -- stamps, totals, turnarounds -- and the issue was reopened
     because none of it counts your rest: the header clock says how long you have been
-    training, which between sets is not the number you want. This is the countdown.
+    training, which between sets is not the number you want. This is the one that is.
 
     **The clock starts with the set; the bell needs a length.** #395, and it is the better
     answer than the one this shipped with.
@@ -15,13 +15,45 @@
 
     The two are separate now. A Done tap starts the clock counting up, silently, because the
     rest began when the set ended and that is simply true. Nothing happens at any particular
-    number until somebody names one, and then it counts down to it and rings.
+    number until somebody names one.
+
+    **The clock only ever counts up. A named length is a bell, not a display mode.** #514,
+    and it finishes the separation #395 started rather than reversing it.
+
+    #395 split the clock from the bell and then let the bell take the clock over anyway: a
+    length -- prescribed, or tapped on the bar -- switched the display into a countdown and
+    the stopwatch vanished. On a movement carrying a prescribed rest that meant the stopwatch
+    was never seen at all. The lifter tapped Done and the bar opened at 3:00 falling, on every
+    single set, and the one number #395 was reopened to provide was the one number not on
+    screen. A countdown answers "how much longer am I allowed"; a stopwatch answers "how long
+    have I been standing here", and the second question is the one being asked between sets
+    and the only one the app can answer without being told anything.
+
+    So the clock starts at 0:00 on every set and climbs, and it keeps climbing past the bell.
+    Naming a length now decides *when the timer rings* and nothing about what it shows.
+
+    **This applies to a length the lifter taps, too, and that is the part worth flagging.**
+    The middle option was on the table -- stopwatch by default, countdown the moment you tap
+    a duration -- and it was turned down, because it makes the clock's direction a thing a
+    lifter has to remember having chosen, and because two ways to read the same bar is the
+    kind of split the four plain durations already refuse to make. One clock, one direction,
+    every set. If that reads wrong in the gym it is one branch to revisit and this paragraph
+    is where to start.
 
     **A prescribed rest is a length somebody named.** A block writing five minutes between
-    singles counts down and rings without a second tap, because that number was written into
-    the programme by a person -- and since #456 so does a rest the lifter set on the movement
+    singles sets the bell without a second tap, because that number was written into the
+    programme by a person -- and since #456 so does a rest the lifter set on the movement
     itself, for the same reason. #263 settled that the app does not decide how long anybody
-    rests, and a length typed into a form is not the app deciding.
+    rests, and a length typed into a form is not the app deciding. What #514 changes about
+    that rule is only its *effect*: it used to seize the display as well as arm the bell, and
+    now it arms the bell and leaves the clock alone.
+
+    **A rest does not need the server to start.** #513. The cue below rides back on the Done
+    response, so a tap that never reaches the app used to take the clock with it -- and a
+    lifter watching a rest timer that never started has no reason at all to suspect the log.
+    The browser knows when the tap happened, which is when the rest began, so a failed tap
+    arms the clock here from the local clock. What it cannot know is the prescription, and it
+    does not guess one; the argument is at armLocally.
 
     **The suggestion is that rest and nothing else.** It used to fall back to the lifter's own
     median turnaround, labelled "your usual", and that is gone. It was standing in for a
@@ -37,9 +69,10 @@
 
     Outside #session-body, with the RPE footer and for the same reason: a Done tap swaps a
     lift panel and the poll swaps every panel, so anything inside that region is replaced
-    several times a session and a countdown inside it would restart on every poll. Here it
+    several times a session and a clock inside it would restart on every poll. Here it
     is rendered once per page load, htmx never touches it, and the clock lives in a closure
-    that nothing swaps.
+    that nothing swaps -- which is also what lets #513 start a rest with no response at all:
+    the state that survives a failed tap is the state htmx cannot reach.
 
     Fixed above that footer rather than in the flow, so the session scrolls behind it and it
     is never further than the bottom of the screen from whichever panel you swiped to.
@@ -47,36 +80,57 @@
 
     Hidden until armed, and it is `hidden` in markup rather than a class so the degradation
     is the honest one: with JavaScript off nothing here ever appears, which is right, because
-    a countdown with no script is a row of buttons that do nothing. Nothing else on the
+    a clock with no script is a row of buttons that do nothing. Nothing else on the
     screen changes -- the session clock is still server-rendered, the turnarounds are still
     measured, and this adds no server-side state that a scriptless browser would miss.
 
     z-30 puts it over the RPE footer's z-20, which only matters while the footer is open:
-    an opened reference table covers the screen, and a running countdown is the one thing
+    an opened reference table covers the screen, and a running rest is the one thing
     that should stay visible through it. %>
 <div id="rest-timer" hidden
      class="fixed inset-x-0 z-30 <%= rest_timer_offset %> border-t border-gray-300 bg-white">
   <div class="mx-auto flex max-w-md items-center gap-2 px-4 py-2">
     <%# The clock, which is on screen from the moment a set is ticked off rather than from the
-        moment a length is chosen. #395.
+        moment a length is chosen (#395), and which counts up whether or not a length was
+        ever named (#514). It is the one element on this bar whose reading does not depend on
+        anything the server said.
         aria-hidden for the same reason the session clock is (#336): a number changing every
         second in a live region is a screen reader nobody can use. The announcement at the
         foot of the bar is the part worth speaking, and it fires once. %>
     <span data-rest-clock aria-hidden="true"
           class="shrink-0 text-2xl font-semibold tabular-nums text-gray-900"></span>
-    <%# Named only once there is a countdown to name. While the durations are on offer the
+    <%# The bell, said beside the clock rather than by the clock. #514.
+        This is what the countdown used to be, and it is here because taking the countdown
+        away took two things with it that a lifter actually reads. The first is the length
+        itself: without it a climbing number is a stopwatch with a secret. The second is the
+        moment it passed -- the old display said that with a `+` and a switch from black to
+        grey, and grey alone on a number that never stops climbing is not a signal, it is a
+        shade. So the two readings stay, moved off the clock and onto their own word:
+          before the bell   "/ 3:00"   -- 0:42 / 3:00, elapsed against the length asked for
+          after it          "+0:42"    -- the overshoot, in the same glyph #281 gave it
+        The slash going away is the signal. It means the number is no longer ahead of you,
+        and it changes at the same instant the beep starts and the clock turns grey, so the
+        lifter who missed the sound has two things saying so and one of them is a word.
+        Empty and hidden while no length has been named, because there is nothing to say:
+        the clock is a stopwatch and nothing is going to happen at any particular number. %>
+    <span data-rest-bell hidden aria-hidden="true"
+          class="shrink-0 text-xs tabular-nums text-gray-500"></span>
+    <%# Named only once there is a bell to name. While the durations are on offer the
         room goes to them: on a 420px screen the movement and five buttons do not both fit,
         and the buttons are the thing a thumb is reaching for. %>
     <span data-rest-movement hidden aria-hidden="true"
           class="min-w-0 flex-1 truncate text-xs text-gray-500"></span>
-    <%# Where the countdown's number came from, said while it is counting rather than only
-        while it is offered. A prescribed rest starts on its own (#395), so its button is
-        never seen -- and without this the lifter would watch a countdown with nothing saying
-        whether the block asked for it or the app worked it out. The word is copied from the
-        labels on the button below rather than written twice, so the two cannot drift. %>
+    <%# Where the bell's number came from, said while it is pending rather than only while it
+        is offered. A prescribed rest arms on its own (#395), so its button is never seen --
+        and without this the lifter would watch a clock with a bell on it and nothing saying
+        whether the block asked for that length or they tapped it themselves. The word is
+        copied from the labels on the button below rather than written twice, so the two
+        cannot drift, and it is said only when the bell is the suggested number: a plain 1:00
+        tapped on a movement that prescribes 3:00 is not a prescription and must not wear the
+        word. %>
     <span data-rest-source hidden aria-hidden="true"
           class="shrink-0 text-xs text-gray-500"></span>
-    <%# The offer: what to count down to. Scrollable rather than wrapped, because a second
+    <%# The offer: when to ring. Scrollable rather than wrapped, because a second
         row would change the bar's height and push the last Done button around under a thumb
         that is already reaching for it. %>
     <div data-rest-offer class="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
@@ -113,7 +167,7 @@
             for a prescription in an app that had no way to write one, and now there is one.
 
             The label stays a lookup by kind rather than becoming a bare word, because the
-            script matches on it and the pair is what keeps the button and the countdown
+            script matches on it and the pair is what keeps the button and the bell
             agreeing about what may ring. A second kind would be a span, not a rewrite. %>
         <span data-rest-label="prescribed" hidden class="font-normal text-sky-100">prescribed</span>
       </button>
@@ -126,8 +180,13 @@
       <%- end %>
     </div>
 
-    <%# The adjustment, which replaces the offer once there is a length to adjust. In the same
-        bar rather than a second one, so the bar never changes height between the two states. %>
+    <%# The adjustment, which replaces the offer once there is a bell to adjust. In the same
+        bar rather than a second one, so the bar never changes height between the two states.
+
+        These wind the *bell* earlier or later now, not a countdown (#514) -- which is the
+        same arithmetic and a different sentence. &minus;30 no longer means "take thirty
+        seconds off the number on the clock", because the number on the clock is the elapsed
+        rest and nothing may take time off that; it means "ring thirty seconds sooner". %>
     <div data-rest-steps hidden class="flex shrink-0 items-center gap-2">
       <%# Plus and minus rather than a dial. The issue's screenshot has a picker, and a picker
           is the wrong control for this screen: its whole design is one tap, one-handed, with
@@ -168,9 +227,12 @@
     it -- which on the one number in this app somebody is waiting for is the difference
     between a gym timer and an approximation of one.
 
-    **Past zero it counts up.** The issue asks for this explicitly and it is the half that
-    makes the thing honest: a rest timer that stops at zero implies the rest ended there,
-    when what actually happened is that you took another forty seconds. The count up is
+    **It counts up, and it goes on counting up past the bell.** #281 asked for the second
+    half of that explicitly and it is what makes the thing honest: a rest timer that stops
+    at the bell implies the rest ended there, when what actually happened is that you took
+    another forty seconds. #514 made the first half true as well, so there is now one
+    direction rather than two and the overshoot is not a special case -- it is the same
+    climbing number with the bell behind it instead of ahead. The reading past the bell is
     grey and prefixed, not red or amber -- going over is information, not a warning, and
     amber on this screen means a warning and only a warning (#214).
 
@@ -185,11 +247,14 @@
     Vibration is asked for and ignored where it is not supported -- iOS Safari implements none
     of navigator.vibrate -- which is why the beep is the primary and the buzz is the addition.
 
-    A wake lock is held while a countdown runs, and only then. Without one the phone dims and
+    A wake lock is held while a bell is pending, and only then. Without one the phone dims and
     locks partway through a three-minute rest and the beep arrives to a sleeping page. It is
-    not held while the clock is merely counting up: that state lasts from one set to the next
-    all session, and forcing the screen on for the whole of a workout to time a rest nobody
-    asked to be told about is a battery cost with nothing on the other side of it. Requested
+    not held while the clock is merely counting with nothing to ring: that state lasts from
+    one set to the next all session, and forcing the screen on for the whole of a workout to
+    time a rest nobody asked to be told about is a battery cost with nothing on the other side
+    of it. #514 did not move that line, and it is worth saying so, because the clock counting
+    up no longer distinguishes the two states on screen -- the wake lock follows the bell,
+    which is the thing that needs the page awake, and never the clock. Requested
     inside a try because the API is absent on older Safari and refuses when the page is not
     visible, and neither is a reason to fail to time a rest.
 
@@ -204,6 +269,7 @@
     var offer = bar.querySelector('[data-rest-offer]');
     var steps = bar.querySelector('[data-rest-steps]');
     var clock = bar.querySelector('[data-rest-clock]');
+    var bellLabel = bar.querySelector('[data-rest-bell]');
     var movementLabel = bar.querySelector('[data-rest-movement]');
     var sourceLabel = bar.querySelector('[data-rest-source]');
     var suggestedButton = bar.querySelector('[data-rest-start="suggested"]');
@@ -219,13 +285,30 @@
     // a timer -- and because the gaps are what let you hear somebody talking over it.
     var RING_SECONDS = 10, PULSE_EVERY = 0.8;
 
-    // startedAt is when the set was ticked off, which is when the rest began. target is the
-    // length somebody asked for, or 0 while nobody has. The two are kept apart because #395
-    // is exactly that distinction: the clock runs from the first, the bell needs the second.
-    // target is null while nobody has named a length, and a number once somebody has --
-    // null rather than 0 because a lifter can wind the clock down to zero, and "no length"
-    // and "a length of none" are different states that 0 alone cannot tell apart.
-    var startedAt = 0, target = null, suggested = 0, seenAt = '';
+    // startedAt is when the set was ticked off, which is when the rest began. bell is how far
+    // into that rest the timer should ring. The two are kept apart because #395 is exactly
+    // that distinction and #514 is what follows from taking it seriously: the clock runs from
+    // the first and shows nothing but the first, and the second decides one moment.
+    //
+    // It is called `bell` and not `target` now, which is a rename and an argument. `target`
+    // was the number the display was walking towards, and there is no such number any more --
+    // the display walks away from zero and never arrives anywhere. What is left is a length
+    // at which something happens, which is a bell.
+    //
+    // null while nobody has named a length, and a number once somebody has -- null rather
+    // than 0 because a lifter can wind the bell down to zero, and "no bell" and "a bell at
+    // no seconds" are different states that 0 alone cannot tell apart.
+    //
+    // sourceWord is the word the cue's kind looked up, kept so that the bar can say
+    // "prescribed" of the prescribed number and stay silent about a plain duration tapped on
+    // the same movement -- which the old code could not do, because it wrote the word at arm
+    // time and every bell after that inherited it.
+    //
+    // armedFor is #513's whole state: the set whose rest this browser started on its own,
+    // because the tap that should have started it never reached the app. Empty the rest of
+    // the time. The reconciliation it exists for is at readCue.
+    var startedAt = 0, bell = null, suggested = 0, kind = '', sourceWord = '';
+    var seenAt = '', armedFor = '';
     var rang = false, lock = null, audio = null, ringing = [];
 
     function spell(seconds) {
@@ -275,14 +358,22 @@
       if (lock) { lock.release().catch(function () {}); lock = null; }
     }
 
-    // Three states, not two. The bar is away; or it is counting the rest with no length set,
-    // which is what a Done tap leaves behind; or it is counting down to one. #395 is the
-    // middle state -- it did not exist before, and it is the one a lifter is in most of the
-    // time, because most sets are followed by getting on with it rather than by a decision.
+    // Three states, not two. The bar is away; or it is counting the rest with no bell set,
+    // which is what a Done tap leaves behind; or it is counting the rest with one. #395 is
+    // the middle state -- it did not exist before, and it is the one a lifter is in most of
+    // the time, because most sets are followed by getting on with it rather than by a
+    // decision.
+    //
+    // What the modes no longer decide, after #514, is which way the clock runs: it climbs in
+    // both. They decide which half of the bar is on offer -- the durations to pick a bell
+    // from, or the two buttons that wind the bell you have -- and whether there is a bell to
+    // say anything about beside the clock. 'running' is kept as the name because the thing
+    // running is the bell, not the clock; the clock is running in the middle state too.
     function show(mode) {
       bar.hidden = mode === 'none';
       offer.hidden = mode !== 'counting';
       steps.hidden = mode !== 'running';
+      bellLabel.hidden = mode !== 'running';
       movementLabel.hidden = mode !== 'running';
       sourceLabel.hidden = mode !== 'running' || !sourceLabel.textContent;
       // The bar is fixed, so it covers whatever the page ends with. The session wrapper
@@ -292,22 +383,30 @@
       if (body) { body.classList.toggle('pb-40', mode !== 'none'); }
     }
 
+    // One reading of the clock, in one direction, whether or not a bell is set. #514.
+    //
+    // Everything the countdown used to say is still said; it is said beside the clock instead
+    // of by it. The bell's own word carries the length while it is ahead and the overshoot
+    // once it is behind, and the black-to-grey switch stays exactly where it was -- it is a
+    // second voice on the same fact rather than the only one, which is what it had to become
+    // once the number it qualifies no longer changes direction.
     function tick() {
       if (bar.hidden) { return; }
       var elapsed = Math.round((Date.now() - startedAt) / 1000);
-      // No length asked for: the clock is a stopwatch on this rest and nothing is going to
-      // happen at any particular number, so it counts plainly and stays quiet.
-      if (target === null) {
-        clock.textContent = spell(elapsed);
+      clock.textContent = spell(elapsed);
+      // No bell: the clock is a stopwatch on this rest, nothing is going to happen at any
+      // particular number, and there is nothing to say beside it.
+      if (bell === null) {
+        bellLabel.textContent = '';
         clock.classList.add('text-gray-900');
         clock.classList.remove('text-gray-500');
         return;
       }
-      var left = target - elapsed;
-      clock.textContent = (left < 0 ? '+' : '') + spell(left);
-      clock.classList.toggle('text-gray-900', left > 0);
-      clock.classList.toggle('text-gray-500', left <= 0);
-      if (left <= 0 && !rang) {
+      var past = elapsed - bell;
+      bellLabel.textContent = past < 0 ? '/ ' + spell(bell) : '+' + spell(past);
+      clock.classList.toggle('text-gray-900', past < 0);
+      clock.classList.toggle('text-gray-500', past >= 0);
+      if (past >= 0 && !rang) {
         rang = true;
         beep();
         if (navigator.vibrate) { navigator.vibrate([300, 500, 300, 500, 300, 500, 300]); }
@@ -316,52 +415,160 @@
       }
     }
 
-    // A length, counted from when the set was finished rather than from this tap. "Rest two
+    // A bell, counted from when the set was finished rather than from this tap. "Rest two
     // minutes" is two minutes after the bar went down, not two minutes after you got round to
     // saying so -- and #395's whole point is that the rest started at the Done tap.
-    function aim(seconds) {
-      target = seconds;
+    //
+    // It no longer changes what the clock shows, which is the whole of #514: before this the
+    // same call switched the display into a countdown, so a movement carrying a prescribed
+    // rest reached this line inside arm() and the lifter never saw a stopwatch at all.
+    //
+    // The word is passed in rather than read off the last cue, because whose number this is
+    // depends on which button was tapped and not on what the movement prescribes. Three
+    // minutes prescribed on squats and a lifter tapping 1:00 is a lifter overriding the
+    // prescription, and a bar that called that 1:00 "prescribed" would be putting words in
+    // the programme's mouth.
+    function ringAt(seconds, word) {
+      bell = seconds;
       // Already past it when it was set. That is a statement about the rest you took rather
-      // than an alarm you asked for, so the bell is marked spent and the clock simply reads
-      // how far over you are.
+      // than an alarm you asked for, so the bell is marked spent and the bar simply reads how
+      // far over you are. #513 leans on this: a rest armed locally and reconciled minutes
+      // later against a prescription lands here, and must report rather than beep.
       rang = (Date.now() - startedAt) / 1000 >= seconds;
+      sourceLabel.textContent = word || '';
       announce.textContent = '';
       show('running');
-      hold();
+      // The lock follows the bell, so a bell that is already spent does not hold the screen
+      // awake for a beep that has been and gone.
+      if (rang) { release(); } else { hold(); }
       tick();
     }
 
-    function arm(cue) {
-      silence();
+    // What the server said about this rest, unpacked. Split out of arm() because #513 needs
+    // it twice: once when the cue is what starts the rest, and once when the cue turns up
+    // late for a rest this browser already started on its own.
+    //
+    // Which label shows is a fact about where the number came from, so it is read off the
+    // cue rather than assumed. A prescription and a measured median are different claims.
+    function describe(cue) {
       suggested = parseInt(cue.getAttribute('data-suggested'), 10) || 0;
-      var kind = cue.getAttribute('data-kind') || '';
+      kind = cue.getAttribute('data-kind') || '';
       suggestedButton.hidden = !suggested;
       if (suggested) { suggestedLabel.textContent = spell(suggested) + ' '; }
-      // Which label shows is a fact about where the number came from, so it is read off the
-      // cue rather than assumed. A prescription and a measured median are different claims.
-      // The same word is carried to the running row, so a countdown that started on its own
-      // still says whose number it is counting.
-      sourceLabel.textContent = '';
+      sourceWord = '';
       for (var i = 0; i < labels.length; i++) {
         var matches = labels[i].getAttribute('data-rest-label') === kind;
         labels[i].hidden = !matches;
-        if (matches) { sourceLabel.textContent = labels[i].textContent; }
+        if (matches) { sourceWord = labels[i].textContent; }
       }
       movementLabel.textContent = cue.getAttribute('data-movement') || '';
-      // The rest began when the set was ticked off, which is this cue. A cue landing mid-rest
-      // is a set finished before the last one's timer ran out -- supersets, or simply tapping
-      // ahead -- and the new rest is the one that matters, so it takes the bar over.
+    }
+
+    // A rest with no bell on it, counting from now, which is the state a Done tap leaves
+    // behind before anybody names a length. Shared by the two ways a rest can start: a cue
+    // from the server, and #513's tap that never reached one. Both read the same clock --
+    // this file has never asked the server what time it is, so the failed path is not a
+    // lesser measurement, it is the identical one.
+    function begin() {
       startedAt = Date.now();
-      target = null;
+      bell = null;
       rang = false;
       announce.textContent = '';
       release();
       show('counting');
-      // A rest the block prescribed counts down and rings, because that length is one
+    }
+
+    function arm(cue) {
+      silence();
+      describe(cue);
+      // The rest began when the set was ticked off, which is this cue. A cue landing mid-rest
+      // is a set finished before the last one's timer ran out -- supersets, or simply tapping
+      // ahead -- and the new rest is the one that matters, so it takes the bar over.
+      begin();
+      // And it settles any debt #513 left: whatever this browser started on its own, the set
+      // being rested from now is the one this cue names.
+      armedFor = '';
+      // A rest the block prescribed rings without a second tap, because that length is one
       // somebody wrote into the programme rather than one this app worked out -- which is
-      // what #395 means by the user having given it. A median the app measured never rings
-      // unasked: it is offered on the bar and takes a tap, like every other number there.
-      if (suggested && kind === 'prescribed') { aim(suggested); } else { tick(); }
+      // what #395 means by the user having given it. What it no longer does is take the
+      // display: the clock counts up from 0:00 here exactly as it does for a movement that
+      // prescribes nothing, and the prescription shows up as a bell at 3:00 rather than as a
+      // clock that starts at 3:00. That is #514.
+      if (suggested && kind === 'prescribed') { ringAt(suggested, sourceWord); } else { tick(); }
+    }
+
+    // The same rest, started without the server's help. #513.
+    //
+    // The cue rides back on the Done response, so a tap that never reaches the app produces
+    // no cue, and before this the clock stayed dead until the tap succeeded -- which on a bad
+    // signal can be several minutes and several re-taps later. #516 made that failure audible
+    // and visible, but a lifter who is told the tap was lost still has no rest timer, and the
+    // rest timer is the thing they were actually watching.
+    //
+    // None of it needs the server. The rest began when the lifter tapped, this browser was
+    // there when that happened, and Date.now() is the same clock the successful path uses --
+    // the file's own rule is that it never asks the server what time it is.
+    //
+    // **What the bar shows here, and why it shows less.** No movement name, no suggestion, no
+    // "prescribed": all three came off the cue, and the cue is exactly what did not arrive.
+    // The page does not carry the prescription anywhere else -- it is looked up per account
+    // and per movement on the server and rendered into the cue and nowhere else -- so the
+    // honest bar is a clock and the four plain durations, which is the same bar a movement
+    // with no rest set has always shown. Inventing a length to ring at, or naming the
+    // movement out of the panel heading to make the bar look furnished, would be the app
+    // claiming to know something it found out by guessing. The four durations are one tap
+    // away and they still ring.
+    //
+    // A second lost tap on the same set is not a second rest. A lifter who taps and sees
+    // nothing taps again, harder -- that is the behaviour #516 opens with -- and restarting
+    // the clock on the second tap would tell them their three-minute rest was forty seconds
+    // old. The banner counts sets rather than taps for the same reason.
+    function armLocally(setId) {
+      if (armedFor === setId) { return; }
+      silence();
+      forget();
+      begin();
+      armedFor = setId;
+      tick();
+    }
+
+    // Everything describe() would have filled in, unfilled. A bar that kept the last cue's
+    // movement name would be resting you from whatever you lifted before the signal went.
+    function forget() {
+      suggested = 0;
+      kind = '';
+      sourceWord = '';
+      suggestedButton.hidden = true;
+      for (var i = 0; i < labels.length; i++) { labels[i].hidden = true; }
+      movementLabel.textContent = '';
+      sourceLabel.textContent = '';
+    }
+
+    // The cue that turns up late, for a rest already running here. #513.
+    //
+    // When the lifter re-taps and it lands, the server sends a perfectly good cue carrying
+    // its own stamp for this set -- and arming off it would reset the clock to 0:00 with the
+    // lifter four minutes into their rest, which is a worse failure than the one this set out
+    // to fix, because it is silent and it looks like the timer working.
+    //
+    // So the local clock wins on *when*, and the cue wins on *what*. The rest began at the
+    // first tap; the server's stamp is when the network came back, and the network is not
+    // part of the rest. What the cue brings that this browser could not know is the
+    // prescription and the movement's name, and those are taken -- including arming the bell
+    // it would have armed, measured from the original tap, which for a long outage lands
+    // already spent and reads as an overshoot rather than beeping at somebody mid-set.
+    //
+    // A bell the lifter chose by hand is left alone: they tapped 1:00 while waiting, and a
+    // prescription arriving afterwards does not get to overrule them.
+    //
+    // A dismissed bar stays dismissed. The cue is about a rest the lifter has already ended,
+    // and re-opening the bar for it would be the screen arguing with them.
+    function reconcile(cue) {
+      armedFor = '';
+      if (bar.hidden) { return; }
+      describe(cue);
+      if (bell === null && suggested && kind === 'prescribed') { ringAt(suggested, sourceWord); }
+      tick();
     }
 
     bar.addEventListener('click', function (event) {
@@ -372,18 +579,30 @@
         release();
         show('none');
       } else if (tapped.hasAttribute('data-rest-step')) {
-        target += parseInt(tapped.getAttribute('data-rest-step'), 10);
+        // Winds the bell rather than the clock. Nothing here can move the number on the
+        // clock, which is the elapsed rest and is not a thing anybody gets to adjust -- what
+        // moves is the moment it rings at, and after #514 that is visible in the bell's own
+        // word rather than in the clock jumping thirty seconds.
+        bell += parseInt(tapped.getAttribute('data-rest-step'), 10);
         // Floored at nothing rather than at Bounds::REST's five seconds. That floor is about
-        // what a programme may prescribe; this is a lifter winding the clock down to end the
+        // what a programme may prescribe; this is a lifter winding the bell down to end the
         // rest now, which is a real gesture and lands on zero by design.
-        if (target < 0) { target = 0; }
+        if (bell < 0) { bell = 0; }
         // Stepping back up past the elapsed time is a rest that is running again, so the bell
-        // re-arms.
-        if (target > (Date.now() - startedAt) / 1000) { rang = false; }
+        // re-arms. It reads more plainly now than it did: the bell's word goes back from
+        // "+0:20" to "/ 3:10" at the same moment, because the number is ahead of the clock
+        // again.
+        if (bell > (Date.now() - startedAt) / 1000) { rang = false; }
         tick();
       } else {
         var asked = tapped.getAttribute('data-rest-start');
-        aim(asked === 'suggested' ? suggested : parseInt(asked, 10));
+        // A tapped duration sets the bell and nothing else. This is the branch #514 was
+        // offered a compromise on -- leave the four durations switching the clock to a
+        // countdown, and only stop the prescribed rest from doing it -- and it was turned
+        // down: the clock reading one way on some sets and the other way on others is a
+        // worse bar than either reading alone.
+        ringAt(asked === 'suggested' ? suggested : parseInt(asked, 10),
+               asked === 'suggested' ? sourceWord : '');
       }
     });
 
@@ -405,10 +624,56 @@
       var key = keyOf(cue);
       if (!key || key === seenAt) { return; }
       seenAt = key;
+      // The set is the half of the key that survives a failed tap. #513 arms a rest with no
+      // stamp at all -- there was no response to carry one -- so a cue for the same set is
+      // this browser's rest arriving with its paperwork rather than a new rest, and the two
+      // are told apart by the set alone. The stamp still decides everything else, which is
+      // why it is the pair that is remembered as seen.
+      if (armedFor && cue.getAttribute('data-set') === armedFor) { reconcile(cue); return; }
       arm(cue);
     }
 
+    // A tap that never reached the app. #513.
+    //
+    // The same two events the offline banner is built on, read a second time rather than
+    // relayed: htmx fires sendError for a connection that could not be made and timeout for
+    // one that was made and never answered, one or the other and never both, and between them
+    // they are the whole of "this request is not in the database". Taking the banner's word
+    // for it instead would make one partial into a dispatcher for a fact it merely observed,
+    // and couple two closures that currently share nothing but the page.
+    //
+    // **Only the taps that would have finished a set**, which is the same rule the server
+    // applies and the same rule rest_cue inherits. Three things post to this route and they
+    // do not mean the same thing: a bare tap toggles, so one sent from a row already reading
+    // Undo is a mis-tap being taken back and must not start a rest; a rating completes, so it
+    // arms exactly as a bare tap does; a corrected weight or rep count completes nothing
+    // (#215), so fixing the load two reps into a set must not start a rest either. All three
+    // are answerable from the request itself -- the path says which set, the parameters say
+    // which form -- except the toggle's direction, which is written on the button that sent
+    // it. Nothing is reconstructed from the DOM around the row, for the reason the banner
+    // gives: a swap would have taken it, and here there was no swap only because there was no
+    // response.
+    //
+    // Everything that is not one set being finished falls through: the fifteen-second poll,
+    // which nobody tapped for, and the two forms that add and swap a lift, which make rows
+    // rather than finish them.
+    function lostTap(event) {
+      var config = event.detail && event.detail.requestConfig;
+      var found = config && config.path && config.path.match(/\/sets\/(\d+)\/complete/);
+      if (!found) { return; }
+      var sent = config.parameters || {};
+      if (sent.weight || sent.reps) { return; }
+      if (!sent.rpe) {
+        var elt = event.detail.elt;
+        var button = elt && elt.querySelector && elt.querySelector('button');
+        if (button && button.textContent.trim() === 'Undo') { return; }
+      }
+      armLocally(found[1]);
+    }
+
     document.body.addEventListener('htmx:afterSwap', readCue);
+    document.body.addEventListener('htmx:sendError', lostTap);
+    document.body.addEventListener('htmx:timeout', lostTap);
     // Whatever is on the page at load is marked seen rather than acted on: arriving on a
     // session whose last set was finished an hour ago should not open a rest timer.
     var first = document.getElementById('rest-cue');
