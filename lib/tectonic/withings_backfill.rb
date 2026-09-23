@@ -2,6 +2,7 @@
 
 require 'date'
 require_relative 'db'
+require_relative 'error_reporting'
 require_relative 'timing'
 require_relative 'withings'
 require_relative 'withings_connection'
@@ -23,7 +24,7 @@ class Tectonic < Roda
   # confirms or dismisses through the same two routes the record page already posts to.
   # **Nothing in this file ever writes `workout_id`.**
   #
-  # ## Why it is a rake task and cannot be anything else
+  # ## Why the whole walk is a rake task and cannot be anything else
   #
   # `Withings::TIMEOUT` is ten seconds per call, which is the right number for a settings
   # page and the wrong one for a hundred paginated calls: a walk over a decade can stand at a
@@ -31,6 +32,25 @@ class Tectonic < Roda
   # anybody. It is also nowhere near `preDeployCommand`, which runs on every deploy -- a
   # deploy that reached out to Withings would turn somebody else's bad afternoon into a
   # failed release, and would do it on every push.
+  #
+  # ## And why there is a second entry point anyway. #558
+  #
+  # Everything above is an argument about *a decade in one request*, and none of it is an
+  # argument against a year. #558 is the hole it left: the whole of a lifter's history could
+  # only be imported from a shell with the production database in reach, which is not a thing
+  # the person this app is for has -- so the forward flow worked and their own history was
+  # unreachable. A worker process would be the textbook answer and is the one #458 declined
+  # and #518 declined again; it is a second paid service to run something a lifter presses
+  # perhaps five times in their life.
+  #
+  # So `slice` is the same walk, bounded to what a request can afford honestly: **one year
+  # per press**, which is one request to Withings in the ordinary case, and the page says how
+  # many years are left so the lifter knows whether to press again. It is a narrower entry
+  # point into this module rather than a second walker -- it fetches with `fetch_year`,
+  # stores with `store_all` and pairs with `pair`, which are the same three the rake task
+  # runs -- because a second expression of this logic is exactly how the `more` bug in #553
+  # came about, and this module's whole contract is that a nil year and an empty year are
+  # different things.
   #
   # ## Chunked by year, because a truncated answer looks exactly like an empty one
   #
@@ -101,6 +121,140 @@ class Tectonic < Roda
       report = nil
       DB.transaction(rollback: :always) { report = attempt(account_id, token, years, pause) }
       report.merge(dry_run: true)
+    end
+
+    # One year, on the request path, for a lifter with no terminal. #558.
+    #
+    # Five states and they are five rather than two, on the same argument `proposal` makes
+    # about its four: the differences between them are the whole substance of the feature.
+    #
+    #   :disconnected  -- no usable token, so there is nobody to ask
+    #   :no_sessions   -- nothing logged here, so a history has nothing to be offered to
+    #   :nothing_left  -- every year back to the first stamped set has been read
+    #   :refused       -- Withings did not answer, which is not the same as answering nothing
+    #   :imported      -- a year was read, with the four numbers the rake task reports
+    #
+    # **`:refused` is the one that matters most.** Withings signal rate limiting as status
+    # 601 inside an ordinary HTTP 200, `Withings.answered` folds it into the same nil as a
+    # revoked token, and `Withings.workouts` hands this module that nil for a year it could
+    # not read. A press that got nothing because Withings refused must not read as a press
+    # that found nothing -- that is a lie about a year the lifter then never presses for
+    # again. So a nil never advances the cursor and never renders as a total.
+    #
+    # ## What it does not do: stamp the rake task's watermark
+    #
+    # Deliberately, and #554 is the reason. `attempt` stamps `workouts_backfilled_at`
+    # whenever the years it *chose* to walk all answered, and a slice walks a narrowed range
+    # by construction -- so routing this through `run(since:)` would stamp the watermark
+    # after the first press, `resumed_year` would raise the floor to this year, and every
+    # later press (and every later rake run) would believe the decade behind it had been
+    # read. One press, a claim of completeness, and the history silently lost.
+    #
+    # That is worked around rather than fixed here, because #554 is open and its fix is a
+    # change to what the *task* records. The way round it is to not use that path at all:
+    # `slice` calls `fetch_year`, `store_all` and `pair` directly and keeps its own cursor,
+    # `workouts_imported_year` (045), which says which year was read rather than claiming
+    # everything older was. The two cursors never write each other, so a press cannot make
+    # the task skip a year and the task cannot make a press skip one.
+    def slice(account_id:, pause: PAUSE)
+      token = WithingsConnection.token(account_id)
+      return { state: :disconnected } unless token
+
+      plan = pending(account_id)
+      return plan unless plan[:state] == :ready
+
+      import(account_id, token, plan[:year], plan[:earliest], pause)
+    end
+
+    # What a press would do next, which the page has to be able to say *before* it is pressed.
+    #
+    # The same method answers both questions on purpose. A button offering to import 2023 and
+    # a press that imports 2022 is the kind of disagreement that only shows up in front of a
+    # lifter, and the way two answers to one question stay in agreement is for there to be
+    # one answer.
+    #
+    # `years_left` counts this year and every year down to the floor, so a lifter can tell
+    # "press again" from "press four more times" -- and so the page can stop asking at all
+    # once there is nothing behind the button.
+    def pending(account_id)
+      floor = first_session_year(account_id)
+      return { state: :no_sessions } unless floor
+
+      year = next_year(account_id, floor)
+      return { state: :nothing_left, earliest: floor } unless year
+
+      { state: :ready, year:, earliest: floor, years_left: year - floor + 1 }
+    end
+
+    # The year the next press reads: this year for an account that has never pressed, and
+    # otherwise the year before the last one read. Nil once that falls below the year of the
+    # earliest stamped set, which is the same floor the task walks to and is a bound out of
+    # Tectonic's own data -- a year before the first logged session holds nothing that could
+    # ever be proposed to anything.
+    #
+    # It deliberately does not consult `workouts_backfilled_at`. Reading it would let #554
+    # tell a lifter their history was imported when five years of it were never fetched, and
+    # the two ways of being wrong here are not symmetrical: a cursor behind the truth costs
+    # one request to a year already stored, and `WithingsWorkouts.store` makes re-storing an
+    # activity a no-op, while a cursor ahead of the truth loses that year in silence.
+    def next_year(account_id, floor)
+      candidate = imported_year(account_id)&.pred || Date.today.year
+      candidate < floor ? nil : candidate
+    end
+
+    def imported_year(account_id) = WithingsConnection.of(account_id)&.fetch(:workouts_imported_year, nil)
+
+    # Fetch, store, advance, pair -- and the order is the whole of what makes a press safe to
+    # repeat. The cursor moves only after a year has actually answered and been stored, so a
+    # press that was refused, or that died between the fetch and the write, is a press that
+    # simply has to be made again.
+    #
+    # `more` is the year another press would read, or nil where there is none. A lifter needs
+    # to know whether to press again *and* whether to stop, and only one of those two can be
+    # inferred from a screen that says neither.
+    def import(account_id, token, year, floor, pause)
+      activities = fetch_year(token, year, pause)
+      return { state: :refused, year:, more: year } unless activities
+
+      found = store_all(account_id, activities)
+      advance(account_id, year)
+      { state: :imported, year:, found:, more: next_year(account_id, floor) }.merge(offered(account_id))
+    end
+
+    # How far back the presses have read. Its own column and emphatically not the task's
+    # watermark or the measurement poll's `synced_at`: three readers with different ideas of
+    # what "up to date" means, and a cursor shared between two of them is how a year goes
+    # quietly unread. See 045, and 043 before it.
+    def advance(account_id, year)
+      DB[:account_withings].where(account_id:).update(workouts_imported_year: year)
+    end
+
+    # The pairing, with the one exception #555 describes kept off a lifter's screen.
+    #
+    # A proposal whose session was matched to a *different* activity is never cleared, so a
+    # later run can pick a second activity for that session and the `UPDATE` in `offer` hits
+    # the unique index on `proposed_workout_id`. From a rake task that is a stack trace after
+    # the API budget is already spent; from a button it is a 500 on the settings page of
+    # somebody who pressed Import, with the year they just paid for looking like it failed.
+    #
+    # It is caught rather than fixed, because the fix belongs to #555 and is a change to what
+    # `outstanding` counts -- guarding `offer` here would be the second half of that fix
+    # living somewhere nobody would think to look for it. What is bought instead is honesty:
+    # the activities are stored and committed, the cursor has moved, and the report says the
+    # matching could not be finished rather than reporting four zeroes as though it had.
+    def offered(account_id)
+      pair(account_id)
+    rescue Sequel::UniqueConstraintViolation => e
+      report(e)
+      { pairing: :stalled }
+    end
+
+    def report(exception)
+      return unless ErrorReporting.on?
+
+      Sentry.capture_exception(exception)
+    rescue StandardError
+      # Reporting a failure must never become a second one, on the request path least of all.
     end
 
     # Walk, then pair, then stamp -- and pair even where the walk failed part way, because

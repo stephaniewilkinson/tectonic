@@ -657,6 +657,15 @@ end
 # runs before every single deploy: a release that reached out to Withings would fail whenever
 # Withings had a bad afternoon, on a step whose job is to migrate a database.
 #
+# **It is no longer the only way in, and it is still the only way to walk a whole history.**
+# #558 added a control in the Wearables section of settings that imports one year per press
+# through `WithingsBackfill.slice` -- the same fetch, the same storage, the same pairing, and
+# a cursor of its own. That is what a lifter without a terminal has; this is what an operator
+# has, and the difference is the one thing above that a year per press does not change: a
+# decade in one go is minutes of requests, which belongs in a shell and not in a Puma thread.
+# The two cursors are deliberately separate, so a press cannot narrow what this task walks --
+# see 045, and #554 for the reason that matters.
+#
 # DRY_RUN=1 previews a run without writing, the same convention exercises:merge uses. It is
 # not an estimate -- it is the real walk inside a transaction that always rolls back, so the
 # numbers it prints are the numbers a real run would produce. It still makes the API calls,
