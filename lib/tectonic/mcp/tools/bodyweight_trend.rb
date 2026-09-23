@@ -83,7 +83,7 @@ class Tectonic < Roda
         # spends the rest of its length refusing to make.
         def self.perform(context:, arguments:)
           metric = (arguments[:metric] || DEFAULT_METRIC).to_s.strip
-          fresh = Freshness.checked(context, risk: GAP_RISK)
+          fresh = Freshness.checked(context, risk: GAP_RISK, source: arguments[:source])
           from, to = bounds(context, arguments)
           rows = BodyReadings.in_window(context.health_metrics, metric:, from:, to:, source: arguments[:source])
           return empty(metric, from, to, fresh) if rows.empty?
