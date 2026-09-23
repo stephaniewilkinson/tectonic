@@ -280,13 +280,20 @@ class Tectonic < Roda
     # after the question, which every one of those pages is asking: *performed if we know, and
     # otherwise planned*.
     #
-    # Six of those seven go through here now. **The Withings review list does not, and that is
-    # the one thing #572 leaves undone**: `WithingsProposals.waiting` hands the view plain
-    # `DB[:workouts]` hashes rather than model rows and sorts the list by the same raw column,
-    # so applying this there is a change to that module and to the order the questions come in,
-    # not a change to a template. It is written down here rather than only in the pull request
-    # because "it was done everywhere" being assumed from the outside is the exact mistake that
-    # made #572 -- so the next reader of this method finds out from the method.
+    # All seven go through here now. The Withings review list was the last and the only one
+    # that was not a template edit: `WithingsProposals.waiting` handed the view plain
+    # `DB[:workouts]` hashes, which have no method to call, and sorted the queue by the same
+    # raw column -- so it fetches `Workout` rows `with_performed_on` and sorts on this instead,
+    # and the order the questions arrive in moved with the date deliberately. A list labelled
+    # by one date and ordered by another is worse than one that is merely wrong about both.
+    #
+    # That "six of seven" is now "seven of seven" is worth saying in the method rather than
+    # only in a pull request, because "it was done everywhere" assumed from the outside is the
+    # exact mistake that made #572 in the first place: the old name described the one caller it
+    # had, and three years of issues closed on the belief that the rule had been applied
+    # generally. A reader who wants to know which screens obey this should be able to find out
+    # from here -- and anything that renders a session's date and does not call this is the
+    # eighth, whatever the comment says.
     #
     # The argument the old name's comment made is the argument this one makes, and it is worth
     # restating rather than dropping, because it is the thing that keeps getting lost: **the
