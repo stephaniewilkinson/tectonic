@@ -78,6 +78,47 @@ class Tectonic < Roda
       end
     end
 
+    # How the workout form writes a date, and the only thing that reads one back. #440.
+    #
+    # The form shows a US reader a month-first date, which is a deliberate choice and the
+    # format the Flowbite datepicker on that input is configured for. The cost of it is that
+    # `09/02/2026` is two dates, and which one it is depends entirely on who is reading:
+    #
+    #     Date.parse('09/02/2026')                  # => 2026-02-09
+    #     Date.strptime('09/02/2026', '%m/%d/%Y')   # => 2026-09-02
+    #
+    # Sequel typecasts a string bound to a date column with `Date.parse`, which reads
+    # day-first. So the value the form rendered for 2 September came back and was stored as
+    # 9 February, and the session's completed sets went with it -- the same damage #440 was
+    # opened about, surviving in the write path after the read path was fixed. It only bites
+    # when both halves are <= 12, which is the first twelve days of any month, which is why
+    # it reached production and sat there.
+    #
+    # The format is a constant rather than a literal in each of the two places because the
+    # two places are a renderer and a parser of the same string. Written out twice they can
+    # drift, and the failure when they drift is this one again: no error, a stored date seven
+    # months from the one that was shown.
+    FORM_DATE = '%m/%d/%Y'
+
+    # That string back into a date, or nil where it is not one.
+    #
+    # Nil rather than a raised exception, and nil rather than a guess. `Date.parse` would take
+    # almost anything and be confidently wrong about some of it, which is the bug above.
+    # Letting Sequel raise instead would reach the lifter as a 500, and a 500 reads as the
+    # server having broken rather than as the app declining what was typed. So this answers
+    # "is this a date in the format this form writes", and the route decides what to say about
+    # no -- the same division `Clock.zone?` and the settings form already make, and for the
+    # same reason: a value nothing can resolve is refused where it arrives rather than stored
+    # and misread by every reader afterwards.
+    #
+    # `strptime` rather than a regex and three integers: it rejects 02/30/2026 and 13/01/2026
+    # on the calendar's terms, which is the check a regex would have to grow into.
+    def self.date_from_form(raw)
+      Date.strptime(raw.to_s.strip, FORM_DATE)
+    rescue Date::Error
+      nil
+    end
+
     # What a name is once a form has been through it. A text input posts an empty string
     # whether or not anybody typed in it, and '' is truthy in Ruby, so a blank name stored
     # as itself would draw its own empty element beside every date forever. Null is the
