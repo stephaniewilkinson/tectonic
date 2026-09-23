@@ -30,10 +30,20 @@ Metrics/ClassLength:
 # caller learned that Withings can answer `more: 0` and the other did not. The module is also
 # most of comment by volume, because the provider's behaviour is not guessable from its
 # documentation and every trap in it has been paid for once already.
+# WithingsMeasures is the third, and it is the sibling of the second: the one read of the
+# scale, which since #557 asks for its window a piece at a time so that a read refused partway
+# has something to show for the pieces that arrived. What makes it long is one invariant with
+# two halves -- which piece to ask for next, and what a piece that arrived whole is allowed to
+# claim -- and those two halves are the same sentence read forwards and backwards: the stretch
+# from `measures_read_back_to` up to `synced_at` is what has been fetched. Splitting them into
+# two files would put the question in one and the answer in the other, which is the shape both
+# #554 and #557 already are: a watermark written by code that could not see what the next read
+# would do with it.
 Metrics/ModuleLength:
   Exclude:
     - "lib/tectonic/mcp/tools/program_writer.rb"
     - "lib/tectonic/withings_backfill.rb"
+    - "lib/tectonic/withings_measures.rb"
 
 AllCops:
   NewCops: enable
