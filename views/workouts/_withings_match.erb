@@ -40,6 +40,31 @@
       Was that this session?
     </p>
     <p class="mt-1 text-xs text-gray-600">It <%= @withings[:because] %>.</p>
+    <%# That this is one of many, said on the side that could not otherwise know. #534.
+
+        A backfill can leave a hundred of these at once, and nothing on a record page ever
+        admitted it -- so the honest reading of this box, for a lifter who had not run the
+        task or had forgotten they did, was that one stray Tuesday had a question on it. They
+        would answer it, and the other ninety-nine would sit there being answered at whatever
+        rate they happened to open old sessions.
+
+        It says "other" and links rather than redirecting anybody, because the two doors are
+        genuinely equal: this one is the right door when a lifter is already reading this
+        session and can remember the afternoon, and the list is the right door for a sitting.
+        The answer is the same write either way -- both forms below post to the routes the
+        list posts to -- so there is nothing to lose by taking the question here and no reason
+        to push somebody away from it.
+
+        Nothing at all where this is the only one left, which is the ordinary state of the
+        forward flow: a session finished ten minutes ago is asked about on its own record,
+        there is no queue behind it, and a line saying "0 others" would invent one. %>
+    <%- if questions_elsewhere.positive? %>
+      <p class="mt-2 text-xs text-gray-600">
+        <%= questions_elsewhere %> other session<%= 's' unless questions_elsewhere == 1 %>
+        <%= questions_elsewhere == 1 ? 'is' : 'are' %> waiting on the same question.
+        <a href="/workouts/withings" class="underline">Answer them together</a>.
+      </p>
+    <%- end %>
     <div class="mt-3 flex items-center gap-2">
       <form method="post" action="/workouts/<%= @workout[:id] %>/withings/match">
         <%== csrf_tag("/workouts/#{@workout[:id]}/withings/match") %>

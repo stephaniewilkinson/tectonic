@@ -37,12 +37,30 @@
         nothing waiting and does not promise anything is coming. %>
     <p class="mt-2 text-sm text-gray-700">
       Nothing is waiting for an answer. Proposals appear here after a backfill runs, and
-      disappear as you answer them.
+      disappear as you answer them &mdash; whether you answer them here or on the session&rsquo;s
+      own record.
     </p>
   <%- else %>
     <p class="mt-2 text-sm text-gray-700">
       <%= @proposals.length %> session<%= 's' unless @proposals.length == 1 %> from your history
       overlap something your watch recorded. Each one is a guess &mdash; say which are right.
+    </p>
+    <%# That the other door exists, said on this side too. #534.
+
+        The record page now says how many are waiting here; this says the questions can be
+        answered there. Without both halves the two screens read as two chores that happen to
+        look alike, and a lifter who had answered one on a record would reasonably wonder
+        whether they had also answered it here.
+
+        It is worth saying on this side in particular because of what the row below offers:
+        the date is a link to the session, and it is there because "18:02 to 18:50 on the 14th
+        of March" is only recognisable to somebody who can go and look at what was lifted. A
+        lifter who follows it to check lands on a page with the very same question on it, and
+        this sentence is what stops that being a surprise -- answering it there is not
+        escaping this list, it is finishing one row of it. %>
+    <p class="mt-1 text-sm text-gray-700">
+      Each one can be answered on the session&rsquo;s own record instead &mdash; follow the date
+      to check what was lifted and the question is there too. It is the same answer either way.
     </p>
     <ul class="mt-6 divide-y divide-gray-200">
       <%- @proposals.each do |proposal| %>

@@ -373,5 +373,37 @@
     <p class="mt-2 text-xs text-gray-500">
       Disconnecting stops the app asking for more. Measurements already read stay where they are.
     </p>
+    <%# The review list's permanent address. #534.
+
+        /workouts/withings had nothing at all pointing at it: a lifter who ran the backfill,
+        closed the terminal and came back on Sunday could only reach their own questions by
+        remembering a URL. The prompt that actually catches somebody is on /workouts, and it
+        is only there while something is waiting, which is right for a prompt and wrong for an
+        address -- a screen that can only be found when it has work on it cannot be gone back
+        to, and a lifter who wants to check whether they finished has nowhere to look.
+
+        So the link that is always here is here, with the connection that produces the
+        questions. It is the one place in the app where a lifter already reasons about the
+        watch, nothing else in the app moves when it appears, and it is asked about the same
+        way it is found -- which is what the nav could not offer at any price: a permanent nav
+        entry is carried on every page by every lifter, and a conditional one moves the entries
+        after it.
+
+        It says the count rather than only linking, so the link can be decided about without
+        being followed. Nought is worth printing here and is not worth printing on /workouts:
+        there, the absence of the line is the message, and a box saying nothing is waiting
+        would be clutter on a page about something else. Here the link is unconditional, so
+        the sentence has to be able to say the screen is empty. %>
+    <p class="mt-4 text-sm text-gray-700">
+      <a href="/workouts/withings" class="font-semibold text-lime-700 hover:text-lime-800">Matches from
+        your watch</a>
+      &mdash;
+      <%- if @withings_waiting.positive? %>
+        <%= @withings_waiting %> session<%= 's' unless @withings_waiting == 1 %> from your history
+        <%= @withings_waiting == 1 ? 'is' : 'are' %> waiting for an answer.
+      <%- else %>
+        nothing is waiting for an answer.
+      <%- end %>
+    </p>
   <%- end %>
 </div>

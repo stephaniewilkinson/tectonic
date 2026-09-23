@@ -734,7 +734,12 @@ end
 # March there is no upload on its way: absent is absent, and saying "yet" about it would be a
 # promise nothing is going to keep.
 def announce_proposals(report)
-  puts "#{report[:proposed]} new proposal(s) waiting for an answer at /workouts/withings."
+  # The path is still printed and is no longer the only way back, which is worth saying here
+  # rather than leaving an operator to discover. Until #534 this line was the whole of the
+  # app's signposting: a lifter who ran this, closed the terminal and came back on Sunday had
+  # no route to their own questions but a remembered URL.
+  puts "#{report[:proposed]} new proposal(s) waiting for an answer at /workouts/withings, " \
+       'which the workouts list and the Withings block in settings both point at.'
   puts "#{report[:already_waiting]} session(s) already had one, and were left alone." if
     report[:already_waiting].positive?
   puts "#{report[:without_activity]} session(s) have no activity from your watch -- nothing was recorded " \
