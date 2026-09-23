@@ -36,6 +36,9 @@ class Tectonic < Roda
     def self.endpoint = ENV.fetch('WITHINGS_API_ENDPOINT', 'https://wbsapi.withings.net')
 
     TOKEN_PATH = '/v2/oauth2'
+    # Where the measurements are. Withings splits the API by path and then by `action`, so
+    # this names the service and `getmeas` names the method on it. #518.
+    MEASURE_PATH = '/measure'
     # What #472 settled: metrics for weight and body composition, activity for sleep and
     # workouts. Deliberately *not* `user.info`, which requires a contract with Withings and
     # fails the whole authorisation without one.
@@ -76,13 +79,42 @@ class Tectonic < Roda
                        client_id:, client_secret: secret, refresh_token:)
     end
 
+    # A window of measurements, which is the one thing this app reads. #518.
+    #
+    # Every parameter is Withings' own and none of them is guessable. `meastypes` is a
+    # comma-separated list of their numeric type codes. The dates are unix seconds. `category`
+    # is 1 for readings that actually happened -- the same endpoint returns the *goals* a
+    # lifter has set for themselves under category 2, and taking the default would file a
+    # target bodyweight as though somebody had stood on a scale and weighed it.
+    #
+    # `offset` is their pagination cursor, handed back by a response that says `more`. A
+    # window wide enough to be worth asking for is wider than one page, so a caller that
+    # ignored it would keep the newest readings and silently drop the rest of the window --
+    # see WithingsMeasures.pages, which is what follows it.
+    def measures(token, meastypes:, startdate:, enddate:, offset: nil)
+      form = { action: 'getmeas', meastypes:, category: 1,
+               startdate: startdate.to_i, enddate: enddate.to_i }
+      form[:offset] = offset if offset
+      post(MEASURE_PATH, token:, **form)
+    end
+
     # One POST, and the two ways it can fail folded into one nil.
     #
     # The `status` check is the half that is easy to miss: Withings answers 200 with a
     # non-zero status for an expired token, a bad secret and a revoked grant alike, so a
     # caller trusting the HTTP status would store the error body as though it were tokens.
-    def post(path, **form)
-      response = HTTP.timeout(TIMEOUT).post("#{endpoint}#{path}", form:)
+    #
+    # `token` is a keyword rather than one more form field because the two halves of this API
+    # disagree about where the credential goes. The token endpoint authenticates with the
+    # client secret in the body and takes no header; every other call wants
+    # `Authorization: Bearer` and ignores an `access_token` parameter, which was the shape of
+    # the API Withings retired. Sending it the old way does not fail loudly -- it comes back
+    # as a non-zero status meaning "invalid token", which is indistinguishable here from a
+    # revoked grant, so the app would tell a lifter to reconnect a connection that was fine.
+    def post(path, token: nil, **form)
+      request = HTTP.timeout(TIMEOUT)
+      request = request.auth("Bearer #{token}") if token
+      response = request.post("#{endpoint}#{path}", form:)
       return report("HTTP #{response.status}", path) unless response.status.success?
 
       answered(JSON.parse(response.body.to_s), path)
@@ -92,6 +124,15 @@ class Tectonic < Roda
 
     # The half that is easy to miss, kept on its own so it is hard to: Withings answers 200
     # with a non-zero `status` for an expired token, a bad secret and a revoked grant alike.
+    #
+    # **And for being asked too often.** Status 601 is "Too many request", and it arrives by
+    # the same route as everything else, so the nil this returns covers a credential that is
+    # dead and a call that should simply be made again later. Nothing downstream can tell
+    # them apart, which is why no caller here may turn a nil into "your connection needs
+    # renewing" -- see WithingsMeasures, which reports a failed fetch as unreachable and
+    # keeps "needs renewing" for the one case that really does say so, a refresh that failed.
+    # Carrying the code out to callers would widen this return contract for the token
+    # exchange too, so it is deliberately not done here; the code is in the log and in Sentry.
     def answered(body, path)
       return body['body'] if body['status'].to_i.zero?
 
