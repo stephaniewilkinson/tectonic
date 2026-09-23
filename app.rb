@@ -941,7 +941,10 @@ class Tectonic < Roda
     r.on 'workouts' do
       rodauth.require_login
       @account_id = rodauth.account_from_session[:id]
-      r.get('new') { view('workouts/new') }
+      # Through workout_form rather than view, which is what carries a refused save's reason
+      # onto the page. New as well as edit: a date the app cannot read is declined the same
+      # way on both, and the one that silently said nothing would be the worse of the two.
+      r.get('new') { workout_form('workouts/new') }
       r.on String do |workout_id|
         @workout = Workout[workout_id]
         # One ownership gate for every nested workout route: a workout that does
@@ -1257,7 +1260,7 @@ class Tectonic < Roda
             r.redirect "/workouts/#{workout_id}"
           end
         end
-        r.get('edit') { view('workouts/edit') }
+        r.get('edit') { workout_form('workouts/edit') }
         r.is do
           # By id, which is the order the session was trained in, rather than by
           # exercise_id, which was the order the movements happen to sit in the exercises
@@ -1326,8 +1329,25 @@ class Tectonic < Roda
         # And how it went, on the same terms (#310). Blank clears, so a note written after a
         # bad day can be taken back off without leaving an empty paragraph behind.
         note = Workout.clean_note(r.params['note'])
+        # And the date, read with the format the form wrote it in rather than handed to
+        # Sequel to guess at. #440.
+        #
+        # The form renders `%m/%d/%Y` for a US reader, and a string bound to a date column is
+        # typecast by `Date.parse`, which reads day-first. So a session trained on 2 September
+        # posted `09/02/2026` and was stored as 9 February, dragging its completed sets with
+        # it -- silently, and only when both halves are <= 12, so on the first twelve days of a
+        # month and not the rest of it.
+        #
+        # Refused rather than stored as something else, on the same terms as the time zone on
+        # the settings form: a value the app cannot read is a reason to decline the save and
+        # say so, not a reason to write a different date and let every reader afterwards
+        # believe it. Refused rather than raised, too -- an unrescued typecast reaches a lifter
+        # as a 500, which reads as the server having fallen over rather than as the app
+        # declining what was typed.
+        date = Workout.date_from_form(r.params['date'])
         if id.empty?
-          workout_id = Workout.insert(account_id: @account_id, date: r.params['date'], name:, note:)
+          back_to_the_form('/workouts/new') unless date
+          workout_id = Workout.insert(account_id: @account_id, date:, name:, note:)
           r.redirect "/workouts/#{workout_id}/"
         else
           # Rescheduling is owner-only. This route sits outside the nested ownership
@@ -1335,7 +1355,11 @@ class Tectonic < Roda
           # account's workout could be moved to a new date.
           @workout = Workout.where(id:, account_id: @account_id).first
           r.redirect '/workouts' unless @workout
-          @workout.update(date: r.params['date'], name:, note:)
+          # After the ownership gate, and sent back by the session's own id rather than by the
+          # one that was posted: the refusal names a page, and a page named out of raw params
+          # is a redirect somebody else writes.
+          back_to_the_form("/workouts/#{@workout.id}/edit") unless date
+          @workout.update(date:, name:, note:)
           r.redirect "/workouts/#{@workout.id}/"
         end
       end
@@ -2096,6 +2120,37 @@ class Tectonic < Roda
   def settings_with(notice)
     session['settings.notice'] = notice
     request.redirect '/settings'
+  end
+
+  # The New workout and Edit workout pages, which are the same form twice and now have the
+  # same thing to say when a save is declined. #440.
+  #
+  # The notice is read out of the session and deleted in the same breath, which is the shape
+  # the exercise page settled on: a refusal is about the save that just happened, and one
+  # still on the page after a reload describes nothing the lifter can see.
+  def workout_form(page)
+    @notice = session.delete('workout.notice')
+    view(page)
+  end
+
+  # Declining a save and sending the lifter back to the form holding it. #440.
+  #
+  # Only a date reaches here, and only a date nothing can read as one -- the input is
+  # `required` and driven by a datepicker, so in practice this is a hand-made post, an
+  # autofill, or a browser that filled the box from a different locale. That last one is
+  # exactly the case worth refusing out loud rather than guessing at, because guessing is
+  # what put sessions seven months from where they were trained.
+  #
+  # A redirect rather than a re-render, which costs the name and the note that were typed
+  # alongside the bad date. Re-rendering would keep them, at the price of the form learning to
+  # read its values back out of params -- a second source for every field on it, to save
+  # retyping on a path a lifter using the datepicker cannot reach. The same trade the settings
+  # form makes, and `settings_with` above is the same three lines.
+  def back_to_the_form(page)
+    session['workout.notice'] =
+      'That date could not be read, so nothing was saved. Dates go in as month/day/year, ' \
+      "like #{Date.today.strftime(Workout::FORM_DATE)}."
+    request.redirect page
   end
 
   # A session-length budget off a form, or nothing. #446.
