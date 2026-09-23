@@ -1,0 +1,244 @@
+<%# "You are offline", said out loud on the one screen where silence costs a session. #516.
+
+    The bug is the whole of htmx's swap rule. A failed request swaps nothing, so a Done tap
+    that never reached the server and a Done tap that never happened produce exactly the
+    same screen: the row does not tint, the count stays at "2 of 12", and the rest timer
+    does not start. Three sets into squats in a basement gym the bars drop to nothing, the
+    lifter taps Done, taps it again harder, assumes it did not land, and carries on lifting.
+    At the end the app has recorded two sets out of twelve and has said nothing about the
+    other ten. The app is not wrong there, it is silent, which on this screen is worse.
+
+    The second casualty is the rest timer, and it is worth naming because it is the thing a
+    lifter is actually watching between sets. The countdown is armed by _rest_cue, an element
+    the server sends back *with* the Done response and swaps out of band into #rest-cue. No
+    response means no cue means no countdown. So losing signal does not only lose the log, it
+    takes away the clock -- and a lifter staring at a rest timer that never started has no
+    reason at all to suspect the log.
+
+    This is (a) of the three problems #516 separates, and only (a). Nothing here is queued
+    and nothing is replayed: that is stage 2 of the issue and it is blocked on an endpoint
+    that is safe to send twice, which the complete route is not -- the primary tap toggles,
+    deliberately, so a replayed Done marks the set done and then un-does it. Nothing here is
+    served from a cache either, which is stage 3 and needs a service worker. What is left
+    costs no storage, no service worker and no Ruby, and it is most of the value: it turns a
+    silent data-loss bug into an honest one, which is the difference between a lifter who
+    knows to re-tap ten sets and a lifter who finds out a week later.
+
+    Background Sync is not the mechanism and could not have been. Safari has never supported
+    it on any version or platform, every browser on iOS is WebKit underneath, and the lifter
+    this screen exists for is on iOS Safari. The browser specs here drive Firefox, which
+    does not support it either -- so the design that works for the user is also the one this
+    repo can test, which is a happier alignment than it sounds.
+
+    Fixed to the top of the screen, and that placement is a decision rather than a default.
+    The foot of this screen is already three deep -- the RPE footer at z-20, the rest timer
+    at z-30, the nudge at z-40 -- and each of those knows the others' heights, in arithmetic
+    written into rest_timer_offset and nudge_offset. A fourth would have to be taught to
+    every one of them, and worse, it would be the one message that has to be readable at the
+    exact moment a rest timer is on screen, because a rest timer that started is not evidence
+    of anything when the tap that armed it failed. The top of this screen holds a nav and
+    nothing else, and covering the nav while nothing is saving is the right trade: there is
+    nowhere worth navigating to until this clears.
+
+    Not a toast, for the same reason. This has to be legible mid-set, on a phone, to somebody
+    out of breath, and it has to stay up for as long as it is true rather than for four
+    seconds.
+
+    Rendered from session.erb outside #session-body, like the rest timer and the note above
+    it, and for the identical reason: a tap replaces one lift panel and the poll replaces
+    every panel, and a banner inside that region would be swapped away by the very requests
+    it is reporting on -- or, when those requests are failing, left alone by accident, which
+    is a correct result arrived at for no reason. %>
+<div id="offline-banner" hidden
+     class="fixed inset-x-0 top-0 z-50 border-b border-amber-200 bg-amber-50">
+  <div class="mx-auto max-w-md px-4 py-3">
+    <%# Two independent lines, shown and hidden separately, because they answer two
+        questions that stop being true at different moments. "There is no connection" ends
+        the instant a request comes back. "Two sets did not save" ends only when somebody
+        taps them again, which may be a minute later and is the thing a lifter has to be
+        able to see after the signal returns -- a banner that vanished the moment the wifi
+        came back would take the only record of the damage with it. %>
+    <p data-offline-state hidden class="text-lg font-semibold text-amber-800">
+      No connection. Nothing you tap is being saved.
+    </p>
+    <%# The count rather than a list of which ones, which is what the rows themselves say.
+        A number tells a lifter whether to worry, in one glance, from arm's length. %>
+    <p data-offline-lost hidden class="mt-1 text-base text-amber-800">
+      <span data-offline-count class="font-semibold tabular-nums"></span> did not save.
+      Tap Done again on each.
+    </p>
+  </div>
+</div>
+
+<%# What decides whether any of that is true.
+
+    Every rule here is about preferring evidence over claims, because the one trap in this
+    problem is that the browser's own answer is not evidence. navigator.onLine reports
+    whether there is a link, not whether anything is at the other end of it: a phone holding
+    a useless association with a gym access point, or one behind a captive portal, reads as
+    online all day. The asymmetry is what makes it usable at all -- false is trustworthy and
+    true is a guess -- so `offline` raises the banner and `online` is deliberately not bound
+    to anything. What takes the banner down is a request that came back, which is a fact.
+
+    A request that failed to send is better evidence than the OS either way, and it is what
+    the htmx events below provide.
+
+    **The fifteen-second poll is left running, which is where this parts company with #516.**
+    That issue asks for the poll to be suspended while offline, through `hx:poll:trigger`,
+    on the grounds that it would otherwise machine-gun the banner. There is no such event:
+    htmx 2.0.4 polls from a setTimeout that fires the ordinary request events and nothing
+    else, so the suspension would have to be a beforeRequest veto rather than the one-line
+    hook the issue pictures. Which is worth knowing, because it is not wanted anyway.
+
+    Suspending the poll would take away the only thing on this screen that makes a request
+    nobody tapped for -- and that request is what notices the signal has come back. Without
+    it the banner could only clear on the next tap, so a lifter resting between sets would
+    sit under "no connection" for two minutes after the bars returned, which is the same
+    lie in the other direction. Kept running, it is a heartbeat: it finds the outage within
+    fifteen seconds, usually before a single set has been lost to it, and it finds the way
+    back just as fast. The machine-gunning it would cause is real and is handled where it
+    belongs, in what is said rather than in what is requested -- a failure nobody tapped for
+    raises the banner silently and announces nothing. %>
+<script>
+  (function () {
+    var banner = document.getElementById('offline-banner');
+    if (!banner) { return; }
+
+    var state = banner.querySelector('[data-offline-state]');
+    var lost = banner.querySelector('[data-offline-lost]');
+    var counter = banner.querySelector('[data-offline-count]');
+    // The rows whose tap never reached the server, by set id. A plain object rather than a
+    // Set because the only thing ever asked of it is membership, and because the rest of
+    // the scripts on this screen are written in the same dialect.
+    var unsaved = {};
+    var offline = navigator.onLine === false;
+
+    // Which set a request was about, read off the path it was sent to rather than off the
+    // DOM around the element that sent it.
+    //
+    // #516 makes this point about the write queue it declines to build -- requestConfig
+    // carries the verb, the path and the parameters, so nothing is ever reconstructed from
+    // markup -- and it turns out to be load-bearing here for a reason the issue does not
+    // reach. When a request succeeds, htmx fires afterRequest on the element that sent it,
+    // and by then the swap has already taken that element out of the document. An event
+    // fired on a detached node does not bubble to a listener on the body, so this script
+    // never sees that one at all; htmx notices and re-fires on the nearest ancestor still
+    // on the page, which on this screen is #lift-panels. That is the right request arriving
+    // with every trace of which row it came from removed. The path still has it.
+    //
+    // Null for everything that is not one set being completed: the poller, and the two
+    // forms that add and swap a lift, which make rows rather than finish them.
+    function setOf(event) {
+      var config = event.detail && event.detail.requestConfig;
+      var found = config && config.path && config.path.match(/\/sets\/(\d+)\/complete/);
+      return found && found[1];
+    }
+
+    function mark(id, shown) {
+      var row = document.querySelector('[data-set-row="' + id + '"]');
+      var note = row && row.querySelector('[data-unsaved]');
+      if (note) { note.hidden = !shown; }
+    }
+
+    // Draws the whole of what this script knows, every time, rather than patching the bit
+    // that changed. There are two lines and a set of row marks and four events that can
+    // move any of them; re-deciding all of it from the two variables above is shorter than
+    // the transitions would be, and it cannot leave the banner disagreeing with the rows.
+    function render() {
+      var ids = Object.keys(unsaved);
+      counter.textContent = ids.length === 1 ? '1 set' : ids.length + ' sets';
+      // Re-applied here rather than left to survive, because they cannot: the poll
+      // re-renders every panel whenever anything on the screen has changed, and a mark
+      // comes back from the server hidden. The server is right to send it hidden -- the row
+      // is not saved as far as this browser is concerned, and the database has never heard
+      // of the tap -- so remembering is this script's job.
+      for (var i = 0; i < ids.length; i++) { mark(ids[i], true); }
+      state.hidden = !offline;
+      lost.hidden = ids.length === 0;
+      banner.hidden = state.hidden && lost.hidden;
+    }
+
+    // Through the region the server already announces every tap into (#336) rather than a
+    // second live region of this element's own. A lifter who cannot see the banner hears
+    // this in the same place, and in the same breath, as "squat, set 3 of 5, done".
+    function announce(sentence) {
+      var region = document.getElementById('session-announcement');
+      if (region) { region.textContent = sentence; }
+    }
+
+    // A request that never reached the server. htmx fires sendError for a connection that
+    // could not be made and timeout for one that was made and never answered -- one or the
+    // other, never both -- and for this screen's purposes they are the same fact: the tap
+    // is not in the database and the lifter has no way of knowing that.
+    function failed(event) {
+      var id = setOf(event);
+      var fresh = !offline;
+      offline = true;
+      if (id) { unsaved[id] = true; }
+      render();
+      // The poll is the one request on this screen nobody tapped for, so its failure raises
+      // the banner and says nothing further: there is no row to mark, and repeating the
+      // same sentence every fifteen seconds is what would machine-gun a screen reader. The
+      // first one is worth saying, which is what `fresh` is for.
+      if (id) {
+        announce('Offline. ' + counter.textContent + ' did not save.');
+      } else if (fresh) {
+        announce('Offline. Nothing you tap is being saved.');
+      }
+    }
+
+    // A response that came back, whatever it said. A 404 or a 500 is the server disagreeing
+    // with the request, and disagreeing is something only a reachable server can do, so an
+    // error response is proof of a connection in exactly the way a failure to send is proof
+    // of none. This is also why htmx:responseError is bound to nothing: showing "you are
+    // offline" because the server refused a write would be a second lie replacing the first.
+    function returned(event) {
+      var xhr = event.detail && event.detail.xhr;
+      // status 0 is a request that never got an answer, which arrives here too -- htmx
+      // fires afterRequest before sendError on the same failure.
+      if (!xhr || !xhr.status) { return; }
+      var id = setOf(event);
+      var was = offline;
+      offline = false;
+      // Only the row this request was about. Every other mark stands, because the
+      // connection coming back is not somebody having lifted those sets again -- they are
+      // still not in the database, and this is the only thing on the screen saying so.
+      if (id && unsaved[id]) {
+        delete unsaved[id];
+        mark(id, false);
+      }
+      render();
+      // Said once, on the way back, and only when it was the poll that found out. Where the
+      // lifter's own tap is what came back, the server has sent its own sentence into this
+      // region already -- overwriting "squat, set 3 of 5, done" with "back online" would
+      // replace the confirmation they were waiting for with news they can see in the banner.
+      if (was && !id) {
+        announce(Object.keys(unsaved).length ?
+          'Back online. ' + counter.textContent + ' still not saved.' : 'Back online.');
+      }
+    }
+
+    // Bound to document.body because htmx events bubble, so this binds once and survives
+    // every swap -- the same reasoning as the two scripts at the foot of session.erb, and
+    // load-bearing here in a way it is not there: the elements these events come from are
+    // the forms inside the panels, which are replaced on every tap and every poll.
+    document.body.addEventListener('htmx:sendError', failed);
+    document.body.addEventListener('htmx:timeout', failed);
+    document.body.addEventListener('htmx:afterRequest', returned);
+    // And once more after every swap, because a swap is the one way a mark can be lost
+    // without anything having happened to the set it is about.
+    document.body.addEventListener('htmx:afterSwap', render);
+
+    // The browser volunteering that the link has gone, which is the one thing it says about
+    // the network that can be believed. Said once: a phone that flaps between cells fires
+    // this repeatedly, and the sentence is the same every time.
+    window.addEventListener('offline', function () {
+      if (offline) { return; }
+      offline = true;
+      render();
+      announce('Offline. Nothing you tap is being saved.');
+    });
+
+    render();
+  })();
+</script>
