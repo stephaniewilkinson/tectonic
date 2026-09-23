@@ -34,6 +34,7 @@ require_relative 'lib/tectonic/rests'
 require_relative 'lib/tectonic/withings'
 require_relative 'lib/tectonic/withings_connection'
 require_relative 'lib/tectonic/withings_measures'
+require_relative 'lib/tectonic/withings_workouts'
 require_relative 'lib/tectonic/progress_chart'
 require_relative 'lib/tectonic/mailer'
 require_relative 'lib/tectonic/oauth_keys'
@@ -1235,6 +1236,31 @@ class Tectonic < Roda
             view 'workouts/session'
           end
         end
+        # Answering the proposal the record page made. #520.
+        #
+        # Two routes because they are two different statements, and the app must be able to
+        # tell them apart forever: yes is a link between a session and a recording of it,
+        # and no is a standing instruction to stop asking about this session. Neither is a
+        # write to Withings -- the app reads, and the watch is the instrument.
+        #
+        # On the record rather than on the session screen, which is where #520 puts the
+        # whole flow: the session screen is for lifting, and by the time there is anything
+        # to match the lifting is done. It also means the question survives a lifter who
+        # taps finish and pockets the phone, because it is on a page they come back to.
+        r.on 'withings' do
+          r.post 'match' do
+            check_csrf!
+            WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout.id,
+                                     external_id: r.params['activity'].to_s)
+            r.redirect "/workouts/#{workout_id}"
+          end
+          r.post 'dismiss' do
+            check_csrf!
+            WithingsWorkouts.dismiss(account_id: @account_id, workout_id: @workout.id,
+                                     external_id: r.params['activity'].to_s)
+            r.redirect "/workouts/#{workout_id}"
+          end
+        end
         r.get('edit') { workout_form('workouts/edit') }
         r.is do
           # By id, which is the order the session was trained in, rather than by
@@ -1268,6 +1294,14 @@ class Tectonic < Roda
           # stamps are columns on the sets this page has just fetched, which is the whole
           # reason the timing lives on the set rather than in a table beside it.
           @timing = Timing.session(@workout, @sets.map(&:values))
+          # And what the watch says about the same session, if anything (#520). Asked on
+          # every render rather than once at finish, because closing a workout in Withings
+          # starts an upload that reaches their servers seconds to minutes later -- so a
+          # lifter who taps finish immediately would be told there was nothing, about a
+          # thing that is merely late. It answers nil for a session there is nothing to say
+          # about, which is most of them, and the page draws nothing at all in that case.
+          @withings = WithingsWorkouts.proposal(account_id: @account_id, workout: @workout,
+                                                timing: @timing)
           view 'workouts/show'
         end
       end
@@ -1619,6 +1653,35 @@ class Tectonic < Roda
     return [] unless @workout.finished?
 
     @session_summary ||= SessionSummary.of(@workout, @sets.map(&:values), @timing)
+  end
+
+  # The Withings activity this session has been matched to, or nil. #520.
+  #
+  # One reading of `@withings[:state]`, in one place, because the record page asks the same
+  # question in four spots -- the length, the two ends, the block under them, and whether to
+  # say "from your taps" -- and four copies of `@withings && @withings[:state] == :matched`
+  # is four places for one of them to drift and start reporting the watch's numbers under
+  # the app's labels.
+  def matched_activity
+    return nil unless @withings && @withings[:state] == :matched
+
+    @withings[:activity]
+  end
+
+  # How long the watch says it took.
+  #
+  # The wall-clock span rather than Withings' own `effduration`, which is their judgement
+  # about how much of that span was work. Two reasons. It is the figure that sits beside the
+  # app's own overall span and answers the same question, so they are comparable; and the
+  # active-versus-elapsed split on this page is already made from a threshold this app
+  # defends in lib/tectonic/timing.rb, so borrowing a second opinion about it from another
+  # vendor would put two unexplained trims on one line. `effduration` is stored and can have
+  # its own line the day something asks for it.
+  def watch_seconds
+    activity = matched_activity
+    return nil unless activity
+
+    (activity[:ended_at] - activity[:started_at]).to_i
   end
 
   # A cue with nothing in it, which is what a tap that did not finish a set sends. Named

@@ -64,8 +64,8 @@ module CleanDatabase
   # rather than leaks. test_isolation_spec asserts this still names every table, since a
   # migration that adds one and forgets it here would go back to leaking quietly.
   TABLES = %i[
-    sets program_lifts workouts program_days program_weeks programs mcp_audit_log
-    oauth_grants account_plates account_dumbbell_plates
+    sets program_lifts withings_workouts workouts program_days program_weeks programs
+    mcp_audit_log oauth_grants account_plates account_dumbbell_plates
     account_training_maxes account_training_max_statements
     account_goals account_exercise_rests health_metrics account_withings
     account_remember_keys account_password_reset_keys exercises

@@ -91,6 +91,24 @@
     about training that never happened. %>
 <%- if @timing[:overall] %>
   <p class="mt-2 text-sm text-gray-500">
+    <%# The watch first, where one has been matched. #520.
+
+        This is the app deferring, and it is deliberate. Everything else on this line is
+        arithmetic on taps: the session began when a set was first marked done and ended
+        when the lifter said so, which is an inference from when somebody touched a phone.
+        The watch was strapped to them and *measured* it. Where the two disagree about how
+        long a session took, #520 says the watch is right and the app should say so rather
+        than quietly keeping its own figure.
+
+        Both numbers stay on the line, and the tap-derived one gets the words "from your
+        taps" the moment there is a watch figure beside it to be confused with. A page that
+        showed one number whose meaning depended on whether a match existed would be worse
+        than either reading: a lifter comparing this Tuesday to last would have no way to
+        know they were comparing two different measurements. %>
+    <%- if matched_activity %>
+      <%= Timing.phrase(watch_seconds) %> measured by your watch
+      <span aria-hidden="true">&middot;</span>
+    <%- end %>
     <%- if @timing[:discarded].positive? %>
       <%= Timing.phrase(@timing[:active]) %> active
       <span aria-hidden="true">&middot;</span>
@@ -98,6 +116,7 @@
     <%- else %>
       <%= Timing.phrase(@timing[:overall]) %><%= ' so far' if @timing[:overall_basis] == :in_progress %>
     <%- end %>
+    <%= 'from your taps' if matched_activity %>
     <%- if @timing[:typical_turnaround] %>
       <span aria-hidden="true">&middot;</span>
       typically <%= Timing.phrase(@timing[:typical_turnaround]) %> between sets
@@ -119,7 +138,25 @@
       exist yet, and the line above already says "so far" about it; printing a start alone
       under that reads as though the session were over. The stamps themselves are the same
       two `overall` has always subtracted -- this stops throwing the ends away. %>
-  <%- if @timing[:started_at] && @timing[:overall_basis] == :finished %>
+  <%# The same preference applied to the two ends. #520.
+
+      The line above defers about the length, so this has to defer about where the session
+      sat in the day, or the page would report a 49 minute session running from 18:02 to
+      18:55 and leave a reader to work out which half to believe. The watch's ends are the
+      ones the length above is the difference of.
+
+      It also reaches a session the tap-derived line cannot: `overall_basis == :finished`
+      keeps the stamps off a session still in progress, because printing a start under a
+      length that says "so far" reads as though it were over. A matched session has a real
+      measured end whether or not anybody tapped finish, so there is nothing to withhold. %>
+  <%- if matched_activity %>
+    <p class="mt-1 text-sm text-gray-500">
+      <%== render('workouts/_clock_time', locals: { at: matched_activity[:started_at] }) %>
+      to
+      <%== render('workouts/_clock_time', locals: { at: matched_activity[:ended_at] }) %>
+      on your watch
+    </p>
+  <%- elsif @timing[:started_at] && @timing[:overall_basis] == :finished %>
     <p class="mt-1 text-sm text-gray-500">
       <%== render('workouts/_clock_time', locals: { at: @timing[:started_at] }) %>
       to
@@ -145,6 +182,12 @@
     <p class="mt-1 text-sm text-gray-500"><%= Tectonic::SessionDiagnosis.sentence(session_diagnosis) %></p>
   <%- end %>
 <%- end %>
+
+<%# What the watch has to say, and the question about whether it is about this session.
+    #520. Outside the timing block above deliberately: a session with no stamps has no
+    length to print and the block draws nothing for it, but it can still be a session an
+    account with a watch wants to stop being asked about. %>
+<%== render('workouts/_withings_match') %>
 
 <%# The clock times above, put into the reader's own timezone. #397.
 
