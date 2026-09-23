@@ -390,7 +390,17 @@
       <tbody class="divide-y divide-gray-200">
         <%- @sets.each do |set| %>
           <tr>
-            <td class="whitespace-nowrap py-4 pr-3 text-sm text-gray-500"><%= set.workout[:date].strftime('%b %d, %Y') %></td>
+            <%# The day the set was lifted, not the day a programme asked for it. #572 calls
+                this the worst of the seven, and it is right to: this table is a lifter's own
+                record of what they lifted and when, and it is the one people read to answer
+                "when did I last squat this". Dating it by plan answers a question nobody asked.
+
+                The route eager-loads these workouts `with_performed_on`, so the stamp is on
+                the row and Workout#performed_or_planned_on never falls back to a query here --
+                which in a table of a year of sets would be a year of queries. %>
+            <td class="whitespace-nowrap py-4 pr-3 text-sm text-gray-500">
+              <%= set.workout.performed_or_planned_on.strftime('%b %d, %Y') %>
+            </td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= weight_label(set[:weight]) %></td>
             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:reps] %></td>
           </tr>

@@ -34,7 +34,12 @@
           <%- workouts.each do |workout| %>
             <tr>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <%= workout[:date].strftime('%b %d, %Y') %>
+                <%# The day it was trained, falling back to the day it is written for. #572,
+                    and Workout#performed_or_planned_on is the rule. Free of a query per row:
+                    the route fetches this list `with_performed_on`, so the stamp is a column
+                    on the row already and the fallback inside that method never fires here.
+                    spec/query_count_spec.rb is what notices if that stops being true. %>
+                <%= workout.performed_or_planned_on.strftime('%b %d, %Y') %>
                 <%# @today is the lifter's, not the server's (#349): on the server's clock a
                     Monday evening session in New York is already Tuesday and reads as missed
                     while it is being lifted. %>

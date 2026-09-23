@@ -13,8 +13,13 @@
     silently the next time the padding was tuned. %>
 <div id="session-page" class="mx-auto max-w-md pb-24">
   <div class="flex items-baseline justify-between">
+    <%# The day it was trained, falling back to the day it is written for. #572, and the same
+        rule the record page and the calendar use -- see Workout#performed_or_planned_on.
+        It matters more here than anywhere, because this is the screen somebody is holding
+        while they train: a session opened in the gym and headed with Friday, two days from
+        now, reads as having opened the wrong one. %>
     <h1 class="text-3xl font-semibold text-gray-900">
-      <%= @workout[:date].strftime('%A %b %-d') %>
+      <%= @workout.performed_or_planned_on.strftime('%A %b %-d') %>
     </h1>
     <%# "record" was the noun -- the page that records this session -- and read as the verb,
         which on a gym screen is an instruction to start recording. It is also where you go

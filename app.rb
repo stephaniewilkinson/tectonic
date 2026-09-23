@@ -1008,7 +1008,25 @@ class Tectonic < Roda
           # exercise never surfaces another account's logged sets.
           my_workouts = Workout.where(account_id: @account_id).select(:id)
           mine = WorkoutSet.where(exercise_id: @exercise.id, workout_id: my_workouts)
-          @sets = mine.all
+          # Eager, and eager through `with_performed_on`, because the history table below dates
+          # every row by the session it came from. #572, #234.
+          #
+          # The table used to walk `set.workout` per row, which is a query a set -- a hundred
+          # for a lifter with a hundred squat sets on record, and it grew every session. That
+          # was already true before #572 and nothing noticed, because a page that is slow is
+          # still a page that renders. Eager loading collapses it to one further query for
+          # every session those sets belong to, however many sets that is.
+          #
+          # The block is what makes the second half free. #572 dates each row by
+          # `performed_or_planned_on`, which reads `performed_on`, which falls back to its own
+          # query when the dataset did not ask -- so a plain `eager(:workout)` would have
+          # traded a query per set for a query per session and called it a fix. Asking for the
+          # stamp in the eager load itself means the whole table is two queries whatever a year
+          # of training put in it, which is what spec/query_count_spec.rb pins.
+          #
+          # The value is what Sequel hands the eager load's own dataset through before it runs,
+          # so this is `with_performed_on` applied to "the workouts these sets belong to".
+          @sets = mine.eager(workout: lambda(&:with_performed_on)).all
           @heaviest_by_day = heaviest_by_day(mine)
           # Whatever a percentage of this movement would resolve against today, and which
           # of the two answers that is. Nil when there is neither, which is the state the
@@ -1084,7 +1102,16 @@ class Tectonic < Roda
         view('workouts/withings')
       end
       r.on String do |workout_id|
-        @workout = Workout[workout_id]
+        # `with_performed_on` rather than a bare `Workout[workout_id]`, because three of the
+        # pages under here -- the record, the gym floor screen and the set list -- now head
+        # themselves with the day the session was trained rather than the day it was written
+        # for (#572). That reading is `performed_on`, which answers from the row where the
+        # query asked for it and otherwise goes and fetches it, so leaving this alone would
+        # have added a second query to every one of those pages to learn something the query
+        # that fetched the workout could have selected. One row, two correlated subqueries,
+        # still one query -- and `performed?` on the record page stops issuing its own EXISTS
+        # into the bargain.
+        @workout = Workout.where(id: workout_id).with_performed_on.first
         # One ownership gate for every nested workout route: a workout that does
         # not exist or belongs to another account never resolves, so show, edit,
         # sets, session, and delete are all closed to a guessed id.
@@ -1509,13 +1536,21 @@ class Tectonic < Roda
       end
       r.get do
         # Sessions still to train are read forwards and training already done is read
-        # backwards, so both lists open on the workout nearest today. with_performance
-        # answers "has anything been lifted here" for the whole page in the query that
-        # fetches it, which is what keeps the split off the sets table.
+        # backwards, so both lists open on the workout nearest today. with_performed_on
+        # answers "has anything been lifted here" *and* "when" for the whole page in the query
+        # that fetches it, which is what keeps the split off the sets table.
+        #
+        # with_performed_on rather than with_performance since #572, and the extra column is
+        # not decoration: the rows print a date apiece, and since #572 that date is the day the
+        # session was trained rather than the day it was written for. Left at with_performance
+        # the date would still be right and `performed_on` would fall back to a query per
+        # workout to get it -- fifty sessions, fifty queries, the #234 shape arriving by the
+        # back door and with nothing failing to say so. with_performed_on is with_performance
+        # plus one correlated subquery, so this is the same one query it always was.
         # Read once rather than per workout: this is a query, and asking it inside the
         # partition would ask it once per row of the list it is partitioning.
         @today = Clock.today_for(@account_id)
-        planned, history = Workout.where(account_id: @account_id).with_performance.with_set_count
+        planned, history = Workout.where(account_id: @account_id).with_performed_on.with_set_count
                                   .reverse(:date).all
                                   .partition { |workout| workout.status(@today) == :planned }
         @upcoming = planned.reverse

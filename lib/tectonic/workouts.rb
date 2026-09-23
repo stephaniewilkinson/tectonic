@@ -255,6 +255,80 @@ class Tectonic < Roda
       Digest::MD5.hexdigest(rows.map { |row| SESSION_COLUMNS.map { |column| row[column] }.join(',') }.join(';'))
     end
 
+    # The day this session belongs to, for anybody being shown it. #479, #572.
+    #
+    # What happened, where it happened: a trained session belongs on the day it was trained,
+    # and a plan belongs on the day it is written for. `workouts.date` is only ever the
+    # second of those -- it is when a session was *written for*, which for a generated block
+    # is a decision made weeks ahead and no statement at all about when anybody lifted. Those
+    # two are the same date most of the time and the app is only interesting when they are not.
+    #
+    # Falls back to the stored date whenever there is no stamp to read -- a session nobody has
+    # trained yet, one performed before #281 gave sets a `completed_at`, or one whose
+    # completions predate it. Those rows are not wrong, they simply cannot say, and the planned
+    # date is the best available answer rather than a guess. **That fallback is the half of
+    # this a careless caller breaks**: a date blanked because a session has not happened yet is
+    # a worse bug than a date two days out, because it takes away the only thing a planned
+    # session has to say for itself.
+    #
+    # It was called `on_calendar` until #572, which is the name that caused #572. It described
+    # the one caller it had rather than the fact it returns, so seven other renderings of a
+    # session's date -- the record page, the gym floor screen, the two sets pages, the workouts
+    # list, the Withings review list and exercise history -- each read the raw column instead,
+    # and three years of issues closed on the belief that the rule had been applied everywhere.
+    # A method named after a screen invites exactly one screen to use it. This one is named
+    # after the question, which every one of those pages is asking: *performed if we know, and
+    # otherwise planned*.
+    #
+    # Six of those seven go through here now. **The Withings review list does not, and that is
+    # the one thing #572 leaves undone**: `WithingsProposals.waiting` hands the view plain
+    # `DB[:workouts]` hashes rather than model rows and sorts the list by the same raw column,
+    # so applying this there is a change to that module and to the order the questions come in,
+    # not a change to a template. It is written down here rather than only in the pull request
+    # because "it was done everywhere" being assumed from the outside is the exact mistake that
+    # made #572 -- so the next reader of this method finds out from the method.
+    #
+    # The argument the old name's comment made is the argument this one makes, and it is worth
+    # restating rather than dropping, because it is the thing that keeps getting lost: **the
+    # stored column still means the plan.** Nothing here writes, nothing here sorts or groups
+    # by a second date, and the edit form goes on loading and posting `date` itself -- #530
+    # made rescheduling safe and rescheduling is a real thing to do. There is one date anything
+    # can disagree about, and this is a reading of it rather than a rival to it.
+    def performed_or_planned_on
+      performed_on&.to_date || date.to_date
+    end
+
+    # Whether this session happened on a day other than the one it was written for, which is
+    # the one thing `performed_or_planned_on` cannot say by itself: it answers with a date, and
+    # a date on its own gives a reader no way to tell a plan kept from a plan departed from.
+    #
+    # Only the record page asks. That is deliberate rather than a first instalment -- see the
+    # note in views/workouts/show.erb for why this is not said on the other six.
+    #
+    # False for a session nobody has trained, because there is nothing to have departed from
+    # yet. `performed_on` nil means the fallback fired, which makes the two dates equal by
+    # construction, so the comparison would answer false anyway; it is written out because
+    # "no answer" and "the same answer" being folded together by accident is how this kind of
+    # thing comes back.
+    def performed_away_from_plan?
+      return false unless performed_on
+
+      performed_on.to_date != date.to_date
+    end
+
+    # When the first set of this was ticked off, or nil. Taken from the row where the query
+    # asked (with_performed_on) and otherwise fetched, the same shape as `performed?` above so
+    # a caller that has not opted into the wider select gets an answer rather than an error.
+    #
+    # **The fallback is a query per workout**, which is fine for a page showing one session and
+    # is an N+1 in a loop. A list that draws a date per row has to ask for it in the query that
+    # fetches the rows -- `with_performed_on` on the dataset, or an eager load that applies it
+    # -- and spec/query_count_spec.rb is what notices when one does not. The workouts list and
+    # exercise history both do; they are the two lists that render this per row.
+    def performed_on
+      values.fetch(:performed_on) { sets_dataset.where(is_completed: true).min(:completed_at) }
+    end
+
     # Planned, performed or skipped, decided without inspecting the sets one at a time.
     # A session that has been lifted at all is performed; one still on or ahead of its date
     # is planned; one whose date has passed with nothing lifted was skipped.
@@ -292,27 +366,11 @@ class Tectonic < Roda
     # program_day_id no longer appears here, which is the tell that the rule got simpler
     # rather than gaining a case: whether a program wrote a session was only ever a proxy
     # for whether it was a plan, and the date answers that directly.
-    # The day a calendar should draw this session on. #479.
     #
-    # What happened, where it happened: a trained session belongs on the day it was trained,
-    # and a plan belongs on the day it is written for. Those are the same date most of the
-    # time and the calendar is only interesting when they are not.
-    #
-    # Falls back to the stored date whenever there is no stamp to read -- a session performed
-    # before #281 gave sets a `completed_at`, or one whose completions predate it. Those rows
-    # are not wrong, they simply cannot say, and the planned date is the best available answer
-    # rather than a guess.
-    def on_calendar
-      performed_on&.to_date || date.to_date
-    end
-
-    # When the first set of this was ticked off, or nil. Taken from the row where the query
-    # asked (with_performed_on) and otherwise fetched, the same shape as `performed?` above so
-    # a caller that has not opted into the wider select gets an answer rather than an error.
-    def performed_on
-      values.fetch(:performed_on) { sets_dataset.where(is_completed: true).min(:completed_at) }
-    end
-
+    # The stored column rather than `performed_or_planned_on`, and on purpose. This asks
+    # whether a *plan* has come due, which is a question about the day it was written for --
+    # a session nobody has trained has no other date anyway, and one that has been trained
+    # never reaches the comparison, because `performed?` answers on the first line.
     def status(today = Date.today)
       return :performed if performed?
       return :planned if date.to_date >= today

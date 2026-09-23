@@ -1,10 +1,44 @@
 <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-  <%# The one heading in the app that titles a thing that happened rather than labelling a
-      screen you are about to act on, which is what makes it a display surface under #200's
-      rule. It is still a page title and still obeys #128's shape -- an h1 at text-3xl,
-      semibold, in the title colour -- so this is both, and `serif` outranks the heading
-      rule on specificity to decide which face wins. %>
-  <h1 class="serif text-3xl font-semibold col-span-2 text-gray-900"><%= @workout[:date].strftime('%A %B %-d, %Y') %></h1>
+  <%# The heading and, under it, what the programme had planned where that is a different day.
+      The column that used to carry `col-span-2` was the h1 itself; it is this wrapper now, so
+      the two lines stay one cell of the grid and the controls beside them do not move. %>
+  <div class="col-span-2">
+    <%# The one heading in the app that titles a thing that happened rather than labelling a
+        screen you are about to act on, which is what makes it a display surface under #200's
+        rule. It is still a page title and still obeys #128's shape -- an h1 at text-3xl,
+        semibold, in the title colour -- so this is both, and `serif` outranks the heading
+        rule on specificity to decide which face wins.
+
+        The day it was trained, falling back to the day it was written for. #572. This used to
+        be `@workout[:date]`, which is the plan and only ever the plan -- so a session lifted
+        on Wednesday the 23rd was titled "Friday September 25, 2026", because the programme had
+        scheduled it for then and the lifter trained two days early. A heading on the record of
+        something that happened, carrying a date in the future, twice in a row. See
+        Workout#performed_or_planned_on for the rule and for why the column still holds the
+        plan. %>
+    <h1 class="serif text-3xl font-semibold text-gray-900">
+      <%= @workout.performed_or_planned_on.strftime('%A %B %-d, %Y') %>
+    </h1>
+    <%# And, where the two dates disagree, what the programme wrote. #572 left this open and
+        this is the argument for saying it: a lifter two days ahead of their block is shown a
+        date they may not recognise as the session they opened, and the plan is the thing that
+        makes it recognisable -- "Friday's session, done Wednesday" is what happened, and one
+        of those halves alone is a worse answer than both. It also stops the app quietly
+        showing one date while storing another, which is the shape of confusion that had #440
+        closed twice on the belief the rule was applied everywhere.
+
+        The record page and nowhere else. The other six renderings are lists and headers where
+        a lifter is looking for a session rather than reading one, and a parenthetical on every
+        row of a year of training is noise charged to everybody to serve the few rows it is
+        about. This page is the one that exists to say what a session was.
+
+        Silent when the dates agree, which is most sessions, and silent on a session nobody has
+        trained -- there the heading *is* the plan, and a line underneath repeating it would be
+        the page saying the same date twice. Both cases are `performed_away_from_plan?`. %>
+    <%- if @workout.performed_away_from_plan? %>
+      <p class="mt-1 text-sm text-gray-500">Written for <%= @workout[:date].strftime('%A %B %-d, %Y') %>.</p>
+    <%- end %>
+  </div>
   <div class="flex flex-col gap-2">
     <%# Both of these used to hover to gray-500, which on a control means disabled. It kept
         surviving review because white on gray-500 is 4.83:1 and white on lime-500 is 1.98:1,
