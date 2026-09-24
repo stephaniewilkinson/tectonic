@@ -239,13 +239,6 @@ class Tectonic < Roda
 
     def stated? = source == STATED
 
-    def derived? = source == DERIVED
-
-    # How the number should be introduced wherever it is shown beside a percentage. The two
-    # readings are far enough apart to be worth a sentence rather than a word: a stated max
-    # is a fact about the lifter, and a derived one is an inference the app is making and
-    # should be seen to be making -- and, since it is an estimated *single* standing in for a
-    # training max, an inference on a different scale from the one the box asks for.
     # Whether the stated number and the number trained off are different, which is when the
     # arithmetic is worth showing. False for a competition-max convention, and for every row
     # written before #292.
@@ -269,6 +262,11 @@ class Tectonic < Roda
       "#{discounted? ? "which is #{working}" : 'which you set'}#{since}"
     end
 
+    # How the number should be introduced wherever it is shown beside a percentage. The two
+    # readings are far enough apart to be worth a sentence rather than a word: a stated max
+    # is a fact about the lifter, and a derived one is an inference the app is making and
+    # should be seen to be making -- and, since it is an estimated *single* standing in for a
+    # training max, an inference on a different scale from the one the box asks for.
     def explanation
       return "#{train_at_percent}% of the #{Plates.numeric(stated_pounds)} lb max you set" if discounted?
       return 'the max you set' if stated?
