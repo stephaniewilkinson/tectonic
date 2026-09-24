@@ -78,12 +78,14 @@ describe 'signing in with nothing logged' do
   # a session. The old redirect ran `login_destination`, which ends at a page behind
   # `require_login`, so leaving it in place would have sent every new account straight into
   # the login screen with the "check your email" notice consumed on the way past.
-  it 'sends a sign-up to the login page rather than anywhere that needs a session' do
+  # It went to /login until #633, which gave it a page of its own for waiting on the email;
+  # that page needs no session either.
+  it 'sends a sign-up to the waiting page rather than anywhere that needs a session' do
     get '/create-account'
     post '/create-account', { login: "#{SecureRandom.hex}@example.com",
                               '_csrf' => token_from(last_response.body) }
 
-    assert_equal '/login', last_response.headers['location']
+    assert_equal '/check-your-email', last_response.headers['location']
   end
 end
 
