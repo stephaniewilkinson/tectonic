@@ -21,15 +21,11 @@ MARKUP_NAME = '<script>alert(1)</script> Squat'
 # everything after it is read as further attributes on the input.
 QUOTE_NAME = 'Squat" onmouseover="alert(1)'
 
-def escaping_sign_up
-  email = "#{SecureRandom.hex}@gmail.com"
-  password = SecureRandom.hex
-  visit '/create-account'
-  fill_in 'email', with: email
-  fill_in 'password', with: password
-  click_on 'Sign up'
-  DB[:accounts].where(email:).get(:id)
-end
+# A copy of the sign-up walk until #575 put a confirmation email in the middle of one. The
+# shared helper in spec_helper writes the account and drives only the sign-in, and the note
+# there says why: what this file is about is whether a name with markup in it reaches the
+# page as characters, not how an account comes to exist.
+def escaping_sign_up = sign_in_as_somebody_new
 
 def escaping_add_exercise(name)
   visit '/exercises'

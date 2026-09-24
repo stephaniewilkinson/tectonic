@@ -55,12 +55,35 @@ describe 'signing in with nothing logged' do
     assert_equal '/start', land(email, password)
   end
 
-  it 'lands there when the account was made a moment ago, not on an empty calendar' do
+  # The brand new account, which since #575 arrives here one flow later than it used to.
+  # Signing up no longer opens a session, so the redirect that chooses a destination moved
+  # from `create_account_redirect` to `verify_account_redirect` -- and the first request a new
+  # account makes with a session in it is now the confirmation, not the sign-up. This is the
+  # only case the first-run page was ever written for, so it is asserted from where it now
+  # happens rather than dropped.
+  it 'lands there when the account was confirmed a moment ago, not on an empty calendar' do
     email = "#{SecureRandom.hex}@example.com"
     get '/create-account'
-    post '/create-account', { login: email, password: 'pw12345678',
-                              '_csrf' => token_from(last_response.body) }
+    post '/create-account', { login: email, '_csrf' => token_from(last_response.body) }
+    row = DB[:account_verification_keys].where(id: DB[:accounts].where(email:).get(:id)).first
+    get "/verify-account?key=#{row[:id]}_#{row[:key]}"
+    follow_redirect! while last_response.redirect?
+    # The password is typed here, on the page the link leads to, and not on the sign-up form.
+    post '/verify-account', { password: 'pw12345678', '_csrf' => token_from(last_response.body) }
+
     assert_equal '/start', last_response.headers['location']
+  end
+
+  # And the half of that which used to be implied: the sign-up itself goes nowhere that needs
+  # a session. The old redirect ran `login_destination`, which ends at a page behind
+  # `require_login`, so leaving it in place would have sent every new account straight into
+  # the login screen with the "check your email" notice consumed on the way past.
+  it 'sends a sign-up to the login page rather than anywhere that needs a session' do
+    get '/create-account'
+    post '/create-account', { login: "#{SecureRandom.hex}@example.com",
+                              '_csrf' => token_from(last_response.body) }
+
+    assert_equal '/login', last_response.headers['location']
   end
 end
 

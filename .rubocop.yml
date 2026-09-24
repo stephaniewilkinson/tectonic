@@ -86,3 +86,5 @@ Naming/FileName:
     - "views/create-account.erb"
     - "views/reset-password.erb"
     - "views/reset-password-request.erb"
+    - "views/verify-account.erb"
+    - "views/verify-account-resend.erb"

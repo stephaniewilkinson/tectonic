@@ -46,6 +46,28 @@ module AuthForm
       assert_includes page_ids, target
     end
   end
+
+  def csrf = last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1]
+
+  # The page the emailed link leads to, which since #575 is where the password box lives.
+  # Reached by signing up and following the link, because that is the only way to reach it:
+  # the route refuses without a key, and Rodauth moves the key into the session on the way
+  # past so the form itself carries nothing.
+  def open_the_page_the_link_leads_to
+    email = "#{SecureRandom.hex}@example.com"
+    Tectonic::Mailer.stub(:deliver, ->(**) { true }) do
+      get '/create-account'
+      post '/create-account', { login: email, '_csrf' => csrf }
+    end
+    follow_the_key_written_for(email)
+    email
+  end
+
+  def follow_the_key_written_for(email)
+    row = DB[:account_verification_keys].where(id: DB[:accounts].where(email:).get(:id)).first
+    get "/verify-account?key=#{row[:id]}_#{row[:key]}"
+    follow_redirect! while last_response.redirect?
+  end
 end
 
 describe 'the sign-in form' do
@@ -78,16 +100,6 @@ describe 'the sign-up form' do
 
   before { get '/create-account' }
 
-  # This token carries more weight than it used to. The form no longer asks for the
-  # password twice, and nothing else in this app catches a typo in it: there is no
-  # password reset, so a slip on this one box costs the account. "new-password" is the
-  # instruction that makes a manager offer to generate the password and keep it, which is
-  # the only thing standing in for the confirmation box that used to be here.
-  it 'offers the new credential for saving instead of refusing it' do
-    assert_equal 'new-password', autocomplete('password')
-    refute_includes last_response.body, 'autocomplete="off"'
-  end
-
   # A credential saved here is offered back at sign-in only if both forms name the
   # identifier the same way, so the two tokens are asserted against each other.
   it 'names the identifier the same way the sign-in form does' do
@@ -102,9 +114,64 @@ describe 'the sign-up form' do
     assert_nil field('password-confirm')
   end
 
+  # And since #575 it does not ask for the password a first time either. A box here would be
+  # worse than useless: `create_account_set_password?` is false while verify_account is
+  # enabled, so Rodauth collects the parameter and drops it -- somebody would type a password
+  # that is stored nowhere and then find it does not work.
+  it 'does not ask for a password at all, because there is nowhere to put one yet' do
+    assert_nil field('password')
+  end
+
   it 'writes one id per field and no id twice' do
-    assert_one_id_each 'login', 'password'
+    assert_one_id_each 'login'
     assert_labels_resolve
+  end
+end
+
+# Where the autofill claims went. They were about the sign-up form until #575 moved the
+# password to the page the emailed link leads to; they are the same claims about the same box
+# on a different page, which is why they are moved rather than deleted. iOS Keychain refusing
+# to save a credential is the failure this whole file exists for, and it does not care which
+# route the box is on.
+describe 'the page where the password is chosen' do
+  include Rack::Test::Methods
+  include AuthForm
+
+  before { open_the_page_the_link_leads_to }
+
+  # This token carries more weight here than it did on the sign-up form, and lands less
+  # often. More, because this is now the only moment a credential is created and nothing
+  # else catches a typo in it. Less, because the page is reached from an email, so it is
+  # frequently open in a different browser from the one that filled the sign-up form in, or
+  # on a phone -- and whichever manager would have offered to generate and keep the password
+  # may simply not be there. app.rb's note on this flow takes that trade deliberately; this
+  # asserts the half of it that is in our hands.
+  it 'offers the new credential for saving instead of refusing it' do
+    assert_equal 'new-password', autocomplete('password')
+    refute_includes last_response.body, 'autocomplete="off"'
+  end
+
+  it 'asks for the password once, not twice' do
+    assert_nil field('password-confirm')
+  end
+
+  it 'writes one id per field and no id twice' do
+    assert_one_id_each 'password'
+    assert_labels_resolve
+  end
+
+  # The other half of the move: Rodauth's own template renders a password box here only while
+  # `verify_account_set_password?` is true, and this app's template renders one unconditionally.
+  # If that default were ever overridden the box would stay on the page, be posted, and be
+  # ignored -- a form that looks like it works and sets nothing.
+  it 'sets the password from exactly the fields it renders' do
+    names = inputs.filter_map { |tag| tag[/\sname="([^"]*)"/, 1] } - ['_csrf']
+    params = names.to_h { |name| [name, 'chosen-here-4321'] }
+    params['_csrf'] = csrf
+
+    post '/verify-account', params
+
+    assert_equal '/start', last_response.headers['location']
   end
 end
 
@@ -119,17 +186,18 @@ describe 'the names an account form posts under' do
   #
   # That question is now the one that matters most on this file. Removing the confirmation
   # boxes from the markup is not what removed the confirmations: Rodauth defaults to
-  # demanding "login-confirm" and "password-confirm" on the post and refuses without them,
-  # so this passes only while require_login_confirmation? and require_password_confirmation?
-  # are both false in app.rb. Undo either and every sign-up in the app fails here.
+  # demanding "login-confirm" on the post and refuses without it, so this passes only while
+  # require_login_confirmation? is false in app.rb. Undo it and every sign-up in the app
+  # fails here. Its sibling, require_password_confirmation?, is asserted the same way by the
+  # last spec in the describe above, which now owns the password box.
   it 'creates an account from exactly the fields it renders' do
     get '/create-account'
     email = "#{SecureRandom.hex}@example.com"
     names = inputs.filter_map { |tag| tag[/\sname="([^"]*)"/, 1] } - ['_csrf']
     params = names.to_h { |name| [name, name.start_with?('login') ? email : 'pw12345678'] }
-    params['_csrf'] = last_response.body[/name="_csrf"[^>]*value="([^"]*)"/, 1]
+    params['_csrf'] = csrf
 
-    post '/create-account', params
+    Tectonic::Mailer.stub(:deliver, ->(**) { true }) { post '/create-account', params }
 
     assert_equal 1, DB[:accounts].where(email:).count
   end

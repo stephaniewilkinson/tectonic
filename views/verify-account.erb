@@ -1,0 +1,62 @@
+<%# Confirming the address and choosing the password, reached from the link in the email. #575.
+
+    This is where an account actually starts existing. The sign-up form takes an address and
+    writes a row with no credential at all -- `password_hash` is nullable as of migrate/051,
+    and the note there is where that is argued -- so until this form is posted there is
+    nothing anybody can sign in to. That is the whole point of the feature rather than an
+    implementation detail: the four hundred and nine rows that prompted #575 were usable
+    accounts the moment a bot pressed the button, and under this flow they would have been
+    rows waiting on mail nobody read.
+
+    **The password box carries the cost of that.** On the sign-up form it said
+    `autocomplete="new-password"`, which is the instruction that makes a manager offer to
+    generate a credential and keep it; here the same token is on a page reached from an
+    email, which is frequently a different browser from the one that filled the form in, or a
+    phone. Whatever manager is present still gets asked -- that is why the token is here and
+    not omitted -- but the odds that one is present are worse than they were, and app.rb's
+    note on this flow is where that trade is taken deliberately rather than stumbled into.
+
+    One box, matching views/reset-password.erb and for the reason recorded there: app.rb turns
+    Rodauth's confirmation fields off, so a second box would be collected, ignored and never
+    compared. Rodauth renders `password-confirm-field` here only when
+    `require_password_confirmation?` is true, and it is not.
+
+    Why a form at all, rather than confirming on the GET? Two reasons, and the first would
+    hold even without a password to collect. A link in an inbox is fetched by things that are
+    not the person it was sent to: spam filters, link scanners, corporate mail gateways and
+    the phone's own preview all GET every URL in a message, some within seconds of delivery.
+    A confirmation that happened on GET would routinely be done by a scanner, which is most of
+    the evidence this feature exists to collect. The second is that a password cannot be typed
+    into a GET.
+
+    There is no hidden key field, and that is the point rather than an omission -- exactly as
+    on views/reset-password.erb. Rodauth answers the emailed link with a redirect to this
+    route without the query string, having put the token in the session on the way past, so
+    the secret leaves the address bar and cannot escape through a Referer header on whatever
+    loads next. By the time this renders, the key is session state and the form has nothing
+    to carry. %>
+<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+  <div class="sm:mx-auto sm:w-full sm:max-w-sm">
+    <h1 class="text-center text-3xl font-semibold tracking-tight text-gray-900">Choose your password</h1>
+    <%== render('_form_error') %>
+    <p class="mt-4 text-center text-sm text-gray-600">
+      Your address is confirmed. Pick a password and the account is yours.
+    </p>
+  </div>
+
+  <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+    <form method="post" class="space-y-6" role="form" id="verify-account-form" autocomplete="on">
+      <%== rodauth.csrf_tag %>
+      <div>
+        <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
+        <div class="mt-2">
+          <input id="password" name="password" type="password" autocomplete="new-password" required
+                 class="<%= field_style %> block w-full py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
+        </div>
+      </div>
+      <div>
+        <button type="submit" class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Save it and sign in</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -11,15 +11,11 @@ require 'securerandom'
 # once something is running: whether the bar actually appears, and whether the two buttons on
 # it do what they say.
 module SessionNudge
+  # The sign-up walk was copied in here until #575 put a confirmation email in the middle of
+  # one. The shared helper in spec_helper writes the account and drives only the sign-in, and
+  # the note there says why: nothing in this file is about how an account comes to exist.
   def an_account_with_a_quiet_session(ago: 45 * 60, finished: nil)
-    email = "#{SecureRandom.hex}@gmail.com"
-    password = SecureRandom.hex
-    visit '/'
-    click_on 'Sign up'
-    fill_in 'email', with: email
-    fill_in 'password', with: password
-    click_on 'Sign up'
-    account_id = DB[:accounts].where(email:).get(:id)
+    account_id = sign_in_as_somebody_new
     [account_id, a_quiet_session(account_id, ago:, finished:)]
   end
 

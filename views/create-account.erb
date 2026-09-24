@@ -27,25 +27,25 @@
                  class="<%= field_style %> block w-full py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
         </div>
       </div>
-      <%# The password box says "new-password". It said "off", which on a sign-up form is
-          the instruction not to save the password -- and Safari and iOS Keychain obey it,
-          so the phone declined to remember an account it had just watched being created.
-          "new-password" is the opposite instruction: no such credential exists yet, offer
-          to generate one and offer to keep it.
+      <%# There is no password box here any more. #575.
 
-          It carries more weight than it did when there were two boxes. This form used to
-          catch a typo by asking for the password again and no longer does, and nothing
-          else catches one either, because there is no password reset in this app. A
-          manager that generates the password and keeps it is the whole of what stands
-          between a slip here and an account nobody can open. app.rb turns Rodauth's
-          confirmation requirements off to match the boxes this form actually renders. %>
-      <div>
-        <label for="password" class="block text-sm font-medium leading-6 text-gray-900">Password</label>
-        <div class="mt-2">
-          <input id="password" name="password" type="password" autocomplete="new-password" required
-                 class="<%= field_style %> block w-full py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
-        </div>
-      </div>
+          It sat below this comment for as long as the form existed, and the comment it
+          carried was about `autocomplete="new-password"` -- the instruction that asks a
+          manager to generate a credential and keep it, put there after "off" made Safari and
+          iOS Keychain decline to remember an account they had just watched being created.
+          That argument has not stopped being true; it has moved, to views/verify-account.erb,
+          along with the box, and the token is still on it.
+
+          What moved it is that the password is now chosen after the address is confirmed.
+          `verify_account` turns `create_account_set_password?` off, so a box here would be
+          collected and ignored, and the account this form makes deliberately has no
+          credential at all until somebody has read mail at the address -- which is what makes
+          a sign-up nobody asked for a row rather than an account. app.rb has the argument and
+          migrate/051 has the schema change it costs.
+
+          The old comment also said "there is no password reset in this app", which has been
+          untrue since #344 and is worth correcting on the way past rather than carrying to a
+          new file: a typo costs a reset email now, not the account. %>
       <div>
         <button type="submit" class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Sign up</button>
       </div>
