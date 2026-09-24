@@ -100,8 +100,8 @@ describe 'the disclosure chevron' do
   it 'is still rendered where a disclosure needs one' do
     users = templates.count { |path| File.read(path).include?("render('_chevron')") }
 
-    assert_equal 3, users,
-                 'the rating scale, the two revision disclosures, and the session note use it'
+    assert_equal 4, users,
+                 'the rating scale, a set row\'s revision, the lift swap, and the session note use it'
   end
 end
 
