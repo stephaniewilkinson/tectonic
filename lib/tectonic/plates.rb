@@ -116,10 +116,12 @@ class Tectonic < Roda
       nil
     end
 
-    # "1×25 1×10" for the view, an em dash for a bare bar.
+    # "1×25 1×10" for the view, and "bar only" for a bare bar. That was an em dash until #638,
+    # which is also what every app draws for "no data" -- on the first set of a session, the
+    # empty bar, the one row where the lifter most needs to be told there is nothing to add.
     def label(breakdown)
       return '' if breakdown.nil?
-      return '—' if breakdown.empty?
+      return 'bar only' if breakdown.empty?
 
       breakdown.map { |plate, count| "#{count}×#{plate}" }.join(' ')
     end

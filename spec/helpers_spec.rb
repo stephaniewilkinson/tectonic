@@ -89,19 +89,22 @@ describe 'plate_label' do
     assert_equal '', app.plate_label({ is_barbell: false, weight: 135 })
   end
 
-  it 'shows the per-side plate math for a loaded bar' do
-    assert_equal '1×45', app.plate_label({ is_barbell: true, weight: 135 })
+  # And says it is per side, since #638: "1×45" alone reads as one plate in total as easily as
+  # one on each side.
+  it 'shows the plate math for a loaded bar, and says it is each side' do
+    assert_equal '1×45 each side', app.plate_label({ is_barbell: true, weight: 135 })
   end
 
-  it 'is a dash for a bar with nothing on it' do
-    assert_equal '—', app.plate_label({ is_barbell: true, weight: 45 })
+  # Words rather than the em dash it was, which is what an app draws for "no data" (#638).
+  it 'says bar only for a bar with nothing on it' do
+    assert_equal 'bar only', app.plate_label({ is_barbell: true, weight: 45 })
   end
 
   # The case this was written for. 124 is 39.5 a side, which the default rack cannot
   # make, and the answer used to be the empty string -- indistinguishable, on the screen,
   # from a bar that needs nothing.
   it 'names the nearest loadable weight for a weight the rack cannot make' do
-    assert_equal 'closest 125: 1×25 1×10 1×5', app.plate_label({ is_barbell: true, weight: 124 })
+    assert_equal 'closest 125: 1×25 1×10 1×5 each side', app.plate_label({ is_barbell: true, weight: 124 })
   end
 
   it 'says so for a weight lighter than the bar, which no plates reach downwards' do
