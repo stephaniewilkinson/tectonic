@@ -2068,20 +2068,25 @@ class Tectonic < Roda
   # keeping its own figure". The reporting account's own data is the counter-example: the
   # watch began six minutes after their first completed set and kept recording for
   # twenty-five minutes after their last, and on the following morning bracketed a shorter,
-  # later window than the session entirely. Both rows carry `attrib = 7` and no
-  # `effduration`, which is the shape of an activity the watch *detected* rather than one a
-  # lifter started on it deliberately. So this answers a question about the watch, and the
-  # question about the session is answered by Timing, matched or not.
+  # later window than the session entirely. Both rows carry `attrib = 7`, which is Withings'
+  # own code for a detected activity a lifter later confirmed rather than one they started on
+  # the watch deliberately. So this answers a question about the watch, and the question about
+  # the session is answered by Timing, matched or not.
   #
-  # Still the wall-clock span rather than Withings' own `effduration`, and now for a simpler
-  # reason than the one that used to sit here. The old argument was about comparability --
-  # this figure stood beside the app's overall span and had to mean the same thing, and a
-  # second vendor's opinion about what counted as work would have put two unexplained trims
-  # on one line. It no longer stands beside anything. What is left is that the two ends are
-  # what the page prints either side of this number and what the overlap was computed from,
-  # so the span between them is the only figure a reader can check. `effduration` is stored
-  # and can have its own line the day something asks for it -- and on these two rows it is
-  # absent anyway, which is itself the tell.
+  # #571 read a second tell beside that one -- that neither row came back with an
+  # `effduration` -- and **that half was wrong**, though it pointed the same way. #586
+  # established against Withings' own OpenAPI document that there is no such field and never
+  # was: the name appears nowhere in it, and `Withings::WORKOUT_FIELDS` no longer asks for it.
+  # An absence nobody could have filled is not evidence about a watch. `attrib` is, it is
+  # documented, and it is the one this paragraph now rests on.
+  #
+  # Still the wall-clock span, and now for a simpler reason than the one that used to sit
+  # here. The old argument was about comparability -- this figure stood beside the app's
+  # overall span and had to mean the same thing, and a second vendor's opinion about what
+  # counted as work would have put two unexplained trims on one line. It no longer stands
+  # beside anything, and there is no such opinion on offer anyway. What is left is that the
+  # two ends are what the page prints either side of this number and what the overlap was
+  # computed from, so the span between them is the only figure a reader can check.
   def watch_seconds
     activity = matched_activity
     return nil unless activity

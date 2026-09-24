@@ -45,7 +45,7 @@ module MatchingTheWatch
     { 'id' => id, 'category' => category, 'timezone' => 'America/New_York',
       'attrib' => 0, 'startdate' => starts.to_i, 'enddate' => (starts + (minutes * 60)).to_i,
       'modified' => starts.to_i, 'model' => 59,
-      'data' => { 'calories' => 310.5, 'effduration' => 2400, 'hr_average' => 128,
+      'data' => { 'calories' => 310.5, 'hr_average' => 128,
                   'hr_min' => 61, 'hr_max' => 164 } }.merge(extra)
   end
 
@@ -871,7 +871,19 @@ describe 'storing what Withings sent' do
     record(@workout_id, [activity])
 
     assert_equal 128, stored(@account_id).first[:hr_average]
-    assert_equal 2400, stored(@account_id).first[:effective_seconds]
+    assert_equal 310.5, stored(@account_id).first[:calories].to_f
+  end
+
+  # #586. 042 added `effective_seconds` for `effduration`, which turns out not to be a field
+  # Withings has: the column is written by nothing now and reads null on every row, which is
+  # what it read before while something appeared to be writing it. Asserted rather than left
+  # implicit because a null here used to mean "this watch did not record it", and the
+  # difference between that and "nobody is asking" is the whole of the issue. The column
+  # itself goes in a migration of its own, #607.
+  it 'writes nothing to the column the retired field used to aim at' do
+    record(@workout_id, [activity])
+
+    assert_nil stored(@account_id).first[:effective_seconds]
   end
 
   # A watch with no optical sensor records no heart rate. Nil and zero are different facts.
@@ -1014,7 +1026,22 @@ describe 'the request the app makes for activities' do
     end
 
     assert_equal 'getworkouts', asked[:action]
-    assert_equal 'calories,effduration,hr_average,hr_min,hr_max', asked[:data_fields]
+    assert_equal 'calories,hr_average,hr_min,hr_max', asked[:data_fields]
+  end
+
+  # #586. `effduration` was in this list from #520 and is not a Withings data field: it
+  # appears nowhere in the OpenAPI document their own reference renders, and
+  # `withings_workouts.effective_seconds` is null on every row the reporting account has.
+  # Withings ignores a name it does not know rather than refusing the request, so asking
+  # cost nothing except a column that could never be filled and a reader's belief that it
+  # might be. Asserted separately from the list above so the reason survives a later
+  # change to what else is asked for.
+  it 'does not ask for a field Withings does not publish' do
+    asked = recording_form do
+      Tectonic::Withings.workouts('access-1', from: Date.today, to: Date.today)
+    end
+
+    refute_includes asked[:data_fields], 'effduration'
   end
 
   # Civil dates rather than the epochs the rest of the module deals in, and no `lastupdate`
