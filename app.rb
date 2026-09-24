@@ -1184,18 +1184,24 @@ class Tectonic < Roda
           # The value is what Sequel hands the eager load's own dataset through before it runs,
           # so this is `with_performed_on` applied to "the workouts these sets belong to".
           @sets = mine.eager(workout: lambda(&:with_performed_on)).all
-          @heaviest_by_day = heaviest_by_day(mine)
+          # The completed history every number below is read from, once (#596). The headline
+          # max, the estimate and the chart each used to read it for themselves -- five times a
+          # request, more for a lifter with several blocks behind them -- and each on its own
+          # idea of today: the first two on the server's, the chart on the lifter's. One read on
+          # the lifter's today is one set of rows and one date for all of them.
+          today = Clock.today(account_row[:time_zone])
+          lifted = @exercise.lifted_sets(@account_id, today)
           # Whatever a percentage of this movement would resolve against today, and which
           # of the two answers that is. Nil when there is neither, which is the state the
           # page has to say something about: it is the one that makes a percentage lift
           # refuse to generate.
-          @training_max = TrainingMax.for(account_id: @account_id, exercise: @exercise)
+          @training_max = TrainingMax.for(account_id: @account_id, exercise: @exercise, on: today, lifted:)
           # The best estimate there is, which is not always one that may set a max. Since the
           # chart was extended to ten reps a movement trained in eights has a number, and that
           # number is still too far from a single to become the denominator on its own -- so
           # the page reports it and says why it is not being used, rather than behaving as
           # though it did not exist.
-          @estimate = @exercise.estimated_reading(account_id: @account_id)
+          @estimate = @exercise.estimated_reading(account_id: @account_id, on: today, lifted:)
           # What this movement is aiming at, if anything (#308). Nil is a state the page has
           # to say something different about rather than a number to default.
           @goal = Goal.for(account_id: @account_id, exercise_id: @exercise.id)
@@ -1206,8 +1212,8 @@ class Tectonic < Roda
           # block opened at, what the sessions imply, the goal, and the even-pace line to it
           # (#434). Built here rather than in the template because it asks the database
           # several questions and a view that queries is a view nobody can read.
-          @progress = ProgressChart.of(account_id: @account_id, exercise: @exercise,
-                                       today: Clock.today(account_row[:time_zone]))
+          @progress = ProgressChart.of(account_id: @account_id, exercise: @exercise, today:, lifted:,
+                                       max: @training_max)
           # What the last edit did to sets already logged, read once and taken out of the
           # session (#392). Delete rather than read, so a reload does not re-announce an edit
           # made ten minutes ago -- the same shape program_action uses for its refusals.
@@ -3026,25 +3032,6 @@ class Tectonic < Roda
     return "#{set[:reps]} reps" if set[:is_per_side] || !loaded?(set[:weight])
 
     set[:reps].to_s
-  end
-
-  # The heaviest a lift was taken on each day it was recorded, oldest day first, which
-  # is the line the exercise page draws. Warmups are left out: on any normal day the top
-  # set is heavier than the ramp-up and the answer is the same either way, but a day of
-  # warmups alone should leave a gap in the line rather than a dip that reads as a light
-  # session. The maximum is taken in the database, since the alternative is dragging
-  # every set a lift has ever had into Ruby to fold it back down to one number a day.
-  # The date belongs to the workout rather than the set and is stored as a timestamp, so
-  # it is cast to a day the way the MCP tools cast it when they match one. Each day is
-  # labelled rather than dated: the chart plots these as categories, evenly spaced, so
-  # the label is the only calendar left on the axis and it carries the year, there being
-  # nothing else to tell one March from another.
-  def heaviest_by_day(sets)
-    recorded = Sequel.cast(Sequel[:workouts][:date], :date)
-    heaviest = Sequel.function(:max, Sequel[:sets][:weight])
-    sets.exclude(is_warmup: true).join(:workouts, id: :workout_id).group(recorded).order(recorded)
-        .select_map([Sequel.as(recorded, :day), Sequel.as(heaviest, :heaviest)])
-        .map { |day, weight| [day.strftime('%b %-d, %Y'), weight_label(weight)] }
   end
 
   # The window the volume page is asked for, or a block's worth. Only the offered

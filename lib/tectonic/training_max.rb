@@ -89,11 +89,14 @@ class Tectonic < Roda
     # derived max is a reading of history and therefore has a date: asked at the end of a
     # block it should answer what was true then. A stated one is a standing instruction with
     # no history to be as-of, so it is the answer whatever date is asked about.
-    def self.for(account_id:, exercise:, on: Date.today)
+    #
+    # `lifted` is the movement's history already in hand, for a caller that has read it once
+    # to ask several things of it -- see `Exercise#through`.
+    def self.for(account_id:, exercise:, on: Date.today, lifted: nil)
       stated = DB[:account_training_maxes].where(account_id:, exercise_id: exercise.id).first
       return from_row(stated) if stated
 
-      derived(account_id:, exercise:, on:)
+      derived(account_id:, exercise:, on:, lifted:)
     end
 
     # What this max was on a date that has passed, for reporting and for nothing else. #308.
@@ -116,11 +119,11 @@ class Tectonic < Roda
     # Falling through to the derived reading where no statement is old enough is not a gap,
     # it is the truth: before a lifter stated anything, the app was generating against the
     # estimate, so that is what that block opened at.
-    def self.as_of(account_id:, exercise:, on:)
+    def self.as_of(account_id:, exercise:, on:, lifted: nil)
       said = statement(account_id, exercise.id, on)
       return from_row(said) if said && said[:pounds]
 
-      derived(account_id:, exercise:, on:)
+      derived(account_id:, exercise:, on:, lifted:)
     end
 
     # The last thing said about this movement on or before a date, or nil if nothing had been
@@ -143,8 +146,8 @@ class Tectonic < Roda
     # So the estimate is made, reported and drawn, and it does not become the denominator by
     # itself. Stating a max still does exactly what it always did, and on such a movement it is
     # the thing the page asks for.
-    def self.derived(account_id:, exercise:, on:)
-      reading = exercise.confident_reading(account_id:, on:)
+    def self.derived(account_id:, exercise:, on:, lifted: nil)
+      reading = exercise.confident_reading(account_id:, on:, lifted:)
       reading && new(pounds: reading[:pounds], source: DERIVED, as_of: reading[:on])
     end
 

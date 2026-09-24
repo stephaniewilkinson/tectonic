@@ -225,8 +225,8 @@ class Tectonic < Roda
     # A separate method rather than a wider return from estimated_max, because three callers
     # want the number alone and changing what they get would be churn for nothing. Both read
     # the same rows through the same scope, so the two cannot disagree.
-    def estimated_reading(account_id:, on: Date.today)
-      OneRepMax.best_reading(lifted_sets(account_id, on))
+    def estimated_reading(account_id:, on: Date.today, lifted: nil)
+      OneRepMax.best_reading(through(lifted, on) || lifted_sets(account_id, on))
     end
 
     # The same, restricted to readings the chart is sure enough of to let stand on their own.
@@ -235,8 +235,17 @@ class Tectonic < Roda
     # above is the best estimate there is and gets drawn, this is the best one allowed to
     # become a number the app then prescribes against. A movement trained in eights has the
     # first and not the second.
-    def confident_reading(account_id:, on: Date.today)
-      OneRepMax.best_confident_reading(lifted_sets(account_id, on))
+    def confident_reading(account_id:, on: Date.today, lifted: nil)
+      OneRepMax.best_confident_reading(through(lifted, on) || lifted_sets(account_id, on))
+    end
+
+    # `lifted` is `lifted_sets` already read up to some later date, for a caller asking several
+    # questions of one history -- the exercise page asks five, and until #596 each went and
+    # read the whole of it again. The rows on or before `on` are the rows `lifted_sets` would
+    # have returned for it: `workouts.date` is a timestamp without a zone, so `to_date` here
+    # and `date < on + 1` there draw the same line. Nil where there is nothing in hand.
+    def through(lifted, on)
+      lifted&.select { |row| row[:date].to_date <= on }
     end
 
     # What recent training implies, as against what has ever been demonstrated. #307, and
@@ -318,12 +327,20 @@ class Tectonic < Roda
     # `since` is the lower bound #307 needed and this never had: every caller before it
     # wanted everything up to a date, which is what a lifetime best means. Absent, it still
     # does, so the three existing callers are untouched.
+    #
+    # Ordered by day and then by id, which the progress chart needs and nothing else minds:
+    # it groups these by day, `group_by` keeps first-seen order, and a SELECT with no ORDER BY
+    # comes back in whatever order the table's physical layout suggests. That is what the
+    # chart's own copy of this query found out in #593, before #596 folded it into this one.
     def lifted_sets(account_id, on, since: nil)
       mine = Workout.where(account_id:).where { date < (on + 1) }
       mine = mine.where { date >= since } if since
       WorkoutSet.where(exercise_id: id, workout_id: mine.select(:id), is_completed: true)
-                .join(:workouts, id: :workout_id).select(*READ_COLUMNS).all
+                .join(:workouts, id: :workout_id).select(*READ_COLUMNS)
+                .order(*IN_ORDER).all
     end
+
+    IN_ORDER = [Sequel[:workouts][:date], Sequel[:sets][:id]].freeze
 
     # Qualified because `date` is on workouts while the rest are on sets, and unqualified it
     # is ambiguous the moment the two tables meet.
@@ -334,7 +351,10 @@ class Tectonic < Roda
     #
     # Selecting it changes nothing about what these rows mean. `lifted_sets` filters on
     # `is_completed` and has never filtered on this, so every caller gets the same rows it
-    # always got with one more column on them; the readers take what they need by key.
+    # always got with one more column on them; the readers take what they need by key. It is
+    # also what let the progress chart read through here rather than keep a second copy of
+    # this query that differed only by `is_warmup` (#596) -- the heaviest-set line and the
+    # estimate both have to leave warmups out.
     READ_COLUMNS = [
       Sequel[:sets][:weight], Sequel[:sets][:reps], Sequel[:sets][:rpe],
       Sequel[:sets][:planned_rpe], Sequel[:sets][:is_warmup], Sequel[:workouts][:date]
