@@ -50,15 +50,20 @@ def a_session_with_one_set_at(weight)
   visit '/workouts/new'
   click_on 'Save'
   workout = current_path
+  plan_a_set(workout, weight)
+  visit "#{workout}session"
+end
+
+# One set of Back Squat written into a workout, planned to be lifted at the rack. Unticked
+# because the form ticks a set on today's session as already done since #630, which is right
+# for logging after the fact and wrong for this.
+def plan_a_set(workout, weight)
   visit "#{workout}sets/new"
   pick_the_movement('Back Squat')
   fill_in 'weight', with: weight.to_s
   fill_in 'reps', with: '5'
-  # Planned, to be lifted at the rack: the form ticks a set on today's session as already done
-  # since #630, which is right for logging after the fact and wrong for this.
   uncheck 'Completed?'
   click_on 'Save'
-  visit "#{workout}session"
 end
 
 # The "Lifted something else" disclosure, opened and saved: a correction, and since #215
