@@ -26,7 +26,8 @@ describe 'editing a set' do
     fill_in 'weight', with: '135'
     fill_in 'reps', with: '5'
     click_on 'Save'
-    visit "#{current_path}edit"
+    # Saving comes back to the form since #631, so the set is opened by its id.
+    visit "#{workout}sets/#{DB[:sets].order(:id).last[:id]}/edit"
     fill_in 'Weight', with: '185'
     click_on 'Save'
     assert_includes page.body, '185'

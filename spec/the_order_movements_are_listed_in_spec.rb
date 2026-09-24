@@ -45,7 +45,9 @@ module MovementOrder
     group.scan(/<option[^>]*>([^<]*)</).flatten.map(&:strip)
   end
 
-  def all_options(body) = body.scan(/<option[^>]*>([^<]*)</).flatten.map(&:strip)
+  # Movements only: since #631 a form with nothing to start on opens with a "Choose a movement"
+  # option whose value is empty, which is a prompt rather than a movement in the order.
+  def all_options(body) = body.scan(/<option value="\d+"[^>]*>([^<]*)</).flatten.map(&:strip)
 
   # The movements page, which is the other screen that lists every one of them.
   def index_names

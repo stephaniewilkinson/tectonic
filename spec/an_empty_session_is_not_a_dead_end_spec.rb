@@ -179,13 +179,12 @@ describe 'saving a set that was started anywhere else' do
                                           name: "Front Squat #{SecureRandom.hex(4)}")
   end
 
-  # The record page and the set list are unchanged by #578. The set they write is still
-  # confirmed by landing on it, which is the right answer for a form opened one tap away from
-  # the record and the wrong one for a lifter standing mid-session.
-  it 'still lands on the set' do
+  # Opened anywhere but the session screen, the form comes back to itself since #631 -- it
+  # used to land on the set's own read-only page -- so the next set is one Save away.
+  it 'comes back to the form for the next set' do
     write_a_set
 
-    assert_match %r{/workouts/#{@workout.id}/sets/\d+/}, landed_on
+    assert_equal "/workouts/#{@workout.id}/sets/new", URI(landed_on).path
   end
 
   # return_to is a fixed token rather than a path, so nothing a request says can decide where
@@ -193,7 +192,7 @@ describe 'saving a set that was started anywhere else' do
   it 'will not be talked into going somewhere else' do
     write_a_set('return_to' => 'https://example.com/')
 
-    assert_match %r{/workouts/#{@workout.id}/sets/\d+/}, landed_on
+    assert_equal "/workouts/#{@workout.id}/sets/new", URI(landed_on).path
   end
 end
 
