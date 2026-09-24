@@ -6,7 +6,7 @@ require_relative '../lib/tectonic/plates'
 describe Tectonic::Plates do
   it 'loads every weight from the worked squat session' do
     expected = {
-      45 => '—',
+      45 => 'bar only',
       95 => '1×25',
       115 => '1×25 1×10',
       135 => '1×45',

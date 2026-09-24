@@ -2815,16 +2815,26 @@ class Tectonic < Roda
   # weight under the bar, which no plates can reach downwards, says that in words.
   #
   # The text is plain on purpose: no markup and no entities, so the caller can escape it.
+  #
+  # "each side" after a breakdown, since #638: "2×45" on a 225 set is two 45s on each side,
+  # and read as two in total it is 135 -- which a lifter at their first session, phone in one
+  # hand, had nothing but arithmetic to settle. Not "per side", which this screen already spends
+  # on a rep count taken one limb at a time (#502); two meanings for one phrase a line apart is
+  # the confusion this was meant to end.
   def plate_label(set)
     return '' unless set[:is_barbell]
 
     breakdown = equipment.per_side(set[:weight])
-    return Plates.label(breakdown) if breakdown
+    return each_side(breakdown) if breakdown
 
     weight, nearest = equipment.closest(set[:weight])
-    return "closest #{weight}: #{Plates.label(nearest)}" if nearest
+    return "closest #{weight}: #{each_side(nearest)}" if nearest
 
     "lighter than your #{weight_label(equipment.bar_weight)} lb bar"
+  end
+
+  def each_side(breakdown)
+    breakdown.empty? ? Plates.label(breakdown) : "#{Plates.label(breakdown)} each side"
   end
 
   # What the number on a dumbbell row is the weight *of*. #502.
