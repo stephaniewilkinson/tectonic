@@ -26,8 +26,14 @@ module ScaleReadings
   # This time of day, n days ago. Anchored on now rather than on a fixed date because all
   # three tools default to a window ending today, and a fixture pinned to 2027 would fall
   # outside it the moment a default was exercised.
+  #
+  # One now per spec, not one per reading. Asked afresh each call, the clock moves between
+  # them, and after rounding two readings a week apart could come out a second short of a week
+  # -- inside a seven-day rolling mean that is meant to stop just before it. The trend spec
+  # then read a mean over eight readings instead of seven and failed, on CI, now and then.
   def morning(days_ago)
-    (Time.now - (days_ago * 86_400)).round
+    @now ||= Time.now.round
+    @now - (days_ago * 86_400)
   end
 
   # One row. `external_id` is unique per insert because 041 puts a unique index on
