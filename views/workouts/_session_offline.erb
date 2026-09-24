@@ -1,0 +1,19 @@
+<%# Keeping this screen for a reload with no signal. #543, and the whole of what it does and
+    refuses to do is in assets/sw.js.
+
+    Registered from the session screen and nowhere else, because this is the one page it is for.
+    Once registered it also watches the way out: reaching sign-in or signing out drops the copy,
+    so a phone passed to somebody else does not carry this lifter's session in it.
+
+    Without service workers -- an old browser, a private window that refuses them -- nothing here
+    runs, and a reload with no signal is the browser's offline page, as it was. %>
+<script>
+  (function () {
+    if (!('serviceWorker' in navigator)) { return; }
+    navigator.serviceWorker.register('/sw.js').then(function () {
+      return navigator.serviceWorker.ready;
+    }).then(function (registration) {
+      if (registration.active) { registration.active.postMessage({ keep: location.href }); }
+    }).catch(function () { /* a copy is a convenience; failing to keep one is not an error */ });
+  })();
+</script>
