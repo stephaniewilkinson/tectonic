@@ -196,13 +196,6 @@ describe 'a walk Withings stopped answering part way' do
     assert_equal Date.today.year, @report[:stopped_at]
   end
 
-  # The watermark means "everything older than this has been read". A walk that was throttled
-  # in its first year cannot say that, and stamping it would mean the years it never reached
-  # are never read again.
-  it 'leaves the backfill watermark unstamped' do
-    assert_nil connection(@account_id)[:workouts_backfilled_at]
-  end
-
   # And writes no year down either. A walk refused in the year it started has read nothing,
   # and "read back to this year" is a different claim from "read nothing at all".
   it 'records no year as read, having read none' do
@@ -223,8 +216,10 @@ describe 'a walk that finished' do
     backfill(@account_id, answering(activity(starts: @at)))
   end
 
-  it 'stamps a watermark of its own' do
-    refute_nil connection(@account_id)[:workouts_backfilled_at]
+  # Having read everything back to the first session, the next run starts at this year rather
+  # than re-reading all of it. #600: off the read range now, which reaches the bottom.
+  it 'starts the next run at the year it got to' do
+    assert_equal years_from(Date.today.year), asked_for(@account_id)
   end
 
   # `synced_at` is the measurement poll's resume cursor. Stamping it from a workout fetch
@@ -293,13 +288,6 @@ describe 'a walk the operator narrowed to the recent years' do
 
   before { narrowly_backfilled }
 
-  # The watermark's claim is "everything older than this instant has been read". A walk that
-  # started at last year and never went near this lifter's 2022 cannot make that claim, and
-  # stamping it anyway is what makes the loss permanent rather than merely incomplete.
-  it 'does not claim the years behind it have been read' do
-    assert_nil connection(@account_id)[:workouts_backfilled_at]
-  end
-
   # The failure the issue is actually about. A narrowed run must leave the default run that
   # follows it walking every year back to the earliest stamped set, because those years have
   # never been read by anybody and nothing else is ever going to read them.
@@ -352,12 +340,7 @@ describe 'a walk narrowed to a year before this lifter had started training' do
 
   # SINCE is not evidence of a partial walk -- it is only evidence that the operator chose
   # the bound. This one chose a bound below the floor, so the walk read every year that could
-  # hold anything matchable, and refusing to stamp it would make the task re-read a whole
-  # history on every subsequent run for no reason at all.
-  it 'stamps the watermark, because it did read everything there was to read' do
-    refute_nil connection(@account_id)[:workouts_backfilled_at]
-  end
-
+  # hold anything matchable, and the next run has no reason to re-read any of it.
   it 'starts the next run at the year it got to' do
     assert_equal years_from(Date.today.year), asked_for(@account_id)
   end
@@ -381,8 +364,9 @@ describe 'a walk Withings stopped answering after the first year or two' do
     assert_equal Date.today.year - 2, @report[:stopped_at]
   end
 
-  it 'leaves the watermark unstamped' do
-    assert_nil connection(@account_id)[:workouts_backfilled_at]
+  # The years below the refusal were never read, so the next run has to go back for them.
+  it 'leaves the next run walking back to the earliest stamped set' do
+    assert_equal years_from(@earliest), asked_for(@account_id)
   end
 
   # The years above the refusal did answer and were stored, and saying so costs nothing and
@@ -585,7 +569,6 @@ describe 'a dry run' do
 
   it 'writes nothing at all' do
     assert_empty DB[:withings_workouts].all
-    assert_nil connection(@account_id)[:workouts_backfilled_at]
     assert_nil read_back_to(@account_id)
   end
 
@@ -729,6 +712,29 @@ describe 'answering a proposal from the list rather than from a record' do
          { '_csrf' => token, 'activity' => 'w-1', 'back' => 'https://elsewhere.example' }
 
     assert_equal "/workouts/#{@workout_id}", last_response.headers['Location']
+  end
+end
+
+# #600. The range the import button writes is the same range a walk writes, so a lifter who has
+# pressed Import all the way down to their first session has read their history -- and the task
+# should know it. It used to ignore presses entirely, because the year it resumed from came off
+# an instant only a walk could stamp, and so re-read every year the button had already fetched.
+describe 'a history the import button has already read to the bottom' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include Backfilling
+
+  before do
+    @account_id = login
+    connect(@account_id)
+    @earliest = Date.today.year - 3
+    @workout_id = session_from(@earliest)
+    DB[:account_withings].where(account_id: @account_id)
+                         .update(workouts_imported_year: @earliest, workouts_imported_through_year: Date.today.year - 1)
+  end
+
+  it 'starts the next run at the newest year it read' do
+    assert_equal years_from(Date.today.year - 1), asked_for(@account_id)
   end
 end
 

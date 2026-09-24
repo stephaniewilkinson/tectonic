@@ -15,8 +15,12 @@ require_relative 'spec_helper'
 # only behind use_oauth_access_type?, which this app has never turned on -- #602, and the
 # migration says what turning it on would need. withings_workouts.effective_seconds was for a
 # Withings field that does not exist -- #607.
+#
+# 055 dropped account_withings.workouts_backfilled_at, which was live but said nothing the read
+# range beside it did not -- #600.
 GONE_COLUMNS = { workouts: :photo, accounts: :profile_picture,
-                 oauth_grants: :access_type, withings_workouts: :effective_seconds }.freeze
+                 oauth_grants: :access_type, withings_workouts: :effective_seconds,
+                 account_withings: :workouts_backfilled_at }.freeze
 
 describe 'the columns a feature was never built for' do
   it 'are no longer in the schema' do

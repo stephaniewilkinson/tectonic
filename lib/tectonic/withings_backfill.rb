@@ -142,21 +142,6 @@ class Tectonic < Roda
     # again. So a nil never widens the range of years recorded as read, and never renders as a
     # total.
     #
-    # ## What it does not do: stamp `workouts_backfilled_at`
-    #
-    # When this was written the reason was #554 -- `attempt` stamped that instant whenever the
-    # years it *chose* to walk all answered, so a press routed through `run(since:)` would
-    # have stamped it after one year and every later run would have believed the decade behind
-    # it was read. That is fixed: only a walk that reached the earliest stamped set stamps it
-    # now, and this method could safely call `run` without lying about anything.
-    #
-    # It still does not stamp, for a reason of its own that outlives #554. **A course of
-    # presses can span calendar years.** Each press reads one year, so a lifter who started
-    # pressing in 2023 and finished in 2026 has read a stretch of years and not a history, and
-    # an instant stamped at the end of that course would claim everything older than 2026. What
-    # a press can honestly write is the year it read, which is what `record_read` writes into
-    # the two ends of `workouts_imported_year` and `workouts_imported_through_year`.
-    #
     # It also still calls `fetch_year`, `store_all` and `pair` directly rather than routing
     # through `run(since:)`, because those three are the whole of the walk and a second
     # expression of the logic around them is how the `more` bug in #553 came about.
@@ -439,61 +424,38 @@ class Tectonic < Roda
     # were never read and no later run would ever have read them. The task reported a
     # completed walk, because from its own point of view it had completed one.
     #
-    # So the walk now writes down **what it actually read** rather than the fact that it
-    # finished, and the things it can honestly say about itself turn out to be three different
-    # facts about one claim:
+    # So the walk now writes down **what it actually read**, as the two ends of one range:
     #
     #   `workouts_imported_year`         -- how far back this account's history has been read.
     #   `workouts_imported_through_year` -- how far forward.
-    #   `workouts_backfilled_at`         -- when a read last reached the bottom of it.
     #
-    # The middle one arrived with #566 and 049 argues it; the short version is that "read back
-    # to 2019" was being read as "and everything above 2019 too", which is true on the day a
-    # walk finishes and false a year later. The walk always tops out at this year -- see
+    # The second arrived with #566 and 049 argues it; the short version is that "read back to
+    # 2019" was being read as "and everything above 2019 too", which is true on the day a walk
+    # finishes and false a year later. The walk always tops out at this year -- see
     # `years_to_walk` -- so the top it records is `years.first`, and that is a fact about the
     # walk rather than a guess: it asked for this year and this year answered.
     #
-    # ## Why that is more than one column, having looked hard at making it one
+    # There used to be a third, `workouts_backfilled_at`: the instant a walk last reached the
+    # earliest stamped set, kept because "a year cannot say when it was written". Only its year
+    # was ever read, and only to raise the next walk's floor -- and a range whose bottom reaches
+    # the earliest stamped set says the same thing better. Its top is the newest year read, so
+    # a walk resuming there re-reads that year and everything after it, which is exactly what
+    # the instant's year bought, and it also knows about a course of presses on the settings
+    # page, which never stamped the instant. 055 dropped it (#600). `resumed_year` holds the
+    # rule, and the bottom-reaches-the-floor guard in it is what #554 is about: a range that
+    # stops short of the first session says nothing about the years under it.
     #
-    # 045 added the year cursor for the import button and the obvious tidy answer to #554 is
-    # to delete the instant and keep it: one column, one meaning, nothing to confuse. It does
-    # not work, and the reason is worth writing down so nobody spends the afternoon on it
-    # again. A year on its own cannot say **when** it was written, and the resume needs that:
-    # a walk that read 2019 through 2023 in 2023 has said nothing whatever about 2024 and
-    # 2025, so a task resuming from the year alone must either re-walk the whole history every
-    # single run -- a request per year, forever, for a saving the instant used to buy -- or
-    # skip years nobody has read, which is the bug it was sent to fix. An instant on its own
-    # cannot say **how far back**, which is #554 exactly. The two facts are genuinely two.
-    #
-    # #566 is the sentence above read carefully. "A walk that read 2019 through 2023 in 2023
-    # has said nothing whatever about 2024 and 2025" is true of the *button* as well, and the
-    # button had no instant to fall back on -- a course of presses never stamps one. So the
-    # third part: the top of what has been read, which neither a bottom nor a date can stand in
-    # for. 049 works through the two derivations that look like they could and cannot.
-    #
-    # What none of them are is separate watermarks for separate jobs. Both routes into this
-    # module read years and both write the same two ends, so a walk from the terminal and a
-    # press on the settings page agree about which years have been read instead of each keeping
-    # a private opinion of it -- a lifter who ran the task does not then get asked to press
-    # Import for the years it already fetched, and a lifter who pressed Import is not told the
-    # task has nothing left to do.
-    #
-    # ## Why the read range cannot raise the task's floor, though the instant can
-    #
-    # The range is what *has* been read and says nothing at all about any of it being fresh.
-    # Using its top to raise the walk's floor would be the same mistake in a third direction: a
-    # range of 2019-2023 written in 2023 would have a 2026 run start at 2023 and stop there,
-    # which is fine, and a range of 2019-2019 written by one press would have it start at 2019
-    # and re-read a decade every run. The instant is the only thing here that carries a date,
-    # so it is the only thing that can say a *recent* year has been covered -- and it can only
-    # say that because it is stamped by a walk that reached the bottom, which is #554's change.
+    # Both routes into this module read years and both write the same two ends, so a walk from
+    # the terminal and a press on the settings page agree about which years have been read
+    # instead of each keeping a private opinion of it -- a lifter who ran the task does not
+    # then get asked to press Import for the years it already fetched, and a lifter who pressed
+    # Import to the bottom does not have the task walk it all again.
     def settle(account_id, years, walked)
       floor = first_session_year(account_id)
       lowest = lowest_read(years, walked)
       return { read_back_to: nil, earliest: floor } unless lowest
 
       record_read(account_id, lowest, years.first)
-      stamp(account_id) if floor && lowest <= floor
       { read_back_to: lowest, earliest: floor }
     end
 
@@ -551,16 +513,11 @@ class Tectonic < Roda
 
     # Which years to ask about, newest first, or nil where there is nothing to match against.
     #
-    # A previous walk that **reached the earliest stamped set** moves the floor up to the year
-    # it ran in: everything older than such a walk has already been read and stored, and
-    # re-reading a decade to write the same rows again is a request a year for nothing. Its
-    # own year and not the year after, because the walk happened part way through it.
-    #
-    # It is `workouts_backfilled_at` and not the read range that raises this floor, and they
-    # are not interchangeable here: the range says which years have been read and carries no
-    # date, so it cannot say anything about any of them still being current -- and its top is
-    # written by a single press as readily as by a whole walk. See `settle`, where the
-    # distinction is argued at length and where #554 and #566 both came from.
+    # A history already read **down to the earliest stamped set** moves the floor up to the
+    # newest year that read reached: everything below it has been read and stored, and
+    # re-reading a decade to write the same rows again is a request a year for nothing. That
+    # year itself and not the one after, because the read that reached it may have happened
+    # part way through it. See `resumed_year`.
     #
     # SINCE overrides both bounds rather than being folded into them with `max`. An operator
     # naming a year is making a claim this module cannot check -- that the interesting
@@ -571,7 +528,7 @@ class Tectonic < Roda
       return nil unless first
       return (since..Date.today.year).to_a.reverse if since
 
-      floor = [first, resumed_year(account_id)].compact.max
+      floor = [first, resumed_year(account_id, first)].compact.max
       (floor..Date.today.year).to_a.reverse
     end
 
@@ -586,23 +543,22 @@ class Tectonic < Roda
                .min(Sequel[:sets][:completed_at])&.year
     end
 
-    def resumed_year(account_id) = WithingsConnection.of(account_id)&.fetch(:workouts_backfilled_at, nil)&.year
-
-    # The instant a read last reached the bottom of this lifter's history, which is the whole
-    # of what "everything older than this has been read" is entitled to mean.
+    # Where a walk can start, having been told where this lifter's history begins: the top of
+    # what has been read, but only where what has been read reaches all the way down to it.
+    # Nil otherwise, which walks from the bottom.
     #
-    # Stamped by `settle` and nowhere else, and only where the oldest year the walk read sits
-    # at or below the year of the earliest stamped set. A SINCE below that floor still stamps
-    # -- an operator naming 2015 for a lifter who started in 2019 has read every year that
-    # could hold a matchable session, and refusing them the stamp would make every later run
-    # re-read the same decade for nothing. A SINCE above it never stamps, which is #554.
+    # The guard is #554. A range from a walk narrowed to the recent years, or from a few presses
+    # of the import button, stops short of the earliest stamped set and says nothing about the
+    # years below it -- resuming from its top would skip them for good. A range that reaches
+    # the bottom has read every year from there to its top, by whichever route, so starting at
+    # its top re-reads that year (it may have been read part way through) and skips nothing.
     #
-    # And **not `synced_at`**, which belongs to the measurement poll. Stamping that one from a
-    # workout fetch would tell the poll it had already read a window of bodyweights nobody has
-    # fetched, and those readings would never arrive -- silently, with nothing raised and a
-    # fortnight simply missing from a chart.
-    def stamp(account_id)
-      DB[:account_withings].where(account_id:).update(workouts_backfilled_at: Time.now)
+    # And the top rather than any date, because the top is already the newest year read: a
+    # range of 2019-2023 read in 2023 has a 2026 run start at 2023, which is right, since
+    # 2024 and 2025 were never asked about.
+    def resumed_year(account_id, floor)
+      read = imported_range(account_id)
+      read && read.first <= floor ? read.last : nil
     end
 
     # Offering what was stored to the sessions that have nothing, one session at a time.
