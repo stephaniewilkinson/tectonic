@@ -49,11 +49,12 @@ class Tectonic < Roda
     #
     # A handful was the claim and it had stopped being true: #595 measured 25 queries on a
     # visit that wrote nothing, on the front page and on every login. Each running block's
-    # weeks and days are loaded once here now rather than asked after a row at a time; a block
-    # that has not started is not read at all; and each week asks once which of its days
-    # already have a session. What it reads is still the sessions themselves -- nothing here
-    # remembers having generated anything, because the workouts table is the only record of
-    # that and a second one would be something to disagree with.
+    # weeks, days and lifts are loaded once here now rather than asked after a row at a time
+    # (the lifts because an empty day gets no session, #584); a block that has not started is
+    # not read at all; and each week asks once which of its days already have a session. What
+    # it reads is still the sessions themselves -- nothing here remembers having generated
+    # anything, because the workouts table is the only record of that and a second one would
+    # be something to disagree with.
     #
     # Nothing here may raise into a request. Somebody arriving has come to look at their
     # training, and a block the generator refuses -- an unloadable percentage, a movement that
@@ -61,7 +62,8 @@ class Tectonic < Roda
     # reported and the page renders whatever does exist, which is the same trade config.ru
     # already makes for error reporting itself.
     def ensure_ahead(account_id, today = Date.today)
-      Program.where(account_id:).where { start_date <= today }.eager(program_weeks: :program_days)
+      Program.where(account_id:).where { start_date <= today }
+             .eager(program_weeks: { program_days: :program_lifts })
              .all.each { |program| fill(program, today) }
       nil
     rescue StandardError => e

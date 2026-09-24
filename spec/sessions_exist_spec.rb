@@ -219,3 +219,32 @@ describe 'a visit when every session is already written' do
   end
 end
 
+# #584. A program day with nothing written on it got an empty session every week, and the
+# calendar drew each one as missed once its day had passed -- a session nobody could have done,
+# counted against the lifter. An empty day is a rest day now.
+describe 'a program day with no lifts on it' do
+  include SessionsExist
+
+  before do
+    @account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
+    @monday = Date.today - ((Date.today.wday - 1) % 7)
+    @program = block(@account_id, start_date: @monday)
+    @program.program_weeks.each { |week| Tectonic::ProgramDay.create(program_week_id: week.id, weekday: 3) }
+  end
+
+  it 'gets no session' do
+    Tectonic::ProgramSchedule.ensure_ahead(@account_id, @monday)
+
+    assert_equal [@monday, @monday + 7], dates(@account_id)
+  end
+
+  # A session somebody already has for such a day is theirs, and may have lifts added by hand.
+  it 'leaves a session that already exists for it alone' do
+    empty_day = Tectonic::ProgramDay.first(weekday: 3, program_week_id: @program.program_weeks.first.id)
+    Tectonic::Workout.create(account_id: @account_id, date: @monday + 2, program_day_id: empty_day.id)
+    Tectonic::ProgramSchedule.ensure_ahead(@account_id, @monday)
+
+    assert_equal 1, Tectonic::Workout.where(program_day_id: empty_day.id).count
+  end
+end
+
