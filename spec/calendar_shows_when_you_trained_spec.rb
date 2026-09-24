@@ -158,3 +158,56 @@ describe 'a session that ran past midnight' do
   end
 end
 
+# The same session across a month rather than a day, which #599 had to get right. The grid now
+# fetches any session with a set completed inside it, which is looser than the first completion
+# and draws on the first completion still -- so a session begun on the 31st and finished on the
+# 1st is fetched into both months and must be drawn in one. November 2026 begins on a Sunday,
+# so its grid does not reach back to the 31st, and the only day it could wrongly land on is
+# the 1st.
+describe 'a session that ran past midnight at the end of a month' do
+  include CalendarTruth
+
+  before do
+    @account_id = an_account
+    @workout = Tectonic::Workout.create(account_id: @account_id, date: Date.new(2026, 10, 31))
+    exercise_id = DB[:exercises].insert(name: "Squat #{SecureRandom.hex(4)}", account_id: @account_id)
+    [Time.new(2026, 10, 31, 23, 40, 0), Time.new(2026, 11, 1, 0, 30, 0)].each do |completed_at|
+      DB[:sets].insert(workout_id: @workout.id, exercise_id:, weight: 155, reps: 5, is_warmup: false,
+                       is_completed: true, completed_at:)
+    end
+  end
+
+  it 'is drawn in the month it started' do
+    october = days(@account_id, Date.new(2026, 10, 1), Date.new(2026, 11, 15))
+
+    assert_equal [@workout.id], october[Date.new(2026, 10, 31)].map(&:id)
+  end
+
+  it 'is not drawn in the month it finished' do
+    november = days(@account_id, Date.new(2026, 11, 1), Date.new(2026, 11, 15))
+
+    assert(november.values.all?(&:empty?), 'the session was drawn in November as well')
+  end
+end
+
+# 054's index is only used while its predicate covers what `Workout.completed_between` asks,
+# and nothing else fails if the two drift apart -- the calendar reads the same rows either way,
+# just by reading all of them. Read out of the catalogue for the same reason
+# finding_the_questions_waiting_spec reads 044's: a planner on a fixture this size scans
+# whatever indexes exist, so a plan would assert the size of the fixture.
+describe 'the index a month of the calendar is found through' do
+  it 'holds completed sets by their day' do
+    definition = DB[:pg_indexes].where(indexname: 'sets_completed_on').get(:indexdef).to_s
+
+    assert_includes definition, '((completed_at)::date), workout_id'
+    assert_includes definition, 'WHERE (completed_at IS NOT NULL)'
+  end
+
+  it 'is what the lookup asks for' do
+    sql = Tectonic::Workout.completed_between(Date.new(2026, 9, 1), Date.new(2026, 9, 30)).sql
+
+    assert_includes sql, '"completed_at" IS NOT NULL'
+    assert_includes sql, 'CAST("completed_at" AS date)'
+  end
+end
+
