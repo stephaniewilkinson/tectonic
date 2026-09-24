@@ -274,8 +274,13 @@ class Tectonic < Roda
     #
     # `sets` rides along with each reading because a number off one set and a number off forty
     # are not the same claim, and the caller cannot tell them apart from the pounds alone.
-    def recent_readings(account_id:, windows:, on: Date.today)
-      rows = lifted_sets(account_id, on, since: on - (windows.max * 7))
+    #
+    # `lifted` is the whole history already in hand, as `through` takes it; the widest window
+    # is cut from it rather than read again.
+    def recent_readings(account_id:, windows:, on: Date.today, lifted: nil)
+      since = on - (windows.max * 7)
+      rows = through(lifted, on)&.select { |row| row[:date].to_date >= since } ||
+             lifted_sets(account_id, on, since:)
       windows.map { |weeks| window_reading(rows, weeks, on) }
     end
 

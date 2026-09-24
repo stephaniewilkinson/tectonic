@@ -39,3 +39,28 @@ describe "a movement's page reads its history once" do
   end
 end
 
+# The same read on the tool an assistant reaches for most. It read the history for the
+# estimate, for the resolved max twice -- once for the payload and once for the sentence -- and
+# again for the recent windows. #590's speed-up pass.
+describe 'exercise_history reads the history once' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include QueryCount
+
+  it 'however many figures it reports from it' do
+    account_id = login
+    _sessions, movements = training(account_id, workouts: 6, lifts: 2)
+    token = mint(scopes: ['read'], account_id:).raw
+    name = DB[:exercises].where(id: movements.first).get(:name)
+    body = { jsonrpc: '2.0', id: 1, method: 'tools/call',
+             params: { name: 'exercise_history', arguments: { exercise: name } } }.to_json
+    tally = HistoryReads.new
+    DB.loggers << tally
+    response = mcp.post('http://localhost/mcp', body, mcp_headers(token))
+    DB.loggers.delete(tally)
+
+    answered!('exercise_history', response)
+    assert_equal 1, tally.queries
+  end
+end
+
