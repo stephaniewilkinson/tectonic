@@ -461,6 +461,14 @@ describe 'the metric names a reader is offered' do
     assert_includes Tectonic::BodyReadings::KNOWN, 'standing_hr'
     assert_includes Tectonic::BodyReadings::KNOWN, Tectonic::WithingsMeasures::METRICS.fetch(11).first
   end
+
+  # #585. By hand the list had drifted on four names of the eight the measurement read writes;
+  # it is derived now, and this is the property the derivation is for.
+  it 'offers every name the measurement read can write' do
+    Tectonic::WithingsMeasures::METRICS.each_value do |(metric, _unit)|
+      assert_includes Tectonic::BodyReadings::KNOWN, metric
+    end
+  end
 end
 
 # The join #533 exists to prevent the absence of: a fetch wired to nothing is a table that
