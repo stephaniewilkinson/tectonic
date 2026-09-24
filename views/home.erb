@@ -3,7 +3,11 @@
     <h1 class="text-3xl font-semibold text-gray-900">Welcome to Tectonic Plates</h1>
     <div class="flex gap-2">
       <a href="/workouts/new" class="<%= button_style %> bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Start a new workout</a>
-      <a href="/workouts/" class="<%= button_style %> bg-sky-800 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-900">Continue a workout</a>
+      <%# Not on an account with no sessions at all, where it led to an empty list with
+          nothing in it to continue. #636. %>
+      <%- if @anything %>
+        <a href="/workouts/" class="<%= button_style %> bg-sky-800 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-900">Continue a workout</a>
+      <%- end %>
     </div>
   </div>
 
@@ -23,7 +27,16 @@
     </a>
   </div>
 
-  <%- if @tally.empty? %>
+  <%# A quiet month and an account with nothing in it yet are different news. The second is
+      somebody who closed Start here without acting and came back to a blank grid (#636), and
+      the useful thing to tell them is where the two ways in are. %>
+  <%- if @tally.empty? && !@anything %>
+    <p class="mt-2 text-center text-sm text-gray-500">
+      Nothing logged or planned yet.
+      <a href="/start" class="font-medium text-lime-700 hover:text-lime-800">Start here</a>
+      explains the two ways in.
+    </p>
+  <%- elsif @tally.empty? %>
     <p class="mt-2 text-center text-sm text-gray-500">Nothing trained or planned this month.</p>
   <%- else %>
     <p class="mt-2 text-center text-sm text-gray-500">

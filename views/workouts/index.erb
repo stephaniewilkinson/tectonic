@@ -63,5 +63,16 @@
     <%== render('workouts/_table', locals: { workouts: @upcoming }) %>
     <h2 class="mt-10 text-sm font-semibold uppercase tracking-wide text-gray-500">History</h2>
   <%- end %>
-  <%== render('workouts/_table', locals: { workouts: @workouts }) %>
+  <%# A header row with nothing under it said nothing to a new account, and this is where
+      several first clicks land (#636). A sentence instead, with the two ways a session gets
+      here. %>
+  <%- if @upcoming.empty? && @workouts.empty? %>
+    <p class="mt-8 text-sm text-gray-600">
+      No sessions yet. Your assistant can plan a block and write them for you, or you can
+      <a href="/workouts/new" class="font-medium text-lime-700 hover:text-lime-800">log one you have done</a>.
+      <a href="/start" class="font-medium text-lime-700 hover:text-lime-800">Start here</a> explains both.
+    </p>
+  <%- else %>
+    <%== render('workouts/_table', locals: { workouts: @workouts }) %>
+  <%- end %>
 </div>
