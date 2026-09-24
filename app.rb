@@ -449,8 +449,8 @@ class Tectonic < Roda
       remember_login
       scope.ask_the_browser_for_the_zone(account_id)
     end
-    # Signing in lands on whatever there is to do rather than on the calendar; where that
-    # is is decided in login_destination below.
+    # Signing in lands on whatever there is to do -- today's session if there is one, the
+    # calendar if not; login_destination below decides.
     #
     # Creating an account is set separately because Rodauth keeps a second default for it
     # and never consults this one. A brand new account is exactly the case the first-run
@@ -1932,8 +1932,16 @@ class Tectonic < Roda
   end
 
   # Where a login lands, in the order a lifter would ask for it: a session written for today
-  # and not yet finished, failing that the record of the one that was, failing that the form
-  # for writing one, failing that the first-run page.
+  # and not yet finished, failing that the record of the one that was, failing that the
+  # calendar, failing that the first-run page.
+  #
+  # The calendar on a day with nothing written, since #635. It was the new-workout form, which
+  # is #92's rule ("if you have done a workout, show you the form for a new one") from before
+  # sessions were written ahead. Now an assistant writes a block and the week's sessions exist
+  # before anybody lifts, so on a rest day the useful answer is the week -- what was trained,
+  # what is coming and when -- and a blank form was a question nobody had asked. Logging an
+  # unplanned session is still one tap from the calendar. An account with nothing at all still
+  # lands on /start, which is what it is for.
   #
   # A session still to do opens on the gym floor screen rather than on the record page.
   # Someone opening the app on a day they have training written is about to lift, and the
@@ -2037,7 +2045,7 @@ class Tectonic < Roda
     mine = Workout.where(account_id:)
     today = mine.where(Sequel.cast(:date, :date) => on).order(:id).all
     return todays_screen(today) if today.any?
-    return '/workouts/new' unless mine.empty?
+    return '/' unless mine.empty?
 
     '/start'
   end
