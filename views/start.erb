@@ -9,42 +9,46 @@
     the week, then work off a screen at the rack that ticks each set off as you do it.
   </p>
 
-  <h2 class="mt-8 text-sm font-semibold text-gray-900">Three things worth doing first</h2>
-  <%# Ordered by how soon each one pays back rather than by how much it does. Logging a
-      single session takes a minute and gives the calendar and the charts something to
-      say; writing a block is an evening's work; an assistant is worth little until there
-      is training for it to read. %>
+  <h2 class="mt-8 text-sm font-semibold text-gray-900">Two ways in</h2>
+  <%# The assistant first, because it is what /welcome promised -- "Ask your AI what to lift",
+      #255 -- and since #411 it is also the only way a block gets written: there is no block
+      editor any more, so the card that used to offer one led to an empty workouts list (#629).
+
+      This used to argue the other way, that an assistant "is worth little until there is
+      training for it to read". That was never quite true and is not now: a first block needs
+      nothing but what the lifter says in conversation, a top weight rather than a history,
+      which is the welcome page's own example of somebody coming back after six weeks off.
+      The example sentence is there because a blank chat box is the second place a new lifter
+      stops, after the connect button.
+
+      Logging stays, second, for somebody with a session already behind them or no assistant
+      at all -- it works on its own and gives the calendar something to show. %>
   <ol class="mt-3 space-y-4">
     <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900">Log a workout</h3>
+      <h3 class="text-sm font-semibold text-gray-900">Plan your first block with your assistant</h3>
       <p class="mt-1 text-sm text-gray-600">
-        Put in a date and the lifts you did, weight by weight. One session is enough for
-        the calendar and the charts to have something to show.
+        Connect your AI assistant to this account once, then tell it what you are training for.
+        It writes the weeks, the days and the lifts, and the sessions appear here on the days
+        you train, warmups and plate math included.
+      </p>
+      <p class="mt-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700 ring-1 ring-gray-200">
+        &ldquo;Write me a four-week block, three days a week, built around squat, bench and
+        deadlift. I am coming back after six weeks off.&rdquo;
       </p>
       <%# Full width on a phone and only as wide as its words from 640px up: a thumb
           reaching across a phone screen wants the whole line, and a mouse does not. %>
-      <a href="/workouts/new"
-         class="<%= button_style %> mt-3 inline-flex min-h-11 w-full items-center justify-center bg-lime-500 px-4 text-sm font-semibold text-gray-900 hover:bg-lime-600 sm:w-auto">Log a workout</a>
-    </li>
-
-    <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900">Write a training block</h3>
-      <p class="mt-1 text-sm text-gray-600">
-        A block is weeks, each week days, each day the lifts you will do. The app turns a
-        week of it into real sessions, warmup ramps and all, on the days you said.
-      </p>
-      <a href="/programs"
-         class="<%= button_style %> mt-3 inline-flex min-h-11 w-full items-center justify-center bg-sky-800 px-4 text-sm font-semibold text-white hover:bg-sky-900 sm:w-auto">Write a block</a>
-    </li>
-
-    <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
-      <h3 class="text-sm font-semibold text-gray-900">Connect an assistant</h3>
-      <p class="mt-1 text-sm text-gray-600">
-        Give your AI assistant this account's address over MCP and it can plan a block, log
-        a session, or correct a set you typed wrong. It sees your account and nothing else.
-      </p>
       <a href="/connections"
-         class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:w-auto">Connect an assistant</a>
+         class="<%= button_style %> mt-3 inline-flex min-h-11 w-full items-center justify-center bg-lime-500 px-4 text-sm font-semibold text-gray-900 hover:bg-lime-600 sm:w-auto">Connect your assistant</a>
+    </li>
+
+    <li class="rounded-lg bg-white p-4 shadow ring-1 ring-gray-200">
+      <h3 class="text-sm font-semibold text-gray-900">Or log a session you have already done</h3>
+      <p class="mt-1 text-sm text-gray-600">
+        Put in a date and the lifts you did, weight by weight. One session is enough for the
+        calendar and the charts to have something to show.
+      </p>
+      <a href="/workouts/new"
+         class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-md bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:w-auto">Log a workout</a>
     </li>
   </ol>
 
