@@ -45,6 +45,30 @@ class Tectonic < Roda
     # other's path. Two constants rather than one, because #518 and #520 each found the path
     # their own action needed and a single name would have to be wrong for one of them.
     MEASURE_V2_PATH = '/v2/measure'
+    # And where sleep answers, which is neither of them. #579.
+    #
+    # Both `Sleep v2 - Get` and `Sleep v2 - Getsummary` are here, told apart by `action` the
+    # way everything else in this API is. Worth one line of warning for the next reader of the
+    # reference: the OpenAPI document keys operations by URL, so having two on one path it
+    # publishes the second as `"https://wbsapi.withings.net/v2/sleep "` -- with a trailing
+    # space, to make the key unique. The space is in their own PHP and curl samples too. It is
+    # a quirk of how the document is assembled and not part of the path.
+    SLEEP_PATH = '/v2/sleep'
+    # What `getsummary` must be asked for by name, and the trap is `WORKOUT_FIELDS`' trap in
+    # another place: every field under a summary's `data` is documented *"(Use 'data_fields' to
+    # request this data.)"*, so a request without this comes back with a night in it and
+    # nothing inside the night -- no error, no empty keys, and a caller reading a missing
+    # figure as a lifter who did not sleep.
+    #
+    # One field, deliberately. The stage split, the efficiency ratio and everything in the
+    # Total biomarker pack are each refused for their own reason; `WithingsSleep`'s comment
+    # is where those reasons are, because they are decisions about what this app will say
+    # rather than facts about the API.
+    #
+    # What is *not* here and arrives anyway is the pair that matters most: `startdate` and
+    # `enddate` are on the summary object itself rather than under `data`, so the two ends of
+    # the night cost no parameter at all.
+    SLEEP_FIELDS = 'total_sleep_time'
     # What `getworkouts` must be asked for by name.
     #
     # This is the part of the endpoint that is not guessable from its documentation. Without
@@ -190,6 +214,29 @@ class Tectonic < Roda
       post(MEASURE_V2_PATH, token:, action: 'getworkouts', data_fields: WORKOUT_FIELDS,
                             startdateymd: from.strftime('%Y-%m-%d'),
                             enddateymd: to.strftime('%Y-%m-%d'), offset:)
+    end
+
+    # One page of a range of nights, as summaries. #579.
+    #
+    # Civil dates like `getworkouts` and unlike `getmeas`, and the same mutually-exclusive
+    # trap: the published spec marks `startdateymd`, `enddateymd` *and* `lastupdate` all
+    # required, and sending the third alongside the first two is refused. Only the pair is
+    # sent, because `lastupdate` is a resume cursor and the caller here does not resume -- see
+    # `WithingsSleep.window` for why its range is a constant.
+    #
+    # **Seven days is the most one call may span.** The reference says so on the summary
+    # object's own `enddate`: *"A single call can span up to 7 days maximum. To cover a wider
+    # time range, you will need to perform multiple calls."* It is not enforced here, because
+    # the caller's window is narrower than it by construction and a second opinion about
+    # somebody else's limit is a second place for it to be wrong.
+    #
+    # Paged like everything else, and `offset` is only sent once there is one, so the first
+    # request of a window carries no cursor at all.
+    def sleep_summaries(token, from:, to:, offset: nil)
+      form = { action: 'getsummary', data_fields: SLEEP_FIELDS,
+               startdateymd: from.strftime('%Y-%m-%d'), enddateymd: to.strftime('%Y-%m-%d') }
+      form[:offset] = offset if offset
+      post(SLEEP_PATH, token:, **form)
     end
 
     # A window of measurements, which is the one thing this app reads. #518.

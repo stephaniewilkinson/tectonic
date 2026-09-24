@@ -3,6 +3,7 @@
 require_relative '../../body_readings'
 require_relative '../../error_reporting'
 require_relative '../../withings_measures'
+require_relative '../../withings_sleep'
 
 class Tectonic < Roda
   module MCP
@@ -92,16 +93,51 @@ class Tectonic < Roda
         # Silent rather than explained: `:not_asked` carries no note, because a sentence about
         # how fresh the scale is would be a caveat about an instrument the caller has just said
         # they are not reading from.
-        def checked(context, risk: nil, source: nil)
+        #
+        # ## `instrument`, which is the same exception one step further in
+        #
+        # #579 added a second read through the same grant: sleep, from a different service, on
+        # a different window, with a watermark of its own. Nothing about it changes any of the
+        # above -- a failed read still may not be rendered as a lifter who did not sleep, and
+        # the six outcomes still mean what they mean -- so it arrives here as a choice of who
+        # to ask rather than as a second copy of this module.
+        #
+        # One instrument per call, never both. The argument is the one `elsewhere?` already
+        # makes: a question about bodyweight cannot be answered differently by anything the
+        # watch says, and a question about last night cannot be answered differently by the
+        # scale. Reading both on every call would double the requests this connector makes
+        # against a provider that refuses a caller for asking too often, and it would spend the
+        # second one where it could not have helped. Which instrument a question is about is
+        # `HealthReadings`' to say, because the metric name is the only thing that says it.
+        def checked(context, risk: nil, source: nil, instrument: :scale)
           return NOT_ASKED if elsewhere?(source)
 
-          view = describe(read(context.account_id))
-          view.merge(note: note(view, risk))
+          view = describe(read(context.account_id, instrument))
+          view.merge(note: note(view, risk, instrument))
         end
 
-        # Whether the caller has filtered to something the scale did not write. Blank is not a
+        # Who a name refers to and what they are called in a sentence.
+        #
+        # The noun is here rather than inline because it appears in four sentences, and four
+        # spellings of the same instrument is four chances for a lifter to be told about a
+        # scale when they asked about a watch. `reader` is the module that owns the fetch and
+        # the floor: both answer `freshen` and `STALE_AFTER`, and nothing here needs to know
+        # anything else about either of them.
+        INSTRUMENTS = { scale: { reader: WithingsMeasures, noun: 'scale' },
+                        watch: { reader: WithingsSleep, noun: 'watch' } }.freeze
+
+        def instrument(named) = INSTRUMENTS.fetch(named)
+
+        def noun(named) = instrument(named)[:noun]
+
+        # Whether the caller has filtered to something Withings did not write. Blank is not a
         # filter -- it is the ordinary case, everything, which includes Withings and therefore
         # wants the read.
+        #
+        # One source covers both instruments and that is right: `source` names the provider and
+        # the grant, not the hardware, and a filter of `withings` means "what came through the
+        # connection" rather than "what came off the scale". Which of the two instruments the
+        # question is about is carried by the metric, which is what `instrument` is for.
         def elsewhere?(source)
           named = source.to_s.strip
           !named.empty? && named != WithingsMeasures::SOURCE
@@ -123,8 +159,8 @@ class Tectonic < Roda
         #
         # Reported as :unreachable, which is the honest reading of an exception: something
         # went wrong on the way to the numbers, and this cannot say the grant is dead.
-        def read(account_id)
-          WithingsMeasures.freshen(account_id)
+        def read(account_id, named)
+          instrument(named)[:reader].freshen(account_id)
         rescue StandardError => e
           report(e)
           WithingsMeasures::Fetch.new(:unreachable, 0, nil)
@@ -146,7 +182,7 @@ class Tectonic < Roda
         # things -- "nothing new had arrived" after a read, and "no read happened" before one --
         # and a field that says both says neither.
         def describe(fetch)
-          view = { outcome: fetch.outcome.to_s, last_read_at: BodyReadings.instant(fetch.synced_at),
+          view = { outcome: fetch.outcome.to_s, last_read_at: BodyReadings.instant(fetch.read_at),
                    readings_may_be_missing: fetch.failed? }
           return view unless %i[stored incomplete].include?(fetch.outcome)
 
@@ -160,14 +196,14 @@ class Tectonic < Roda
           ordered.compact.join("\n")
         end
 
-        def note(view, risk)
+        def note(view, risk, named)
           case view[:outcome]
-          when 'revoked' then revoked(view)
+          when 'revoked' then revoked(view, named)
           when 'incomplete' then incomplete(view, risk)
           when 'unreachable' then unreachable(view)
-          when 'absent' then ABSENT
-          when 'stored' then stored(view)
-          else fresh(view)
+          when 'absent' then absent(named)
+          when 'stored' then stored(view, named)
+          else fresh(view, named)
           end
         end
 
@@ -176,9 +212,10 @@ class Tectonic < Roda
         # Withings does arrives as the same nil, so this sentence is kept for the case that
         # really does mean the connection is dead -- telling a lifter to reconnect a working
         # connection is how a caveat stops being read.
-        def revoked(view)
+        def revoked(view, named)
           renew = 'The Withings connection needs renewing: the grant has been withdrawn, so nothing new ' \
-                  'is arriving from the scale. Reconnecting it on the settings page is what starts it again.'
+                  "is arriving from the #{noun(named)}. Reconnecting it on the settings page is what " \
+                  'starts it again.'
           return "#{renew} Nothing was ever read through it." unless view[:last_read_at]
 
           "#{renew} Nothing below is newer than #{view[:last_read_at]}, whatever window was asked for."
@@ -215,17 +252,25 @@ class Tectonic < Roda
         # Nothing is connected, which is not a failure and is worth one clause anyway: a model
         # that reads "no readings" cannot otherwise tell a scale that has not synced from an
         # account that never had one, and those want opposite next moves.
-        ABSENT = 'No scale is connected to this account, so nothing here was read from one.'
+        #
+        # One Withings connection covers both instruments, so this is about the grant rather
+        # than about hardware -- but it is said in the words of whichever one was asked about,
+        # because a lifter who asked how they slept is not helped by a sentence about a scale.
+        def absent(named) = "No #{noun(named)} is connected to this account, so nothing here was read from one."
 
-        def stored(view)
+        def stored(view, named)
           count = view[:new_readings].to_i
           arrived = count.positive? ? "#{count} new reading(s) arrived" : 'nothing new had arrived'
-          "Read from the scale just now; #{arrived}."
+          "Read from the #{noun(named)} just now; #{arrived}."
         end
 
-        def fresh(view)
-          "Last read from the scale at #{view[:last_read_at]}; another read is made when that is more " \
-            "than #{WithingsMeasures::STALE_AFTER / 60} minutes old."
+        # The floor is read off the instrument's own module rather than named here, because the
+        # two reads are independent rate limits on two different requests: they happen to be
+        # fifteen minutes apart today, and a sentence that assumed they always would be is a
+        # sentence that goes quietly wrong the first time one of them moves.
+        def fresh(view, named)
+          "Last read from the #{noun(named)} at #{view[:last_read_at]}; another read is made when that is " \
+            "more than #{instrument(named)[:reader]::STALE_AFTER / 60} minutes old."
         end
       end
     end
