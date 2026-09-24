@@ -54,6 +54,9 @@ def a_session_with_one_set_at(weight)
   pick_the_movement('Back Squat')
   fill_in 'weight', with: weight.to_s
   fill_in 'reps', with: '5'
+  # Planned, to be lifted at the rack: the form ticks a set on today's session as already done
+  # since #630, which is right for logging after the fact and wrong for this.
+  uncheck 'Completed?'
   click_on 'Save'
   visit "#{workout}session"
 end
@@ -80,6 +83,7 @@ describe 'the session view' do
     pick_the_movement('Back Squat')
     fill_in 'weight', with: '135'
     fill_in 'reps', with: '5'
+    uncheck 'Completed?'
     click_on 'Save'
     visit "#{workout}session"
     page.execute_script('window.stayed = true')
