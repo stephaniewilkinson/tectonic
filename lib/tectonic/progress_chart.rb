@@ -83,65 +83,32 @@ class Tectonic < Roda
     # training max, because the derived one is estimated from whatever is there, so the guard
     # that used to be "are there any points" let through a chart whose single line was a number
     # nobody had lifted for. The page drew no chart before #434 and was right about that.
-    def of(account_id:, exercise:, today: Date.today)
-      sets = lifted_sets(account_id, exercise.id, today)
-      lifted = heaviest(sets)
-      return {} if lifted.empty?
+    #
+    # The history and the max are taken from the caller where it has them, which the exercise
+    # page does (#596). It used to read this movement's whole history five times in one
+    # request -- once here, once in each `TrainingMax.for`, once per block for the step line.
+    # The goal is still looked up here; it is one row by key. Read once, every figure on
+    # the page is also computed from the same rows: five reads were five moments, and a set
+    # completed between two of them could put the chart and the headline in disagreement.
+    # Absent, each is read here, which is what a caller asking for the chart alone wants.
+    def of(account_id:, exercise:, today: Date.today, lifted: exercise.lifted_sets(account_id, today),
+           max: TrainingMax.for(account_id:, exercise:, on: today, lifted:))
+      heaviest = heaviest(lifted)
+      return {} if heaviest.empty?
 
-      max = TrainingMax.for(account_id:, exercise:, on: today)
       goal = Goal.for(account_id:, exercise_id: exercise.id)
-      { LIFTED => lifted, ESTIMATED => estimated(sets),
-        TRAINING_MAX => training_max(account_id, exercise, today),
+
+      { LIFTED => heaviest, ESTIMATED => estimated(lifted),
+        TRAINING_MAX => training_max(account_id, exercise, today, lifted, max),
         GOAL => goal_point(goal), PROJECTION => projection(account_id, max, goal, today) }
         .reject { |_name, points| points.empty? }
     end
-
-    # This account's completed sets of this movement, with the day each was lifted.
-    #
-    # Its own query rather than `Exercise#lifted_sets`, which three other callers share and
-    # which does not select `is_warmup` -- and warmups are exactly what the heaviest-set series
-    # has to exclude. Widening the shared one for this would change what `estimated_max` reads
-    # on every page in the app.
-    #
-    # Scoped through the account's own workouts rather than by exercise alone, because a
-    # library movement is shared and the training on it is not.
-    # Ordered, and it had no order at all until #593 caught it -- by accident, which is the
-    # only way this kind of thing is ever caught. A SELECT without an ORDER BY may come back in
-    # whatever order Postgres finds convenient, and what it finds convenient depends on the
-    # physical layout of the table: `group_by` below preserves first-seen order, so the dates
-    # on the x axis of every chart on a movement's page were in whatever order the rows
-    # happened to be read in. It was reliably the insertion order on a table nobody had deleted
-    # from, which is why it looked settled for as long as it did; a suite that empties its
-    # tables between tests reuses the freed space and hands them back in another order, and one
-    # spec asserting on the sequence of two dates started failing depending on what ran before
-    # it. This is the same argument `Workout.one_to_many :sets, order: :id` makes in #217, in
-    # the same words, about the same mistake.
-    #
-    # By day and then by id: a chart is read left to right along a time axis, and two sets
-    # lifted on one day are ordered as they were logged, which is the order the session screen
-    # and the set list already agree on.
-    def lifted_sets(account_id, exercise_id, today)
-      mine = Workout.where(account_id:).where { date < (today + 1) }.select(:id)
-      WorkoutSet.where(exercise_id:, workout_id: mine, is_completed: true)
-                .join(:workouts, id: :workout_id).select(*READ_COLUMNS)
-                .order(Sequel[:workouts][:date], Sequel[:sets][:id]).all.map(&:values)
-    end
-
-    # Qualified because `date` is on workouts while the rest are on sets, and unqualified it is
-    # ambiguous the moment the two tables meet -- the same reason Exercise::READ_COLUMNS is
-    # written out. `is_warmup` is the one this list has that that one does not, and it is the
-    # whole reason this query is not that one.
-    READ_COLUMNS = [
-      Sequel[:sets][:weight], Sequel[:sets][:reps], Sequel[:sets][:rpe],
-      Sequel[:sets][:planned_rpe], Sequel[:sets][:is_warmup],
-      Sequel.as(Sequel.cast(Sequel[:workouts][:date], :date), :day)
-    ].freeze
 
     # The heaviest working set of each session. The ground truth line, and the only one here
     # that is a measurement rather than a decision.
     def heaviest(sets)
       sets.reject { |set| set[:is_warmup] }
-          .group_by { |set| set[:day] }
+          .group_by { |set| set[:date].to_date }
           .filter_map { |day, rows| [day, pounds(rows.filter_map { |set| set[:weight] }.max)] }
           .to_h.compact
     end
@@ -158,7 +125,7 @@ class Tectonic < Roda
     # back to drawing no chart at all -- which is what it did before #434 and was right about.
     def estimated(sets)
       sets.reject { |set| set[:is_warmup] }
-          .group_by { |set| set[:day] }
+          .group_by { |set| set[:date].to_date }
           .filter_map { |day, rows| [day, pounds(OneRepMax.best_of(rows)&.round)] }
           .to_h.compact
     end
@@ -172,11 +139,13 @@ class Tectonic < Roda
     # Today's point is added so the line reaches the right-hand edge rather than stopping at
     # the last block that happened to start, which on a block three weeks in would leave the
     # step line ending well short of the sets drawn beside it.
-    def training_max(account_id, exercise, today)
+    #
+    # Every block's derived max is read off the history already in hand, which is what stopped
+    # a lifter twelve blocks in paying twelve reads of their whole history for this one line.
+    def training_max(account_id, exercise, today, lifted, here)
       opened = Program.where(account_id:).order(:start_date).select_map(:start_date)
                       .uniq.select { |date| date <= today }
-                      .to_h { |date| [date, TrainingMax.as_of(account_id:, exercise:, on: date)&.pounds] }
-      here = TrainingMax.for(account_id:, exercise:, on: today)
+                      .to_h { |date| [date, TrainingMax.as_of(account_id:, exercise:, on: date, lifted:)&.pounds] }
       opened.merge(today => here&.pounds).compact
     end
 
