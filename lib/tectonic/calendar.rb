@@ -144,12 +144,20 @@ class Tectonic < Roda
     # performed date alone loses every session that has not been trained yet, which is the
     # whole forward half of a plan.
     #
-    # A correlated subquery rather than a widened window, because the drift has no bound: it
-    # is however far a lifter moved a session, and a margin chosen here would be a guess that
-    # silently drops anything past it.
+    # A lookup of the trained sessions rather than a widened window, because the drift has no
+    # bound: it is however far a lifter moved a session, and a margin chosen here would be a
+    # guess that silently drops anything past it.
+    #
+    # Neither half makes Postgres read every session the account has (#599). The planned date
+    # is compared as a half-open range of timestamps rather than cast to a day, which is the
+    # same rows and lets `workouts_account_id_date_index` seek on it. The trained half asks
+    # which sessions have *any* set completed in the grid, which 054 indexes, rather than
+    # working out each session's first completion to compare it. Any is looser than first --
+    # a session begun on the 31st and finished on the 1st is in both -- and that is fine here
+    # because it only fetches: `by_day` keys each session by `performed_or_planned_on`, which
+    # is still the first completion, and a session keyed outside the grid is drawn nowhere.
     def within(from, to)
-      Sequel.|({ Sequel.cast(:date, :date) => from..to },
-               { Sequel.cast(Workout.first_completion, :date) => from..to })
+      Sequel.|({ date: from...(to + 1) }, { id: Workout.completed_between(from, to) })
     end
 
     # How a session is written in a cell. The words differ from the status names in one

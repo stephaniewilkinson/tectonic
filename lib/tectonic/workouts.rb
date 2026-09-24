@@ -36,6 +36,18 @@ class Tectonic < Roda
                .select { min(:completed_at) }
     end
 
+    # The sessions with any set completed between two days, as a set of ids rather than a
+    # question asked of each session. #599: the calendar asked `first_completion` of every
+    # session the account had ever had to draw one month.
+    #
+    # The predicate is 054's index predicate, written the same way, and has to stay so: a
+    # condition here that the index does not carry, or one it carries that this drops, and
+    # Postgres can no longer use it and quietly goes back to reading every set.
+    def self.completed_between(from, to)
+      DB[:sets].exclude(completed_at: nil).where(Sequel.cast(:completed_at, :date) => from..to)
+               .select(:workout_id)
+    end
+
     dataset_module do
       # Answers "has anything been lifted here" for every row of a list in the one
       # query that fetches it, as a correlated EXISTS rather than a join, so a page of
