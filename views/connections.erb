@@ -6,9 +6,23 @@
   </p>
 
   <h2 class="mt-8 text-sm font-semibold text-gray-900">Connect one</h2>
-  <p class="mt-2 text-sm text-gray-600">
-    Add a custom connector in your assistant and give it this address. It will send you
-    back here to sign in and approve it.
+  <%# The one-click box /docs has had since #359, here too since #637. /start and settings both
+      send a signed-in lifter to this page, so somebody who signed up first and connected second
+      -- the order /start suggests -- never saw the fastest way in and got the copy-and-paste one
+      instead. Only where the deployment knows its own address, which the link is built from. %>
+  <%- if @resource_url %>
+    <div class="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
+      <p class="text-sm text-gray-700">
+        Using Claude? This opens its add-connector dialog with the address already filled in.
+      </p>
+      <a href="<%= claude_connector_url %>" rel="noopener"
+         class="<%= button_style %> mt-3 inline-flex min-h-11 items-center bg-sky-800 px-4 text-sm
+                font-semibold text-white hover:bg-sky-900">Add to Claude</a>
+    </div>
+  <%- end %>
+  <p class="mt-4 text-sm text-gray-600">
+    Any other assistant: add a custom connector and give it this address. It will send you
+    back here to sign in and approve it, and once you have, it appears under Connected below.
   </p>
   <%- if @resource_url %>
     <div class="mt-3 flex items-center gap-2">
@@ -34,11 +48,35 @@
       "Settings, then Connectors" is a different sequence in each of these, and a reader
       given a generic word would be left hunting through menus.
 
-      A list rather than a sentence, so a client added later is a line rather than a rewrite. %>
+      A list rather than a sentence, so a client added later is a line rather than a rewrite.
+
+      Checked against each vendor's own help pages on 2026-09-24 (#637), and both lines had gone
+      stale: Claude moved connectors from Settings to Customize, and ChatGPT now puts custom
+      servers behind a Developer mode switch and calls them apps, added from Plugins. Both are
+      set up on the web or desktop and then work from the phone -- adding one from a phone app
+      is beta in Claude and absent in ChatGPT -- which is worth saying on an app used at the
+      rack. These menus move; the date above is when they were last true. %>
   <dl class="mt-4 space-y-1 text-sm text-gray-600">
-    <div><dt class="inline font-medium text-gray-900">Claude:</dt> <dd class="inline">Settings, then Connectors, then Add custom connector.</dd></div>
-    <div><dt class="inline font-medium text-gray-900">ChatGPT:</dt> <dd class="inline">Settings, then Connectors, then add an MCP server.</dd></div>
+    <div><dt class="inline font-medium text-gray-900">Claude:</dt> <dd class="inline">Customize, then Connectors, then the + button.</dd></div>
+    <div><dt class="inline font-medium text-gray-900">ChatGPT:</dt> <dd class="inline">Settings, then Security and login, and turn on Developer mode; then Plugins, then the + button. Paid plans only.</dd></div>
   </dl>
+  <p class="mt-2 text-sm text-gray-500">
+    Do this on a computer or in the browser. Once it is connected, it works from your
+    assistant&rsquo;s phone app too.
+  </p>
+
+  <%# What to say once it is connected. A connected assistant on an empty account needs to be
+      told the lifter's lifts and numbers, and a blank chat box is the next place a new lifter
+      stops. The same first message /start offers, so the two pages agree. %>
+  <h2 class="mt-8 text-sm font-semibold text-gray-900">Then try asking</h2>
+  <p class="mt-2 rounded-md bg-gray-50 p-3 text-sm text-gray-700 ring-1 ring-gray-200">
+    &ldquo;Write me a four-week block, three days a week, built around squat, bench and
+    deadlift. I am coming back after six weeks off.&rdquo;
+  </p>
+  <p class="mt-2 text-sm text-gray-500">
+    What it can and cannot do, and what is stored, is on
+    <a href="/docs" class="font-medium text-lime-700 hover:text-lime-800">the connector page</a>.
+  </p>
 
   <h2 class="mt-10 text-sm font-semibold text-gray-900">Connected</h2>
   <%- if @connections.empty? %>
