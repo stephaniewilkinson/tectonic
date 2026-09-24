@@ -218,3 +218,36 @@ describe 'disconnecting something that is not yours' do
   end
 end
 
+# #637. /start and settings send a signed-in lifter here, and it lacked the one-click button
+# /docs has, said nothing about what to ask once connected, and had menu directions that had
+# gone stale in both assistants.
+describe 'connecting from the assistants page' do
+  include Rack::Test::Methods
+  include Connecting
+
+  before do
+    sign_up
+    with_base_url('https://tectonicplates.app') { get '/connections' }
+    @page = last_response.body
+  end
+
+  it 'offers the one-click Add to Claude' do
+    assert_includes @page, 'Add to Claude'
+    assert_includes @page, 'modal=add-custom-connector'
+  end
+
+  it 'gives the directions each assistant uses now' do
+    assert_includes @page, 'Customize, then Connectors'
+    assert_includes @page, 'turn on Developer mode'
+  end
+
+  it 'says to set it up on a computer, and that the phone app works after' do
+    assert_includes @page, 'Do this on a computer or in the browser'
+  end
+
+  it 'suggests a first thing to ask, and links to what it can do' do
+    assert_includes @page, 'Then try asking'
+    assert_includes @page, 'href="/docs"'
+  end
+end
+
