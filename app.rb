@@ -171,15 +171,25 @@ class Tectonic < Roda
     # MCP client authenticates with. All auth -- web sessions and machine access --
     # runs through this one Rodauth config rather than any hand-rolled path.
     enable :login, :logout, :create_account, :remember, :json, :reset_password,
+           :verify_account,
            :oauth_authorization_code_grant, :oauth_pkce,
            :oauth_client_credentials_grant, :oauth_jwt,
            :oauth_resource_indicators, :oauth_dynamic_client_registration,
            :oauth_token_introspection, :oauth_token_revocation
-    # Sign-up asks for the address once and the password once. Rodauth defaults both of
-    # these to true and enforces them on the post rather than in the template, so deleting
-    # the two confirmation boxes from views/create-account.erb without turning these off
-    # leaves every sign-up rejected for disagreeing with a parameter the form no longer
-    # sends -- and the message names a field that is not on the page.
+    # Each of the two things a person types is typed once. Rodauth defaults both of these to
+    # true and enforces them on the post rather than in the template, so deleting the
+    # confirmation boxes from a form without turning these off leaves every submission
+    # rejected for disagreeing with a parameter the form no longer sends -- and the message
+    # names a field that is not on the page.
+    #
+    # Since #575 they govern two different pages. The address is typed on
+    # views/create-account.erb and the password on views/verify-account.erb, so
+    # require_login_confirmation? is about the first and require_password_confirmation? about
+    # the second -- and about views/reset-password.erb, which has been a single box since #344
+    # for the same reason. `verify_account` happens to force the first of them false itself
+    # (`verify_account.rb:161-163`); it is still written out, because a line that is load-
+    # bearing for the reset and sign-up forms should not silently depend on a feature that
+    # has nothing to do with either.
     #
     # What the password confirmation was buying is a typo nobody can see. That used to be
     # unrecoverable -- reset_password was not enabled and there was no mailer, so an account
@@ -187,9 +197,10 @@ class Tectonic < Roda
     # email rather than the account, which is what made leaving these off defensible rather
     # than merely convenient.
     #
-    # The remaining box still says autocomplete="new-password", asking a password manager to
-    # generate and keep the credential instead of leaving a human to type it twice. That is
-    # now the first line rather than the only one.
+    # The remaining password box still says autocomplete="new-password", asking a manager to
+    # generate and keep the credential instead of leaving a human to type it twice. That
+    # matters more than it did and lands less often than it did, both because of where the box
+    # now is; the #575 note further down has that argument.
     require_login_confirmation? false
     require_password_confirmation? false
     # Losing a password no longer loses the account. #344.
@@ -234,6 +245,163 @@ class Tectonic < Roda
                      text: scope.reset_password_body(reset_password_email_link))
     end
 
+    # An address has to be proved before the account is worth anything. #575.
+    #
+    # 410 accounts, 409 of which have never logged a set: 274 gmail and 99 yahoo with a tail
+    # of throwaway-mail domains, 90 of the local parts carrying four or more consecutive
+    # digits, and all of them arriving between 9 and 23 September. That is a form being found
+    # and submitted by a bot, and the cost is not clutter. `reset_password` above really
+    # sends, so every one of those addresses -- most belonging to people who never signed up
+    # here -- can be made to receive mail from this domain by anybody who knows it. A sending
+    # reputation is the kind of thing that is cheap to keep and very expensive to get back.
+    #
+    # ## The address is confirmed and the password is chosen on the same page
+    #
+    # Which is Rodauth's own default and is left alone here, so there is no line to point at:
+    # `verify_account_set_password?` is true, which turns `create_account_set_password?` off
+    # (`verify_account.rb:222-225`), so the sign-up form asks for an address and nothing else
+    # and the emailed link leads to the page that takes the password.
+    #
+    # It is the flow that makes the feature mean the most. A sign-up form that takes a
+    # password leaves a complete account sitting in the table that only a status column is
+    # keeping shut; this way the row genuinely has no credential until somebody has read mail
+    # at that address. For the four hundred and nine rows that prompted this, the difference
+    # is between "an account nobody can open" and "not an account".
+    #
+    # **And it closes a hole the other order leaves open**, which is the argument that settles
+    # it rather than merely favours it. Taking the password at sign-up means a bot that types
+    # somebody else's address has already chosen the credential. Everything then rests on the
+    # real owner of that mailbox not clicking the link -- and the link arrives looking exactly
+    # like an ordinary confirmation, so one curious click hands the bot a working, confirmed
+    # account under that person's address, with their mailbox as the recovery route. #575
+    # exists because four hundred and nine accounts were made this way against what the domain
+    # spread says are mostly real mailboxes, so that is not a hypothetical population. With the
+    # password chosen after the link, the bot never holds a credential and no click by anybody
+    # can create one: whoever opens the link is the person who sets the password, and that is
+    # the person who reads the mail.
+    #
+    # **It costs `password_hash` its NOT NULL constraint**, and migrate/051 is where that is
+    # argued -- including why the column stays on `accounts` rather than moving to Rodauth's
+    # separate hash table, and why a null hash is safe rather than merely tolerable.
+    #
+    # **And it costs the password manager, which is the real price.** The sign-up form now has
+    # nothing on it worth saving, so nothing offers to generate a credential there. The
+    # password is instead chosen on a page reached from an email -- frequently in a different
+    # browser from the one the form was filled in, or on a phone, without whichever manager
+    # would have saved it. That is a worse moment to create a credential than the sign-up form
+    # was, and it is the answer to "why is the password form over here": not an oversight, a
+    # trade taken deliberately for the paragraph above. views/verify-account.erb keeps
+    # `autocomplete="new-password"` on the box so that whatever manager *is* present still
+    # offers; that is the whole of what can be done about it from here.
+    # Sign-up no longer logs anybody in, so it can no longer redirect anywhere that needs a
+    # session -- and the old value here was `login_destination(account_id)`, which runs
+    # `ProgramSchedule.ensure_ahead` and `SessionClose.sweep` and then sends the browser to a
+    # page behind `require_login`. After this change that is a redirect straight into the
+    # login screen, with the sign-up's notice flash consumed on the way past.
+    #
+    # `/login` rather than `/welcome`, because the sentence the flash is about to say is
+    # "check your email", and the page to be standing on once the email has been read is the
+    # one you come back to.
+    create_account_redirect { '/login' }
+    # The zone question, moved here from `create_account_redirect` one flow later. #349, #575.
+    #
+    # It is asked at the first moment there is a session to ask it in, and that moment used
+    # to be the sign-up redirect. Verification moves it, because `verify_account_autologin?`
+    # is Rodauth's default and stays on: the person who clicks the link in the email is
+    # logged in by `autologin_session('verify_account')` (`verify_account.rb:148-150`), and
+    # that is now the first session a new account has.
+    #
+    # The ordering trap that made the old note worth writing is unchanged, and this is still
+    # the only place the question can be asked from. `autologin_session` calls
+    # `login_session`, which clears the session against fixation and then sets it again, so
+    # anything an `after_create_account` or `after_verify_account` hook puts in the session is
+    # wiped a few lines later, silently. A redirect block runs after all of that. The original
+    # was found by a browser that detected its zone correctly, posted nothing, and left no
+    # trace of why -- which is the only way this kind of ordering shows itself, and the reason
+    # this comment is longer than the code.
+    #
+    # `login_destination` is right here for the same reason it was right there: a brand new
+    # account is exactly the case the first-run page was written for.
+    verify_account_redirect do
+      scope.ask_the_browser_for_the_zone(account_id)
+      scope.login_destination(account_id)
+    end
+    verify_account_email_sent_redirect { '/login' }
+    # Two flashes where Rodauth uses one. `verify_account_email_sent_notice_flash` is the
+    # answer to *both* the sign-up form and the resend form (`verify_account.rb:185-187`),
+    # and those two need different sentences, because only one of them knows an email was
+    # sent. The resend form is answered identically for an address with no account -- see the
+    # hook below -- so its wording has to stay true when nothing was sent at all, the same
+    # way views/reset-password-request.erb's does. Sign-up does know, and gets to say so.
+    create_account_notice_flash 'Check your email. The link in it is where you choose a password'
+    verify_account_email_sent_notice_flash \
+      'If that address has an account waiting to be confirmed, a new link is on its way to it'
+    verify_account_notice_flash 'Your address is confirmed. Welcome to tectonic plates'
+    # And the two refusals, which Rodauth words for a developer reading a log rather than for
+    # the person reading the page: "The account you tried to login with is currently awaiting
+    # verification" names the mechanism and not the way out. Both of these are shown above the
+    # resend form, so they have one job -- to explain why that form is what somebody is
+    # looking at -- and the form underneath says what to do next.
+    attempt_to_login_to_unverified_account_error_flash \
+      'That address has not been confirmed yet, so there is nothing to sign in to'
+    attempt_to_create_unverified_account_error_flash \
+      'That address is already waiting to be confirmed, so there is nothing to sign up for again'
+    # Through Resend rather than Rodauth's Mail object, mirroring send_reset_password_email
+    # above -- including why a delivery failure is logged rather than raised into the request.
+    #
+    # `require_mail?` is deliberately left alone. Turning it off would stop Rodauth checking
+    # that a mailer exists, and the check costs nothing while this override is what actually
+    # sends; the day somebody deletes the override, the refusal to boot is the cheapest place
+    # to find out.
+    send_verify_account_email do
+      Mailer.deliver(to: account[login_column], subject: 'Confirm your tectonic plates address',
+                     text: scope.verify_account_body(verify_account_email_link))
+    end
+    # The reset form must go on answering a stranger exactly the way it answers a member,
+    # which is the policy argued at length above -- and verification breaks it if nothing is
+    # done. `_account_from_login` stops filtering on status once `skip_status_checks?` is
+    # false (`base.rb:837`) and now matches unverified accounts too, so the existing
+    # `before_reset_password_request_route` hook waves them through; the route then reaches
+    # `reset_password_request_for_unverified_account` (`reset_password.rb:79`) and answers 403
+    # "awaiting verification" where a stranger gets a 302 and a notice.
+    #
+    # That is a brand new oracle on the one form this app has written a policy for, so it is
+    # the one of the three that gets an override. The other two -- login and sign-up -- are
+    # answered in the PR: both were already oracles before this change, and both are where a
+    # real person who never got the email has to be told something.
+    #
+    # The cost is that an unverified account asking for a reset is told nothing and gets no
+    # email. That is the right trade here because it is not the way out: a person in that
+    # state has a password, they chose it on the sign-up form, and what they are missing is
+    # the confirmation. Trying to log in lands them on the resend page, which is the route
+    # that fixes it.
+    reset_password_request_for_unverified_account do
+      set_notice_flash reset_password_email_sent_notice_flash
+      redirect reset_password_email_sent_redirect
+    end
+    # And the fourth oracle, which is the resend form itself and is not in the issue.
+    #
+    # `/verify-account-resend` is an unauthenticated form that takes an address and sends
+    # mail to it -- the same shape as the reset form, and it answers a hit with a notice and
+    # a miss with a 401 and an error flash (`verify_account.rb:75-93`). It also answers "sent
+    # one in the last five minutes" differently again. Left alone it would be a better
+    # enumeration oracle than the reset form ever was, and it would be one on the very change
+    # whose purpose is to stop this app mailing addresses it has no relationship with.
+    #
+    # So the same hook, in the same shape, for the same reason: anything that is not an
+    # unverified account due another email is answered with the notice and writes nothing.
+    # Collapsing the throttled case in here too is deliberate -- if a recent send were the one
+    # case that came back differently, the form would still answer the question, just more
+    # slowly.
+    before_verify_account_resend_route do
+      next unless request.post?
+      next if account_from_login(param(login_param).to_s) && allow_resending_verify_account_email? &&
+              !verify_account_email_recently_sent?
+
+      set_notice_flash verify_account_email_sent_notice_flash
+      redirect verify_account_email_sent_redirect
+    end
+
     # What a second signup on one address is told. #345.
     #
     # Until the unique index in 027 there was nothing to say, because the second signup
@@ -267,22 +435,11 @@ class Tectonic < Roda
     # login and prefers it, so someone who followed a link to a workout, or to the OAuth
     # consent screen, still arrives where they were going.
     login_redirect { scope.login_destination(account_id) }
-    # The same question asked of a brand new account, which has no zone by definition -- and
-    # asked here rather than in after_create_account, which is where it obviously belongs and
-    # does not work.
-    #
-    # Creating an account does not go through `login`, so after_login never fires for it:
-    # create_account calls `autologin_session`, which calls `login_session`, which clears the
-    # session against fixation and then sets it again. Anything after_create_account put in
-    # the session is wiped by that, silently, a few lines later. This block is the first thing
-    # that runs with the new session in place.
-    #
-    # Found by a browser that detected its zone correctly, posted nothing, and left no trace
-    # of why -- which is the only way this kind of ordering shows itself.
-    create_account_redirect do
-      scope.ask_the_browser_for_the_zone(account_id)
-      scope.login_destination(account_id)
-    end
+    # The same question is asked of a brand new account -- which has no zone by definition --
+    # from `verify_account_redirect` above, and the note there is the one that explains why a
+    # redirect block is the only place it can be asked from. It sat here, on
+    # `create_account_redirect`, until #575 moved it: sign-up no longer opens a session, so
+    # there is nothing here to put a zone request into.
 
     # A background request cannot be answered with a redirect to the login page: the
     # browser follows it inside the fetch, so what htmx receives is the sign-in markup
@@ -2837,6 +2994,43 @@ class Tectonic < Roda
 
       If this was not you, nothing has changed and you can ignore this message -- your
       current password still works. Somebody typed your address into the reset form.
+    TEXT
+  end
+
+  # The confirmation email, beside the one above and in the same shape. #575.
+  #
+  # Plain text for the same reason, and it answers the same two questions -- what the link
+  # does, and what to do if it was not you -- because this message reaches a strictly wider
+  # audience than the reset one does. The whole point of the feature is that anybody can type
+  # anybody's address into the sign-up form, so a good number of the people reading this never
+  # asked for it, and the last line is written for them rather than as an afterthought.
+  #
+  # It says nothing about expiry, because the link does not expire: migrate/051 gives the key
+  # table no deadline column, and the note there says why. Promising "24 hours" here the way
+  # the reset email does would be a sentence that goes quietly wrong.
+  #
+  # It does say that the link is where the password is chosen, and that has to be said here
+  # rather than only on the page: this message is the *only* thing standing between a sign-up
+  # and an account, so somebody who reads it as "confirm your address" and files it away has
+  # lost the account without being told they were halfway through making one.
+  #
+  # "Confirm" rather than "verify" throughout, here and on both pages. Verification is
+  # Rodauth's word for the mechanism and it is the word in the route; what a person is being
+  # asked to do is confirm that an address is theirs.
+  def verify_account_body(link)
+    <<~TEXT
+      Somebody started creating a tectonic plates account with this address.
+
+      Open this link to confirm the address is yours and choose a password:
+
+      #{link}
+
+      There is no account until that is done. Nothing has been created that can be signed
+      in to, and nothing can be logged against this address.
+
+      If this was not you, there is nothing to do. Ignore this message and nothing comes of
+      it; no account exists, nobody can make one from this, and you will not hear from us
+      again about it.
     TEXT
   end
 

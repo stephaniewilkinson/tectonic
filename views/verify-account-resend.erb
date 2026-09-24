@@ -1,0 +1,64 @@
+<%# Asking for the confirmation link again. #575.
+
+    This is the page a real person who never got the email lands on, so it is not optional:
+    without it Rodauth's unstyled built-in renders inside this app's layout, and the one
+    screen standing between somebody and their account would be the one screen that looks
+    broken.
+
+    It is reached three ways, which is why the form has to work when it is a page and when it
+    is a response. Rodauth returns this view in place of the login form when an unconfirmed
+    address tries to sign in (`verify_account.rb:275-282`) and in place of the sign-up form
+    when an unconfirmed address signs up again (`verify_account.rb:189-196`), and it is also
+    at /verify-account-resend on its own. In the first two cases the address has just been
+    typed, so it is carried through as a hidden field rather than asked for twice; on its own
+    the field is shown.
+
+    The action and the CSRF token both name verify_account_resend_path explicitly. They have
+    to: on the first two routes in this page is rendered at /login and /create-account, and
+    Roda's csrf_tag binds a token to the path it is given, so a token minted for the current
+    path would be refused by the post. That failure is a 403 on the one form a locked-out
+    person is using.
+
+    The copy says "if there is an account" rather than "we have sent you an email", the same
+    way views/reset-password-request.erb does and for the same reason: app.rb answers this
+    form identically for an address with no account, so the sentence has to stay true when
+    nothing was sent. %>
+<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+  <div class="sm:mx-auto sm:w-full sm:max-w-sm">
+    <h1 class="text-center text-3xl font-semibold tracking-tight text-gray-900">Confirm your address</h1>
+    <%== render('_form_error') %>
+    <p class="mt-4 text-center text-sm text-gray-600">
+      This account is waiting on a link sent by email. Until the address is confirmed there is
+      no way in, which is how an account nobody asked for stays shut.
+    </p>
+  </div>
+
+  <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+    <form action="<%= rodauth.verify_account_resend_path %>" method="post" class="space-y-6" role="form"
+          id="verify-account-resend-form" autocomplete="on">
+      <%== rodauth.csrf_tag(rodauth.verify_account_resend_path) %>
+      <% if rodauth.param_or_nil(rodauth.login_param) %>
+        <%== rodauth.login_hidden_field %>
+      <% else %>
+        <div>
+          <label for="email" class="block text-sm font-medium leading-6 text-gray-900">Email address</label>
+          <div class="mt-2">
+            <%# name="login" and autocomplete="email", matching the sign-in, sign-up and reset
+                forms. A password manager offers back what it saved there only if every form
+                names the identifier the same way. %>
+            <input id="email" name="login" type="email" autocomplete="email" required
+                   class="<%= field_style %> block w-full py-1.5 text-gray-900 placeholder:text-gray-400 sm:text-sm sm:leading-6">
+          </div>
+        </div>
+      <% end %>
+      <div>
+        <button type="submit" class="<%= button_style %> flex w-full justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Send the link again</button>
+      </div>
+    </form>
+
+    <p class="mt-10 text-center text-sm text-gray-500">
+      Confirmed it already?
+      <a href="/login" class="font-semibold leading-6 text-lime-700 hover:text-lime-800">Log in</a>
+    </p>
+  </div>
+</div>

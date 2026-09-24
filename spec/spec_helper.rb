@@ -35,6 +35,7 @@ ENV['MCP_PUBLIC_BASE_URL'] ||= 'https://example.org'
 # same trade Rails makes in its own test environment. It took `rake test:rack` from about
 # five minutes to under thirty seconds.
 require 'bcrypt'
+require 'securerandom'
 BCrypt::Engine.cost = BCrypt::Engine::MIN_COST
 
 # require 'dotenv/load' #keeping this here until i need it later
@@ -68,7 +69,7 @@ module CleanDatabase
     mcp_audit_log oauth_grants account_plates account_dumbbell_plates
     account_training_maxes account_training_max_statements
     account_goals account_exercise_rests health_metrics account_withings
-    account_remember_keys account_password_reset_keys exercises
+    account_remember_keys account_password_reset_keys account_verification_keys exercises
     oauth_applications accounts
   ].freeze
 
@@ -165,4 +166,32 @@ module BrowserSpec
     super
   end
 end
+
+# A signed-in Capybara session, which eight spec files needed and each of which built its own
+# by walking the sign-up form. #575 put a confirmation email in the middle of that walk and
+# broke all eight at once, which is the argument for there being one of these rather than
+# eight: the flow those files depend on is "be signed in", and none of them was written to
+# have an opinion about how an account comes to exist.
+#
+# So the row is written directly and only the sign-in is driven. Writing an account straight
+# into the table is what fifty-odd other files here already do, and it is the case
+# migrate/051's default of an open status exists to keep working. The sign-up walk itself is
+# pinned end to end in confirming_the_address_spec, and driven through a real Firefox --
+# including the email and the link -- in system_spec, which is where a flow with three pages
+# and a message in it belongs.
+#
+# The address and the password can be named by a caller that needs to use them again, and the
+# account's id comes back because that is what every caller did with it.
+module SignedInBrowser
+  def sign_in_as_somebody_new(email: "#{SecureRandom.hex}@gmail.com", password: SecureRandom.hex)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
+    visit '/login'
+    fill_in 'email', with: email
+    fill_in 'password', with: password
+    click_on 'Sign in'
+    DB[:accounts].where(email:).get(:id)
+  end
+end
+
+Minitest::Test.include SignedInBrowser
 

@@ -29,16 +29,10 @@ require 'securerandom'
 module LosingSignal
   UNREACHABLE = 'http://offline.invalid/'
 
-  def a_lifter
-    email = "#{SecureRandom.hex}@gmail.com"
-    password = SecureRandom.hex
-    visit '/'
-    click_on 'Sign up'
-    fill_in 'email', with: email
-    fill_in 'password', with: password
-    click_on 'Sign up'
-    DB[:accounts].where(email:).get(:id)
-  end
+  # A copy of the sign-up walk until #575 put a confirmation email in the middle of one. The
+  # shared helper in spec_helper writes the account and drives only the sign-in, and the note
+  # there says why: nothing in this file is about how an account comes to exist.
+  def a_lifter = sign_in_as_somebody_new
 
   # One lift, so that however many sets are asked for they share a panel -- which is what
   # makes a tap on the second of them re-render the first, and is the whole of the last

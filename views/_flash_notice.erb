@@ -1,0 +1,38 @@
+<%# What just happened, on the page it happened to. #575.
+
+    This app set notice flashes and rendered none of them. `_form_error` beside this file
+    reads `flash['error']` and has done since #345; nothing anywhere read `flash['notice']`,
+    so every success Rodauth announced was announced into a void. That was survivable while
+    the successes were self-evident -- signing in lands you on your own training, and a page
+    full of your workouts is its own confirmation -- and #575 makes it not.
+
+    The case that forces it: signing up now writes a row, sends an email and redirects to
+    /login. With nothing rendered here, pressing "Sign up" empties the form, returns the
+    sign-in page and says nothing whatsoever. That is indistinguishable from the button
+    being broken, and it is the exact failure #345 wrote `_form_error` to end, arriving from
+    the other direction -- a correct outcome nobody can see. Worse than a refused signup,
+    because the one instruction that matters ("go and read your email") is the thing being
+    swallowed.
+
+    It also fixes a silence that was already there: #344's reset request redirects with
+    "if there is an account, a link is on the way" and that sentence has never once reached
+    a screen. The form's own copy carried the meaning, which is why nobody noticed.
+
+    In the layout rather than on the two or three pages that need it today, because a flash
+    is set by whatever handled the *previous* request and the page it lands on cannot know
+    in advance that it is about to be handed one. A partial rendered per page is a list to
+    keep in step with Rodauth's redirects, and the day it falls out of step is a day
+    somebody presses a button and is told nothing.
+
+    role="status" rather than role="alert": this is confirmation, not a problem, and alert
+    interrupts a screen reader mid-sentence where status waits its turn. #336's rule, which
+    `_form_error` applies with the other role for the other reason.
+
+    Green rather than the rose `_form_error` uses, and lime is not it -- lime is the brand
+    colour and the colour of every primary button on the site, so a lime banner above a lime
+    button reads as part of the furniture rather than as something that just happened. %>
+<%- if flash['notice'] %>
+  <div role="status" class="mt-6 rounded-md bg-emerald-100 p-3 text-sm text-emerald-900 ring-1 ring-emerald-900/25">
+    <%= flash['notice'] %>
+  </div>
+<%- end %>

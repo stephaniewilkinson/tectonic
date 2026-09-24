@@ -39,12 +39,38 @@ describe Tectonic do
     refute_includes last_response.body, 'href="#"'
   end
 
+  # The sign-up walk, with the email in the middle of it that #575 put there, driven the way
+  # a person walks it: fill the form, read the link out of the message that was sent, open it,
+  # press the button.
+  #
+  # The mailer is stubbed rather than left to log, because the link is the only thing in this
+  # flow the test cannot construct honestly -- and because reading it out of the message is
+  # what proves the message carries a usable one. The stub is in place across the click alone,
+  # which is enough: Capybara's `click_on` does not return until the response has been served,
+  # and that response is served on a Puma thread inside this process, so the send has already
+  # happened by the time the block ends.
+  #
+  # The link is visited by path rather than by URL. Capybara's server binds an ephemeral port
+  # and the app builds its links from the request it was serving, so the host in the message
+  # is right for the request that made it and is not worth re-resolving here.
+  def confirm_the_address_of(mail, pass)
+    sent = nil
+    Tectonic::Mailer.stub(:deliver, ->(to:, text:, **) { sent = text if to == mail }) do
+      visit '/'
+      click_on 'Sign up'
+      fill_in 'email', with: mail
+      click_on 'Sign up'
+    end
+    # The password is typed here and not on the form, which is the half of this walk only a
+    # browser proves: the sign-up page has no box to type it into, so a `fill_in 'password'`
+    # up there would raise rather than quietly go nowhere.
+    visit sent[%r{/verify-account\?key=\S+}]
+    fill_in 'password', with: pass
+    click_on 'Save it and sign in'
+  end
+
   it 'lets new user sign up' do
-    visit '/'
-    click_on 'Sign up'
-    fill_in 'email', with: email
-    fill_in 'password', with: password
-    click_on 'Sign up'
+    confirm_the_address_of(email, password)
     # An account a second old lands on the first-run page, not on the calendar: a month
     # with nothing on it answers a question a brand new account has not asked yet.
     assert_includes page.body, 'Start here'
@@ -60,11 +86,7 @@ describe Tectonic do
     pw = SecureRandom.hex
     mail = "#{SecureRandom.hex}@gmail.com"
 
-    visit '/'
-    click_on 'Sign up'
-    fill_in 'email', with: mail
-    fill_in 'password', with: pw
-    click_on 'Sign up'
+    confirm_the_address_of(mail, pw)
 
     visit '/workouts/new'
     click_on 'Save'

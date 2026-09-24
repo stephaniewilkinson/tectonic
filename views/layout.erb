@@ -202,6 +202,11 @@
   <%== render('nav') %>
     <main id="main">
       <div class="max-w-5xl mx-auto px-4">
+        <%# Above the page rather than inside it, because a notice is about the request that
+            just finished and not about anything the page is showing -- and because the page
+            it lands on cannot know it is about to be handed one. The partial's own note has
+            the argument, including why this app rendered no notice at all until #575. %>
+        <%== render('_flash_notice') %>
         <%== yield %>
       </div>
     </main>
