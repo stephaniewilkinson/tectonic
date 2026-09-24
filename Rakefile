@@ -538,6 +538,43 @@ def perform_merge(from, to)
   puts "Folded #{from.name} into #{to.name}."
 end
 
+# Every ERB template this repo has, at any depth. #587.
+#
+# CI linted views as `erb_lint views/*/* views/*`, and that spelling had the shell doing the
+# thinking. Three things followed from it. It reached exactly one directory deep, so a
+# template at `views/a/b/c.erb` would have gone unlinted and nothing would have said so --
+# nothing is nested that deep today, so this glob lints the same 58 files the old one did and
+# turns up no new violations, but the next person to nest one does not have to know that.
+# It could not be run at all in several sandboxed environments, where a `bundle exec` carrying
+# a glob the shell expands at runtime is refused outright, which cost four contributors an
+# afternoon between them and produced three different local workarounds -- one expanding all
+# 58 paths by hand, one substituting `views/**/*.erb`, one skipping the linter and trusting
+# CI. And it made "every view" a pattern each reader had to simulate rather than a definition
+# anybody could read or correct.
+#
+# This is the definition, and it is the correctable part: widen the glob rather than the
+# command the day templates live somewhere else too.
+# `base:` rather than a bare relative glob, so the list is the same whether rake was invoked
+# from here or from a subdirectory; the paths stay relative because that is what erb_lint's
+# output should read as.
+VIEW_TEMPLATES = Dir.glob('views/**/*.erb', base: __dir__).sort.freeze
+
+namespace :lint do
+  desc 'Lint every ERB template under views/'
+  task :views do
+    # `sh` with an array and no shell at all, which is both what makes this runnable in a
+    # sandbox and what keeps a filename with a space in it from becoming two arguments.
+    #
+    # The abort is not defensiveness. erb_lint given no files lints nothing and exits zero,
+    # so a glob that stopped matching -- views moved, the task run from the wrong directory --
+    # would report a clean run forever, which is the one failure a linter must not have.
+    abort 'No ERB templates matched views/**/*.erb; the view linter would pass by linting nothing.' \
+      if VIEW_TEMPLATES.empty?
+
+    sh 'bundle', 'exec', 'erb_lint', *VIEW_TEMPLATES
+  end
+end
+
 namespace :library do
   desc 'Load the built-in barbell exercise library (idempotent on name)'
   task :exercises do

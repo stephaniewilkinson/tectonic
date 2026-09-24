@@ -11,10 +11,14 @@
 # Five is where Puma's own default already had it rather than a number chosen to look
 # round. The web service is a Render starter instance -- half a CPU -- so more threads
 # would queue rather than serve, and each one is another Postgres connection held open.
-# What the database plan allows is not something this repo knows: render.yaml has no
-# `databases:` block and DATABASE_URL is `sync: false`, pointed at a database managed from
-# the dashboard. So the arithmetic is written down rather than a ceiling assumed -- one
-# process times five threads is five connections, and raising either raises that.
+# What the database plan allows is still not something this repo knows. render.yaml does
+# carry a `databases:` block now -- #348 added one so the blueprint describes the whole
+# deployment rather than only the half that serves requests -- but what it declares is a
+# plan, a region and a major version, and none of those is a connection limit. It also
+# governs nothing until that blueprint is linked in the dashboard, and DATABASE_URL stays
+# `sync: false`, pointed at an instance managed from there. So the arithmetic is written
+# down rather than a ceiling assumed -- one process times five threads is five connections,
+# and raising either raises that.
 max_threads = Integer(ENV.fetch('RAILS_MAX_THREADS', 5))
 threads max_threads, max_threads
 

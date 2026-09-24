@@ -157,8 +157,13 @@ jobs:
       - name: rubocop
         run: bundle exec rubocop
 
+      # The task rather than a glob of this job's own. #587: the glob that used to be here
+      # reached one directory deep, could not be run at all in several sandboxed
+      # environments, and was therefore the one check people skipped locally -- so "green
+      # locally" and "green here" were two different claims about two different file lists.
+      # The Rakefile computes the list in Ruby and this runs exactly what a contributor runs.
       - name: erb_lint
-        run: bundle exec erb_lint views/*/* views/*
+        run: bundle exec rake lint:views
 
   # Does the app boot with only the gems Render actually installs?
   #

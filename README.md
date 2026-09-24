@@ -145,12 +145,17 @@ Two prerequisites, neither obvious from the failure you get without them:
   Capybara and selenium, on a Puma server bound to port 9292. `MOZ_HEADLESS=1` keeps
   windows from opening; CI sets it for the same reason.
 
-The linters, both of which CI runs:
+The linters, both of which CI runs — these exact commands, not equivalents of them:
 
 ```
 bundle exec rubocop
-bundle exec erb_lint views/*/* views/*
+bundle exec rake lint:views
 ```
+
+`lint:views` is a rake task rather than `erb_lint` with a glob because the glob had to be
+expanded by a shell, which reached only one directory deep and was refused outright in
+several sandboxed environments. The Rakefile builds the file list in Ruby, so the list is
+readable, recursive, and the same one in CI as on your machine.
 
 ## The program engine
 
