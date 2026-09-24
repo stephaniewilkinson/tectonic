@@ -36,6 +36,7 @@ require_relative 'lib/tectonic/withings_connection'
 require_relative 'lib/tectonic/withings_measures'
 require_relative 'lib/tectonic/withings_workouts'
 require_relative 'lib/tectonic/withings_answers'
+require_relative 'lib/tectonic/session_stream'
 # The proposals a backfill left, which this app reads. #534.
 require_relative 'lib/tectonic/withings_proposals'
 # And the walk that makes them, which this app now reaches in one place and one shape only:
@@ -1609,6 +1610,19 @@ class Tectonic < Roda
           # header and the poller beside them out of band. The poller has to come back
           # because it carries the digest it asked about, and one still asking about the
           # old digest would go on reporting the same news every fifteen seconds.
+          # The doorbell for the poll above: open for a while, and says `changed` the moment
+          # the sets differ from `since`. lib/tectonic/session_stream.rb carries the argument,
+          # including why it carries no markup and why it cannot hold a thread for long. #592.
+          r.get 'stream' do
+            unless SessionStream.claim
+              response.status = 204
+              next ''
+            end
+
+            r.halt [200, { 'content-type' => 'text/event-stream', 'cache-control' => 'no-cache',
+                           'x-accel-buffering' => 'no' },
+                    SessionStream::Body.new(@workout, r.params['since'].to_s)]
+          end
           r.get 'changes' do
             fresh = @workout.session_fingerprint
             if r.params['since'] == fresh

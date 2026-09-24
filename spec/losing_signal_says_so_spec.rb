@@ -214,14 +214,14 @@ describe 'the poller on a screen with a queue behind it' do
   # poller listens -- one extra trigger on an element that already exists, rather than a
   # second request of the queue's own asking the same question. #542.
   it 'refreshes the panels when the queue has finished sending' do
-    assert_match(/hx-trigger="every 15s, queue-drained from:body"/, @body)
+    assert_match(/hx-trigger="every 15s, queue-drained from:body[^"]*"/, @body)
   end
 
   # And it comes back on every tap carrying the same trigger, because this element replaces
   # itself out of band and a poller that forgot how to listen would leave the screen stale
   # after the first flush of the session rather than after none of them.
   it 'keeps the trigger through the swap that replaces it' do
-    assert_match(/hx-trigger="every 15s, queue-drained from:body"/, tap(@workout_id, @set_id))
+    assert_match(/hx-trigger="every 15s, queue-drained from:body[^"]*"/, tap(@workout_id, @set_id))
   end
 end
 
