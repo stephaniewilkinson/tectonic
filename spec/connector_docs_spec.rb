@@ -2,6 +2,7 @@
 
 require_relative 'spec_helper'
 require 'rack/test'
+require_relative '../lib/tectonic/body_readings'
 
 # The connector has documentation. #359.
 #
@@ -70,6 +71,16 @@ end
 # trail records field names and never values, which is true of the crash reports and not of the
 # log -- McpAuditLog.record stores the whole argument hash, which is the right design for an
 # audit trail and the wrong thing to claim the opposite of on a public page.
+# #634. This page said there was no bodyweight and no health data of any kind for months
+# after the Withings work began storing both. Each metric the reading tools know about is
+# named here in the words the page uses for it, and a metric added to BodyReadings::KNOWN
+# without a phrase fails the first assertion -- so the page cannot fall behind the app again
+# without a spec saying so.
+DOCS_STORED = { 'weight' => 'weight', 'lean_mass' => 'lean mass', 'fat_ratio' => 'fat percentage',
+                'fat_mass' => 'fat mass', 'standing_hr' => 'heart rate taken with a measurement',
+                'muscle_mass' => 'muscle mass', 'hydration' => 'hydration', 'bone_mass' => 'bone mass',
+                'sleep_hours' => 'how long you slept', 'sleep_window_hours' => 'over what window' }.freeze
+
 describe 'what the page says is stored' do
   include Rack::Test::Methods
   include ConnectorDocs
@@ -80,6 +91,16 @@ describe 'what the page says is stored' do
 
   it 'says the crash reports do, which is the half that is true' do
     assert_match(/error monitoring carries the names/, docs)
+  end
+
+  it 'names every health metric the app stores' do
+    assert_equal Tectonic::BodyReadings::KNOWN.sort, DOCS_STORED.keys.sort
+    prose = docs.gsub(/\s+/, ' ')
+    DOCS_STORED.each_value { |phrase| assert_includes prose, phrase }
+  end
+
+  it 'no longer claims to hold no health data' do
+    refute_match(/no health data/, docs)
   end
 
   # #346 wrote the terms and deliberately did not publish them: they sit in legal/ with no

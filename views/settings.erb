@@ -310,8 +310,9 @@
       </p>
     <%- elsif @withings[:state] == :absent %>
       <p class="mt-2 text-sm text-gray-600">
-        Connect your Withings account and the app can read your weight and body composition
-        alongside your training. It reads; it never writes anything back.
+        Connect your Withings account and the app can read your weight and body composition,
+        your sleep, and the activities your watch records, with their heart rate, alongside
+        your training. It reads; it never writes anything back.
       </p>
       <form method="post" action="/settings/withings/connect" class="mt-3">
         <%== csrf_tag('/settings/withings/connect') %>

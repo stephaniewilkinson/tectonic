@@ -110,11 +110,22 @@
   </p>
 
   <h2 class="mt-10 text-2xl font-semibold text-gray-900">What is stored</h2>
+  <%# #634. This said "no bodyweight, no measurements ... and no health data of any other
+      kind" until the Withings work made it false, and it went on saying so on the one page a
+      stranger reads before granting access. The list below is pinned against
+      BodyReadings::KNOWN by spec/connector_docs_spec.rb, so a metric the app starts storing
+      fails a spec until this sentence names it. %>
   <p class="mt-3 text-gray-700">
     Your email address, so you can sign in, and your training: workouts, sets, the movements
-    you do them on, the blocks you write, the plates you own, and your time zone. That is the
-    whole of it. There is no bodyweight, no measurements, no photographs and no health data of
-    any other kind.
+    you do them on, the blocks you write, the plates you own, and your time zone.
+  </p>
+  <p class="mt-3 text-gray-700">
+    If you connect Withings, and only then, it also stores what Withings sends about you: your
+    weight and body composition (lean mass, fat mass, fat percentage, muscle mass, hydration
+    and bone mass), the heart rate taken with a measurement, how long you slept and over what
+    window, and the activities your watch recorded, with their heart rate and calories. Weights
+    you type into the Withings app arrive the same way. Your assistant can read all of it.
+    There are no photographs, and nothing from any other health service.
   </p>
   <%# Written against the code rather than from memory, and corrected once while writing it: a
       first draft here said the audit log records field names and never values, which is true
