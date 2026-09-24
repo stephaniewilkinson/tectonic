@@ -42,6 +42,9 @@ class Tectonic < Roda
     # per call, on a screen that asks once. Somewhere that asked in a loop should read the zone
     # once and pass it to `today`, which is why that is the method this is built on rather than
     # the other way round.
+    #
+    # A page has the row already -- rodauth loaded it -- and passes its zone to `today` rather
+    # than asking again (#603). This is for the callers that have only the id.
     def today_for(account_id, now: Time.now)
       today(zone_of(account_id), now:)
     end
