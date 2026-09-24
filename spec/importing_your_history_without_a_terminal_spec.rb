@@ -230,13 +230,11 @@ describe 'what a press does to the rake task that shares the walk' do
     press(answering(@found))
   end
 
-  # #554, worked around deliberately. `attempt` stamps `workouts_backfilled_at` whenever the
-  # years it chose to walk all answered, and a slice walks a narrowed range by construction --
-  # so a press routed through `run(since:)` would stamp the watermark, `resumed_year` would
-  # raise the floor to this year, and every later press and every later rake run would believe
-  # the decade behind it had been read. One press, a claim of completeness, history gone.
-  it 'leaves the rake task\'s watermark alone' do
-    assert_nil connection(@account_id)[:workouts_backfilled_at]
+  # #554. One press reads one year, and must not let the rake task believe the years behind it
+  # have been read. The task now resumes off the range a press writes (#600), and only where
+  # that range reaches the first session -- which one press of this year does not.
+  it 'leaves the rake task walking back to the first session' do
+    assert_equal this_year - 2, Tectonic::WithingsBackfill.years_to_walk(@account_id, nil).last
   end
 
   it 'keeps its own cursor instead, naming the year it actually read' do

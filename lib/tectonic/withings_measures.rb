@@ -48,7 +48,7 @@ class Tectonic < Roda
   # (#557).
   #
   # The second, `measures_read_back_to`, says *how far back* -- which is a different claim and
-  # needs a different column, exactly as the backfill keeps `workouts_backfilled_at` off
+  # needs a different column, exactly as the backfill keeps its own read range off
   # `synced_at`. Together they describe one stretch of time: from the reach forward to
   # `synced_at`, every reading has been fetched. A read asks for that stretch's near end and
   # then walks backwards behind it, and each piece that arrives whole moves one watermark or
