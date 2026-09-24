@@ -75,7 +75,8 @@ class Tectonic < Roda
         # the table as it was a moment before the readings it triggered arrived.
         def self.perform(context:, arguments:)
           metric = named(arguments)
-          fresh = Freshness.checked(context, risk: GAP_RISK, source: arguments[:source])
+          fresh = Freshness.checked(context, risk: GAP_RISK, source: arguments[:source],
+                                             instrument: recorded_by(metric))
           from, to = bounds(context, arguments)
           rows = BodyReadings.in_window(context.health_metrics, metric:, from:, to:, source: arguments[:source])
           return empty(context, metric, from, to, fresh) if rows.empty?
@@ -92,6 +93,27 @@ class Tectonic < Roda
           instruments = BodyReadings.by_instrument(rows).map { |key, group| instrument(key, group, arguments) }
           ok(Freshness.told(summary(metric, from, to, instruments, arguments), fresh),
              structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments:, freshness: fresh })
+        end
+
+        # Which instrument a question is about, which only the metric name can say. #579.
+        #
+        # This is the one tool of the three that takes a metric, and it is therefore the only
+        # one that can be asked about something the scale never wrote. `bodyweight_trend` and
+        # `body_composition` are about a scale by construction and do not pass this at all.
+        #
+        # A list rather than a prefix match on "sleep", because a prefix is a rule about
+        # spelling and this is a rule about which service has the rows. `WithingsSleep::METRICS`
+        # is the same list the read writes from, so a metric added there triggers the right
+        # fetch without anybody remembering to say so in a second place -- which is exactly the
+        # join #533 was opened because nobody had made.
+        #
+        # Everything else falls to the scale, including a name nothing has ever written. That
+        # is deliberate and it is the cheaper mistake: a read of the scale that could not have
+        # helped costs one request inside a fifteen-minute floor, and the alternative -- asking
+        # neither -- would answer "no readings" about an account whose scale had never been
+        # read, which is the silent lie the whole of Freshness exists to remove.
+        def self.recorded_by(metric)
+          WithingsSleep::METRICS.include?(metric) ? :watch : :scale
         end
 
         # A metric name is free text in the table on purpose, so this refuses only the empty

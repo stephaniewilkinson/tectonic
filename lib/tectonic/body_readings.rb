@@ -54,7 +54,20 @@ class Tectonic < Roda
     # `metric` as free text on purpose, "because the set grows with every instrument and a
     # migration per metric is a migration nobody will write" -- so this is the list a model is
     # told about, and anything else a source writes is still readable by naming it.
-    KNOWN = %w[weight fat_mass lean_mass fat_ratio resting_hr sleep_minutes].freeze
+    #
+    # Two names in it were names nothing writes, which is the one thing this list must not
+    # contain: a model told to try `sleep_minutes` or `resting_hr` gets silence from them
+    # forever, and silence is what it would also get from a metric that genuinely has no rows
+    # yet. They were written here before either read existed, and both reads have since
+    # arrived under different names.
+    #
+    # `sleep_minutes` is now `sleep_hours` and `sleep_window_hours`, because #579's read
+    # stores hours -- a night is said in hours by the lifter and by Health Mate alike.
+    # `resting_hr` is now `standing_hr`, which is the name #581 chose for `getmeas` type 11
+    # and chose carefully: a pulse taken standing on a scale or sitting with a cuff on is not
+    # a resting heart rate in the sense anybody means by that. That file declined to claim
+    # `resting_hr`; this stops advertising it.
+    KNOWN = %w[weight fat_mass lean_mass fat_ratio standing_hr sleep_hours sleep_window_hours].freeze
 
     # The three figures a body composition read reports, in the order a reader wants them:
     # the bodyweight first, because it is the denominator everything else is read against.

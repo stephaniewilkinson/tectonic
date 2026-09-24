@@ -214,7 +214,21 @@ class Tectonic < Roda
     # :unreachable nothing arrived at all
     # :revoked     there is no usable token, which does mean the connection needs renewing
     # :absent      this account has never connected anything
-    Fetch = Struct.new(:outcome, :stored, :synced_at) do
+    #
+    # ## Shared with the sleep read, which is why the third member is not called `synced_at`
+    #
+    # #579 added a second read through the same grant, and the six outcomes above mean exactly
+    # what they mean here: a night that did not arrive is `:incomplete` for the same reason a
+    # quarter of weigh-ins is, and for the same reason neither may be rendered as an empty
+    # week. A second struct carrying the same six symbols is how two modules come to disagree
+    # about what one of them includes, which is the mistake `Withings.more?` exists to undo.
+    #
+    # So `read_at`, which is what the member has always held from a reader's point of view --
+    # `Freshness` has called it `last_read_at` since #533. The old name was this module's own
+    # column showing through the struct, and a sleep read putting `sleep_read_at` in a member
+    # called `synced_at` would put the one confusion 052 is a whole migration about back into
+    # the code that 052 keeps it out of the database.
+    Fetch = Struct.new(:outcome, :stored, :read_at) do
       def to_s = outcome.to_s
 
       # Whether what is in the table can be read as the whole story. A caller that ignores
