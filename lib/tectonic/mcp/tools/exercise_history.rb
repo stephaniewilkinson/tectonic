@@ -49,12 +49,34 @@ class Tectonic < Roda
           required: ['exercise'], additionalProperties: false
         )
 
+        #
+        # The completed history is read once, here, and every figure is taken from it: the
+        # estimate, the resolved max and the three recent windows. They used to read it for
+        # themselves -- the resolved max twice, once for the payload and once for the sentence
+        # -- which was four reads of one lifter's whole history of a movement per call, on the
+        # tool an assistant reaches for most. #590's speed-up pass found it; the exercise page
+        # had the same shape and #596 fixed it the same way.
         def self.perform(context:, arguments:)
           exercise = find(context, arguments[:exercise])
           rows = history(context, exercise, arguments).all
-          recent = recent_readings(context, exercise, arguments)
-          ok(summary(exercise, rows, context, arguments, recent),
-             structured: payload(context, exercise, rows, arguments).merge(recent:))
+          read = reading(context, exercise, as_of(context, arguments))
+          ok(summary(exercise, rows, read),
+             structured: payload(exercise, rows, arguments, read).merge(recent: read[:recent]))
+        end
+
+        # As of the end of the window rather than today, so asking about a block that finished
+        # in March is answered with what was true in March; without a window it means now,
+        # which is what "what can I lift" asks.
+        #
+        # The max goes through TrainingMax rather than repeating its fallback, so this and
+        # ProgramGenerator cannot come to different conclusions about the same movement --
+        # which would make this tool describe a block it is not generating.
+        def self.reading(context, exercise, on)
+          lifted = exercise.lifted_sets(context.account_id, on)
+          { estimated: OneRepMax.best_of(lifted),
+            max: TrainingMax.for(account_id: context.account_id, exercise:, on:, lifted:),
+            recent: exercise.recent_readings(account_id: context.account_id, windows: Volume::WINDOWS, on:, lifted:)
+                            .map { |window| readable(window) } }
         end
 
         # The movement by name among the ones this account can see, without creating it:
@@ -139,12 +161,12 @@ class Tectonic < Roda
         # assistant reaches for most. The keys are the same three `view_workout` carries, with
         # the same meanings, because a row of a history and a row of a list describing a date
         # differently would be the mismatch this fixes, one level down.
-        def self.payload(context, exercise, rows, arguments)
+        def self.payload(exercise, rows, arguments, read)
           { exercise: exercise.name, exercise_id: exercise.id, shown: rows.length,
-            limit: limit_for(arguments), estimated_1rm: estimated(context, exercise, arguments),
+            limit: limit_for(arguments), estimated_1rm: read[:estimated],
             typical_turnaround_seconds: turnaround(rows),
             sets: rows.map { |set| Presenter.view_set(set).merge(Presenter.dates(set.workout)) } }
-            .merge(max_fields(context, exercise, arguments))
+            .merge(max_fields(read[:max]))
         end
 
         # What the last twelve, twenty-six and fifty-two weeks each imply, beside the lifetime
@@ -170,13 +192,7 @@ class Tectonic < Roda
         # windows, because the windows are context for those rows rather than a summary of
         # them.
         # Read once in `perform` and handed to both the payload and the sentence, so the two
-        # cannot describe the same movement differently and the extra query is one rather than
-        # two.
-        def self.recent_readings(context, exercise, arguments)
-          exercise.recent_readings(account_id: context.account_id, windows: Volume::WINDOWS,
-                                   on: as_of(context, arguments))
-                  .map { |reading| readable(reading) }
-        end
+        # cannot describe the same movement differently -- see `reading`.
 
         # One window on its way out of the door. Both conversions are the kind of bug that only
         # shows up in the payload half, which is the half nobody reads by eye.
@@ -201,8 +217,7 @@ class Tectonic < Roda
         # day it is as of. Split out because they are one fact in three parts and because a
         # payload naming every field of every fact in one literal is a method doing several
         # jobs -- which rubocop counted before a reader would have.
-        def self.max_fields(context, exercise, arguments)
-          resolved = resolved_max(context, exercise, arguments)
+        def self.max_fields(resolved)
           { training_max: resolved&.pounds, training_max_source: resolved&.source,
             training_max_as_of: resolved&.on_date&.strftime('%Y-%m-%d') }
         end
@@ -211,22 +226,6 @@ class Tectonic < Roda
         # from one another. The rows carry workout_id already.
         def self.turnaround(rows)
           Timing.between_sets_of(rows.map(&:values))
-        end
-
-        # The max as of the end of the window rather than as of today, so asking about a
-        # block that finished in March is answered with what was true in March. Without a
-        # window it means now, which is what "what can I lift" asks.
-        def self.estimated(context, exercise, arguments)
-          exercise.estimated_max(account_id: context.account_id, on: as_of(context, arguments))
-        end
-
-        # What a percentage lift would generate against: the stated max if there is one and
-        # the derived reading otherwise. Through TrainingMax rather than repeating the
-        # fallback, so this and ProgramGenerator cannot come to different conclusions about
-        # the same movement -- which would make this tool describe a block it is not
-        # generating.
-        def self.resolved_max(context, exercise, arguments)
-          TrainingMax.for(account_id: context.account_id, exercise:, on: as_of(context, arguments))
         end
 
         def self.as_of(context, arguments)
@@ -243,11 +242,11 @@ class Tectonic < Roda
         # the next block will be built on, and it says which kind it is -- many clients show
         # only this text, and "max 315" that turns out to be a guess off a set from before a
         # layoff is the misreading #264 is about.
-        def self.summary(exercise, rows, context, arguments, recent)
+        def self.summary(exercise, rows, read)
           heaviest = Presenter.weight(rows.map(&:weight).compact.max)
           "#{exercise.name}: #{rows.length} set(s), heaviest #{heaviest || 'none'}, " \
-            "#{max_phrase(resolved_max(context, exercise, arguments))}#{pace(rows)}." \
-            "#{recent_phrase(recent)}"
+            "#{max_phrase(read[:max])}#{pace(rows)}." \
+            "#{recent_phrase(read[:recent])}"
         end
 
         # The windows in the sentence and not only in the payload, which is #262's lesson and
