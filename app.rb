@@ -324,9 +324,25 @@ class Tectonic < Roda
     #
     # `login_destination` is right here for the same reason it was right there: a brand new
     # account is exactly the case the first-run page was written for.
+    # Where the page that asked for a sign-in was saved -- the consent screen, most of all --
+    # it wins here as it does at login (#628). An account signing up to connect an assistant
+    # has that screen in its session, and the emailed link opened in the same browser
+    # carries it through; opened anywhere else it has nothing, and /start says why.
+    #
+    # Read before the account is verified rather than in the redirect, because verifying signs
+    # the account in and signing in starts a fresh session: by the time the redirect runs, the
+    # saved page has gone with the old one.
+    before_verify_account do
+      @requested_before_sign_up = session[login_redirect_session_key]
+    end
     verify_account_redirect do
       scope.ask_the_browser_for_the_zone(account_id)
-      scope.login_destination(account_id)
+      @requested_before_sign_up || scope.login_destination(account_id)
+    end
+    # The same saved page, read at sign-up, to note which assistant this account came here to
+    # connect. See migrate/056. The session value is left where it is for the redirect above.
+    after_create_account do
+      scope.remember_the_connection(account_id, session[login_redirect_session_key])
     end
     verify_account_email_sent_redirect { '/login' }
     # Two flashes where Rodauth uses one. `verify_account_email_sent_notice_flash` is the
@@ -436,6 +452,21 @@ class Tectonic < Roda
     # Neither hook overrides a deep link. Rodauth saves the path of a page that demanded a
     # login and prefers it, so someone who followed a link to a workout, or to the OAuth
     # consent screen, still arrives where they were going.
+    #
+    # That was the claim, and it was not true until #628: Rodauth only saves the page when
+    # `login_return_to_requested_location?` is on, and it defaults to off. So somebody pressing
+    # Connect in Claude while signed out signed in and landed on /start, and the assistant
+    # waited for a consent that never came. It is on now.
+    #
+    # Only for a page somebody navigated to. A background request that finds the session gone
+    # -- the session screen's poll, its doorbell -- would otherwise save a fragment or an event
+    # stream as the place to return to, and the next sign-in would land on a scrap of HTML.
+    login_return_to_requested_location? true
+    login_return_to_requested_location_path do
+      navigated = request.get? && !request.env['HTTP_HX_REQUEST'] &&
+                  !request.env['HTTP_ACCEPT'].to_s.include?('text/event-stream')
+      request.fullpath if navigated
+    end
     login_redirect { scope.login_destination(account_id) }
     # The same question is asked of a brand new account -- which has no zone by definition --
     # from `verify_account_redirect` above, and the note there is the one that explains why a
@@ -581,6 +612,7 @@ class Tectonic < Roda
     # who has trained for a year can still come back and read what a block is.
     r.get('start') do
       rodauth.require_login
+      @connecting = connecting_to(rodauth.account_from_session[:id])
       view('start')
     end
     # GET /
@@ -1945,6 +1977,27 @@ class Tectonic < Roda
   # signing in from an airport.
   def ask_the_browser_for_the_zone(account_id)
     session['zone.detect'] = true unless Clock.zone_of(account_id)
+  end
+
+  # Which assistant an account signed up to connect, from the consent screen it was sent to
+  # sign in for (#628). Nothing where the saved page was anything else, or there was none.
+  def remember_the_connection(account_id, saved)
+    return unless saved.to_s.start_with?('/authorize')
+
+    client_id = Rack::Utils.parse_query(URI(saved).query.to_s)['client_id']
+    application_id = client_id && DB[:oauth_applications].where(client_id:).get(:id)
+    DB[:accounts].where(id: account_id).update(signed_up_connecting_id: application_id) if application_id
+  end
+
+  # The assistant's name, while the connection it came here for has still not been made: the
+  # note on /start is for somebody who confirmed their address somewhere the consent screen
+  # could not follow, and it has nothing to say once they have connected.
+  def connecting_to(account_id)
+    application_id = DB[:accounts].where(id: account_id).get(:signed_up_connecting_id)
+    return nil unless application_id
+    return nil unless DB[:oauth_grants].where(account_id:, oauth_application_id: application_id).empty?
+
+    DB[:oauth_applications].where(id: application_id).get(:name)
   end
 
   # `today` is the lifter's, not the server's (#349). This is the first of the three failures
