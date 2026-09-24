@@ -105,10 +105,26 @@ class Tectonic < Roda
     #
     # Scoped through the account's own workouts rather than by exercise alone, because a
     # library movement is shared and the training on it is not.
+    # Ordered, and it had no order at all until #593 caught it -- by accident, which is the
+    # only way this kind of thing is ever caught. A SELECT without an ORDER BY may come back in
+    # whatever order Postgres finds convenient, and what it finds convenient depends on the
+    # physical layout of the table: `group_by` below preserves first-seen order, so the dates
+    # on the x axis of every chart on a movement's page were in whatever order the rows
+    # happened to be read in. It was reliably the insertion order on a table nobody had deleted
+    # from, which is why it looked settled for as long as it did; a suite that empties its
+    # tables between tests reuses the freed space and hands them back in another order, and one
+    # spec asserting on the sequence of two dates started failing depending on what ran before
+    # it. This is the same argument `Workout.one_to_many :sets, order: :id` makes in #217, in
+    # the same words, about the same mistake.
+    #
+    # By day and then by id: a chart is read left to right along a time axis, and two sets
+    # lifted on one day are ordered as they were logged, which is the order the session screen
+    # and the set list already agree on.
     def lifted_sets(account_id, exercise_id, today)
       mine = Workout.where(account_id:).where { date < (today + 1) }.select(:id)
       WorkoutSet.where(exercise_id:, workout_id: mine, is_completed: true)
-                .join(:workouts, id: :workout_id).select(*READ_COLUMNS).all.map(&:values)
+                .join(:workouts, id: :workout_id).select(*READ_COLUMNS)
+                .order(Sequel[:workouts][:date], Sequel[:sets][:id]).all.map(&:values)
     end
 
     # Qualified because `date` is on workouts while the rest are on sets, and unqualified it is

@@ -23,7 +23,12 @@ class Tectonic < Roda
         title 'List sessions'
         description "List the account's workouts, most recent first, with set counts, " \
                     'whether each is planned, performed or skipped, and how long each one ' \
-                    'took. Narrow with from/to (YYYY-MM-DD) and limit; the default is the ' \
+                    'took. Each row carries three dates: performed_or_planned_on is the day ' \
+                    'it was trained and is the one the app itself shows; date is the day the ' \
+                    'session was written for, and is what from/to match on and what ' \
+                    'get_workout takes; performed_on is null until something in it has been ' \
+                    'ticked off. They differ whenever a session was trained early or late. ' \
+                    'Narrow with from/to (YYYY-MM-DD) and limit; the default is the ' \
                     "#{DEFAULT_LIMIT} most recent."
         scope :read
         input_schema(
@@ -39,8 +44,22 @@ class Tectonic < Roda
           # them and the timing subtracts their stamps. Without it that is a query a workout
           # -- twenty for a default page -- which is #234's shape in the one list that had
           # escaped it. Two queries now, however long the page.
-          workouts = matching.with_performance.order(Sequel.desc(:date), Sequel.desc(:id))
-                             .limit(limit_for(arguments)).eager(:sets).all
+          #
+          # eager(:program_day) is #594 and it is the list-page ticket's bug in a tool:
+          # `view_workout` prints `label`, which is `name || program_day&.focus`, so every
+          # generated session nobody renamed was a primary-key lookup of its own. Production
+          # has 32 of 54 taking that branch.
+          #
+          # with_performed_on rather than with_performance is #606, and the two halves of that
+          # issue are one change. The rows print a date apiece and since #572 the date a
+          # session is known by is the day it was trained; this tool printed the stored column,
+          # so the app said Wednesday and the connector said Friday about the same session.
+          # Reading the right date without asking for it in this query would have cost a query
+          # per workout through `performed_on`'s fallback -- the same shape as the eager loads
+          # beside it, arriving while it was being removed. with_performed_on is
+          # with_performance plus one correlated subquery, so this is the same one query.
+          workouts = matching.with_performed_on.order(Sequel.desc(:date), Sequel.desc(:id))
+                             .limit(limit_for(arguments)).eager(:sets, :program_day).all
           ok(summary(workouts, total, context.today),
              structured: payload(workouts, total, arguments, context.today))
         end
@@ -109,10 +128,19 @@ class Tectonic < Roda
         # One workout: when, what it is called, how much of it is done, and where it sits
         # in the plan. `label` rather than `name` because a generated session has no name
         # of its own and is known by its program day's focus.
+        #
+        # Dated by `performed_or_planned_on` since #606, with the plan date after it where the
+        # two differ. This line is the whole answer for a client that renders only the text,
+        # and on the reporting account sessions are routinely trained two days from the day
+        # they were written for -- so a lifter reading /workouts and an assistant reading this
+        # were describing the same session by different days and neither said which. The
+        # parenthesis is what keeps that legible rather than merely moved: a row now says the
+        # session happened on Wednesday *and* that Friday is what from/to would match it on.
         def self.row(workout, on)
           view = Presenter.view_workout(workout)
           done = "#{view[:completed]} of #{view[:sets]} set(s) done"
-          "  [workout #{view[:id]}] #{view[:date]}#{" #{view[:label]}" if view[:label]}: " \
+          "  [workout #{view[:id]}] #{view[:performed_or_planned_on]}#{Presenter.planned_for(view)}" \
+            "#{" #{view[:label]}" if view[:label]}: " \
             "#{done}, #{workout.status(on)}#{', finished' if view[:finished]}#{took(workout)}"
         end
 

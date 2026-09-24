@@ -34,7 +34,7 @@ class Tectonic < Roda
         def self.perform(context:, arguments:)
           program = ProgramFinder.program(context, arguments[:program_id])
           week = week_for(context, program, arguments[:week])
-          workouts = generate(context, program, week)
+          workouts = written(context, generate(context, program, week))
           lengths = estimate_each(context, program, workouts)
           ok("Week #{week.number} of #{program.name} is scheduled: #{summary(workouts)}." \
              "#{budget_sentence(program, lengths)}",
@@ -114,8 +114,33 @@ class Tectonic < Roda
           raise Tool::Refusal, e.message
         end
 
+        # The sessions the generator just wrote, read back in one query with their sets and
+        # their completion stamps. #594, #606.
+        #
+        # The generator hands back model rows it built one at a time, and everything below
+        # reads their sets -- the estimate, the summary and `Presenter.view_workout` -- so
+        # this was already a query per session through the association, four or five a call.
+        # #606 makes `view_workout` read `performed_on` as well, which on rows no query asked
+        # for it on is a second one each. Two queries here rather than eight or ten there, and
+        # the one place that had to change was the fetch rather than three readers.
+        #
+        # Ordered explicitly because the order is what the summary prints and what a lifter
+        # reads as their week; the generator's own order is not something this can assume
+        # survives a round trip through the database.
+        def self.written(context, generated)
+          context.workouts.where(id: generated.map(&:id))
+                 .with_performed_on.eager(:sets).order(:date, :id).all
+        end
+
+        # Through `performed_or_planned_on` rather than the column, which on a week this call
+        # has just written is the same date by construction -- nothing in it has been lifted
+        # yet. It is written that way anyway because #606 is about renderings of a session's
+        # date that read the column directly, and one that is harmless today is one somebody
+        # copies tomorrow into a place where it is not.
         def self.summary(workouts)
-          workouts.map { |w| "#{w.date.strftime('%a %b %-d')} (#{w.sets.count} sets)" }.join(', ')
+          workouts.map do |workout|
+            "#{workout.performed_or_planned_on.strftime('%a %b %-d')} (#{workout.sets.count} sets)"
+          end.join(', ')
         end
       end
     end

@@ -21,7 +21,10 @@ class Tectonic < Roda
                     'whether each was a warmup and whether it was completed, what the ' \
                     'program prescribed, the session rating, and how long it took. Give a ' \
                     "date ('today' or YYYY-MM-DD) or a workout_id, which list_workouts and " \
-                    'search return.'
+                    'search return. The date argument matches the day the session was ' \
+                    'written for, which is the `date` field; the reply also carries ' \
+                    'performed_or_planned_on, the day it was actually trained and the one ' \
+                    'the app shows, and performed_on, which is null until it has been.'
         scope :read
         input_schema(
           type: 'object',
@@ -45,8 +48,15 @@ class Tectonic < Roda
         # many clients render only the text -- and this is the sentence that was misread.
         # A session sitting at "3 completed, performed" reads as one still under way, which
         # is the whole of #218; the word is what closes it.
+        # Headed by the day it was trained since #606, with the day it was written for after it
+        # where those differ -- the same sentence list_workouts' rows now carry, built by the
+        # same helper so one session cannot be described two ways by two tools. This is the
+        # line a client that renders only text shows, and it was the plan date: "how did Monday
+        # go" answered under Wednesday's heading, on an account where a session lands two days
+        # from its plan as a matter of course.
         def self.headline(detail)
-          "#{detail[:date]}: #{detail[:sets].count} set(s), #{done(detail)} completed, " \
+          "#{detail[:performed_or_planned_on]}#{Presenter.planned_for(detail)}: " \
+            "#{detail[:sets].count} set(s), #{done(detail)} completed, " \
             "#{detail[:status]}#{', finished' if detail[:finished]}#{timing(detail)}."
         end
 
@@ -196,8 +206,13 @@ class Tectonic < Roda
             (raise Tool::Refusal, "No workout on #{date.strftime('%Y-%m-%d')} for this account.")
         end
 
+        # with_performed_on so the completion stamp arrives on the row this query already
+        # fetches (#606). One session, so the alternative is one further query rather than an
+        # N+1 -- but it is a correlated subquery on a select that was happening anyway, and
+        # `Workout#performed_on`'s own comment asks callers to ask for it in the query that
+        # fetches the rows.
         def self.by_id(context, id)
-          context.workouts.where(id:).first ||
+          context.workouts.with_performed_on.where(id:).first ||
             (raise Tool::Refusal, "No workout with id #{id.inspect} on this account.")
         end
 

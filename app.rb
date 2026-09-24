@@ -1064,7 +1064,17 @@ class Tectonic < Roda
         # find `Overhead Press` in is no better served by insertion order than a menu is. The
         # Source column is where the library/own split shows here, which is what makes the
         # library sitting above the account's own readable rather than arbitrary.
+        #
+        # eager for the same reason the workouts list has one (#593): the Source column prints
+        # `provenance(exercise)`, which walks `created_by_oauth_application` per row. Production
+        # has 28 of 84 movements created by an assistant, so this was 28 primary-key lookups on
+        # a page that is otherwise a handful. It is one query now whatever the library holds.
+        # `.all` and not only `.eager`: Sequel applies an eager load in `all`, and a dataset
+        # handed to a template to enumerate never reaches it -- the page would read exactly as
+        # it does now and go on issuing the query per row. That is the whole failure mode this
+        # file is about, so it is worth the six characters and this sentence.
         @exercises = Exercise.visible_to(@account_id).library_first_by_name
+                             .eager(:created_by_oauth_application).all
         # The stated maxes, in one query rather than one per row. #411 keeps the training
         # maxes visible when the programme screens go, on the grounds that "squat at 80%" is
         # only meaningful beside "squat max 191, set 31 Aug" -- and this is the page every
@@ -1596,8 +1606,22 @@ class Tectonic < Roda
         # plus one correlated subquery, so this is the same one query it always was.
         # Read once rather than per workout: this is a query, and asking it inside the
         # partition would ask it once per row of the list it is partitioning.
+        #
+        # The two eager loads are #593, and they are the same mistake twice on one page. Each
+        # row prints `workout.label`, which is `name || program_day&.focus`, and each row prints
+        # `provenance(workout)`, which is `created_by_oauth_application&.name`. Both are
+        # many_to_one walks, so both were a query per row of the list -- and a nil key answers
+        # nil without asking, which is why the version of this page a lifter sees and the
+        # version spec/query_count_spec.rb measured were not the same page. The fixture wrote
+        # sessions with neither column set. Production has 32 of 54 carrying a program day and
+        # no name, so the list cost about 36 queries against a ceiling of 10 and nothing failed.
+        #
+        # Two further queries whatever the list holds, and nothing about what either field means
+        # changes: the focus is still read through the day, so renaming a programme day still
+        # renames every session it wrote.
         @today = Clock.today_for(@account_id)
         planned, history = Workout.where(account_id: @account_id).with_performed_on.with_set_count
+                                  .eager(:program_day, :created_by_oauth_application)
                                   .reverse(:date).all
                                   .partition { |workout| workout.status(@today) == :planned }
         @upcoming = planned.reverse

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'date'
+require_relative '../applications'
 require_relative '../tool'
 require_relative '../../exercises'
 # Exercise.barbell_by_name?, the default the resolver gives a movement it has to create.
@@ -351,9 +352,16 @@ class Tectonic < Roda
         # The account's workout on a date without opening one, for the read and edit
         # tools: a question about a day that was never trained has to be answerable as
         # "nothing there" rather than by quietly creating an empty session to answer it.
+        #
+        # Matched on the stored date and not on when it was trained, which is the half of
+        # #606 that is deliberately left alone. A date argument names a session, and the
+        # column is the thing a session is filed under -- `update_workout` writes it, the
+        # edit form posts it, and the plan is what "Friday's session" means before Friday.
+        # Fetched `with_performed_on` so that whatever renders the row can say when it was
+        # actually trained without going back for the stamp one session at a time.
         def find_workout(context, date:)
           day = date.is_a?(Date) ? date : parse_date(date, on: context.today)
-          context.workouts.where(Sequel.cast(:date, :date) => day).order(:id).first
+          context.workouts.with_performed_on.where(Sequel.cast(:date, :date) => day).order(:id).first
         end
 
         # One of the account's sets by id, refusing rather than returning nil: a set id
@@ -417,10 +425,68 @@ class Tectonic < Roda
         # listed through a fresh query, so one response could say "2 completed" over three
         # completed sets. A list still passes nothing and still costs no extra query.
         def view_workout(workout, sets = workout.sets)
-          { id: workout.id, date: workout.date.strftime('%Y-%m-%d'), name: workout.name,
-            label: workout.label, note: workout.note, sets: sets.count,
-            completed: sets.count(&:is_completed), finished: workout.finished? }
-            .merge(provenance(workout))
+          { id: workout.id, name: workout.name, label: workout.label, note: workout.note,
+            sets: sets.count, completed: sets.count(&:is_completed), finished: workout.finished? }
+            .merge(dates(workout)).merge(provenance(workout))
+        end
+
+        # When a session happened, as three separate facts, because one field could not carry
+        # them and one field is what #606 is about.
+        #
+        # Every screen in this app dates a session by `Workout#performed_or_planned_on` --
+        # when it was trained if a set was ever ticked, and otherwise the day it is written
+        # for. This surface printed `workouts.date` raw, which is only ever the second of
+        # those. On the reporting account sessions are routinely trained two days before their
+        # plan date, so `/workouts` said Wednesday and `list_workouts` said Friday about the
+        # same session, and **"what did I do on Wednesday" got different answers from the app
+        # and from the connector**. Neither said which date it was using.
+        #
+        # The obvious fix -- make `date` mean what every screen means -- is the one not taken,
+        # and the reason is that `date` is not only a field here, it is a *key*.
+        # `get_workout(date:)`, `list_workouts(from:/to:)` and `update_workout(date:)` all
+        # match on the stored column, so a `date` that had quietly become the trained one
+        # would not find the session it came out of. An assistant reading a date and handing
+        # it back is the commonest thing an assistant does with one.
+        #
+        # So `date` keeps its meaning and stops being the only answer:
+        #
+        # * `date` -- the day the session is written for. What the date arguments match on.
+        # * `performed_on` -- the day the first set was ticked. Null until something is.
+        # * `performed_or_planned_on` -- the two combined by the rule every screen applies.
+        #
+        # Three keys rather than two because the fallback is the half a careless reader gets
+        # wrong, and `Workout#performed_or_planned_on`'s own comment says so: handed a null
+        # `performed_on` and left to combine them, a reader who forgets blanks the date of
+        # every session nobody has trained yet -- which takes away the only thing a planned
+        # session has to say for itself. The name is the method's, spelled out, because a
+        # shorter one is a name that can be misread as a claim: a session never trained has a
+        # `performed_or_planned_on` and has not been performed, and anything called
+        # `trained_on` would be lying about half the rows in the table.
+        #
+        # `performed_on` comes off the row where the query asked for it (`with_performed_on`)
+        # and otherwise costs one query for the one session -- the same shape `performed?` and
+        # `set_count` have. Every caller here that draws a *list* asks for it in the fetch;
+        # see the datasets in list_workouts, exercise_history and Locator.found_workouts.
+        def dates(workout)
+          { date: workout.date.strftime('%Y-%m-%d'),
+            performed_on: workout.performed_on&.to_date&.strftime('%Y-%m-%d'),
+            performed_or_planned_on: workout.performed_or_planned_on.strftime('%Y-%m-%d') }
+        end
+
+        # The plan date in a sentence, and only where it is not the date the sentence already
+        # gave. Three tools print a session's date in prose -- list_workouts' rows,
+        # get_workout's headline and the connector's fetch document -- and plenty of clients
+        # render only that prose, which is #262's lesson and the reason those sentences carry
+        # what they carry. Printing the trained date alone would leave a text-only client
+        # unable to see that a session was moved at all; printing both on every row would put
+        # the same date twice on the nineteen sessions in twenty that were trained as written.
+        #
+        # One helper rather than three copies, on the same argument `load_phrase` makes about
+        # a set: one session must not be described two ways by two tools.
+        def planned_for(view)
+          return '' if view[:performed_or_planned_on] == view[:date]
+
+          " (planned for #{view[:date]})"
         end
 
         # planned_weight and planned_reps ride along with what was lifted, because the
@@ -535,8 +601,14 @@ class Tectonic < Roda
         # `on` is the lifter's today (#349), passed by every caller that has a request context.
         # It defaults to the server's so a caller without one reads as it always did -- and so
         # that forgetting is an hour of wrongness rather than a crash.
+        # eager(:exercise) is #594, and it is the precedent the set list page set in #234
+        # (`app.rb`, `@sets = @workout.sets_dataset.eager(:exercise)`) arriving on the surface
+        # that needed it more. `view_set` below prints `set.exercise.name`, a many_to_one, so
+        # a twenty-set session was twenty primary-key lookups after this query and a
+        # forty-set one was forty. Two queries now, whatever the session holds -- and this is
+        # the tool an assistant calls on nearly every turn that writes anything.
         def view_workout_detail(workout, on: Date.today)
-          sets = workout.sets_dataset.order(:id).all
+          sets = workout.sets_dataset.order(:id).eager(:exercise).all
           timing = Timing.session(workout, sets.map(&:values))
           view_workout(workout, sets).merge(
             status: workout.status(on).to_s, program_day_id: workout.program_day_id,
@@ -569,8 +641,21 @@ class Tectonic < Roda
         end
 
         # Who and when, both nil for a human-made row so a client can tell the two apart.
+        #
+        # Through Applications rather than the `created_by_oauth_application` association
+        # since #594. The association is a many_to_one, so this was one
+        # `SELECT * FROM oauth_applications WHERE id = N` per row of every payload -- and the
+        # table has two rows in the whole production database. It is read once per tool call
+        # now and this is a hash lookup; see lib/tectonic/mcp/applications.rb for why once per
+        # call rather than once per fetch site.
+        #
+        # The association stays on the three models. app.rb's own `provenance` helper draws
+        # the same line on six pages and reaches it through Sequel, and the eager loads the
+        # workouts list and the exercises list grew in #593 are that association being used
+        # properly. What was wrong was walking it a row at a time, not the association.
         def provenance(record)
-          { created_by: record.created_by_oauth_application&.name, created_at: record.created_at&.iso8601 }
+          { created_by: Applications.name_of(record.created_by_oauth_application_id),
+            created_at: record.created_at&.iso8601 }
         end
       end
 
@@ -596,8 +681,13 @@ class Tectonic < Roda
           context.exercises.where(Sequel.ilike(:name, like)).limit(20).all
         end
 
+        # Matched on the stored date, because that is the column and a search is a string
+        # against it; titled by when the session was trained, because that is what every
+        # screen calls it (#606). with_performed_on is what makes the second of those one
+        # query rather than one per hit -- twenty of them at this limit.
         def found_workouts(context, like)
-          context.workouts.where(Sequel.ilike(Sequel.cast(:date, :text), like)).limit(20).all
+          context.workouts.where(Sequel.ilike(Sequel.cast(:date, :text), like))
+                 .with_performed_on.limit(20).all
         end
 
         def found_programs(context, like)
@@ -625,8 +715,13 @@ class Tectonic < Roda
           { id: "exercise:#{exercise.id}", title: exercise.name, url: url('exercises', exercise.id) }
         end
 
+        # Titled by `performed_or_planned_on` since #606: a search result is a thing a person
+        # reads and clicks through to a page, and the page it opens is headed with that date.
+        # A result that names a different day from the screen behind it is the mismatch that
+        # issue is about, arriving in the one place a lifter would see both at once.
         def workout_result(workout)
-          { id: "workout:#{workout.id}", title: "Workout on #{workout.date.strftime('%Y-%m-%d')}",
+          { id: "workout:#{workout.id}",
+            title: "Workout on #{workout.performed_or_planned_on.strftime('%Y-%m-%d')}",
             url: url('workouts', workout.id) }
         end
 
@@ -667,8 +762,10 @@ class Tectonic < Roda
 
           detail = Presenter.view_workout_detail(workout)
           lines = detail[:sets].map { |set| "#{set[:exercise]} #{set[:weight]}x#{set[:reps]}" }.join(', ')
-          workout_result(workout).merge(text: "Workout on #{workout.date.strftime('%Y-%m-%d')}: #{lines}.",
-                                        metadata: detail)
+          workout_result(workout).merge(
+            text: "Workout on #{detail[:performed_or_planned_on]}#{Presenter.planned_for(detail)}: #{lines}.",
+            metadata: detail
+          )
         end
 
         def program_document(program)

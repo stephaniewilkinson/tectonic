@@ -27,6 +27,10 @@ class Tectonic < Roda
         title 'History of a movement'
         description "The account's own sets of one movement (by name), newest first, with " \
                     'the dates they were lifted and the estimated one-rep max they support. ' \
+                    'Each set carries three dates: performed_or_planned_on is the day it was ' \
+                    'trained and is what the app itself shows; date is the day its session ' \
+                    'was written for, which is what from/to match on; performed_on is null ' \
+                    'until something in that session was ticked off. ' \
                     'Narrow with from/to (YYYY-MM-DD). Completed sets only by default, which ' \
                     'is what training history means; pass include_planned for written but ' \
                     'unlifted sets too. Also reports how long this lifter typically takes ' \
@@ -65,10 +69,25 @@ class Tectonic < Roda
           Resolver.existing_exercise(context, name)
         end
 
+        # Two eager loads, and between them they are most of #594. Every row of the payload
+        # reads `set.exercise.name` through `Presenter.view_set` and `set.workout` for the
+        # date, and both are many_to_one walks -- so this tool cost three queries a set. At
+        # the default limit that is 161 for fifty rows; at `MAX_LIMIT` it is **611 in a single
+        # tool call**, on one of five connections inside a 20-second budget, which makes it
+        # the largest request this app can be asked to serve. It is four queries now whatever
+        # the limit.
+        #
+        # The sessions are loaded `with_performed_on` rather than plain, because the date on
+        # each row is the day the set was lifted rather than the day its session was written
+        # for (#572, #606) -- and `performed_on` unasked-for falls back to a query per
+        # workout, which would put the N+1 straight back by the other door. An eager_block is
+        # how a many_to_one says which dataset to load through; it is the same association,
+        # asked for one column more.
         def self.history(context, exercise, arguments)
           rows = context.sets.where(exercise_id: exercise.id).order(Sequel.desc(:id))
           rows = rows.where(is_completed: true) unless arguments[:include_planned]
           window(context, rows, arguments).limit(limit_for(arguments))
+                                          .eager(:exercise, workout: proc(&:with_performed_on))
         end
 
         # Dates live on the workout, not the set, so a window is a filter on the sessions
@@ -110,11 +129,21 @@ class Tectonic < Roda
         # numbers instead of in a constant somebody chose. Off the rows already fetched, so
         # it costs no query, and nil where nothing can be measured: a movement lifted once,
         # and every movement whose sets predate #281. A zero would read as instantaneous.
+        #
+        # The date on a row is `Presenter.dates` since #606, which is three keys where there
+        # was one. It used to be `set.workout.date` -- the plan date, the one date this
+        # surface had that no screen in the app agrees with. The description above promises
+        # "the dates they were lifted" and that was the field that was not answering it: a set
+        # lifted on Wednesday against a session written for Friday was reported as Friday, so
+        # a question about last week got an answer off by two days, silently, from the tool an
+        # assistant reaches for most. The keys are the same three `view_workout` carries, with
+        # the same meanings, because a row of a history and a row of a list describing a date
+        # differently would be the mismatch this fixes, one level down.
         def self.payload(context, exercise, rows, arguments)
           { exercise: exercise.name, exercise_id: exercise.id, shown: rows.length,
             limit: limit_for(arguments), estimated_1rm: estimated(context, exercise, arguments),
             typical_turnaround_seconds: turnaround(rows),
-            sets: rows.map { |set| Presenter.view_set(set).merge(date: set.workout.date.strftime('%Y-%m-%d')) } }
+            sets: rows.map { |set| Presenter.view_set(set).merge(Presenter.dates(set.workout)) } }
             .merge(max_fields(context, exercise, arguments))
         end
 

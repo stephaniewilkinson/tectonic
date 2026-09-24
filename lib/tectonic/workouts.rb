@@ -280,20 +280,34 @@ class Tectonic < Roda
     # after the question, which every one of those pages is asking: *performed if we know, and
     # otherwise planned*.
     #
-    # All seven go through here now. The Withings review list was the last and the only one
+    # All seven pages go through here. The Withings review list was the last and the only one
     # that was not a template edit: `WithingsProposals.waiting` handed the view plain
     # `DB[:workouts]` hashes, which have no method to call, and sorted the queue by the same
     # raw column -- so it fetches `Workout` rows `with_performed_on` and sorts on this instead,
     # and the order the questions arrive in moved with the date deliberately. A list labelled
     # by one date and ordered by another is worse than one that is merely wrong about both.
     #
-    # That "six of seven" is now "seven of seven" is worth saying in the method rather than
-    # only in a pull request, because "it was done everywhere" assumed from the outside is the
-    # exact mistake that made #572 in the first place: the old name described the one caller it
-    # had, and three years of issues closed on the belief that the rule had been applied
-    # generally. A reader who wants to know which screens obey this should be able to find out
-    # from here -- and anything that renders a session's date and does not call this is the
-    # eighth, whatever the comment says.
+    # **This comment used to say "seven of seven", and that was the wrong shape of claim.**
+    # #606 is what it cost: the MCP surface had been rendering a session's date off the raw
+    # column the whole time -- `Presenter.view_workout`, `exercise_history`'s rows, the
+    # connector's search titles -- so a lifter reading /workouts saw Wednesday and an
+    # assistant reading `list_workouts` saw Friday about the same session, and nobody looking
+    # for stragglers found them, because the method they would have looked in said there were
+    # none. A count is a claim about code the counter did not read. It closed the question it
+    # was written to keep open, which is the same failure as the name it replaced: `on_calendar`
+    # described the one caller it had, this described a total it could not check, and both
+    # invited a reader to stop looking.
+    #
+    # So: no count. **Every rendering of a session's date goes through here, and any that does
+    # not is a bug** -- the seven pages, and since #606 the connector too, where the rule needs
+    # one more thing said about it. The stored column is what a date *argument* matches on,
+    # because that is what files a session, so the MCP payloads carry both and name them; see
+    # `Presenter.dates`. That is the one place in the app where a reader is shown two dates on
+    # purpose, and it is because a reader there is a machine that will hand one of them back.
+    #
+    # If you are adding a screen, a tool or a payload that prints when a session happened, it
+    # calls this. Checking that is a grep for `\.date` on a `Workout`, not a number in a
+    # comment.
     #
     # The argument the old name's comment made is the argument this one makes, and it is worth
     # restating rather than dropping, because it is the thing that keeps getting lost: **the
