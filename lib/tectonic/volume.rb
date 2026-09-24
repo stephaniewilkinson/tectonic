@@ -20,6 +20,14 @@ class Tectonic < Roda
   # not a completion; `where(is_completed: true)` renders as IS TRUE, so nulls are out.
   module Volume
     # Postgres truncates to a Monday, which is the week a training block is written in.
+    #
+    # `workouts.date` on purpose, and this is the one place in the app that reads it rather
+    # than `Workout#performed_or_planned_on` (#572, #606). A chart of weekly tonnage is a
+    # reading of a *block*, and a session trained on Sunday instead of the Monday it was
+    # written for belongs to the week that prescribed it -- moving it would take a week's
+    # work out of the week that planned it and hand it to the one before. That is the opposite
+    # of what every screen showing a single session does, deliberately, because a session's
+    # own date answers "when did I train" and a bucket answers "what did that week hold".
     WEEK = Sequel.function(:date_trunc, 'week', Sequel[:workouts][:date])
     # The columns these aggregates read. Named once because every query below qualifies
     # the same handful across a three-table join, and spelled-out qualification is what

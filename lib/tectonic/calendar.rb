@@ -123,9 +123,16 @@ class Tectonic < Roda
     # It was called `on_calendar` until #572 -- named for this caller, which is how it came to
     # have only this caller while six other pages went on printing the plan. Same rule, same
     # fallback, a name that says what it answers rather than who asks.
+    #
+    # eager(:program_day) is #593, and this grid is the half of that issue nobody was looking
+    # at: `entries` below reads `label` on every session it draws, `label` is
+    # `name || program_day&.focus`, and `program_day` is a many_to_one. So a month of a
+    # four-day block was sixteen `SELECT * FROM program_days WHERE id = N` after this query --
+    # and spec/query_count_spec.rb, which exists to catch exactly that, did not measure the
+    # front page at all. It does now. One further query whatever the month holds.
     def by_day(account_id, from, to)
       Workout.where(account_id:).where(within(from, to))
-             .with_performed_on.order(:date, :id).all
+             .with_performed_on.eager(:program_day).order(:date, :id).all
              .group_by(&:performed_or_planned_on)
     end
 

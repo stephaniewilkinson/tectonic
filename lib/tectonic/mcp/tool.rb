@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'mcp'
+require_relative 'applications'
 require_relative 'config'
 require_relative 'logging'
 require_relative 'request_context'
@@ -131,11 +132,16 @@ class Tectonic < Roda
           @clock = now
         end
 
+        # Applications.during wraps the body rather than the whole method, because the gate
+        # and the audit row below it name no creator and a refusal should not read a table to
+        # say no. See lib/tectonic/mcp/applications.rb for what it is and why the binding is
+        # opened here: this is the one place every tool body runs inside, and per-call state
+        # is what this object already exists to hold.
         def run
           reason = gate
           return refuse(reason) if reason
 
-          finish(@tool.perform(context: @context, arguments: @arguments))
+          finish(Applications.during { @tool.perform(context: @context, arguments: @arguments) })
         rescue Refusal => e
           refuse(e.message)
         rescue StandardError => e
