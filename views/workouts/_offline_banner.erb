@@ -1,8 +1,9 @@
-<%# "You are offline", said out loud on the one screen where silence costs a session. #516.
+<%# What happens to a Done tap that never reaches the server. #516 said so out loud; #542
+    holds on to it and sends it again.
 
-    The bug is the whole of htmx's swap rule. A failed request swaps nothing, so a Done tap
-    that never reached the server and a Done tap that never happened produce exactly the
-    same screen: the row does not tint, the count stays at "2 of 12", and the rest timer
+    The bug underneath is the whole of htmx's swap rule. A failed request swaps nothing, so a
+    Done tap that never reached the server and a Done tap that never happened produce exactly
+    the same screen: the row does not tint, the count stays at "2 of 12", and the rest timer
     does not start. Three sets into squats in a basement gym the bars drop to nothing, the
     lifter taps Done, taps it again harder, assumes it did not land, and carries on lifting.
     At the end the app has recorded two sets out of twelve and has said nothing about the
@@ -15,20 +16,29 @@
     takes away the clock -- and a lifter staring at a rest timer that never started has no
     reason at all to suspect the log.
 
-    This is (a) of the three problems #516 separates, and only (a). Nothing here is queued
-    and nothing is replayed: that is stage 2 of the issue and it is blocked on an endpoint
-    that is safe to send twice, which the complete route is not -- the primary tap toggles,
-    deliberately, so a replayed Done marks the set done and then un-does it. Nothing here is
-    served from a cache either, which is stage 3 and needs a service worker. What is left
-    costs no storage, no service worker and no Ruby, and it is most of the value: it turns a
-    silent data-loss bug into an honest one, which is the difference between a lifter who
-    knows to re-tap ten sets and a lifter who finds out a week later.
+    #516 separated three problems and this file now carries two of them. (a) was saying it:
+    turning a silent data-loss bug into an honest one, which is most of the value and costs
+    no storage and no Ruby. (b) is this: the tap is written to IndexedDB with the moment it
+    was made on it and sent when anything reaches the server again, so a basement session
+    logs itself completely and the lifter never has to remember what the app missed. (c) --
+    serving this screen from a cache when the network is gone entirely -- needs a service
+    worker, is #543, and is deliberately not here.
+
+    **Stage zero of (b) was a route change and it had to come first.** The Done tap used to
+    toggle, so a held tap replayed onto a set the server had already recorded would un-do it:
+    a recovered set turned into a lost one, minutes later, with nothing on the screen to say
+    so. The form now says which state it wants and a completion that is already true writes
+    nothing at all, which is what makes any of the sending below safe. See the comment on the
+    Done form in _lift_panel.erb and WorkoutSet#completion_to.
 
     Background Sync is not the mechanism and could not have been. Safari has never supported
     it on any version or platform, every browser on iOS is WebKit underneath, and the lifter
-    this screen exists for is on iOS Safari. The browser specs here drive Firefox, which
-    does not support it either -- so the design that works for the user is also the one this
-    repo can test, which is a happier alignment than it sounds.
+    this screen exists for is on iOS Safari. The browser specs here drive Firefox, which does
+    not support it either -- so the design that works for the user is also the one this repo
+    can test, which is a happier alignment than it sounds. Every flush below is driven by the
+    page being open: a request that came back, a poll, a page becoming visible, a page load.
+    That window is not a real limit, because the lifter is holding the phone; the time when a
+    flush is impossible is the time when nobody is lifting.
 
     Fixed to the top of the screen, and that placement is a decision rather than a default.
     The foot of this screen is already three deep -- the RPE footer at z-20, the rest timer
@@ -52,36 +62,68 @@
 <div id="offline-banner" hidden
      class="fixed inset-x-0 top-0 z-50 border-b border-amber-200 bg-amber-50">
   <div class="mx-auto max-w-md px-4 py-3">
-    <%# Two independent lines, shown and hidden separately, because they answer two
-        questions that stop being true at different moments. "There is no connection" ends
-        the instant a request comes back. "Two sets did not save" ends only when somebody
-        taps them again, which may be a minute later and is the thing a lifter has to be
-        able to see after the signal returns -- a banner that vanished the moment the wifi
-        came back would take the only record of the damage with it. %>
-    <p data-offline-state hidden class="text-lg font-semibold text-amber-800">
+    <%# Five sentences, shown and hidden independently, because they answer questions that
+        stop being true at different moments. "There is no connection" ends the instant a
+        request comes back; "two sets are waiting" ends when they have gone out, a second
+        later; "two sets did not save" ends only when somebody taps them again.
+
+        The first two are the same sentence with opposite second halves, and which one is
+        true is not known until the browser has been asked for a store. A lifter in a private
+        window, or on a phone that refuses IndexedDB, must not be told their taps are being
+        kept -- that is exactly the lie #516 exists to remove, wearing the other words. So
+        both are here and the script shows whichever it can stand behind. %>
+    <p data-offline-kept hidden class="text-lg font-semibold text-amber-800">
+      No connection. Your taps are being kept on this phone.
+    </p>
+    <p data-offline-unkept hidden class="text-lg font-semibold text-amber-800">
       No connection. Nothing you tap is being saved.
     </p>
     <%# The count rather than a list of which ones, which is what the rows themselves say.
-        A number tells a lifter whether to worry, in one glance, from arm's length. %>
+        A number tells a lifter whether to worry, in one glance, from arm's length -- and
+        it is a count of sets rather than of taps, because the question it answers is how
+        much of the session is not in yet. Tapping Done twice on one set is one set. %>
+    <p data-offline-held hidden class="mt-1 text-base text-amber-800">
+      <span data-held-count class="font-semibold tabular-nums"></span> waiting to send.
+    </p>
+    <%# And while they are going out, which is usually less than a second and is not always:
+        a phone that has just found one bar sends slowly. Saying it is the difference between
+        a screen that looks stuck and one that is visibly working through a backlog. %>
+    <p data-offline-sending hidden class="mt-1 text-base text-amber-800">
+      Sending <span data-sending-count class="font-semibold tabular-nums"></span>…
+    </p>
+    <%# #516's sentence, kept for the case where it is still true: the tap could not be held
+        at all, or it was sent and the server would not take it. Both are real -- a browser
+        with no usable store, a set deleted from another device, an account signed out -- and
+        in both the lifter is back to being the only thing that can save the set. %>
     <p data-offline-lost hidden class="mt-1 text-base text-amber-800">
-      <span data-offline-count class="font-semibold tabular-nums"></span> did not save.
+      <span data-lost-count class="font-semibold tabular-nums"></span> did not save.
       Tap Done again on each.
     </p>
   </div>
 </div>
 
-<%# What decides whether any of that is true.
+<%# What decides whether any of that is true, and what holds the taps.
 
-    Every rule here is about preferring evidence over claims, because the one trap in this
-    problem is that the browser's own answer is not evidence. navigator.onLine reports
-    whether there is a link, not whether anything is at the other end of it: a phone holding
-    a useless association with a gym access point, or one behind a captive portal, reads as
-    online all day. The asymmetry is what makes it usable at all -- false is trustworthy and
-    true is a guess -- so `offline` raises the banner and `online` is deliberately not bound
-    to anything. What takes the banner down is a request that came back, which is a fact.
+    In this file rather than in assets/js, which is where #516 pictured it ("offline-queue.js,
+    hand-vendored beside htmx.min.js"). The store and the banner are one feature and they
+    share every variable they have: what is in the queue *is* what the banner says, and a
+    second file would mean either a global for the two halves to talk through or the same
+    state counted twice. The precedent is _rest_timer.erb, which is a longer script than this
+    one in the partial that draws the thing it drives. No build step either way, which was
+    the part of that sentence that mattered.
+
+    Every rule about the network is about preferring evidence over claims, because the one
+    trap in this problem is that the browser's own answer is not evidence. navigator.onLine
+    reports whether there is a link, not whether anything is at the other end of it: a phone
+    holding a useless association with a gym access point, or one behind a captive portal,
+    reads as online all day. The asymmetry is what makes it usable at all -- false is
+    trustworthy and true is a guess -- so `offline` raises the banner and `online` only
+    *tries* a flush rather than claiming anything. What takes the banner down is a request
+    that came back, which is a fact.
 
     A request that failed to send is better evidence than the OS either way, and it is what
-    the htmx events below provide.
+    the htmx events below provide. There is no second scheme for detecting failure: the
+    queue is filled by the same htmx:sendError and htmx:timeout #516 already listens for.
 
     **The fifteen-second poll is left running, which is where this parts company with #516.**
     That issue asks for the poll to be suspended while offline, through `hx:poll:trigger`,
@@ -91,71 +133,157 @@
     hook the issue pictures. Which is worth knowing, because it is not wanted anyway.
 
     Suspending the poll would take away the only thing on this screen that makes a request
-    nobody tapped for -- and that request is what notices the signal has come back. Without
-    it the banner could only clear on the next tap, so a lifter resting between sets would
-    sit under "no connection" for two minutes after the bars returned, which is the same
-    lie in the other direction. Kept running, it is a heartbeat: it finds the outage within
-    fifteen seconds, usually before a single set has been lost to it, and it finds the way
-    back just as fast. The machine-gunning it would cause is real and is handled where it
-    belongs, in what is said rather than in what is requested -- a failure nobody tapped for
-    raises the banner silently and announces nothing. %>
+    nobody tapped for -- and that request is what notices the signal has come back. It was
+    load-bearing for the banner and it is more so for the queue: a lifter resting between
+    sets taps nothing for two minutes, and without the poll the held taps would sit there for
+    all of it. Kept running, it is a heartbeat: it finds the outage within fifteen seconds,
+    usually before a single set has been lost to it, and it finds the way back just as fast,
+    at which point the queue empties itself. The machine-gunning it would cause is real and
+    is handled where it belongs, in what is said rather than in what is requested -- a
+    failure nobody tapped for raises the banner silently and announces nothing. %>
 <script>
   (function () {
     var banner = document.getElementById('offline-banner');
     if (!banner) { return; }
 
-    var state = banner.querySelector('[data-offline-state]');
+    var kept = banner.querySelector('[data-offline-kept]');
+    var unkept = banner.querySelector('[data-offline-unkept]');
+    var held = banner.querySelector('[data-offline-held]');
+    var sending = banner.querySelector('[data-offline-sending]');
     var lost = banner.querySelector('[data-offline-lost]');
-    var counter = banner.querySelector('[data-offline-count]');
-    // The rows whose tap never reached the server, by set id. A plain object rather than a
-    // Set because the only thing ever asked of it is membership, and because the rest of
-    // the scripts on this screen are written in the same dialect.
+    var heldCount = banner.querySelector('[data-held-count]');
+    var sendingCount = banner.querySelector('[data-sending-count]');
+    var lostCount = banner.querySelector('[data-lost-count]');
+
+    // The open store, or null where the browser would not give one. Everything below tests
+    // this rather than assuming it: a queue that cannot be written to is a fact about what
+    // the screen may promise, not an error to swallow.
+    var store = null;
+    // The held taps, as the store has them, oldest first. Re-read after every change rather
+    // than maintained alongside the store, because two copies of a queue is how a screen
+    // comes to report a set as waiting that went out a minute ago.
+    var queued = [];
+    // The sets nobody is going to save but the lifter. A plain object rather than a Set
+    // because the only thing ever asked of it is membership, and because the rest of the
+    // scripts on this screen are written in the same dialect.
     var unsaved = {};
     var offline = navigator.onLine === false;
+    var flushing = false;
+    // Which sets have landed in the drain currently running, so that what is announced at
+    // the end of it is the news rather than a running total.
+    var landed = {};
 
     // Which set a request was about, read off the path it was sent to rather than off the
     // DOM around the element that sent it.
     //
     // #516 makes this point about the write queue it declines to build -- requestConfig
     // carries the verb, the path and the parameters, so nothing is ever reconstructed from
-    // markup -- and it turns out to be load-bearing here for a reason the issue does not
-    // reach. When a request succeeds, htmx fires afterRequest on the element that sent it,
-    // and by then the swap has already taken that element out of the document. An event
-    // fired on a detached node does not bubble to a listener on the body, so this script
-    // never sees that one at all; htmx notices and re-fires on the nearest ancestor still
-    // on the page, which on this screen is #lift-panels. That is the right request arriving
-    // with every trace of which row it came from removed. The path still has it.
+    // markup -- and it turns out to be load-bearing for the banner too, for a reason the
+    // issue does not reach. When a request succeeds, htmx fires afterRequest on the element
+    // that sent it, and by then the swap has already taken that element out of the document.
+    // An event fired on a detached node does not bubble to a listener on the body, so this
+    // script never sees that one at all; htmx notices and re-fires on the nearest ancestor
+    // still on the page, which on this screen is #lift-panels. That is the right request
+    // arriving with every trace of which row it came from removed. The path still has it.
     //
-    // Null for everything that is not one set being completed: the poller, and the two
-    // forms that add and swap a lift, which make rows rather than finish them.
+    // Null for everything that is not one set being completed: the poller, and the two forms
+    // that add and swap a lift. Those two are deliberately not queued, which is #516's rule
+    // and is about what can be said twice: they create rows, so a replay would create a
+    // second one, and there is no idempotent way to phrase "add a set" from a browser that
+    // cannot see what the server already has.
     function setOf(event) {
       var config = event.detail && event.detail.requestConfig;
       var found = config && config.path && config.path.match(/\/sets\/(\d+)\/complete/);
       return found && found[1];
     }
 
-    function mark(id, shown) {
-      var row = document.querySelector('[data-set-row="' + id + '"]');
-      var note = row && row.querySelector('[data-unsaved]');
-      if (note) { note.hidden = !shown; }
+    // The path a held tap will be sent to, which is a path and never a URL.
+    //
+    // Every request this page makes is same-origin -- htmx refuses anything else unless told
+    // otherwise -- so the origin carries no information, and keeping it would pin a tap to
+    // the host the page happened to be served from. This app answers to two domains already
+    // (see CANONICAL_ORIGIN) and moved between them once; a queue written under the old one
+    // would go on posting there after a lifter had stopped using it. What the tap is about
+    // is a set, and what identifies it is the path.
+    function pathOf(config) {
+      return config.path.replace(/^[a-z][a-z0-9+.-]*:\/\/[^\/]*/i, '');
+    }
+
+    // The tap as the form would have sent it, with the moment it was made added.
+    //
+    // **The stamp travels with the tap**, and that is the difference between a queue and a
+    // rewriting of history. A set completed at 18:04 and sent at 18:40 happened at 18:04;
+    // stamping it on arrival would record the phone finding signal rather than the lifter
+    // finishing a set, and every turnaround computed from these instants afterwards would
+    // describe the outage. It is the same distinction measured_at draws against created_at
+    // for what the scale records, and asked_stamp in app.rb is what decides whether to
+    // believe it -- a phone's clock is the phone's.
+    //
+    // Milliseconds since the epoch, because that is what Date.now() gives and it carries no
+    // timezone to be read wrongly at the other end.
+    //
+    // The CSRF token rides along in the parameters exactly as it was rendered. Roda's
+    // route_csrf token is random data plus an HMAC over the method and the path, with no
+    // timestamp in it and no expiry, so one minted at the start of a session is still good
+    // an hour later -- and the path it was minted for is the path this will be sent to.
+    function bodyOf(config, at) {
+      var given = config.parameters || {};
+      var body = new URLSearchParams();
+      for (var name in given) {
+        if (Object.prototype.hasOwnProperty.call(given, name)) { body.append(name, given[name]); }
+      }
+      body.set('completed_at', at);
+      return body.toString();
+    }
+
+    // The sets with a tap still held, in the order they were tapped, counted once each.
+    function waiting() {
+      var seen = {};
+      var ids = [];
+      for (var i = 0; i < queued.length; i++) {
+        if (!seen[queued[i].setId]) {
+          seen[queued[i].setId] = true;
+          ids.push(queued[i].setId);
+        }
+      }
+      return ids;
+    }
+
+    function counted(ids) {
+      return ids.length === 1 ? '1 set' : ids.length + ' sets';
     }
 
     // Draws the whole of what this script knows, every time, rather than patching the bit
-    // that changed. There are two lines and a set of row marks and four events that can
-    // move any of them; re-deciding all of it from the two variables above is shorter than
+    // that changed. There are five lines and two marks per row and eight things that can
+    // move any of them; re-deciding all of it from the four variables above is shorter than
     // the transitions would be, and it cannot leave the banner disagreeing with the rows.
+    //
+    // Every row on the screen is visited rather than the ones this script has touched. The
+    // rows are re-rendered underneath it constantly -- a tap replaces a whole lift panel and
+    // the poll replaces every panel -- and they come back from the server with both lines
+    // hidden, which is correct, because as far as the database is concerned neither thing
+    // has happened. Remembering is this script's job; a session is thirty rows at the outside
+    // and this is two attribute writes each.
     function render() {
-      var ids = Object.keys(unsaved);
-      counter.textContent = ids.length === 1 ? '1 set' : ids.length + ' sets';
-      // Re-applied here rather than left to survive, because they cannot: the poll
-      // re-renders every panel whenever anything on the screen has changed, and a mark
-      // comes back from the server hidden. The server is right to send it hidden -- the row
-      // is not saved as far as this browser is concerned, and the database has never heard
-      // of the tap -- so remembering is this script's job.
-      for (var i = 0; i < ids.length; i++) { mark(ids[i], true); }
-      state.hidden = !offline;
-      lost.hidden = ids.length === 0;
-      banner.hidden = state.hidden && lost.hidden;
+      var ids = waiting();
+      var gone = Object.keys(unsaved);
+      var rows = document.querySelectorAll('[data-set-row]');
+      for (var i = 0; i < rows.length; i++) {
+        var id = rows[i].getAttribute('data-set-row');
+        var mark = rows[i].querySelector('[data-waiting]');
+        var note = rows[i].querySelector('[data-unsaved]');
+        if (mark) { mark.hidden = ids.indexOf(id) < 0; }
+        if (note) { note.hidden = !unsaved[id]; }
+      }
+      heldCount.textContent = counted(ids);
+      sendingCount.textContent = counted(ids);
+      lostCount.textContent = counted(gone);
+      kept.hidden = !offline || !store;
+      unkept.hidden = !offline || !!store;
+      held.hidden = flushing || !ids.length;
+      sending.hidden = !flushing || !ids.length;
+      lost.hidden = !gone.length;
+      banner.hidden = kept.hidden && unkept.hidden && held.hidden && sending.hidden && lost.hidden;
     }
 
     // Through the region the server already announces every tap into (#336) rather than a
@@ -166,25 +294,127 @@
       if (region) { region.textContent = sentence; }
     }
 
+    // The store, opened once. Everything about this is defensive because the failures are
+    // real and are not exotic: Safari in a private window has historically thrown from
+    // indexedDB.open outright, a phone can be out of quota, and a browser can be configured
+    // to have no storage at all. None of those is an error worth reporting to a lifter mid
+    // set -- what they change is which sentence the banner is allowed to say.
+    function openStore(after) {
+      var request;
+      try {
+        request = window.indexedDB.open('tectonic', 1);
+      } catch (error) {
+        after();
+        return;
+      }
+      request.onupgradeneeded = function () {
+        // Keyed by an auto-incrementing id, which is also the order taps are replayed in.
+        // Order matters: two taps on one set are a Done and possibly an Undo, and sending
+        // them out of order would leave the set in the state the lifter changed their mind
+        // about.
+        request.result.createObjectStore('taps', { keyPath: 'id', autoIncrement: true });
+      };
+      request.onsuccess = function () {
+        store = request.result;
+        // Let go when something else needs the database. A connection held open is a
+        // connection that blocks every attempt to upgrade or delete it, and the thing
+        // holding it would be a tab in a pocket: the lifter's phone, on the session screen,
+        // for the rest of the day. Nothing in this app asks for a version change today, so
+        // in a gym this never fires; the browser specs delete this store between examples
+        // and would hang on it otherwise, which is the cheap demonstration of the same rule.
+        store.onversionchange = function () {
+          store.close();
+          store = null;
+        };
+        after();
+      };
+      request.onerror = function () { after(); };
+      request.onblocked = function () { after(); };
+    }
+
+    function taps(mode) {
+      return store.transaction('taps', mode).objectStore('taps');
+    }
+
+    // Re-reads the queue and redraws from it. Every change goes through here, so the screen
+    // is never reporting anything but what the store actually holds.
+    function refresh(after) {
+      if (!store) {
+        queued = [];
+        render();
+        if (after) { after(); }
+        return;
+      }
+      var request = taps('readonly').getAll();
+      request.onsuccess = function () {
+        queued = request.result || [];
+        render();
+        if (after) { after(); }
+      };
+      request.onerror = function () {
+        render();
+        if (after) { after(); }
+      };
+    }
+
+    function hold(record, after) {
+      if (!store) {
+        after(false);
+        return;
+      }
+      var request;
+      try {
+        request = taps('readwrite').add(record);
+      } catch (error) {
+        after(false);
+        return;
+      }
+      request.onsuccess = function () { after(true); };
+      request.onerror = function () { after(false); };
+    }
+
+    function drop(id, after) {
+      // The connection can have been let go between a tap being sent and this running, since
+      // onversionchange above closes it the moment something else needs the database.
+      if (!store) {
+        after();
+        return;
+      }
+      var request = taps('readwrite').delete(id);
+      request.onsuccess = after;
+      request.onerror = after;
+    }
+
     // A request that never reached the server. htmx fires sendError for a connection that
     // could not be made and timeout for one that was made and never answered -- one or the
-    // other, never both -- and for this screen's purposes they are the same fact: the tap
-    // is not in the database and the lifter has no way of knowing that.
+    // other, never both -- and for this screen's purposes they are the same fact: the tap is
+    // not in the database and the lifter has no way of knowing that.
     function failed(event) {
       var id = setOf(event);
       var fresh = !offline;
       offline = true;
-      if (id) { unsaved[id] = true; }
-      render();
-      // The poll is the one request on this screen nobody tapped for, so its failure raises
-      // the banner and says nothing further: there is no row to mark, and repeating the
-      // same sentence every fifteen seconds is what would machine-gun a screen reader. The
-      // first one is worth saying, which is what `fresh` is for.
-      if (id) {
-        announce('Offline. ' + counter.textContent + ' did not save.');
-      } else if (fresh) {
-        announce('Offline. Nothing you tap is being saved.');
+      if (!id) {
+        // The poll, or one of the two forms that make rows. There is nothing to hold and
+        // nothing to mark. The poll is the one request nobody tapped for, so it raises the
+        // banner and says nothing further: repeating the same sentence every fifteen seconds
+        // is what would machine-gun a screen reader, and the first one is worth saying,
+        // which is what `fresh` is for.
+        render();
+        if (fresh) { announce((store ? kept : unkept).textContent.trim()); }
+        return;
       }
+      var config = event.detail.requestConfig;
+      // When the thumb came off the button, not when the browser gave up on the request --
+      // those are seconds apart for a connection that has to time out, and it is the first
+      // one that is a fact about the training.
+      var at = (event.detail.xhr && event.detail.xhr.tappedAt) || Date.now();
+      hold({ path: pathOf(config), body: bodyOf(config, at), setId: id, at: at }, function (ok) {
+        if (!ok) { unsaved[id] = true; }
+        refresh(function () {
+          announce(ok ? 'Offline. ' + counted(waiting()) + ' waiting to send.'
+                      : 'Offline. ' + counted(Object.keys(unsaved)) + ' did not save.');
+        });
+      });
     }
 
     // A response that came back, whatever it said. A 404 or a 500 is the server disagreeing
@@ -200,28 +430,120 @@
       var id = setOf(event);
       var was = offline;
       offline = false;
-      // Only the row this request was about. Every other mark stands, because the
-      // connection coming back is not somebody having lifted those sets again -- they are
-      // still not in the database, and this is the only thing on the screen saying so.
-      if (id && unsaved[id]) {
-        delete unsaved[id];
-        mark(id, false);
-      }
+      // Only the row this request was about. Every other mark stands, because the connection
+      // coming back is not somebody having lifted those sets again.
+      if (id && unsaved[id]) { delete unsaved[id]; }
       render();
-      // Said once, on the way back, and only when it was the poll that found out. Where the
-      // lifter's own tap is what came back, the server has sent its own sentence into this
-      // region already -- overwriting "squat, set 3 of 5, done" with "back online" would
-      // replace the confirmation they were waiting for with news they can see in the banner.
-      if (was && !id) {
-        announce(Object.keys(unsaved).length ?
-          'Back online. ' + counter.textContent + ' still not saved.' : 'Back online.');
+      // Said once, on the way back, and only when it was the poll that found out and there
+      // is nothing queued. Where the lifter's own tap is what came back, the server has sent
+      // its own sentence into this region already -- overwriting "squat, set 3 of 5, done"
+      // with "back online" would replace the confirmation they were waiting for with news
+      // they can see in the banner. And where taps are waiting, the flush about to start has
+      // better news to announce in a moment than this does now.
+      if (was && !id && !queued.length) { announce('Back online.'); }
+      flush();
+    }
+
+    // Send everything held, oldest first, one at a time. #516 asks for strict order and the
+    // reason is the same as the store's key: a Done followed by an Undo is a lifter changing
+    // their mind, and sending them in either order is not the same session.
+    //
+    // One at a time rather than all at once, because the failure of the second must not be
+    // able to happen before the first has landed. This is also why the drain stops dead on
+    // the first send that fails: everything behind it stays queued and stays in order.
+    function flush() {
+      // window.fetch is tested rather than assumed for the same reason the store is: a
+      // browser without it holds the taps and says so, which is a worse outcome than sending
+      // them and a better one than a script that throws halfway through a drain and leaves
+      // the banner claiming to be sending something forever.
+      if (flushing || !store || !window.fetch || !queued.length) { return; }
+      flushing = true;
+      landed = {};
+      render();
+      send();
+    }
+
+    function send() {
+      if (!queued.length) {
+        settle();
+        return;
       }
+      var record = queued[0];
+      // fetch rather than htmx.ajax, because a replayed tap must write without touching the
+      // screen. htmx.ajax would swap the response into the panel the tap came from, which on
+      // a page that has been re-rendered since -- or is a different page altogether, the
+      // queue having outlived the one that filled it -- would put a stale lift panel on
+      // screen. The server is told this is an htmx request all the same, so that it answers
+      // with the panel rather than a redirect: a redirect followed by fetch comes back
+      // looking exactly like a success, and the difference matters below.
+      window.fetch(record.path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'HX-Request': 'true'
+        },
+        body: record.body
+      }).then(function (response) {
+        offline = false;
+        // A tap the server took, or one it would not. Both come off the queue: a refusal is
+        // the server having had its say -- the set was deleted from another device, the
+        // account is signed out, the token was refused -- and none of that gets better by
+        // sending it again every fifteen seconds forever. What it does get is #516's
+        // sentence, because for that set it is true again: nothing saved it and nothing is
+        // going to but the lifter.
+        if (response.ok && !response.redirected) {
+          landed[record.setId] = true;
+        } else {
+          unsaved[record.setId] = true;
+        }
+        drop(record.id, function () {
+          refresh(function () {
+            // The one way this could spin: a store that will not delete what has just been
+            // sent hands back the same tap, which is then sent again, forever. Sending it
+            // twice is harmless -- that is what stage zero bought -- and sending it every
+            // second for the rest of the session is not, so the drain stops instead.
+            if (queued.length && queued[0].id === record.id) {
+              flushing = false;
+              render();
+              return;
+            }
+            send();
+          });
+        });
+      }).catch(function () {
+        // Still no network. The record stays where it is, in the order it was made, and the
+        // next thing that reaches the server starts this again.
+        offline = true;
+        flushing = false;
+        render();
+      });
+    }
+
+    function settle() {
+      var ids = Object.keys(landed);
+      flushing = false;
+      render();
+      if (!ids.length) { return; }
+      announce(counted(ids) + ' saved.');
+      // The screen is now out of date about itself: those sets went in by fetch, so nothing
+      // swapped, and the rows still offer Done on work the database has. The poll would find
+      // that within fifteen seconds on its own, which is a long time to stand there having
+      // watched the count go to zero. So the poller is told, through the trigger it carries
+      // for exactly this (see _session_poll.erb), rather than this script fetching panels of
+      // its own and having a second opinion about what the screen should look like.
+      if (window.htmx) { window.htmx.trigger(document.body, 'queue-drained'); }
     }
 
     // Bound to document.body because htmx events bubble, so this binds once and survives
     // every swap -- the same reasoning as the two scripts at the foot of session.erb, and
     // load-bearing here in a way it is not there: the elements these events come from are
     // the forms inside the panels, which are replaced on every tap and every poll.
+    document.body.addEventListener('htmx:beforeRequest', function (event) {
+      // Where the moment a tap was made is written down, on the one object that survives
+      // from the request being made to the request failing.
+      if (event.detail && event.detail.xhr) { event.detail.xhr.tappedAt = Date.now(); }
+    });
     document.body.addEventListener('htmx:sendError', failed);
     document.body.addEventListener('htmx:timeout', failed);
     document.body.addEventListener('htmx:afterRequest', returned);
@@ -236,9 +558,44 @@
       if (offline) { return; }
       offline = true;
       render();
-      announce('Offline. Nothing you tap is being saved.');
+      announce((store ? kept : unkept).textContent.trim());
+    });
+
+    // And the three ways a page that is already open gets told it might be worth trying
+    // again. None of them is believed -- each only starts a flush, and it is the response
+    // that decides whether there is a connection -- which is why `online` clears nothing on
+    // its own. visibilitychange and pageshow are the ones that matter on a phone: a lifter
+    // puts the screen out between sets, and iOS freezes the tab rather than running it.
+    window.addEventListener('online', flush);
+    window.addEventListener('pageshow', flush);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) { flush(); }
     });
 
     render();
+
+    // And the flush that needs no event at all. This page was fetched from the server, so
+    // there is a connection by construction, and anything the store is still holding was
+    // held by a page that is gone -- the tab was closed, the phone locked, the session
+    // reopened the next morning. Recovering it here is the whole reason the queue is in
+    // IndexedDB rather than in a variable in this closure.
+    //
+    // Not before the document is parsed, though, and that is a race worth naming because it
+    // is invisible when it goes wrong. This script runs while the page is still being read,
+    // and an IndexedDB that answers quickly can have the whole queue sent before htmx has
+    // processed the document -- at which point the queue-drained event fires at a poller
+    // that is not listening yet, and the screen sits on stale rows until the ordinary
+    // fifteen-second poll catches up. htmx binds on DOMContentLoaded and its listener is
+    // registered first, htmx.min.js being in the head, so waiting for the same event puts
+    // this after it.
+    function begin() {
+      openStore(function () { refresh(flush); });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', begin);
+    } else {
+      begin();
+    }
   })();
 </script>

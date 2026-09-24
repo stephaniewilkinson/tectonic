@@ -67,13 +67,15 @@ describe 'tapping Done when the tap does not arrive' do
   end
 
   # And it says so at the same time, because a clock running on a tap that failed would
-  # otherwise be the app agreeing that the set was saved. #516's banner is what says
-  # otherwise, and the two have to be on screen together.
-  it 'is on screen beside the banner saying the tap was lost' do
+  # otherwise be the app agreeing that the set was saved. The banner is what says otherwise,
+  # and the two have to be on screen together -- since #542 in the words of a tap that is
+  # being held rather than one that was lost, which is a better thing for a lifter watching
+  # a rest count down to read.
+  it 'is on screen beside the banner saying the tap has not gone yet' do
     assert resting?
 
-    assert_text 'No connection. Nothing you tap is being saved.'
-    assert_selector '[data-set-row] p', text: 'Not saved.'
+    assert_text 'No connection. Your taps are being kept on this phone.'
+    assert_selector '[data-set-row] p', text: 'Waiting to send.'
   end
 end
 
@@ -132,7 +134,7 @@ describe 'tapping Done twice when neither tap arrives' do
     standing = seconds_in(clock_text)
     tap_done
 
-    assert_text '1 set did not save.'
+    assert_text '1 set waiting to send.'
     assert_operator seconds_in(clock_text), :>=, standing
   end
 end
@@ -257,7 +259,7 @@ describe 'a lost tap that was never going to finish a set' do
     standing = seconds_in(clock_text)
     cut_the_signal
     find('button', text: 'Undo').click
-    assert_text 'No connection. Nothing you tap is being saved.'
+    assert_text 'No connection. Your taps are being kept on this phone.'
 
     assert_operator seconds_in(clock_text), :>=, standing
   end
@@ -270,7 +272,7 @@ describe 'a lost tap that was never going to finish a set' do
     find('summary', text: 'Lifted something else').click
     fill_in "weight-#{@set_ids.first}", with: '145'
     click_button 'Save'
-    assert_text 'No connection. Nothing you tap is being saved.'
+    assert_text 'No connection. Your taps are being kept on this phone.'
 
     refute has_css?('#rest-timer', visible: true)
   end

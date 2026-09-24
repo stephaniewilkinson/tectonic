@@ -30,9 +30,19 @@
 
     This element replaces itself because it carries state: the `since` it was rendered with
     is stale the moment a swap lands, and a poller still asking about the old digest would
-    report the same news forever. %>
+    report the same news forever.
+
+    **The second trigger is the write queue finishing.** #542 holds the taps that failed and
+    sends them by fetch when the connection comes back, which writes sets without swapping
+    anything -- so the moment a drain lands, this screen is out of date about itself: the
+    rows still offer Done on work the database now has. The poll would find that on its own
+    within fifteen seconds, and fifteen seconds is a long time to stand there having just
+    watched the waiting count go to zero. So the queue says when it is done and this element
+    listens, which keeps one thing asking the server what the panels should look like. The
+    event is dispatched on the body, hence `from:body`: the queue's script lives outside
+    #session-body with the banner it draws, and this element is inside it. %>
 <div id="session-poll"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %>
      hx-get="/workouts/<%= workout_id %>/session/changes?since=<%= fingerprint %>"
-     hx-trigger="every 15s"
+     hx-trigger="every 15s, queue-drained from:body"
      hx-target="#lift-panels"
      hx-swap="innerHTML"></div>

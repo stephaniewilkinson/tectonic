@@ -161,8 +161,42 @@ module BrowserSpec
   end
 
   def after_teardown
+    forget_held_taps
     Capybara.use_default_driver
     super
+  end
+
+  # The session screen's write queue, emptied between tests for the same reason the tables
+  # above are. #542 holds a tap that failed in IndexedDB so that it survives the tab being
+  # closed -- which is the point of it, and which means it also survives the end of a test.
+  # Capybara's session reset clears cookies and nothing else, so a tap held by one example
+  # was still there for the next: it flushed on that example's first page load, the set it
+  # named had been deleted by the teardown here, the server refused it, and a spec that had
+  # nothing to do with any of this found "1 set did not save" on its screen. That is a spec
+  # failing for a reason nothing in it caused, which is the shape this file already exists
+  # to prevent.
+  #
+  # Before Capybara resets, because after it the browser is on about:blank and storage is
+  # keyed by origin -- the deletion would be of a database belonging to nowhere.
+  #
+  # Waited on rather than fired and forgotten, since the deletion is asynchronous and the
+  # next example's page load would otherwise race it. The page's own connection is what
+  # would block it, and the script there closes on versionchange precisely so that
+  # something asking to delete this database is not left waiting on a tab nobody is looking
+  # at any more.
+  def forget_held_taps
+    Capybara.current_session.evaluate_async_script(<<~JS)
+      var done = arguments[0];
+      if (!window.indexedDB) { return done(); }
+      var request = window.indexedDB.deleteDatabase('tectonic');
+      request.onsuccess = done;
+      request.onerror = done;
+      request.onblocked = done;
+    JS
+  rescue StandardError
+    # A test that never opened a page, or a browser that has already gone. Neither leaves
+    # anything behind to clear, and neither is worth failing a green example over.
+    nil
   end
 end
 

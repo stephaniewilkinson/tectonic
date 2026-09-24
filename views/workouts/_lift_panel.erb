@@ -195,6 +195,19 @@
               JavaScript nothing here ever appears, which is right, because with no
               JavaScript there is no htmx either -- Done is a plain form post and a failed
               one is the browser's own error page rather than a row that goes quiet. %>
+          <%# And the line it wears in the ordinary case since #542, which is a different
+              claim about the same tap: it is not in the database and it is not lost either,
+              it is on the phone waiting for a way out. Two elements rather than one whose
+              words the script rewrites, so that both sentences are in the template, beside
+              the row they appear on, where they can be read and changed together.
+
+              Grey rather than the amber above it, and that is the palette's rule rather than
+              a shade chosen by eye: amber is this app's warning colour and a held tap is not
+              a warning. It is the same grey as the plate math and the planned line, which is
+              the register this row uses for facts about itself. %>
+          <p data-waiting hidden class="mt-2 text-sm font-semibold text-gray-700">
+            Waiting to send.
+          </p>
           <p data-unsaved hidden class="mt-2 text-sm font-semibold text-amber-800">
             Not saved.
           </p>
@@ -374,8 +387,12 @@
             </form>
           </div>
 
-          <%# A tap on this row that never reached the server, as on the warmup rows above.
-              #516, and the argument for it is written out there. %>
+          <%# A tap on this row that is waiting to go out, and one that is not going out at
+              all, as on the warmup rows above. #516 and #542, and the argument for both is
+              written out there. %>
+          <p data-waiting hidden class="mt-2 text-sm font-semibold text-gray-700">
+            Waiting to send.
+          </p>
           <p data-unsaved hidden class="mt-2 text-sm font-semibold text-amber-800">
             Not saved.
           </p>

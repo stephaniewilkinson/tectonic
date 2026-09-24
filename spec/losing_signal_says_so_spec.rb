@@ -57,26 +57,16 @@ describe 'the session screen before anything has gone wrong' do
     assert_match(/<div id="offline-banner" hidden/, @body)
   end
 
-  # Both of its lines start hidden, and separately, because they stop being true at
-  # different moments: the connection comes back in an instant and the sets it lost stay
-  # lost until somebody taps them again.
-  it 'hides both of the things it can say until one of them is true' do
-    assert_match(/<p data-offline-state hidden/, @body)
+  # Every line it can say starts hidden, and they are separate lines because they stop being
+  # true at different moments: the connection comes back in an instant, the taps being held
+  # go out over the following second, and a set the server refused stays refused until
+  # somebody taps it again.
+  it 'hides all of the things it can say until one of them is true' do
+    assert_match(/<p data-offline-kept hidden/, @body)
+    assert_match(/<p data-offline-unkept hidden/, @body)
+    assert_match(/<p data-offline-held hidden/, @body)
+    assert_match(/<p data-offline-sending hidden/, @body)
     assert_match(/<p data-offline-lost hidden/, @body)
-  end
-
-  # The one the placement actually rests on, and it is asserted against the responses rather
-  # than against the nesting on the page, because "outside the region htmx replaces" is a
-  # claim about what comes back from these two routes and nothing else. Inside that region
-  # the banner would be replaced by every request that succeeded and left alone by every
-  # request that failed -- the right answer for the wrong reason, and one that stops being
-  # right the moment anything else on the screen swaps.
-  it 'is in nothing a tap sends back' do
-    refute_includes tap(@workout_id, @set_id), 'offline-banner'
-  end
-
-  it 'is in nothing the poll sends back' do
-    refute_includes poll(@workout_id, @body), 'offline-banner'
   end
 
   # The region the script announces through is the one the server already announces every
@@ -86,6 +76,60 @@ describe 'the session screen before anything has gone wrong' do
   it 'announces through the live region the server already uses' do
     assert_includes @body, 'id="session-announcement"'
     assert_includes @body, "getElementById('session-announcement')"
+  end
+end
+
+describe 'where the banner is not' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include LosingSignal
+
+  before do
+    @workout_id = a_session(login)
+    get "/workouts/#{@workout_id}/session"
+    @body = last_response.body.dup.force_encoding(Encoding::UTF_8)
+  end
+
+  # The claim the placement actually rests on, and it is asserted against the responses
+  # rather than against the nesting on the page, because "outside the region htmx replaces"
+  # is a claim about what comes back from these two routes and nothing else. Inside that
+  # region the banner would be replaced by every request that succeeded and left alone by
+  # every request that failed -- the right answer for the wrong reason, and one that stops
+  # being right the moment anything else on the screen swaps.
+  it 'is in nothing a tap sends back' do
+    refute_includes tap(@workout_id, @set_id), 'offline-banner'
+  end
+
+  it 'is in nothing the poll sends back' do
+    refute_includes poll(@workout_id, @body), 'offline-banner'
+  end
+end
+
+describe 'the two things the banner can say about a connection' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include LosingSignal
+
+  before do
+    @workout_id = a_session(login)
+    get "/workouts/#{@workout_id}/session"
+    @body = last_response.body.dup.force_encoding(Encoding::UTF_8)
+  end
+
+  # They differ in what they promise, and which is true is decided by something the browser
+  # only answers at load: whether there is a store to hold a tap in at all. A lifter in a
+  # private window, or on a phone that refuses the database, must not be told their taps are
+  # being kept -- that is the lie #516 exists to remove, wearing the opposite words. So both
+  # are on the page and the script shows whichever it can stand behind. #542.
+  it 'carries the promise it can keep and the one it cannot' do
+    assert_includes @body, 'No connection. Your taps are being kept on this phone.'
+    assert_includes @body, 'No connection. Nothing you tap is being saved.'
+  end
+
+  # And neither of them is in anything htmx swaps, like the rest of the banner: a sentence
+  # about whether requests are arriving cannot live in the region those requests replace.
+  it 'keeps them out of what a tap sends back' do
+    refute_includes tap(@workout_id, @set_id), 'No connection.'
   end
 end
 
@@ -112,6 +156,27 @@ describe 'every row of a session' do
     assert_equal 2, @body.scan('<p data-unsaved hidden').length
   end
 
+  # And the line it wears while the queue is holding it, which is the ordinary case since
+  # #542 and a different claim: the tap is not in the database and it is not lost either.
+  # Two elements rather than one with its words rewritten by the script, so that both
+  # sentences are in the template where they can be read beside the rows they appear on.
+  it 'carries a hidden line saying the tap is waiting to send' do
+    assert_equal 2, @body.scan('<p data-waiting hidden').length
+    assert_includes @body, 'Waiting to send.'
+  end
+end
+
+describe 'what a row says about a tap and what it does not' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include LosingSignal
+
+  before do
+    @workout_id = a_session(login)
+    get "/workouts/#{@workout_id}/session"
+    @body = last_response.body.dup.force_encoding(Encoding::UTF_8)
+  end
+
   # Words rather than a colour, which is what #214 settled for this row: the tint has two
   # states, done and not, and a set the app failed to save is not a third state of the set.
   # The set is exactly as unfinished as the row already shows; what is new is a statement
@@ -123,10 +188,40 @@ describe 'every row of a session' do
 
   # The reason the script has to remember which rows it marked rather than trusting the DOM
   # to keep them. A tap on one set re-renders its whole panel and the poll re-renders every
-  # panel on the screen, and both send these rows back hidden -- correctly, because as far
-  # as the database is concerned the lost tap never happened.
-  it 'comes back from a tap with the line hidden again' do
+  # panel on the screen, and both send these rows back with both lines hidden -- correctly,
+  # because as far as the database is concerned neither thing has happened to this set.
+  it 'comes back from a tap with both lines hidden again' do
     assert_match(/<p data-unsaved hidden/, tap(@workout_id, @set_id))
+    assert_match(/<p data-waiting hidden/, tap(@workout_id, @set_id))
+  end
+end
+
+describe 'the poller on a screen with a queue behind it' do
+  include Rack::Test::Methods
+  include RouteOwnership
+  include LosingSignal
+
+  before do
+    @workout_id = a_session(login)
+    get "/workouts/#{@workout_id}/session"
+    @body = last_response.body.dup.force_encoding(Encoding::UTF_8)
+  end
+
+  # What a flush leaves behind is a screen that is out of date about itself: the sets went in
+  # by fetch, so nothing swapped, and the rows still show Done on work the database now has.
+  # The poll would find that within fifteen seconds on its own. Fifteen seconds is a long
+  # time to stand there having watched the count go to zero, so the drain says so and the
+  # poller listens -- one extra trigger on an element that already exists, rather than a
+  # second request of the queue's own asking the same question. #542.
+  it 'refreshes the panels when the queue has finished sending' do
+    assert_match(/hx-trigger="every 15s, queue-drained from:body"/, @body)
+  end
+
+  # And it comes back on every tap carrying the same trigger, because this element replaces
+  # itself out of band and a poller that forgot how to listen would leave the screen stale
+  # after the first flush of the session rather than after none of them.
+  it 'keeps the trigger through the swap that replaces it' do
+    assert_match(/hx-trigger="every 15s, queue-drained from:body"/, tap(@workout_id, @set_id))
   end
 end
 
