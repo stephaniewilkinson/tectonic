@@ -2006,6 +2006,23 @@ class Tectonic < Roda
     session['zone.detect'] = true unless Clock.zone_of(account_id)
   end
 
+  # Whether a new set starts out ticked as done. #630.
+  #
+  # The first thing /start recommends is logging a session already trained, and the box came up
+  # clear -- so a lifter recorded a real session, #304's rule filed it as planned (or, dated
+  # yesterday, missed), and no chart appeared. The rule stays; what the form suggests changes.
+  # A set on a session dated today or earlier, on the lifter's own calendar, is most likely one
+  # being recorded after the fact, so the box starts ticked, and a future date is a plan and
+  # starts clear. Either way it is a box they can see and untick.
+  #
+  # Not from the session screen, which has its own way of saying a set is done -- the Done
+  # button, tapped at the rack -- and where a set added mid-session has not been lifted yet.
+  def lifted_by_default?
+    return false if @return_to_session || !@workout
+
+    @workout[:date].to_date <= Clock.today(account_row[:time_zone])
+  end
+
   # Which assistant an account signed up to connect, from the consent screen it was sent to
   # sign in for (#628). Nothing where the saved page was anything else, or there was none.
   def remember_the_connection(account_id, saved)

@@ -70,7 +70,8 @@
       <%- end %>
       <%# An unticked box sends nothing, and the route reads a missing parameter as false,
           so a box that does not arrive carrying the row's own state clears it on save.
-          Both come up clear on the new-set form, where there is no state to carry.
+          On the new-set form there is no state to carry, and Completed comes up ticked for a
+          session dated today or earlier -- see lifted_by_default? (#630).
 
           The three colour classes are #163's, which the new-set copy carried and the edit
           copy, whose boxes wore no classes at all, did not. accent-lime-500 is the one that
@@ -82,7 +83,7 @@
       <div class="relative flex items-start">
         <div class="flex h-6 items-center">
           <input id="is_completed" aria-describedby="is_completed-description" name="is_completed" type="checkbox"
-            <%= 'checked' if @set && @set[:is_completed] %>
+            <%= 'checked' if @set ? @set[:is_completed] : lifted_by_default? %>
             class="h-4 w-4 rounded border-gray-300 text-lime-500 accent-lime-500 focus:ring-lime-500">
         </div>
         <div class="ml-3 text-sm leading-6">
