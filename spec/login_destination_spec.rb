@@ -214,12 +214,14 @@ describe 'the first-run page' do
     assert_includes last_response.body, 'Start here'
   end
 
-  it 'offers the three things it says are worth doing first' do
+  # Two since #629: connecting an assistant, and logging a session. The block card linked to
+  # /programs, which #411 had already turned into a redirect to an empty list.
+  it 'offers the two ways in it describes' do
     email, password, = account_with
     land(email, password)
     get '/start'
 
-    %w[/workouts/new /programs /connections].each do |path|
+    %w[/connections /workouts/new].each do |path|
       assert_includes last_response.body, %(href="#{path}")
     end
   end
