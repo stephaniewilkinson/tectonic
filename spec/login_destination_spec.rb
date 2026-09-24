@@ -91,15 +91,19 @@ describe 'signing in with training behind you but none written for today' do
   include Rack::Test::Methods
   include LandingAfterLogin
 
-  it 'lands on the new-workout form' do
+  # The calendar since #635, where it was the new-workout form: on a day with nothing
+  # written, the useful answer is the week, and logging something unplanned is a tap from it.
+  it 'lands on the calendar' do
     email, password, = account_with(Date.today - 3, Date.today - 10)
-    assert_equal '/workouts/new', land(email, password)
+    assert_equal '/', land(email, password)
   end
 
-  # A session dated ahead is a plan, not something to open today: nothing is due yet.
+  # A session dated ahead is a plan, not something to open today -- but it is exactly what the
+  # calendar shows, which is the case #635 was about: an assistant wrote the block, the first
+  # session is Monday, and a blank form on Saturday said nothing about it.
   it 'lands there when the only other session is still in the future' do
     email, password, = account_with(Date.today + 2)
-    assert_equal '/workouts/new', land(email, password)
+    assert_equal '/', land(email, password)
   end
 end
 
