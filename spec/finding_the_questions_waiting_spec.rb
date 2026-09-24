@@ -53,7 +53,7 @@ module FindingTheQuestions
   # ask", not "the lifter refused to be asked".
   def answer_them_all
     @sessions.each_with_index do |workout_id, day|
-      Tectonic::WithingsWorkouts.confirm(account_id: @account_id, workout_id:, external_id: "w-#{day}")
+      Tectonic::WithingsAnswers.confirm(account_id: @account_id, workout_id:, external_id: "w-#{day}")
     end
   end
 
@@ -62,7 +62,7 @@ module FindingTheQuestions
   # was one more somewhere else.
   def answer_all_but_the_first
     @sessions.drop(1).each_with_index do |workout_id, index|
-      Tectonic::WithingsWorkouts.confirm(account_id: @account_id, workout_id:, external_id: "w-#{index + 1}")
+      Tectonic::WithingsAnswers.confirm(account_id: @account_id, workout_id:, external_id: "w-#{index + 1}")
     end
   end
 

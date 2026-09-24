@@ -42,9 +42,9 @@ module AlreadyAnswered
   end
 
   def answered_from_its_own_record
-    Tectonic::WithingsWorkouts.store(@account_id, activity(id: 'confirmed', starts: @at + 120, minutes: 45))
-    Tectonic::WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout_id,
-                                       external_id: 'confirmed')
+    Tectonic::WithingsActivity.store(@account_id, activity(id: 'confirmed', starts: @at + 120, minutes: 45))
+    Tectonic::WithingsAnswers.confirm(account_id: @account_id, workout_id: @workout_id,
+                                      external_id: 'confirmed')
   end
 
   def a_session_with_a_proposal
@@ -106,9 +106,9 @@ module AlreadyAnswered
   # single statement, and the state it produces -- a session whose slot is taken, reached by
   # code that believed it was free -- is exactly what the two halves of the guard are for.
   def offer_anyway
-    session = Tectonic::WithingsBackfill.sessions(@account_id).first
+    session = Tectonic::WithingsPairing.sessions(@account_id).first
     Tectonic::WithingsWorkouts.stub(:standing, nil) do
-      Tectonic::WithingsBackfill.offer(@account_id, session, [])
+      Tectonic::WithingsPairing.offer(@account_id, session, [])
     end
   end
 
@@ -260,8 +260,8 @@ describe 'a walk that meets a proposal nobody can answer' do
   before do
     a_session_with_a_proposal
     @elsewhere = trained_session(@account_id, started_at: @at - (3 * 86_400))
-    Tectonic::WithingsWorkouts.dismiss(account_id: @account_id, workout_id: @elsewhere,
-                                       external_id: 'backfilled')
+    Tectonic::WithingsAnswers.dismiss(account_id: @account_id, workout_id: @elsewhere,
+                                      external_id: 'backfilled')
     @report = backfill(@account_id, answering(backfilled, second_recording), since: @at.year)
   end
 
@@ -294,7 +294,7 @@ describe 'a run that reaches for the activity already carrying the proposal' do
 
   before do
     a_session_with_a_proposal
-    Tectonic::WithingsWorkouts.store(@account_id, second_recording)
+    Tectonic::WithingsActivity.store(@account_id, second_recording)
   end
 
   # The tally, which `offer` reported without ever looking at what the update did. The row it
@@ -314,7 +314,7 @@ describe 'a run whose session lost its slot to another walk' do
 
   before do
     a_session_with_a_proposal
-    Tectonic::WithingsWorkouts.store(@account_id, fuller_recording)
+    Tectonic::WithingsActivity.store(@account_id, fuller_recording)
   end
 
   # The activity it picks is a free one and the session's slot is taken all the same.

@@ -35,6 +35,7 @@ require_relative 'lib/tectonic/withings'
 require_relative 'lib/tectonic/withings_connection'
 require_relative 'lib/tectonic/withings_measures'
 require_relative 'lib/tectonic/withings_workouts'
+require_relative 'lib/tectonic/withings_answers'
 # The proposals a backfill left, which this app reads. #534.
 require_relative 'lib/tectonic/withings_proposals'
 # And the walk that makes them, which this app now reaches in one place and one shape only:
@@ -889,7 +890,7 @@ class Tectonic < Roda
         # permission that has expired has a Reconnect in front of it and nothing to import
         # through until somebody uses it, and an account with no connection at all is told how
         # to start and nothing else.
-        @withings_import = WithingsBackfill.pending(@account_id) if @withings[:state] == :live
+        @withings_import = WithingsReadRange.pending(@account_id) if @withings[:state] == :live
         # Taken out of the session as it is read, the same as the notice below, so a reload
         # does not re-announce a year imported ten minutes ago as though it had just happened.
         @withings_imported = session.delete('withings.import')
@@ -1652,14 +1653,14 @@ class Tectonic < Roda
           # something went wrong, and nothing did; the question was simply already answered.
           r.post 'match' do
             check_csrf!
-            linked = WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout.id,
-                                              external_id: r.params['activity'].to_s)
+            linked = WithingsAnswers.confirm(account_id: @account_id, workout_id: @workout.id,
+                                             external_id: r.params['activity'].to_s)
             r.redirect(linked.positive? ? answered_from(workout_id, r.params['back']) : "/workouts/#{workout_id}")
           end
           r.post 'dismiss' do
             check_csrf!
-            WithingsWorkouts.dismiss(account_id: @account_id, workout_id: @workout.id,
-                                     external_id: r.params['activity'].to_s)
+            WithingsAnswers.dismiss(account_id: @account_id, workout_id: @workout.id,
+                                    external_id: r.params['activity'].to_s)
             r.redirect answered_from(workout_id, r.params['back'])
           end
           # Asking Withings, because the lifter asked. #560.

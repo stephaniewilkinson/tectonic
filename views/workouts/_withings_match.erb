@@ -174,7 +174,7 @@
       <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
         <%- @withings[:nearby].each do |activity| %>
           <li>
-            <span class="font-medium text-gray-900"><%= Tectonic::WithingsWorkouts.called(activity[:category]) %></span>
+            <span class="font-medium text-gray-900"><%= Tectonic::WithingsActivity.called(activity[:category]) %></span>
             &mdash;
             <%- if (day = Tectonic::WithingsWorkouts.day_apart(activity[:started_at], @withings[:session])) %>
               <%= day %>,

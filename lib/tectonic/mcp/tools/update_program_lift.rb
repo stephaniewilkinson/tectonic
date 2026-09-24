@@ -202,7 +202,7 @@ class Tectonic < Roda
           # client gets a sentence instead of a database error -- the same courtesy the rest
           # and the target RPE get on the way in. #451.
           Bounds.check(Bounds::WARMUP_SETS, attributes[:warmup_sets], 'Warmup sets')
-          ProgramWriter.check_load(merged(lift, attributes), shape(lift, attributes))
+          LiftChecks.check_load(merged(lift, attributes), shape(lift, attributes))
         end
 
         # The row as it will be, including how it is done. The three shape columns are

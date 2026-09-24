@@ -6,7 +6,10 @@ require_relative 'error_reporting'
 require_relative 'timing'
 require_relative 'withings'
 require_relative 'withings_connection'
+require_relative 'withings_pairing'
+require_relative 'withings_read_range'
 require_relative 'withings_proposals'
+require_relative 'withings_answers'
 require_relative 'withings_workouts'
 
 class Tectonic < Roda
@@ -47,7 +50,7 @@ class Tectonic < Roda
   # per press**, which is one request to Withings in the ordinary case, and the page says how
   # many years are left so the lifter knows whether to press again. It is a narrower entry
   # point into this module rather than a second walker -- it fetches with `fetch_year`,
-  # stores with `store_all` and pairs with `pair`, which are the same three the rake task
+  # stores with `store_all` and pairs with `WithingsPairing.pair`, which are the same three the rake task
   # runs -- because a second expression of this logic is exactly how the `more` bug in #553
   # came about, and this module's whole contract is that a nil year and an empty year are
   # different things.
@@ -142,133 +145,17 @@ class Tectonic < Roda
     # again. So a nil never widens the range of years recorded as read, and never renders as a
     # total.
     #
-    # It also still calls `fetch_year`, `store_all` and `pair` directly rather than routing
+    # It also still calls `fetch_year`, `store_all` and `WithingsPairing.pair` directly rather than routing
     # through `run(since:)`, because those three are the whole of the walk and a second
     # expression of the logic around them is how the `more` bug in #553 came about.
     def slice(account_id:, pause: PAUSE)
       token = WithingsConnection.token(account_id)
       return { state: :disconnected } unless token
 
-      plan = pending(account_id)
+      plan = WithingsReadRange.pending(account_id)
       return plan unless plan[:state] == :ready
 
       import(account_id, token, plan[:year], pause)
-    end
-
-    # What a press would do next, which the page has to be able to say *before* it is pressed.
-    #
-    # The same method answers both questions on purpose. A button offering to import 2023 and
-    # a press that imports 2022 is the kind of disagreement that only shows up in front of a
-    # lifter, and the way two answers to one question stay in agreement is for there to be
-    # one answer.
-    #
-    # `years_left` counts every year still unread, on both sides of what has been read, so a
-    # lifter can tell "press again" from "press four more times" -- and so the page can stop
-    # asking at all once there is nothing behind the button. The rest of what `remaining`
-    # returns is there because the page's offer has to be able to name a gap: see #566, and
-    # the Wearables section of views/settings.erb, where those numbers become sentences.
-    #
-    # The range is read once here and handed down to both of them, rather than each fetching
-    # the row again. Two readings of one row inside one answer is a way for the button and the
-    # sentence beside it to disagree about a press made in between, and this method's whole
-    # argument is that they cannot.
-    def pending(account_id)
-      floor = first_session_year(account_id)
-      return { state: :no_sessions } unless floor
-
-      read = imported_range(account_id)
-      year = next_year(read, floor)
-      return { state: :nothing_left, earliest: floor } unless year
-
-      { state: :ready, year:, earliest: floor, **remaining(read, floor) }
-    end
-
-    # The year the next press reads, or nil where every year from the earliest stamped set to
-    # this one has been read.
-    #
-    # ## What this used to be, and why one number could not do it
-    #
-    # It used to be `imported_year&.pred || Date.today.year`: the year before the cursor, and
-    # this year for an account that had never pressed. That reads the cursor as the answer to
-    # two questions -- how far back the reading got, and whether everything above it is read --
-    # and it is only ever the answer to the first. #566: a course of presses in 2023 that
-    # reached 2019 leaves a cursor of 2019, and in 2026 this returned nil, because 2018 is
-    # below the floor. 2024 and 2025 were never read and nothing would ever have read them.
-    #
-    # So the recorded claim is a *range* now, and the two ends of it are two columns, which is
-    # argued at length in 049 and in `settle`. Given a range, the years still to read are the
-    # two gaps either side of it: the years since it, and the years below it down to the floor.
-    #
-    # ## Upward through the newer gap first, and why that is not the walk's order reversed
-    #
-    # The years above the range are newer than the years below it, so they go first -- which is
-    # the same preference `walk` states for reading a history newest year first, applied to the
-    # two gaps rather than within one. Inside that gap the order has to be upward, because a
-    # press of this year would leave two disjoint stretches of read history and a range is the
-    # one thing two numbers can hold. That is a real cost and a small one: it is an ordering
-    # over a gap that is usually a year or two, where `walk`'s argument is about a decade cut
-    # short by a throttle. It also loses least, since the very newest year is the one the
-    # forward flow has been matching on its own all along.
-    #
-    # The floor is the year of the earliest stamped set, the same bound the task walks to and
-    # one out of Tectonic's own data: a year before the first logged session holds nothing that
-    # could ever be proposed to anything.
-    #
-    # The two ways of being wrong here are still not symmetrical, and that is what decides
-    # every close call in this module: a claim behind the truth costs one request to a year
-    # already stored, and `WithingsWorkouts.store` makes re-storing an activity a no-op, while
-    # a claim ahead of the truth loses that year in silence.
-    def next_year(read, floor)
-      return Date.today.year unless read
-      return read.last + 1 if read.last < Date.today.year
-
-      candidate = read.first - 1
-      candidate < floor ? nil : candidate
-    end
-
-    # The years this account's history has been read over, or nil where none have been.
-    #
-    # Both ends or neither, because they are one claim and half of one cannot be read: a row
-    # carrying a bottom and no top says how far back some read got and nothing whatever about
-    # what is above it, which is the state 049 emptied and the shape of #566. Nothing writes
-    # that state now -- `record_read` always writes both -- and treating it as "nothing has
-    # been read" is the reading that costs a re-read rather than a year.
-    def imported_range(account_id)
-      row = WithingsConnection.of(account_id)
-      bottom = row&.fetch(:workouts_imported_year, nil)
-      top = row&.fetch(:workouts_imported_through_year, nil)
-      bottom && top ? bottom..top : nil
-    end
-
-    # Everything the page needs to say what is left, which since #566 is more than a count.
-    #
-    # A single number could describe the work left when the work was always one unbroken run
-    # backwards. It is two runs now -- the years since the last read, and the years below it --
-    # and a page given only a total cannot tell a lifter which. So the two gaps are reported as
-    # the years they are, and the sentences are built from them in the view.
-    def remaining(read, floor)
-      since = unread_since(read)
-      older = older_left(read, floor)
-      { imported_from: read&.first, imported_to: read&.last,
-        unread_from: since&.first, unread_to: since&.last,
-        older_left: older, years_left: older + (since&.count || 0) }
-    end
-
-    # The years above the read range: the year after it up to this one. Nil where the range
-    # already reaches this year, and nil where nothing has been read at all -- an account with
-    # no range has no gap above it, only a whole history below.
-    def unread_since(read)
-      return nil unless read && read.last < Date.today.year
-
-      (read.last + 1)..Date.today.year
-    end
-
-    # And the years at or below the bottom of the range that are still to be read. Zero rather
-    # than negative where a read went below the floor, which SINCE can do.
-    def older_left(read, floor)
-      return Date.today.year - floor + 1 unless read
-
-      [read.first - floor, 0].max
     end
 
     # Fetch, store, record, pair -- and the order is the whole of what makes a press safe to
@@ -278,7 +165,7 @@ class Tectonic < Roda
     #
     # `more` is the year another press would read, or nil where there is none. A lifter needs
     # to know whether to press again *and* whether to stop, and only one of those two can be
-    # inferred from a screen that says neither. It is asked of `pending` rather than worked out
+    # inferred from a screen that says neither. It is asked of `WithingsReadRange.pending` rather than worked out
     # here, because that is the method the page asks the same question of a moment later and a
     # report that disagreed with the button under it would be a disagreement only a lifter ever
     # saw. `catching_up` is which of the two gaps that year sits in, which the page needs
@@ -289,90 +176,17 @@ class Tectonic < Roda
       return { state: :refused, year:, more: year } unless activities
 
       found = store_all(account_id, activities)
-      record_read(account_id, year, year)
-      next_press = pending(account_id)
+      WithingsReadRange.record_read(account_id, year, year)
+      next_press = WithingsReadRange.pending(account_id)
       { state: :imported, year:, found:, more: next_press[:year],
         catching_up: !next_press[:unread_from].nil? }.merge(offered(account_id))
-    end
-
-    # The years this account's history has now been read over, by whichever route read them.
-    #
-    # 045 added the bottom of this for the presses alone and said in as many words that the
-    # rake task would never write it, because at the time the task's own watermark could be
-    # stamped for an account with five unread years behind it and the button could not afford
-    # to believe anything the task wrote. #554 closed that, and with the task no longer able to
-    # claim a history it did not read there is no reason left for two private opinions of one
-    # number: a year read from a terminal is a year read, and a lifter should not be asked to
-    # press Import for it. Still emphatically not the measurement poll's `synced_at`, which is
-    # a different question about different data -- see 043.
-    #
-    # ## Why this took a second end, replacing the `LEAST` that used to be the whole of it
-    #
-    # This was one line -- `least(workouts_imported_year, year)` -- and the argument for it was
-    # that the cursor must only ever move backwards, because a SINCE-narrowed task run writing
-    # its floor in flat would drag it up over years somebody had already read. That argument
-    # was right and it was half the shape. A bottom that only moves down cannot say anything at
-    # all about the years above it, and the page was reading it as though it could: #566, where
-    # a course of presses that finished in 2023 told a lifter in 2026 that 2024 and 2025 were
-    # imported. So what is written down is the stretch of years actually read, at both ends.
-    #
-    # ## Three cases, because two ranges can fail to touch
-    #
-    # A read that **touches** what is recorded -- overlapping it, or adjacent to it with no year
-    # in between -- widens the record to cover both, and that is every ordinary case: a press
-    # reads the year next to the range by construction, and a task run walks from its floor up
-    # to this year, which is at or above the top of anything recorded.
-    #
-    # A read that does **not** touch it can only come from an operator's SINCE, and there the
-    # union of the two is not a range and there is nothing honest to write for the year between
-    # them. One of the two has to be given up, and it is the shallower: the deeper claim is the
-    # one that cost more requests to acquire, and the button walks up through the gap and on
-    # over the shallow one anyway, where the other choice would hand a decade back to it. That
-    # is also what keeps the promise the old `LEAST` made -- the bottom never moves forward.
-    #
-    # And a row with nothing recorded, or with half a claim on it, takes the read entire. 049
-    # emptied the half-claims; the condition is here because a bottom without a top is not a
-    # statement this module is willing to read, wherever it came from.
-    #
-    # All three in one statement rather than a read and then a write, for the reason the
-    # `LEAST` gave: the arithmetic belongs in the database rather than in a round trip this
-    # module would have to hold a lock across. Every reference below is to the row as it was
-    # before the update, which is what Postgres gives an UPDATE's right-hand sides.
-    def record_read(account_id, lowest, highest)
-      read = lowest..highest
-      DB[:account_withings].where(account_id:).update(
-        workouts_imported_year: end_of_range(:workouts_imported_year, :least, lowest, read),
-        workouts_imported_through_year: end_of_range(:workouts_imported_through_year, :greatest, highest, read)
-      )
-    end
-
-    # One end of the recorded range under the three cases above, in the order they are argued.
-    def end_of_range(column, merge, year, read)
-      Sequel.case([[nothing_recorded, year],
-                   [touching(read), Sequel.function(merge, column, year)],
-                   [Sequel[:workouts_imported_year] > read.first, year]],
-                  column)
-    end
-
-    # Half a claim is not a claim. Either column being null means this row has never had a
-    # stretch of years written to it that could be widened.
-    def nothing_recorded
-      Sequel.|({ workouts_imported_year: nil }, { workouts_imported_through_year: nil })
-    end
-
-    # Two stretches of years touch unless one ends more than a year before the other begins.
-    # Adjacent counts: 2019-2023 and 2024-2026 are one unbroken 2019-2026, and refusing to join
-    # them would be refusing to record the ordinary result of pressing the button twice.
-    def touching(read)
-      Sequel.&(Sequel[:workouts_imported_through_year] >= read.first - 1,
-               Sequel[:workouts_imported_year] <= read.last + 1)
     end
 
     # The pairing, with the last thing that can raise out of it kept off a lifter's screen.
     #
     # **#555 is fixed rather than caught now**, and this stays for what the fix cannot reach.
     # What it was written for was a proposal nobody could answer holding a session's slot
-    # under the unique index on `proposed_workout_id`: `offer` gives those up before it writes
+    # under the unique index on `proposed_workout_id`: `WithingsPairing.offer` gives those up before it writes
     # and guards the write on the session id as well as on the row, so a single walk no longer
     # meets one. Two walks at once still can -- both can read no row and both can write, and
     # an index is the only thing that can settle that, which is what an index is for.
@@ -384,7 +198,7 @@ class Tectonic < Roda
     # zeroes as though it had. Pressing Import again re-pairs, because pairing is the part of
     # this module that is free to repeat.
     def offered(account_id)
-      pair(account_id)
+      WithingsPairing.pair(account_id)
     rescue Sequel::UniqueConstraintViolation => e
       report(e)
       { pairing: :stalled }
@@ -409,7 +223,7 @@ class Tectonic < Roda
     def attempt(account_id, token, years, pause)
       walked = walk(account_id, token, years, pause)
       settled = settle(account_id, years, walked)
-      walked.merge(pair(account_id)).merge(years:, state: :walked, **settled)
+      walked.merge(WithingsPairing.pair(account_id)).merge(years:, state: :walked, **settled)
     end
 
     # What a walk leaves written down, which #554 is the story of getting wrong.
@@ -455,7 +269,7 @@ class Tectonic < Roda
       lowest = lowest_read(years, walked)
       return { read_back_to: nil, earliest: floor } unless lowest
 
-      record_read(account_id, lowest, years.first)
+      WithingsReadRange.record_read(account_id, lowest, years.first)
       { read_back_to: lowest, earliest: floor }
     end
 
@@ -501,13 +315,13 @@ class Tectonic < Roda
       Withings.workouts(token, from: Date.new(year, 1, 1), to: Date.new(year, 12, 31), pause:)
     end
 
-    # Storage is `WithingsWorkouts.store` and deliberately not a second upsert written here.
+    # Storage is `WithingsActivity.store` and deliberately not a second upsert written here.
     # That one already omits `workout_id` and `dismissed_at` from its update list, which is
     # the property that makes re-running this safe: a backfill run twice must not un-answer a
     # question the lifter has answered, and the way to inherit that guarantee is to go
     # through the code that carries it rather than to restate it and hope.
     def store_all(account_id, activities)
-      DB.transaction { activities.each { |activity| WithingsWorkouts.store(account_id, activity) } }
+      DB.transaction { activities.each { |activity| WithingsActivity.store(account_id, activity) } }
       activities.length
     end
 
@@ -557,131 +371,8 @@ class Tectonic < Roda
     # range of 2019-2023 read in 2023 has a 2026 run start at 2023, which is right, since
     # 2024 and 2025 were never asked about.
     def resumed_year(account_id, floor)
-      read = imported_range(account_id)
+      read = WithingsReadRange.imported_range(account_id)
       read && read.first <= floor ? read.last : nil
-    end
-
-    # Offering what was stored to the sessions that have nothing, one session at a time.
-    #
-    # Greedy, oldest session first, and an activity offered to one session is out of the
-    # running for the next. That is not the optimal assignment over the whole history -- a
-    # proper one would be a matching problem over a bipartite graph -- and the reason it does
-    # not need to be is that contested overlaps barely exist: two Tectonic sessions rarely
-    # overlap each other in time, so the candidate sets are nearly disjoint and greedy and
-    # optimal agree. Where they do not, the lifter says no and the activity goes back into
-    # the pool on the next run.
-    def pair(account_id)
-      tally = { proposed: 0, already_waiting: 0, without_activity: 0 }
-      claimed = []
-      sessions(account_id).each { |session| tally[offer(account_id, session, claimed)] += 1 }
-      tally.merge(activities_without_session: unoffered(account_id))
-    end
-
-    # One session's turn, and which of the three things happened to it.
-    #
-    # A session that already has a proposal waiting is left exactly as it is. That is what
-    # makes a second run a no-op rather than a second set of proposals -- and it is also what
-    # keeps a re-run from quietly swapping a waiting proposal for a different activity
-    # between the lifter reading the page and answering it.
-    #
-    # `reclaim` first, because `standing` can only see a proposal that is still a question and
-    # a dead one holds the session's slot just as firmly. See #555: an activity claimed by
-    # another session, or refused, while it was still carrying this session's proposal is
-    # invisible to the check above and fatal to the write below, since `proposed_workout_id`
-    # is unique. Giving it up here is what turns a walk that died at the index into a walk
-    # that offers the session the recording it can still answer.
-    def offer(account_id, session, claimed)
-      window = session[:window]
-      return :already_waiting if WithingsWorkouts.standing(account_id, session[:id], window)
-
-      pick = WithingsWorkouts.best(available(account_id, window, session[:id], claimed), window)
-      return :without_activity unless pick
-
-      claimed << pick[:id]
-      WithingsWorkouts.reclaim(account_id, session[:id])
-      wrote?(pick[:id], session[:id]) ? :proposed : :already_waiting
-    end
-
-    # The write, guarded on both halves of what the unique index protects, and reported on by
-    # what it actually did rather than by having been reached. #555.
-    #
-    # `proposed_workout_id: nil` is the guard on the **row**: an offer that appeared
-    # underneath this one -- another run, a half-open session -- is refused rather than
-    # overwritten. The `NOT EXISTS` is the guard on the **value**, which was missing: nothing
-    # asked whether some other row already held this session's id, so a walk that met one
-    # found out from Postgres, as an exception, out of `pair` and `attempt` and `run`, with
-    # the year's requests already spent. After `reclaim` the only row that can still be
-    # holding the slot is a live proposal written by a concurrent walk, and this declines to
-    # it rather than raising at it.
-    #
-    # It is a narrower window and not a closed one: two transactions can both read no row and
-    # both write, and the index is what catches that -- which is what the index is for, and
-    # why the rescue in `offered` stays.
-    #
-    # The subquery is not scoped to the account on purpose, unlike every other read in this
-    # module. What it is standing in front of is a unique index over the whole table, so the
-    # question it has to ask is the index's question and not this lifter's.
-    #
-    # And the count is read, because a write that changed nothing is not a proposal made. The
-    # report's four numbers are what a lifter uses to decide whether an import worked, and
-    # until now the only one of them that could not be trusted was the one they read first.
-    # `:already_waiting` rather than a fourth state: every way of getting here means some
-    # proposal is in place for this session or for this activity, which is what that word
-    # already says, and a fourth number would need a fifth sentence on two screens to explain
-    # a case that means the same thing as the third.
-    def wrote?(activity_id, workout_id)
-      held = DB[:withings_workouts].where(proposed_workout_id: workout_id).exists
-      DB[:withings_workouts].where(id: activity_id, proposed_workout_id: nil).exclude(held)
-                            .update(proposed_workout_id: workout_id).positive?
-    end
-
-    # The scoring is the forward flow's, entire: the same overlap gate, the same ratio, the
-    # same quarter-point for a lifting category, the same nearest-start tie-break. A second
-    # scorer would be a second answer to "is this recording of this session", and the two
-    # would disagree eventually -- on an old session, where nobody would be watching.
-    def available(account_id, window, workout_id, claimed)
-      WithingsWorkouts.candidates(account_id, window, workout_id)
-                      .reject { |row| claimed.include?(row[:id]) }
-    end
-
-    # Every session that could still take an offer, with the interval to score against.
-    #
-    # Already-matched sessions are excluded because they are answered, and dismissed ones
-    # because #520 requires a no to stick permanently -- a backfill that re-proposed to a
-    # session the lifter had waved away would be the nagging the issue forbids, arriving
-    # months later and in bulk.
-    #
-    # A session with no stamped sets drops out here rather than being counted as one the
-    # watch recorded nothing for, and the difference is worth keeping: a written but untrained
-    # session, which is most of what a generated programme week is, has no interval and
-    # therefore no question to ask about it. Counting those would put a number in the report
-    # that grows every time somebody generates a week.
-    def sessions(account_id)
-      matched = DB[:withings_workouts].where(account_id:).exclude(workout_id: nil).select_map(:workout_id)
-      rows = DB[:workouts].where(account_id:, withings_dismissed_at: nil)
-                          .exclude(id: matched).order(:date, :id).all
-      stamps = WithingsProposals.stamps_for(rows.map { |row| row[:id] })
-      rows.filter_map { |row| session_window(row, stamps.fetch(row[:id], [])) }
-    end
-
-    # `Timing.session` and `WithingsWorkouts.interval`, in that order, which is exactly what
-    # the record page does. The interval a session is matched on is one idea and it lives in
-    # one place; a backfill that read `min(completed_at)` out of the database itself would be
-    # a second reading of it, and the day the two disagreed would be the day a year of
-    # proposals was subtly wrong.
-    def session_window(row, sets)
-      window = WithingsWorkouts.interval(Timing.session(row, sets))
-      window && { id: row[:id], date: row[:date], window: }
-    end
-
-    # Activities nobody has been asked about and no session wants: stored, unclaimed,
-    # un-refused and unoffered. The honest name for these is "the watch recorded something
-    # Tectonic has no session for" -- a walk, a bike ride, or a session trained and never
-    # logged -- and the count is reported rather than swallowed because it is the number that
-    # tells a lifter whether the matching worked or merely ran.
-    def unoffered(account_id)
-      DB[:withings_workouts].where(account_id:, workout_id: nil, dismissed_at: nil,
-                                   proposed_workout_id: nil).count
     end
   end
 end
