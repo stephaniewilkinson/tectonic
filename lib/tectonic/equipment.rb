@@ -14,11 +14,22 @@ class Tectonic < Roda
   # smallest jump a bar can make is a property of the rack, and `Rounding.to_increment`
   # already took an increment, so most callers need the number rather than the inventory.
   class Equipment
-    # What a rack looks like when nobody has said otherwise: a men's bar and the plates
-    # the app assumed before it asked. Two pairs of each is enough for any weight these
-    # denominations can express without being a claim about a particular garage.
+    # What a rack looks like when nobody has said otherwise: a men's bar and a gym's plates.
+    #
+    # Eight pairs of 45s, since #632. It was two pairs of each, which loads nothing heavier than
+    # 395 -- and the default is what every lifter who has not opened settings trains on, which
+    # is everybody who signs up, connects an assistant and asks for a block. A 455 squat was
+    # written as 395 without a word, warmups compressed to match. A commercial gym is the
+    # likelier place for a new lifter to be standing, and a rack big enough for any lift a
+    # person can do means the default never silently caps anybody.
+    #
+    # The trade, chosen knowingly: a home-gym lifter with two pairs of 45s who has not
+    # described their rack can now be written a load they cannot build, and finds out at the
+    # rack rather than in the block. Weight plates in settings is the fix, as it always was.
+    # The smaller plates stay one or two pairs, because they decide the increment, not the
+    # ceiling, and the increment is unchanged.
     DEFAULT_BAR = 45
-    DEFAULT_PLATES = { 45 => 2, 25 => 2, 10 => 2, 5 => 2, 2.5 => 2 }.freeze
+    DEFAULT_PLATES = { 45 => 8, 25 => 2, 10 => 2, 5 => 2, 2.5 => 2 }.freeze
     # The denominations the form offers. Not a limit on what can be stored -- the column
     # takes any weight and an MCP tool or a migration may write others -- just the ones
     # worth putting in front of someone, from a full-size plate down to the micro plates
