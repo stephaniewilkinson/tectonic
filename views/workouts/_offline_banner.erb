@@ -574,11 +574,13 @@
 
     render();
 
-    // And the flush that needs no event at all. This page was fetched from the server, so
-    // there is a connection by construction, and anything the store is still holding was
+    // And the flush that needs no event at all. This page was usually fetched from the server,
+    // so there is usually a connection, and anything the store is still holding was
     // held by a page that is gone -- the tab was closed, the phone locked, the session
     // reopened the next morning. Recovering it here is the whole reason the queue is in
-    // IndexedDB rather than in a variable in this closure.
+    // IndexedDB rather than in a variable in this closure. Usually, not always: since #543 the
+    // page may be the copy assets/sw.js kept, opened with no signal, and then this flush simply
+    // fails and holds everything -- which is right, because the response decides, not the load.
     //
     // Not before the document is parsed, though, and that is a race worth naming because it
     // is invisible when it goes wrong. This script runs while the page is still being read,
