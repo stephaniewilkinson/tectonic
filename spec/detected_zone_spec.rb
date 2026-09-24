@@ -221,23 +221,32 @@ end
 # anything `after_create_account` puts in the session is wiped by the fixation-clearing inside
 # `autologin_session` a few lines later. The detector was simply absent from the page, with
 # nothing anywhere saying why.
-describe 'a real browser saying where it is' do
-  include Minitest::Capybara::Behaviour
-  include BrowserSpec
-  include Capybara::DSL
-
+#
+# #575 moved which request that is without changing any of the above. Signing up no longer
+# opens a session at all, so the hook moved from `create_account_redirect` to
+# `verify_account_redirect` -- the confirmation is now the first request a new account makes
+# with a session in it, and `autologin_session` still clears and resets that session on the
+# way past. So the walk below gained a link and an email, and this file keeps driving the
+# whole of it: it is the one spec whose subject is the ordering, and shortening the walk to
+# a direct sign-in would leave the moved hook unasserted in a browser.
+module ZoneInABrowser
   def stored_for(email) = DB[:accounts].where(email:).get(:time_zone)
 
-  it 'sets the zone on a brand new account, without anybody being asked' do
-    email = "#{SecureRandom.hex}@example.com"
-    visit '/'
-    click_on 'Sign up'
-    fill_in 'email', with: email
+  # The mailer is stubbed rather than left to log, because the link is the only part of this
+  # walk the spec cannot construct honestly. The stub is in place across the click alone,
+  # which is enough: `click_on` does not return until the response has been served, and that
+  # response is served on a Puma thread inside this process.
+  def sign_up_and_confirm(email)
+    sent = nil
+    Tectonic::Mailer.stub(:deliver, ->(to:, text:, **) { sent = text if to == email }) do
+      visit '/'
+      click_on 'Sign up'
+      fill_in 'email', with: email
+      click_on 'Sign up'
+    end
+    visit sent[%r{/verify-account\?key=\S+}]
     fill_in 'password', with: SecureRandom.hex
-    click_on 'Sign up'
-
-    assert_equal(page.evaluate_script('Intl.DateTimeFormat().resolvedOptions().timeZone'),
-                 eventually { stored_for(email) })
+    click_on 'Save it and sign in'
   end
 
   # The fetch is not awaited by the page, so the assertion has to wait for it rather than the
@@ -250,6 +259,21 @@ describe 'a real browser saying where it is' do
       sleep 0.1
     end
     nil
+  end
+end
+
+describe 'a real browser saying where it is' do
+  include Minitest::Capybara::Behaviour
+  include BrowserSpec
+  include Capybara::DSL
+  include ZoneInABrowser
+
+  it 'sets the zone on a brand new account, without anybody being asked' do
+    email = "#{SecureRandom.hex}@example.com"
+    sign_up_and_confirm(email)
+
+    assert_equal(page.evaluate_script('Intl.DateTimeFormat().resolvedOptions().timeZone'),
+                 eventually { stored_for(email) })
   end
 end
 

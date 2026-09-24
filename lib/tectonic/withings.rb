@@ -76,7 +76,36 @@ class Tectonic < Roda
     # error, no empty keys, simply an activity with no measurements in it. A caller that
     # assumed the heart rate would be there would find nil on every row and have no way to
     # tell that from a watch that recorded none.
-    WORKOUT_FIELDS = 'calories,effduration,hr_average,hr_min,hr_max'
+    #
+    # **`effduration` was in this list and is not a field Withings has.** #586. The whole
+    # OpenAPI document their reference renders -- a string literal inside
+    # `developer.withings.com/assets/js/main.<hash>.js`, the hash taken from the `<script
+    # src=>` of `/api-reference/`, which is the only way to read the reference as text at all
+    # -- has zero occurrences of the name: not in the `data_fields` list for `getworkouts`,
+    # not in the `workout_object` schema the response is made of, nowhere in 1.5 MB. Read off
+    # bundle `main.8ae1c0ad.js` on 2026-09-24. The only duration-shaped fields for an activity
+    # are `pause_duration` and `algo_pause_duration`; the `*duration` names that do exist
+    # elsewhere -- `asleepduration`, `lightsleepduration` -- belong to sleep.
+    #
+    # The data said the same thing for a year and nobody could read it: `effective_seconds`
+    # is null on every row this app has ever stored. Asking cost nothing on the wire, which is
+    # exactly why it survived -- Withings drops a name it does not recognise instead of
+    # refusing the request, so a retired or misremembered field is indistinguishable from a
+    # live one that this watch never fills. What it did cost is a reader's fair assumption
+    # that every name here is live, a column that could never be filled, and #571 an argument
+    # built on an absence: two activities "came back with no `effduration`", read as the
+    # signature of a workout the watch detected rather than one somebody started. They came
+    # back without it because nobody could have got it. See app.rb and views/workouts/show.erb,
+    # where that inference is now corrected rather than deleted.
+    #
+    # The other four were checked against that same document in the same sitting and are all
+    # published for this action, in both the `data_fields` list and `workout_object.data`, and
+    # all four are marked available for every category except Multi-sport and breathing
+    # exercises -- category 16, "Lift weights", is in scope for each. The list stays shorter
+    # than what is on offer on purpose: `hr_zone_0` through `hr_zone_3`, `steps`, `distance`,
+    # `spo2_average` and `core_body_temperature_*` are all there for the asking, and each one
+    # would want a column, a reader and a reason before it is worth a parameter.
+    WORKOUT_FIELDS = 'calories,hr_average,hr_min,hr_max'
     # What #472 settled: metrics for weight and body composition, activity for sleep and
     # workouts. Deliberately *not* `user.info`, which requires a contract with Withings and
     # fails the whole authorisation without one.

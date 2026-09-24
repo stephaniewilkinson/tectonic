@@ -100,6 +100,40 @@ class Tectonic < Roda
       { is_completed: done, completed_at: done ? at : nil }
     end
 
+    # The same two columns, for a row that already has an answer in them: what it would take
+    # to reach `done` from where this set is, which is nothing at all when it is already
+    # there. #542.
+    #
+    # This is what makes a completion safe to send twice, and it is the prerequisite the
+    # write queue is built on rather than a tidiness. A tap held on a phone and replayed
+    # when the signal returns arrives at a server that may already have recorded it -- the
+    # request did reach the database and the *response* was what the network ate, which is
+    # the likeliest way a tap comes to be queued at all. `completion` would mark it done a
+    # second time, which is harmless for the flag and a lie in the stamp: the set was lifted
+    # at 18:04 and the second arrival would say 18:40, moving a turnaround the lifter never
+    # took. Every reader of completed_at -- the rest cue, Timing's turnarounds, the record's
+    # clock times -- would then describe the phone finding signal rather than the training.
+    #
+    # It also fixes the wrinkle #516 named in the rating path, where the same re-stamp
+    # happened without any queue involved: rating a set that was already done wrote the
+    # moment of the rating over the moment of the lift.
+    #
+    # An empty hash rather than the columns set to what they already hold, because the
+    # difference is visible: MCP's Changes.apply reports every field it writes, so an
+    # assistant asked to log a set twice said "completed_at 18:04 to 18:40" the second time
+    # and now says there was nothing to change. Which is true, and is the thing the lifter
+    # needs to hear.
+    #
+    # Deliberately not a guard inside `completion` itself. That one is a class method used
+    # at insert time -- create_set, and the fixtures in the specs -- where there is no row to
+    # compare against, and it is the right shape for "these are the two columns a completion
+    # is made of". This is the shape for "this set is being asked to become something".
+    def completion_to(done, at: Time.now)
+      return {} if is_completed == done
+
+      self.class.completion(done, at:)
+    end
+
     # A set moved onto another movement: the new movement's facts, and none of the old
     # movement's prescription. #406.
     #

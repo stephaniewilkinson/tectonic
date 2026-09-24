@@ -40,10 +40,18 @@ class Tectonic < Roda
           lifted = arguments.slice(:weight, :reps, :rpe)
           check(lifted)
           Bounds.rating_fits!(lifted[:rpe], warmup: set.is_warmup, timed: set.timed?)
-          # Through WorkoutSet.completion so the stamp travels with the flag (#281). This
-          # is the other path that can un-complete a set, and the one most easily forgotten
-          # -- the session screen's Done is the obvious one and this is the quiet one.
-          lifted.merge(WorkoutSet.completion(arguments.fetch(:completed, true)))
+          # Through completion_to so the stamp travels with the flag (#281) and so a set
+          # already in the state being asked for keeps the stamp it has (#542). This is the
+          # other path that can un-complete a set, and the one most easily forgotten -- the
+          # session screen's Done is the obvious one and this is the quiet one.
+          #
+          # The no-op matters more here than on the screen, because nothing is watching. An
+          # assistant retrying a call it is not sure landed is the ordinary shape of a retry,
+          # and until #542 the second one moved completed_at to whenever the retry happened --
+          # rewriting when a set was lifted, in a session the lifter finished hours ago, and
+          # reporting the move back to them as a change they had asked for. Now there is
+          # nothing to change, and Changes.describe says exactly that.
+          lifted.merge(set.completion_to(arguments.fetch(:completed, true)))
         end
 
         def self.check(lifted)

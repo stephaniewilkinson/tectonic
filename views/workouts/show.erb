@@ -138,11 +138,17 @@
         session 6:13 to 7:18 that ran 6:07 to 6:53, twenty-five minutes of its recording
         falling after the last completed set, and on the following morning it bracketed a
         shorter, later window than the session it was supposedly measuring. Both of those
-        rows carry `attrib = 7` and came back with no `effduration`, which is what an
-        activity the watch *detected* looks like rather than one somebody deliberately
-        started on it. So deferring did not put a real number in place of an estimate; it
-        redisplayed a 46 minute session as an hour, over the top of the right answer. #571
-        carries the numbers.
+        rows carry `attrib = 7`, Withings' own code for an activity their device *detected*
+        and the lifter confirmed afterwards rather than one somebody deliberately started on
+        it. So deferring did not put a real number in place of an estimate; it redisplayed a
+        46 minute session as an hour, over the top of the right answer. #571 carries the
+        numbers.
+
+        This used to read "and came back with no `effduration`" as a second tell. #586 took
+        that half out: there is no such field in Withings' API, so both rows were always going
+        to come back without it and its absence said nothing about either one. The measured
+        windows above are unaffected and `attrib` is documented, so the conclusion stands on
+        what is left of the evidence rather than on all of it.
 
         What the taps measure is when a set was actually marked done. That is an inference
         from somebody touching a phone, and #520 was right that it is an inference -- but it

@@ -1,0 +1,199 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Take a copy of the production database, without connecting to it.
+#
+#   bin/backup            take one, check that it is a dump with rows in it, prune old copies
+#   bin/backup --check    take nothing; say how old the newest copy is, and fail if it is old
+#
+# Why a script and not a rake task, which is where the restore drill lives and where this
+# would otherwise sit beside it: the moment you need a backup is the moment other things are
+# broken, and a rake task in this repository loads dotenv, roda, the error reporter and --
+# through them -- a database connection, none of which downloading a file needs. This uses
+# nothing but Ruby's standard library, so it runs in a checkout whose bundle is not installed,
+# against a database that is not answering, on a laptop restored from nothing an hour ago.
+# That is the day it exists for. It is the same reason there is no `bundle exec` in front of
+# it and no new gem behind it: a backup tool that can be stopped by a dependency resolution
+# has a second way to fail on the day it is needed.
+#
+# The argument for the approach -- that Render will take the pg_dump for us, server-side, over
+# an API the database's allow list does not touch -- is in lib/tectonic/backup/render_export.rb
+# and in BACKUPS.md. #588.
+
+require 'optparse'
+require_relative '../lib/tectonic/backup/render_export'
+
+Copies = TectonicBackup
+Render = TectonicBackup::RenderExport
+
+# Unbuffered, for two reasons that are really the same reason. A refusal goes to stderr and the
+# progress goes to stdout, and buffered they arrive in the wrong order -- so the failure appears
+# above the line explaining what was being attempted, which is exactly backwards for the person
+# reading it. And during the wait for Render, an unflushed line is indistinguishable from a
+# hung script.
+$stdout.sync = true
+
+# Everything here exits non-zero on anything short of a verified copy, and says a sentence
+# about why. There is no warning level: a run that did not produce a backup did not produce a
+# backup, and what makes that visible to a person is the shell saying so and the exit code
+# saying so to whatever ran it.
+def refuse(message)
+  warn message
+  exit 1
+end
+
+def options_from(argv)
+  chosen = { directory: Copies::DEFAULT_DIRECTORY, database: Render::DATABASE, check: false, wait: 1_200 }
+  OptionParser.new do |parser|
+    parser.banner = 'Usage: bin/backup [--check] [--dir PATH] [--database NAME] [--wait SECONDS]'
+    parser.on('--check', 'Report the age of the newest copy and fail if it is stale') { chosen[:check] = true }
+    parser.on('--dir PATH', "Where copies live (default #{Copies::DEFAULT_DIRECTORY})") { |v| chosen[:directory] = v }
+    parser.on('--database NAME', 'The Render Postgres instance to copy') { |v| chosen[:database] = v }
+    parser.on('--wait SECONDS', Integer, 'How long to give Render to finish') { |v| chosen[:wait] = v }
+  end.parse!(argv)
+  chosen
+end
+
+# What is already in hand, said out loud before anything else happens. On a run somebody does
+# by hand this is the health check: if the newest copy is from March, this is the line that
+# says so, and it prints whether or not today's run then succeeds.
+def report_on(copies)
+  return puts 'No copies here yet.' if copies.empty?
+
+  puts format('%<count>d %<noun>s here; the newest is %<age>.1f days old (%<name>s).',
+              count: copies.length, noun: copies.length == 1 ? 'copy' : 'copies',
+              age: Copies.age_in_days(copies.max), name: File.basename(copies.max))
+end
+
+def check(copies)
+  report_on(copies)
+  return puts 'OK: the newest copy is recent enough.' unless Copies.stale?(copies)
+
+  refuse <<~REFUSAL
+    FAILED: there is no copy of the production database newer than #{Copies::STALE_AFTER_DAYS} days.
+    Render keeps its own exports for 7 days and its point-in-time recovery for 3 to 7, so
+    anything older than that window exists nowhere but in the live database. Run bin/backup.
+  REFUSAL
+end
+
+# Where the dumps live. Refused inside a git repository -- see TectonicBackup's
+# inside_a_repository? for why that deserves a check of its own.
+def directory_for(chosen)
+  directory = File.expand_path(chosen)
+  if Copies.inside_a_repository?(directory)
+    refuse "FAILED: #{directory} is inside a git repository. A dump is every account's training " \
+           'history and email address, and a file committed to git history is not deleted by ' \
+           'deleting it. Keep copies somewhere no repository can reach.'
+  end
+  FileUtils.mkdir_p(directory)
+  directory
+end
+
+# Ask, then watch for something new to appear. Render's POST answers 202 with no body and no
+# id, so "ours" is defined as the export that was not in the list a moment ago -- and an export
+# in the list is not a file until it has a URL.
+def wait_for_an_export(key, id, seconds)
+  before = Render.exports(key, id).map { |export| export['id'] }
+  Render.ask_for_an_export(key, id)
+  minutes = seconds / 60
+  puts "Asked Render for an export; waiting up to #{minutes} #{minutes == 1 ? 'minute' : 'minutes'}."
+  watch(key, id, before, Time.now + seconds) || refuse(timed_out(seconds))
+end
+
+def watch(key, id, before, deadline)
+  loop do
+    sleep 10
+    fresh = Render.arrived(Render.exports(key, id), before)
+    url = fresh && Render.ready(fresh)
+    return [fresh, url] if url
+    return nil if Time.now > deadline
+  end
+end
+
+def timed_out(seconds)
+  "FAILED: Render did not finish an export within #{seconds} seconds, so there is no new copy.\n" \
+    "The export may yet finish -- look at the database's Recovery page in the dashboard and either " \
+    'download it by hand or run this again. Nothing was deleted and nothing on Render was changed.'
+end
+
+# Download to a .part and rename only once every byte is here, so an interrupted run leaves a
+# file that is obviously unfinished rather than a short tarball named like a backup. A
+# half-written copy that looks like a whole one tells the same lie as a backup that never ran.
+def download_to(directory, url, export, key)
+  path = File.join(directory, Copies.filename(export))
+  partial = "#{path}.part"
+  Render.download(url, partial, key)
+  File.rename(partial, path)
+  path
+end
+
+def fetch(directory, options)
+  key = Render.credential
+  id = Render.database_id(key, name: options[:database])
+  export, url = wait_for_an_export(key, id, options[:wait])
+  download_to(directory, url, export, key)
+end
+
+# Unpack, interrogate, and then throw the unpacked copy away. What is kept is one tarball per
+# backup: a dump left extracted is a second unencrypted copy of the same personal data, and
+# keeping both doubles what retention has to delete and what a lost laptop hands over. The
+# untar is a documented step in BACKUPS.md for the day somebody actually restores one.
+def verify(directory, tarball)
+  workspace = File.join(directory, '.verify')
+  FileUtils.rm_rf(workspace)
+  dump = Copies.unpack(tarball, into: workspace)
+  puts format('  %<entries>d entries, %<tables>d tables, %<data>d of them carrying rows.', **Copies.contents(dump))
+  File.basename(dump)
+ensure
+  FileUtils.rm_rf(workspace)
+end
+
+# Retention, applied only to files this script named and never to the newest few. One line per
+# deletion: deleting a backup is not a thing that should happen quietly.
+def prune(copies)
+  Copies.expired(copies).each do |copy|
+    puts "  retention: deleting #{File.basename(copy)} (#{Copies.age_in_days(copy).round} days old)"
+    File.delete(copy)
+  end
+end
+
+def take(options)
+  directory = directory_for(options[:directory])
+  report_on(Copies.copies(directory))
+  tarball = fetch(directory, options)
+  puts format('Wrote %<name>s (%<size>s).', name: File.basename(tarball), size: readable(File.size(tarball)))
+  inside = verify(directory, tarball)
+  prune(Copies.copies(directory))
+  finish(tarball, inside)
+end
+
+def readable(bytes)
+  return "#{bytes} bytes" if bytes < 1024
+
+  format('%<size>.1f KB', size: bytes / 1024.0)
+end
+
+# The check above reads the dump's table of contents, which is the cheap half. The other half
+# is restoring it into a real database and asking the restored copy questions, which is what
+# the drill does and what a table of contents cannot tell you. So a successful run ends by
+# naming the next two commands rather than implying the job is finished.
+def finish(tarball, inside)
+  puts <<~NEXT
+    PASSED: #{File.basename(tarball)} is a readable dump with rows in it.
+
+    That was its table of contents, not a restore. Rehearse the real thing with:
+      tar xzf #{tarball} -C /tmp
+      rake 'backup:drill[/tmp/#{inside}]'
+    then delete /tmp/#{inside} -- it is a second unencrypted copy of everybody's training log.
+  NEXT
+end
+
+options = options_from(ARGV)
+begin
+  options[:check] ? check(Copies.copies(options[:directory])) : take(options)
+rescue TectonicBackup::Refused => e
+  refuse e.message
+rescue Interrupt
+  refuse 'FAILED: interrupted, so there is no new copy. Nothing on Render was changed.'
+end
+

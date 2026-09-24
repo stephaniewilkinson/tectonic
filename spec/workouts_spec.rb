@@ -7,22 +7,17 @@ require 'securerandom'
 # The set-edit picker needs a selectable exercise; the library supplies one.
 Tectonic::Exercise.load_library
 
-def register
-  email = "#{SecureRandom.hex}@gmail.com"
-  password = SecureRandom.hex
-  visit '/'
-  click_on 'Sign up'
-  fill_in 'email', with: email
-  fill_in 'password', with: password
-  click_on 'Sign up'
-end
+# The describes below call `sign_in_as_somebody_new`, which used to be a copy of the sign-up
+# walk kept in this file under the name `register`. #575 put a confirmation email in the
+# middle of that walk and broke every copy of it at once; there is one now, in spec_helper,
+# and the note there says why it writes the account rather than signing up for it.
 
 describe 'editing a set' do
   include Capybara::DSL
   include Minitest::Capybara::Behaviour
 
   it 'saves the new weight from the edit form' do
-    register
+    sign_in_as_somebody_new
     visit '/workouts/new'
     click_on 'Save'
     workout = current_path
@@ -43,7 +38,7 @@ describe 'a fresh account' do
   include Minitest::Capybara::Behaviour
 
   it "sees none of another account's workouts" do
-    register
+    sign_in_as_somebody_new
     visit '/workouts'
     assert page.has_no_css?('tbody tr')
   end
@@ -54,12 +49,12 @@ describe "another account's workout" do
   include Minitest::Capybara::Behaviour
 
   it 'is out of reach, redirecting a stranger to the index' do
-    register
+    sign_in_as_somebody_new
     visit '/workouts/new'
     click_on 'Save'
     path = current_path
     Capybara.reset_sessions!
-    register
+    sign_in_as_somebody_new
     visit path
     assert_equal '/workouts', current_path
   end

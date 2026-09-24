@@ -35,6 +35,7 @@ ENV['MCP_PUBLIC_BASE_URL'] ||= 'https://example.org'
 # same trade Rails makes in its own test environment. It took `rake test:rack` from about
 # five minutes to under thirty seconds.
 require 'bcrypt'
+require 'securerandom'
 BCrypt::Engine.cost = BCrypt::Engine::MIN_COST
 
 # require 'dotenv/load' #keeping this here until i need it later
@@ -68,7 +69,7 @@ module CleanDatabase
     mcp_audit_log oauth_grants account_plates account_dumbbell_plates
     account_training_maxes account_training_max_statements
     account_goals account_exercise_rests health_metrics account_withings
-    account_remember_keys account_password_reset_keys exercises
+    account_remember_keys account_password_reset_keys account_verification_keys exercises
     oauth_applications accounts
   ].freeze
 
@@ -161,8 +162,70 @@ module BrowserSpec
   end
 
   def after_teardown
+    forget_held_taps
     Capybara.use_default_driver
     super
   end
+
+  # The session screen's write queue, emptied between tests for the same reason the tables
+  # above are. #542 holds a tap that failed in IndexedDB so that it survives the tab being
+  # closed -- which is the point of it, and which means it also survives the end of a test.
+  # Capybara's session reset clears cookies and nothing else, so a tap held by one example
+  # was still there for the next: it flushed on that example's first page load, the set it
+  # named had been deleted by the teardown here, the server refused it, and a spec that had
+  # nothing to do with any of this found "1 set did not save" on its screen. That is a spec
+  # failing for a reason nothing in it caused, which is the shape this file already exists
+  # to prevent.
+  #
+  # Before Capybara resets, because after it the browser is on about:blank and storage is
+  # keyed by origin -- the deletion would be of a database belonging to nowhere.
+  #
+  # Waited on rather than fired and forgotten, since the deletion is asynchronous and the
+  # next example's page load would otherwise race it. The page's own connection is what
+  # would block it, and the script there closes on versionchange precisely so that
+  # something asking to delete this database is not left waiting on a tab nobody is looking
+  # at any more.
+  def forget_held_taps
+    Capybara.current_session.evaluate_async_script(<<~JS)
+      var done = arguments[0];
+      if (!window.indexedDB) { return done(); }
+      var request = window.indexedDB.deleteDatabase('tectonic');
+      request.onsuccess = done;
+      request.onerror = done;
+      request.onblocked = done;
+    JS
+  rescue StandardError
+    # A test that never opened a page, or a browser that has already gone. Neither leaves
+    # anything behind to clear, and neither is worth failing a green example over.
+    nil
+  end
 end
+
+# A signed-in Capybara session, which eight spec files needed and each of which built its own
+# by walking the sign-up form. #575 put a confirmation email in the middle of that walk and
+# broke all eight at once, which is the argument for there being one of these rather than
+# eight: the flow those files depend on is "be signed in", and none of them was written to
+# have an opinion about how an account comes to exist.
+#
+# So the row is written directly and only the sign-in is driven. Writing an account straight
+# into the table is what fifty-odd other files here already do, and it is the case
+# migrate/051's default of an open status exists to keep working. The sign-up walk itself is
+# pinned end to end in confirming_the_address_spec, and driven through a real Firefox --
+# including the email and the link -- in system_spec, which is where a flow with three pages
+# and a message in it belongs.
+#
+# The address and the password can be named by a caller that needs to use them again, and the
+# account's id comes back because that is what every caller did with it.
+module SignedInBrowser
+  def sign_in_as_somebody_new(email: "#{SecureRandom.hex}@gmail.com", password: SecureRandom.hex)
+    DB[:accounts].insert(email:, password_hash: BCrypt::Password.create(password))
+    visit '/login'
+    fill_in 'email', with: email
+    fill_in 'password', with: password
+    click_on 'Sign in'
+    DB[:accounts].where(email:).get(:id)
+  end
+end
+
+Minitest::Test.include SignedInBrowser
 

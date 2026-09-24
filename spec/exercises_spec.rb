@@ -12,15 +12,10 @@ require 'securerandom'
 # Seed the built-in library once, the way `rake library:exercises` does on deploy.
 Tectonic::Exercise.load_library
 
-def sign_up
-  email = "#{SecureRandom.hex}@gmail.com"
-  password = SecureRandom.hex
-  visit '/'
-  click_on 'Sign up'
-  fill_in 'email', with: email
-  fill_in 'password', with: password
-  click_on 'Sign up'
-end
+# The describes below call `sign_in_as_somebody_new`, which used to be a copy of the sign-up
+# walk kept in this file. #575 put a confirmation email in the middle of that walk and broke
+# every copy of it at once; there is one now, in spec_helper, and the note there says why it
+# writes the account rather than signing up for it.
 
 def add_exercise(name, note: nil)
   visit '/exercises'
@@ -47,7 +42,7 @@ describe 'a new account' do
   include Minitest::Capybara::Behaviour
 
   it 'sees the library and can add its own alongside it' do
-    sign_up
+    sign_in_as_somebody_new
     visit '/exercises'
     assert_includes page.body, 'Back Squat'
     add_exercise 'My Garage Special'
@@ -62,11 +57,11 @@ describe 'a private exercise' do
   include Minitest::Capybara::Behaviour
 
   it 'is invisible to and uneditable by another account' do
-    sign_up
+    sign_in_as_somebody_new
     add_exercise 'Private Move A'
     path = current_path
     Capybara.reset_sessions!
-    sign_up
+    sign_in_as_somebody_new
     visit '/exercises'
     assert_includes page.body, 'Back Squat'
     refute_includes page.body, 'Private Move A'
@@ -82,7 +77,7 @@ describe 'a library exercise' do
   include Minitest::Capybara::Behaviour
 
   it 'shows as read-only and refuses a direct edit' do
-    sign_up
+    sign_in_as_somebody_new
     visit '/exercises'
     click_on 'Back Squat'
     assert page.has_no_link?('Edit')
@@ -109,14 +104,14 @@ describe 'a note on a movement you own' do
   include Minitest::Capybara::Behaviour
 
   it 'is written from the form and read back on the movement page' do
-    sign_up
+    sign_in_as_somebody_new
     add_exercise "Cue #{SecureRandom.hex(4)}", note: 'this helps correct valgus'
 
     assert_includes page.text, 'this helps correct valgus'
   end
 
   it 'is changed and then cleared through the same form' do
-    sign_up
+    sign_in_as_somebody_new
     add_exercise "Cue #{SecureRandom.hex(4)}", note: 'brace before you unrack'
     click_on 'Edit'
     fill_in 'note', with: 'ribs down'
@@ -147,7 +142,7 @@ describe 'a note containing markup' do
   include Minitest::Capybara::Behaviour
 
   it 'is shown as the characters that were typed rather than run as HTML' do
-    sign_up
+    sign_in_as_somebody_new
     add_exercise "Cue #{SecureRandom.hex(4)}", note: NOTE_WITH_MARKUP
 
     assert page.has_no_css?('b#pwned', visible: :all)
@@ -158,7 +153,7 @@ describe 'a note containing markup' do
   # the two to get wrong: an unescaped angle bracket there closes the field early, and
   # everything after it becomes markup in the form rather than text in the box.
   it 'comes back into the edit form as the same characters' do
-    sign_up
+    sign_in_as_somebody_new
     add_exercise "Cue #{SecureRandom.hex(4)}", note: NOTE_WITH_MARKUP
     click_on 'Edit'
 

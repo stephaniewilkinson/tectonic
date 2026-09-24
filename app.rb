@@ -171,15 +171,25 @@ class Tectonic < Roda
     # MCP client authenticates with. All auth -- web sessions and machine access --
     # runs through this one Rodauth config rather than any hand-rolled path.
     enable :login, :logout, :create_account, :remember, :json, :reset_password,
+           :verify_account,
            :oauth_authorization_code_grant, :oauth_pkce,
            :oauth_client_credentials_grant, :oauth_jwt,
            :oauth_resource_indicators, :oauth_dynamic_client_registration,
            :oauth_token_introspection, :oauth_token_revocation
-    # Sign-up asks for the address once and the password once. Rodauth defaults both of
-    # these to true and enforces them on the post rather than in the template, so deleting
-    # the two confirmation boxes from views/create-account.erb without turning these off
-    # leaves every sign-up rejected for disagreeing with a parameter the form no longer
-    # sends -- and the message names a field that is not on the page.
+    # Each of the two things a person types is typed once. Rodauth defaults both of these to
+    # true and enforces them on the post rather than in the template, so deleting the
+    # confirmation boxes from a form without turning these off leaves every submission
+    # rejected for disagreeing with a parameter the form no longer sends -- and the message
+    # names a field that is not on the page.
+    #
+    # Since #575 they govern two different pages. The address is typed on
+    # views/create-account.erb and the password on views/verify-account.erb, so
+    # require_login_confirmation? is about the first and require_password_confirmation? about
+    # the second -- and about views/reset-password.erb, which has been a single box since #344
+    # for the same reason. `verify_account` happens to force the first of them false itself
+    # (`verify_account.rb:161-163`); it is still written out, because a line that is load-
+    # bearing for the reset and sign-up forms should not silently depend on a feature that
+    # has nothing to do with either.
     #
     # What the password confirmation was buying is a typo nobody can see. That used to be
     # unrecoverable -- reset_password was not enabled and there was no mailer, so an account
@@ -187,9 +197,10 @@ class Tectonic < Roda
     # email rather than the account, which is what made leaving these off defensible rather
     # than merely convenient.
     #
-    # The remaining box still says autocomplete="new-password", asking a password manager to
-    # generate and keep the credential instead of leaving a human to type it twice. That is
-    # now the first line rather than the only one.
+    # The remaining password box still says autocomplete="new-password", asking a manager to
+    # generate and keep the credential instead of leaving a human to type it twice. That
+    # matters more than it did and lands less often than it did, both because of where the box
+    # now is; the #575 note further down has that argument.
     require_login_confirmation? false
     require_password_confirmation? false
     # Losing a password no longer loses the account. #344.
@@ -234,6 +245,163 @@ class Tectonic < Roda
                      text: scope.reset_password_body(reset_password_email_link))
     end
 
+    # An address has to be proved before the account is worth anything. #575.
+    #
+    # 410 accounts, 409 of which have never logged a set: 274 gmail and 99 yahoo with a tail
+    # of throwaway-mail domains, 90 of the local parts carrying four or more consecutive
+    # digits, and all of them arriving between 9 and 23 September. That is a form being found
+    # and submitted by a bot, and the cost is not clutter. `reset_password` above really
+    # sends, so every one of those addresses -- most belonging to people who never signed up
+    # here -- can be made to receive mail from this domain by anybody who knows it. A sending
+    # reputation is the kind of thing that is cheap to keep and very expensive to get back.
+    #
+    # ## The address is confirmed and the password is chosen on the same page
+    #
+    # Which is Rodauth's own default and is left alone here, so there is no line to point at:
+    # `verify_account_set_password?` is true, which turns `create_account_set_password?` off
+    # (`verify_account.rb:222-225`), so the sign-up form asks for an address and nothing else
+    # and the emailed link leads to the page that takes the password.
+    #
+    # It is the flow that makes the feature mean the most. A sign-up form that takes a
+    # password leaves a complete account sitting in the table that only a status column is
+    # keeping shut; this way the row genuinely has no credential until somebody has read mail
+    # at that address. For the four hundred and nine rows that prompted this, the difference
+    # is between "an account nobody can open" and "not an account".
+    #
+    # **And it closes a hole the other order leaves open**, which is the argument that settles
+    # it rather than merely favours it. Taking the password at sign-up means a bot that types
+    # somebody else's address has already chosen the credential. Everything then rests on the
+    # real owner of that mailbox not clicking the link -- and the link arrives looking exactly
+    # like an ordinary confirmation, so one curious click hands the bot a working, confirmed
+    # account under that person's address, with their mailbox as the recovery route. #575
+    # exists because four hundred and nine accounts were made this way against what the domain
+    # spread says are mostly real mailboxes, so that is not a hypothetical population. With the
+    # password chosen after the link, the bot never holds a credential and no click by anybody
+    # can create one: whoever opens the link is the person who sets the password, and that is
+    # the person who reads the mail.
+    #
+    # **It costs `password_hash` its NOT NULL constraint**, and migrate/051 is where that is
+    # argued -- including why the column stays on `accounts` rather than moving to Rodauth's
+    # separate hash table, and why a null hash is safe rather than merely tolerable.
+    #
+    # **And it costs the password manager, which is the real price.** The sign-up form now has
+    # nothing on it worth saving, so nothing offers to generate a credential there. The
+    # password is instead chosen on a page reached from an email -- frequently in a different
+    # browser from the one the form was filled in, or on a phone, without whichever manager
+    # would have saved it. That is a worse moment to create a credential than the sign-up form
+    # was, and it is the answer to "why is the password form over here": not an oversight, a
+    # trade taken deliberately for the paragraph above. views/verify-account.erb keeps
+    # `autocomplete="new-password"` on the box so that whatever manager *is* present still
+    # offers; that is the whole of what can be done about it from here.
+    # Sign-up no longer logs anybody in, so it can no longer redirect anywhere that needs a
+    # session -- and the old value here was `login_destination(account_id)`, which runs
+    # `ProgramSchedule.ensure_ahead` and `SessionClose.sweep` and then sends the browser to a
+    # page behind `require_login`. After this change that is a redirect straight into the
+    # login screen, with the sign-up's notice flash consumed on the way past.
+    #
+    # `/login` rather than `/welcome`, because the sentence the flash is about to say is
+    # "check your email", and the page to be standing on once the email has been read is the
+    # one you come back to.
+    create_account_redirect { '/login' }
+    # The zone question, moved here from `create_account_redirect` one flow later. #349, #575.
+    #
+    # It is asked at the first moment there is a session to ask it in, and that moment used
+    # to be the sign-up redirect. Verification moves it, because `verify_account_autologin?`
+    # is Rodauth's default and stays on: the person who clicks the link in the email is
+    # logged in by `autologin_session('verify_account')` (`verify_account.rb:148-150`), and
+    # that is now the first session a new account has.
+    #
+    # The ordering trap that made the old note worth writing is unchanged, and this is still
+    # the only place the question can be asked from. `autologin_session` calls
+    # `login_session`, which clears the session against fixation and then sets it again, so
+    # anything an `after_create_account` or `after_verify_account` hook puts in the session is
+    # wiped a few lines later, silently. A redirect block runs after all of that. The original
+    # was found by a browser that detected its zone correctly, posted nothing, and left no
+    # trace of why -- which is the only way this kind of ordering shows itself, and the reason
+    # this comment is longer than the code.
+    #
+    # `login_destination` is right here for the same reason it was right there: a brand new
+    # account is exactly the case the first-run page was written for.
+    verify_account_redirect do
+      scope.ask_the_browser_for_the_zone(account_id)
+      scope.login_destination(account_id)
+    end
+    verify_account_email_sent_redirect { '/login' }
+    # Two flashes where Rodauth uses one. `verify_account_email_sent_notice_flash` is the
+    # answer to *both* the sign-up form and the resend form (`verify_account.rb:185-187`),
+    # and those two need different sentences, because only one of them knows an email was
+    # sent. The resend form is answered identically for an address with no account -- see the
+    # hook below -- so its wording has to stay true when nothing was sent at all, the same
+    # way views/reset-password-request.erb's does. Sign-up does know, and gets to say so.
+    create_account_notice_flash 'Check your email. The link in it is where you choose a password'
+    verify_account_email_sent_notice_flash \
+      'If that address has an account waiting to be confirmed, a new link is on its way to it'
+    verify_account_notice_flash 'Your address is confirmed. Welcome to tectonic plates'
+    # And the two refusals, which Rodauth words for a developer reading a log rather than for
+    # the person reading the page: "The account you tried to login with is currently awaiting
+    # verification" names the mechanism and not the way out. Both of these are shown above the
+    # resend form, so they have one job -- to explain why that form is what somebody is
+    # looking at -- and the form underneath says what to do next.
+    attempt_to_login_to_unverified_account_error_flash \
+      'That address has not been confirmed yet, so there is nothing to sign in to'
+    attempt_to_create_unverified_account_error_flash \
+      'That address is already waiting to be confirmed, so there is nothing to sign up for again'
+    # Through Resend rather than Rodauth's Mail object, mirroring send_reset_password_email
+    # above -- including why a delivery failure is logged rather than raised into the request.
+    #
+    # `require_mail?` is deliberately left alone. Turning it off would stop Rodauth checking
+    # that a mailer exists, and the check costs nothing while this override is what actually
+    # sends; the day somebody deletes the override, the refusal to boot is the cheapest place
+    # to find out.
+    send_verify_account_email do
+      Mailer.deliver(to: account[login_column], subject: 'Confirm your tectonic plates address',
+                     text: scope.verify_account_body(verify_account_email_link))
+    end
+    # The reset form must go on answering a stranger exactly the way it answers a member,
+    # which is the policy argued at length above -- and verification breaks it if nothing is
+    # done. `_account_from_login` stops filtering on status once `skip_status_checks?` is
+    # false (`base.rb:837`) and now matches unverified accounts too, so the existing
+    # `before_reset_password_request_route` hook waves them through; the route then reaches
+    # `reset_password_request_for_unverified_account` (`reset_password.rb:79`) and answers 403
+    # "awaiting verification" where a stranger gets a 302 and a notice.
+    #
+    # That is a brand new oracle on the one form this app has written a policy for, so it is
+    # the one of the three that gets an override. The other two -- login and sign-up -- are
+    # answered in the PR: both were already oracles before this change, and both are where a
+    # real person who never got the email has to be told something.
+    #
+    # The cost is that an unverified account asking for a reset is told nothing and gets no
+    # email. That is the right trade here because it is not the way out: a person in that
+    # state has a password, they chose it on the sign-up form, and what they are missing is
+    # the confirmation. Trying to log in lands them on the resend page, which is the route
+    # that fixes it.
+    reset_password_request_for_unverified_account do
+      set_notice_flash reset_password_email_sent_notice_flash
+      redirect reset_password_email_sent_redirect
+    end
+    # And the fourth oracle, which is the resend form itself and is not in the issue.
+    #
+    # `/verify-account-resend` is an unauthenticated form that takes an address and sends
+    # mail to it -- the same shape as the reset form, and it answers a hit with a notice and
+    # a miss with a 401 and an error flash (`verify_account.rb:75-93`). It also answers "sent
+    # one in the last five minutes" differently again. Left alone it would be a better
+    # enumeration oracle than the reset form ever was, and it would be one on the very change
+    # whose purpose is to stop this app mailing addresses it has no relationship with.
+    #
+    # So the same hook, in the same shape, for the same reason: anything that is not an
+    # unverified account due another email is answered with the notice and writes nothing.
+    # Collapsing the throttled case in here too is deliberate -- if a recent send were the one
+    # case that came back differently, the form would still answer the question, just more
+    # slowly.
+    before_verify_account_resend_route do
+      next unless request.post?
+      next if account_from_login(param(login_param).to_s) && allow_resending_verify_account_email? &&
+              !verify_account_email_recently_sent?
+
+      set_notice_flash verify_account_email_sent_notice_flash
+      redirect verify_account_email_sent_redirect
+    end
+
     # What a second signup on one address is told. #345.
     #
     # Until the unique index in 027 there was nothing to say, because the second signup
@@ -267,22 +435,11 @@ class Tectonic < Roda
     # login and prefers it, so someone who followed a link to a workout, or to the OAuth
     # consent screen, still arrives where they were going.
     login_redirect { scope.login_destination(account_id) }
-    # The same question asked of a brand new account, which has no zone by definition -- and
-    # asked here rather than in after_create_account, which is where it obviously belongs and
-    # does not work.
-    #
-    # Creating an account does not go through `login`, so after_login never fires for it:
-    # create_account calls `autologin_session`, which calls `login_session`, which clears the
-    # session against fixation and then sets it again. Anything after_create_account put in
-    # the session is wiped by that, silently, a few lines later. This block is the first thing
-    # that runs with the new session in place.
-    #
-    # Found by a browser that detected its zone correctly, posted nothing, and left no trace
-    # of why -- which is the only way this kind of ordering shows itself.
-    create_account_redirect do
-      scope.ask_the_browser_for_the_zone(account_id)
-      scope.login_destination(account_id)
-    end
+    # The same question is asked of a brand new account -- which has no zone by definition --
+    # from `verify_account_redirect` above, and the note there is the one that explains why a
+    # redirect block is the only place it can be asked from. It sat here, on
+    # `create_account_redirect`, until #575 moved it: sign-up no longer opens a session, so
+    # there is nothing here to put a zone request into.
 
     # A background request cannot be answered with a redirect to the login page: the
     # browser follows it inside the fetch, so what htmx receives is the sign-in markup
@@ -1192,9 +1349,27 @@ class Tectonic < Roda
               revised = revised.reject { |_, value| value.to_s.empty? }
               # Three ways in, and they do not all mean the same thing.
               #
-              # No parameters is the primary tap, which toggles, so a mis-tap is undone by
-              # tapping again. A rating completes: choosing an RPE is saying you lifted it,
-              # and there is nothing else an RPE could be about.
+              # The primary tap is the Done button, and **it says which state it is asking
+              # for** rather than asking for a flip. That is #542's stage zero, and the
+              # reason is that a flip cannot be sent twice: a tap held on a phone with no
+              # signal and replayed when it comes back may arrive at a server that already
+              # recorded it -- the request reached the database and the response was what the
+              # network ate -- and "flip it" would then un-do the set it had just saved, long
+              # after the lifter stopped looking. A queue of toggles is worse still, being a
+              # list of instructions whose meaning depends on the state at the moment they
+              # land, which by then the poll or an assistant writing over MCP may have moved.
+              # `asked_state` and `completion_to` between them make a completion a statement
+              # about where the set should end up, and repeating a statement is free.
+              #
+              # A tap that says nothing still toggles, and that is the no-JS fallback rather
+              # than a leftover: with JavaScript off there is no htmx either, Done is a plain
+              # form post, and a hand-made post carries whatever it carries. The button's own
+              # word for what it does is the honest reading of a request that names no state.
+              #
+              # A rating completes: choosing an RPE is saying you lifted it, and there is
+              # nothing else an RPE could be about. That path was already absolute; what it
+              # lacked was the no-op, so rating a set that was already done re-stamped the
+              # completion. See completion_to.
               #
               # A corrected weight or rep count does neither. It used to complete the set,
               # which is what #215 is about: "the bar actually had 145 on it" and "I have
@@ -1211,19 +1386,25 @@ class Tectonic < Roda
               # differently is the same fact as a working set lifted differently -- the
               # generator writes planned_weight and planned_reps for both -- and a second
               # branch here would be two ways of recording one thing.
-              # Through WorkoutSet.completion so the stamp and the flag are written together
-              # (#281). The empty branch is the one that matters: a correction changes
-              # neither, so it must not touch the stamp either -- fixing a weight two reps
-              # into a set is not doing the set, and re-stamping it would move a turnaround
-              # the lifter never took.
+              # Through completion_to so the stamp and the flag are written together (#281)
+              # and so a state the set is already in writes neither (#542). The empty branch
+              # is the one that matters: a correction changes neither, so it must not touch
+              # the stamp either -- fixing a weight two reps into a set is not doing the set,
+              # and re-stamping it would move a turnaround the lifter never took.
               completion = if revised.empty?
-                             WorkoutSet.completion(!set.is_completed)
+                             set.completion_to(asked_state(r.params, set), at: asked_stamp(r.params))
                            elsif revised.key?(:rpe)
-                             WorkoutSet.completion(true)
+                             set.completion_to(true, at: asked_stamp(r.params))
                            else
                              {}
                            end
-              set.update(**revised, **completion)
+              # Nothing at all where nothing is being asked for, which is what a replayed tap
+              # on a set the server already recorded amounts to: no columns to write, so no
+              # UPDATE and no row touched. Guarded rather than left to Sequel, which raises
+              # on `update()` with no arguments -- and the screen below still re-renders, so
+              # the response is the panel as it stands, which is the right answer to a tap
+              # asking for what is already true.
+              set.update(**revised, **completion) unless revised.empty? && completion.empty?
               if r.env['HTTP_HX_REQUEST']
                 session_body(workout_id, set_id)
               else
@@ -1268,6 +1449,11 @@ class Tectonic < Roda
               # cleared box that left completed_at behind would violate
               # sets_completed_at_needs_a_completion -- which reaches a person as a 500 and
               # a lost edit, which is the failure #213 was about.
+              # `completion_to` rather than `completion` since #542, which fixes something
+              # this form was doing quietly: saving any edit with the box left ticked
+              # re-stamped completed_at, so correcting a weight an hour afterwards moved when
+              # the set was lifted. A box that was ticked and stayed ticked is not a
+              # completion, it is a completion being left alone.
               # `commanded?` rather than the bare parameter the two flags above use,
               # because sets_commanded_reps_are_counted refuses one on a set held for time.
               # The form does not draw the box on a timed set, so the browser cannot send
@@ -1276,7 +1462,7 @@ class Tectonic < Roda
               set.update(weight: r.params['weight'],
                          is_warmup: r.params['is_warmup'] || false,
                          is_commanded: commanded?(set, r.params),
-                         **WorkoutSet.completion(!r.params['is_completed'].nil?),
+                         **set.completion_to(!r.params['is_completed'].nil?),
                          **quantity,
                          **substitution(set, r.params['exercise_id']))
               r.redirect "/workouts/#{workout_id}"
@@ -2068,20 +2254,25 @@ class Tectonic < Roda
   # keeping its own figure". The reporting account's own data is the counter-example: the
   # watch began six minutes after their first completed set and kept recording for
   # twenty-five minutes after their last, and on the following morning bracketed a shorter,
-  # later window than the session entirely. Both rows carry `attrib = 7` and no
-  # `effduration`, which is the shape of an activity the watch *detected* rather than one a
-  # lifter started on it deliberately. So this answers a question about the watch, and the
-  # question about the session is answered by Timing, matched or not.
+  # later window than the session entirely. Both rows carry `attrib = 7`, which is Withings'
+  # own code for a detected activity a lifter later confirmed rather than one they started on
+  # the watch deliberately. So this answers a question about the watch, and the question about
+  # the session is answered by Timing, matched or not.
   #
-  # Still the wall-clock span rather than Withings' own `effduration`, and now for a simpler
-  # reason than the one that used to sit here. The old argument was about comparability --
-  # this figure stood beside the app's overall span and had to mean the same thing, and a
-  # second vendor's opinion about what counted as work would have put two unexplained trims
-  # on one line. It no longer stands beside anything. What is left is that the two ends are
-  # what the page prints either side of this number and what the overlap was computed from,
-  # so the span between them is the only figure a reader can check. `effduration` is stored
-  # and can have its own line the day something asks for it -- and on these two rows it is
-  # absent anyway, which is itself the tell.
+  # #571 read a second tell beside that one -- that neither row came back with an
+  # `effduration` -- and **that half was wrong**, though it pointed the same way. #586
+  # established against Withings' own OpenAPI document that there is no such field and never
+  # was: the name appears nowhere in it, and `Withings::WORKOUT_FIELDS` no longer asks for it.
+  # An absence nobody could have filled is not evidence about a watch. `attrib` is, it is
+  # documented, and it is the one this paragraph now rests on.
+  #
+  # Still the wall-clock span, and now for a simpler reason than the one that used to sit
+  # here. The old argument was about comparability -- this figure stood beside the app's
+  # overall span and had to mean the same thing, and a second vendor's opinion about what
+  # counted as work would have put two unexplained trims on one line. It no longer stands
+  # beside anything, and there is no such opinion on offer anyway. What is left is that the
+  # two ends are what the page prints either side of this number and what the overlap was
+  # computed from, so the span between them is the only figure a reader can check.
   def watch_seconds
     activity = matched_activity
     return nil unless activity
@@ -2400,6 +2591,61 @@ class Tectonic < Roda
     return nil if typed.to_s.strip.empty?
 
     set.timed? ? { duration_seconds: typed, reps: nil } : { reps: typed, duration_seconds: nil }
+  end
+
+  # Which state a Done tap is asking the set to end up in. #542.
+  #
+  # The session screen's form is rendered from the row, so it already knows whether its
+  # button says Done or Undo, and this is that word said out loud in a hidden field. It is
+  # the shape the set edit form has always used -- #516 found the fix twelve lines below the
+  # bug -- and bringing the two into agreement is the whole change rather than an invention.
+  #
+  # A request that says nothing falls back to the toggle, which is the no-JS path and the
+  # hand-made post. So does a request carrying a word this does not know: choosing between
+  # "done" and "not done" on the strength of a string nobody defined is how a set comes to be
+  # un-done by a typo, and the toggle is at least the behaviour the button's own word
+  # describes. Only the two exact spellings the form sends are read as a statement.
+  #
+  # `on` is deliberately not among them, though that is what the edit form's checkbox sends.
+  # A checkbox says true by being present and false by being absent, and absence is already
+  # spoken for here -- it is the toggle -- so this field cannot be a checkbox and must not
+  # pretend to be one.
+  def asked_state(params, set)
+    { 'true' => true, 'false' => false }.fetch(params['is_completed'].to_s) { !set.is_completed }
+  end
+
+  # When a completion says it happened, which is not always when it arrives. #542.
+  #
+  # A tap made at 18:04 in a basement and flushed at 18:40 on the street happened at 18:04,
+  # and stamping it on arrival would record the phone finding signal rather than the lifter
+  # finishing a set. That is exactly the distinction health data draws between measured_at
+  # and created_at, and getting it wrong here is quieter: every turnaround Timing computes
+  # from these stamps would describe the outage.
+  #
+  # Milliseconds since the epoch, because that is what `Date.now()` hands the script on the
+  # phone and it carries no timezone to be read wrongly. An ISO string would arrive with the
+  # phone's offset on it, or without one, and the difference between those two is hours.
+  #
+  # **The server's own clock wins wherever the offered one is not believable**, and the
+  # window is a day. A phone's clock is wrong more often than anybody expects -- a dead
+  # battery, a timezone typed in by hand -- and the two implausible readings fail in
+  # different ways: a stamp from the future sorts above every honest set and hands Timing a
+  # negative rest to explain, and one from last year would file a set into a session that
+  # ended months ago. Falling back rather than clamping is what create_set already says about
+  # a session typed up in the evening: where we cannot know when it was lifted, the honest
+  # thing to record is when we heard about it, and to say so.
+  #
+  # A day rather than an hour because the queue survives the tab being closed, so a session
+  # that lost signal at the end and was reopened the next morning still replays with the
+  # right stamps. Beyond that, a tap is no longer something anybody is standing in the
+  # middle of.
+  STAMP_REACH = 24 * 60 * 60
+  def asked_stamp(params, now: Time.now)
+    offered = Float(params['completed_at'].to_s, exception: false)
+    return now unless offered
+
+    at = Time.at(offered / 1000)
+    at.between?(now - STAMP_REACH, now) ? at : now
   end
 
   # Whether the set edit form is saying this set was done under meet commands. #311.
@@ -2837,6 +3083,43 @@ class Tectonic < Roda
 
       If this was not you, nothing has changed and you can ignore this message -- your
       current password still works. Somebody typed your address into the reset form.
+    TEXT
+  end
+
+  # The confirmation email, beside the one above and in the same shape. #575.
+  #
+  # Plain text for the same reason, and it answers the same two questions -- what the link
+  # does, and what to do if it was not you -- because this message reaches a strictly wider
+  # audience than the reset one does. The whole point of the feature is that anybody can type
+  # anybody's address into the sign-up form, so a good number of the people reading this never
+  # asked for it, and the last line is written for them rather than as an afterthought.
+  #
+  # It says nothing about expiry, because the link does not expire: migrate/051 gives the key
+  # table no deadline column, and the note there says why. Promising "24 hours" here the way
+  # the reset email does would be a sentence that goes quietly wrong.
+  #
+  # It does say that the link is where the password is chosen, and that has to be said here
+  # rather than only on the page: this message is the *only* thing standing between a sign-up
+  # and an account, so somebody who reads it as "confirm your address" and files it away has
+  # lost the account without being told they were halfway through making one.
+  #
+  # "Confirm" rather than "verify" throughout, here and on both pages. Verification is
+  # Rodauth's word for the mechanism and it is the word in the route; what a person is being
+  # asked to do is confirm that an address is theirs.
+  def verify_account_body(link)
+    <<~TEXT
+      Somebody started creating a tectonic plates account with this address.
+
+      Open this link to confirm the address is yours and choose a password:
+
+      #{link}
+
+      There is no account until that is done. Nothing has been created that can be signed
+      in to, and nothing can be logged against this address.
+
+      If this was not you, there is nothing to do. Ignore this message and nothing comes of
+      it; no account exists, nobody can make one from this, and you will not hear from us
+      again about it.
     TEXT
   end
 
