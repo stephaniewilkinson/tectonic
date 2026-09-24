@@ -1,1 +1,21 @@
-<%== render('sets/_form') %>
+<%# Which session the set is going into, and what was just put in it. #631.
+
+    The form had no heading, so nothing on it said which session it was adding to, and saving
+    went to a read-only page with nowhere onward. It comes back here now, and the line below
+    says what landed, with the way back to the workout for when the session is all in. From the
+    session screen the form still goes back to the session instead, as #578 made it. %>
+<h1 class="text-2xl font-semibold text-gray-900">
+  Add a set to <%= [@workout.label, @workout.performed_or_planned_on.strftime('%A %-d %B')].compact.join(', ') %>
+</h1>
+<%- if @set_notice %>
+  <p class="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200" role="alert"><%= @set_notice %></p>
+<%- end %>
+<%- if @just_saved %>
+  <p class="mt-3 rounded-md bg-emerald-100 p-3 text-sm text-emerald-900 ring-1 ring-emerald-900/25" role="status">
+    Saved <%= @just_saved.exercise.name %>, <%= load_label(@just_saved) %>. Add the next one below, or
+    <a href="/workouts/<%= @workout.id %>/" class="font-semibold underline">go back to the workout</a>.
+  </p>
+<%- end %>
+<div class="mt-6">
+  <%== render('sets/_form') %>
+</div>

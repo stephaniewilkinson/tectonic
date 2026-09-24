@@ -358,16 +358,19 @@ describe 'logging a new set through the search box' do
   include BrowserSpec
   include FindingAMovement
 
-  # The untouched new-set form posts what the menu always posted, which is its first option.
-  # Nothing about the search box may change the default, because the default is what a lifter
-  # gets by not answering -- and on this form that is the commonest way it is answered.
-  it 'logs against the first movement when the picker is never touched' do
+  # The untouched new-set form used to post the menu's first option, and that was #631: a
+  # lifter who typed a weight and saved had logged Anderson Squat, the first movement
+  # alphabetically. On an account with nothing logged the picker now starts on no movement at
+  # all, so not answering writes nothing and the form asks for one. The search box must not
+  # change that either -- it is still what a lifter gets by not answering.
+  it 'logs nothing, and asks for a movement, when the picker is never touched' do
     a_new_set_form
     fill_in 'weight', with: '135'
     fill_in 'reps', with: '5'
     click_button 'Save'
 
-    assert_equal first_movement, DB[:sets].where(workout_id: @workout_id).get(:exercise_id)
+    assert_nil DB[:sets].where(workout_id: @workout_id).get(:exercise_id)
+    assert_text 'Choose a movement for the set'
   end
 
   it 'logs against the movement the search found' do

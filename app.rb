@@ -1365,6 +1365,9 @@ class Tectonic < Roda
           # #578, and `back_to_session?` carries the argument.
           r.get('new') do
             @return_to_session = back_to_session?(r)
+            @just_saved = saved_set(workout_id)
+            @prefill = new_set_prefill(workout_id)
+            @set_notice = session.delete('set.notice')
             view('sets/new')
           end
 
@@ -1382,7 +1385,12 @@ class Tectonic < Roda
             form = "/workouts/#{workout_id}/sets/new"
             form += '?return_to=session' if back_to_session?(r)
             exercise = visible_exercise(r.params['exercise_id'])
-            r.redirect form unless exercise
+            # Said rather than silent since #631, now that the movement box can start empty: a
+            # lifter who pressed Save without choosing one is told what is missing.
+            unless exercise
+              session['set.notice'] = 'Choose a movement for the set, then save it again.'
+              r.redirect form
+            end
             # required on the input is the browser's rule and stops at the browser. A post
             # with no rep count in it reaches here, and sets_measures_one_way refuses a row
             # measured in reps that has none -- unrescued, so a 500 rather than a refusal.
@@ -1403,7 +1411,13 @@ class Tectonic < Roda
             # and it is the wrong one for a lifter who is mid-session: its only way onwards is
             # the record, which is two taps from the session. #578.
             r.redirect "/workouts/#{workout_id}/session" if back_to_session?(r)
-            r.redirect "/workouts/#{workout_id}/sets/#{set_id}/"
+            # Back to the form, not to the set's own page, since #631. That page is a read-only
+            # list with nowhere to go but back, so logging a 3 x 5 was three round trips through
+            # it. The form comes back saying what was saved, on the same movement with the same
+            # numbers, so the next set of five is one Save; and a link back to the workout for
+            # when the session is all in.
+            session['set.saved'] = set_id
+            r.redirect form
           end
 
           r.on String do |set_id|
@@ -2852,6 +2866,30 @@ class Tectonic < Roda
 
   def each_side(breakdown)
     breakdown.empty? ? Plates.label(breakdown) : "#{Plates.label(breakdown)} each side"
+  end
+
+  # The set this form just saved, for the line that says so, or nil. Taken out of the session
+  # so a reload does not announce it again. Scoped to the workout the form is for. #631.
+  def saved_set(workout_id)
+    id = session.delete('set.saved')
+    id && WorkoutSet.where(id:, workout_id:).first
+  end
+
+  # What a new set's form starts on. #631.
+  #
+  # The movement box had nothing marked, so the browser showed the first option -- Anderson
+  # Squat, alphabetically -- and a lifter who typed a weight and saved had logged it. It starts
+  # on the movement last logged in this session now, with that set's weight and reps, which is
+  # the next set of a 3 x 5 before anything is typed. A session with nothing in it yet starts on
+  # the lifter's most recent movement from any session, with no numbers; and an account that
+  # has never logged a set starts on nothing, which the form marks as a choice still to make.
+  def new_set_prefill(workout_id)
+    last = WorkoutSet.where(workout_id:).order(:id).last
+    return { exercise_id: last.exercise_id, weight: last.weight, reps: last.reps } if last
+
+    recent = WorkoutSet.where(workout_id: Workout.where(account_id: @account_id).select(:id))
+                       .order(Sequel.desc(:id)).get(:exercise_id)
+    { exercise_id: recent }
   end
 
   # What the number on a dumbbell row is the weight *of*. #502.
