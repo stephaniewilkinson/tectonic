@@ -257,7 +257,10 @@ describe 'the home page' do
 
     assert_equal 200, last_response.status
     assert_includes last_response.body, 'March 2026'
-    assert_includes last_response.body, 'Nothing trained or planned this month.'
+    # An account with nothing in it at all is pointed at Start here rather than told the month
+    # was quiet (#636); a quiet month on an account that has trained is pinned in
+    # an_account_with_nothing_in_it_yet_spec.
+    assert_includes last_response.body, 'Nothing logged or planned yet.'
   end
 
   it 'sends a signed-out visitor to the welcome page' do

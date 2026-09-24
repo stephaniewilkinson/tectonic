@@ -605,6 +605,9 @@ class Tectonic < Roda
       @week_starts_on = week_starts_on
       @weeks = Calendar.weeks(@account_id, @month, today, @week_starts_on)
       @tally = Calendar.tally(@weeks, today)
+      # Whether there is anything at all, in any month. A new account's empty month and a
+      # quiet month on a year-old account need different sentences (#636).
+      @anything = !Workout.where(account_id: @account_id).empty?
       view('home')
     end
 
