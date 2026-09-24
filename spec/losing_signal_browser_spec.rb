@@ -20,6 +20,16 @@ require 'securerandom'
 # genuine htmx:sendError this feature is built on -- rather than a synthetic event
 # dispatched by the spec, which would test that the handler is bound and nothing else.
 #
+# **What this file no longer claims.** #542 gave the screen a queue, so a tap that fails is
+# held and sent again rather than merely reported, and two of the things asserted here became
+# false: that a lost set stays lost until somebody taps it again, and the banner sentence
+# that said nothing you tap is being saved. The describe about a mark surviving a swap went
+# with them -- the mark it pinned is now removed by the flush that a successful tap triggers,
+# so the property it was protecting is no longer observable from the outside. What is left
+# here is the honest signal itself: that a failure to send is noticed, counted, named on the
+# row and announced, and that a refusal from a reachable server is none of those things.
+# a_tap_that_waits_for_signal_browser_spec.rb is where the holding and the sending are.
+#
 # The paths are rewritten through innerHTML and re-processed rather than by setting the
 # attribute, which does not work: htmx captures the verb and the path in a closure when it
 # first processes a node, so an hx-post changed afterwards is an hx-post nothing reads.
@@ -84,13 +94,14 @@ module LosingSignal
   end
 
   # And the sequence after it that a lifter actually goes through: the signal comes back and
-  # the next set is tapped off, which re-renders the lost set's row from a server that has
-  # never heard of it.
+  # the next set is tapped off. Until #542 that re-rendered the lost set's row from a server
+  # that had never heard of it; now the tap coming back is also what tells the queue there is
+  # a way out, so the held set goes with it.
   def lose_one_and_save_the_next
     a_session_to_lift(sets: 2)
     cut_the_signal
     tap_done(0)
-    assert_text 'No connection. Nothing you tap is being saved.'
+    assert_text '1 set waiting to send.'
     restore_the_signal
     tap_done(1)
     assert_button 'Undo'
@@ -109,23 +120,32 @@ describe 'tapping Done with no signal' do
   # all: the row did not tint, the count stayed where it was, and the rest timer -- which is
   # armed by an element the server sends back *with* the response -- never started. A lifter
   # three sets into squats had no way to tell a tap that failed from a tap they imagined.
+  #
+  # The second half of the sentence has changed since #542, and had to. It read "Nothing you
+  # tap is being saved", which was true of this app until the queue existed and is the thing
+  # that issue was opened to stop being true. It is still one sentence and it still says the
+  # two things a lifter needs at arm's length -- there is no signal, and here is what is
+  # happening to your taps -- but the second is now good news.
   it 'says there is no connection' do
-    assert_text 'No connection. Nothing you tap is being saved.'
+    assert_text 'No connection. Your taps are being kept on this phone.'
   end
 
-  # And says how much was lost, which is the number that tells a lifter whether to worry.
-  it 'counts what did not save' do
-    assert_text '1 set did not save.'
+  # And says how much is being held, which is the number that tells a lifter whether to
+  # worry. A count of sets, not of taps, and the same count #516 drew of what was lost.
+  it 'counts what is waiting to send' do
+    assert_text '1 set waiting to send.'
   end
 
-  # Named on the row as well as counted in the banner, because "one set did not save" across
-  # a twelve-set session is not an answer to "which one".
+  # Named on the row as well as counted in the banner, because "one set" across a twelve-set
+  # session is not an answer to "which one".
   it 'marks the row the tap was on' do
-    assert_selector '[data-set-row] p', text: 'Not saved.'
+    assert_selector '[data-set-row] p', text: 'Waiting to send.'
   end
 
   # It does not fake the save. #516 is explicit: don't tint the row green, because a count of
-  # sets that did not land is honest and more useful than a screen that agrees with you.
+  # sets that did not land is honest and more useful than a screen that agrees with you. That
+  # survives the queue intact and matters more with one -- a held tap is not a saved tap, and
+  # the difference is a set the database has never heard of.
   it 'leaves the set exactly as unfinished as it is' do
     assert_button 'Done'
     refute_button 'Undo'
@@ -135,7 +155,7 @@ describe 'tapping Done with no signal' do
   # Through the region the server already announces every tap into (#336), so a lifter who
   # cannot see the banner is told in the same place as "squat, set 3 of 5, done".
   it 'reads the same news out to a screen reader' do
-    assert_selector '#session-announcement', visible: :all, text: 'Offline. 1 set did not save.'
+    assert_selector '#session-announcement', visible: :all, text: 'Offline. 1 set waiting to send.'
   end
 end
 
@@ -147,14 +167,17 @@ describe 'tapping Done twice with no signal' do
 
   # A lifter who taps and sees nothing taps again, harder. That is the behaviour the issue
   # opens with, and it must not read as two sets lost -- the count is of sets, not of taps.
+  # Both taps are held since #542, because they are both true statements about the same set
+  # and sending the same statement twice costs nothing; the number a lifter reads is still
+  # how much of the session is not in yet.
   it 'still counts one set' do
     a_session_to_lift
     cut_the_signal
     tap_done
-    assert_text '1 set did not save.'
+    assert_text '1 set waiting to send.'
     tap_done
 
-    assert_text '1 set did not save.'
+    assert_text '1 set waiting to send.'
   end
 end
 
@@ -184,6 +207,7 @@ describe 'a tap the server refuses' do
     assert_title 'refused'
     refute_text 'No connection'
     refute_text 'Not saved.'
+    refute_text 'Waiting to send.'
   end
 end
 
@@ -197,52 +221,25 @@ describe 'the signal coming back' do
   # That property reports whether there is a link rather than whether anything is at the
   # other end of it -- gym wifi behind a captive portal reads as online all day -- and the
   # asymmetry is the usable part: false is trustworthy, true is a guess.
+  #
+  # The set is saved twice over here, which is the point of stage zero: the second tap
+  # reaches the server, and the first -- held since the fog -- is flushed by that tap coming
+  # back. Both say the set is done, and a completion that says what it wants rather than
+  # asking for a flip can be said as often as it likes. Before #542 the second of them would
+  # have un-done the first, which is the failure the whole issue is arranged around.
   it 'takes the banner down and saves the set that was lost' do
     a_session_to_lift
     cut_the_signal
     tap_done
-    assert_text 'No connection. Nothing you tap is being saved.'
+    assert_text 'No connection. Your taps are being kept on this phone.'
 
     restore_the_signal
     tap_done
 
     assert_button 'Undo'
     refute_text 'No connection'
-    refute_text 'Not saved.'
-    assert completed?, 'the second tap reached the server, so the set is done'
-  end
-end
-
-describe 'a set lost while the next one goes through' do
-  include Capybara::DSL
-  include Minitest::Capybara::Behaviour
-  include BrowserSpec
-  include LosingSignal
-
-  before { lose_one_and_save_the_next }
-
-  # The subtle half, and the one that would rot silently. A mark is not a thing the markup
-  # can keep: the row it is in is re-rendered by a tap on any other set of the same lift and
-  # by every poll that finds anything changed, and it comes back from the server hidden --
-  # correctly, because as far as the database is concerned the tap it is about never
-  # happened. So the script remembers which sets it marked and puts them back after every
-  # swap, and this is the difference between that and a lifter watching the only evidence of
-  # a lost set disappear the moment the signal returns.
-  it 'still says the first one did not save' do
-    assert_text '1 set did not save.'
-    assert_selector '[data-set-row] p', text: 'Not saved.', count: 1
-  end
-
-  it 'has written the second set and not the first' do
-    refute completed?(0), 'the first set is still the one nothing was ever written about'
-    assert completed?(1), 'and the second went through'
-  end
-
-  # The connection is back, so the banner stops claiming otherwise -- while the line about
-  # what was lost stays up, because that is still true and is the only thing telling a
-  # lifter there is a set here to go back for.
-  it 'stops saying there is no connection' do
-    refute_text 'No connection'
+    refute_text 'waiting to send'
+    assert completed?, 'the tap reached the server, so the set is done -- and stayed done'
   end
 end
 

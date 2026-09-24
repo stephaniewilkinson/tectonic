@@ -128,18 +128,38 @@
                 </div>
               <%- end %>
             </div>
-            <%# hx-disabled-elt is on this form and not on the others, because this is the only
-                one whose repeat is destructive. A bare tap toggles -- deliberately, so a
-                mis-tap is undone by tapping again -- so a second tap while the first is
-                still in flight lands as an undo, and the set you did reads as not done.
-                #236. The revision forms write the weight you typed and the RPE buttons
-                write the rating you chose; sending either twice is the same as sending it
-                once. %>
+            <%# hx-disabled-elt is on this form and not on the others, and the reason it is
+                here has changed. #236 put it on because this was the one form whose repeat
+                was destructive: a bare tap toggled, so a second tap while the first was
+                still in flight landed as an undo and the set you did read as not done.
+                Since #542 the tap says which state it wants, so a repeat of it is a repeat
+                of a statement and changes nothing -- and this stays, now about the lifter
+                rather than the database. A button that goes dead for the length of the
+                request is the only thing on this screen saying the first tap was heard, and
+                without it a deliberate second tap would feel broken rather than do nothing.
+                The revision forms write the weight you typed and the RPE buttons write the
+                rating you chose; sending either twice is the same as sending it once. %>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-disabled-elt="find button"
                   hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%# What this tap is asking for, rather than an instruction to flip. #542.
+
+                  The form is rendered from the row, so it already knows which of the two
+                  words its button is showing -- three lines below, in exactly this
+                  expression -- and saying that out loud costs nothing and no query. What it
+                  buys is a request that can be sent twice: a tap held on a phone with no
+                  signal and replayed when it comes back may land on a set the server already
+                  recorded, and "flip it" would then un-do the set it had just saved. The set
+                  edit form has sent an explicit state all along; this is the two of them
+                  finally agreeing, which is the fix #516 found twelve lines from the bug.
+
+                  A value rather than a checkbox's presence, which is what the edit form
+                  uses, because this field needs three answers and a checkbox has two:
+                  absence is already spoken for here as the toggle a no-JS post falls back
+                  to. %>
+              <input type="hidden" name="is_completed" value="<%= set[:is_completed] ? 'false' : 'true' %>">
               <%# The name a screen reader hears, which the visible word cannot be. #338: a
                   twelve-set session draws twelve buttons called "Done", and a list of the
                   page's controls read as "Done, button" twelve times with no way to tell the
@@ -175,6 +195,19 @@
               JavaScript nothing here ever appears, which is right, because with no
               JavaScript there is no htmx either -- Done is a plain form post and a failed
               one is the browser's own error page rather than a row that goes quiet. %>
+          <%# And the line it wears in the ordinary case since #542, which is a different
+              claim about the same tap: it is not in the database and it is not lost either,
+              it is on the phone waiting for a way out. Two elements rather than one whose
+              words the script rewrites, so that both sentences are in the template, beside
+              the row they appear on, where they can be read and changed together.
+
+              Grey rather than the amber above it, and that is the palette's rule rather than
+              a shade chosen by eye: amber is this app's warning colour and a held tap is not
+              a warning. It is the same grey as the plate math and the planned line, which is
+              the register this row uses for facts about itself. %>
+          <p data-waiting hidden class="mt-2 text-sm font-semibold text-gray-700">
+            Waiting to send.
+          </p>
           <p data-unsaved hidden class="mt-2 text-sm font-semibold text-amber-800">
             Not saved.
           </p>
@@ -307,18 +340,38 @@
                 </div>
               <%- end %>
             </div>
-            <%# hx-disabled-elt is on this form and not on the others, because this is the only
-                one whose repeat is destructive. A bare tap toggles -- deliberately, so a
-                mis-tap is undone by tapping again -- so a second tap while the first is
-                still in flight lands as an undo, and the set you did reads as not done.
-                #236. The revision forms write the weight you typed and the RPE buttons
-                write the rating you chose; sending either twice is the same as sending it
-                once. %>
+            <%# hx-disabled-elt is on this form and not on the others, and the reason it is
+                here has changed. #236 put it on because this was the one form whose repeat
+                was destructive: a bare tap toggled, so a second tap while the first was
+                still in flight landed as an undo and the set you did read as not done.
+                Since #542 the tap says which state it wants, so a repeat of it is a repeat
+                of a statement and changes nothing -- and this stays, now about the lifter
+                rather than the database. A button that goes dead for the length of the
+                request is the only thing on this screen saying the first tap was heard, and
+                without it a deliberate second tap would feel broken rather than do nothing.
+                The revision forms write the weight you typed and the RPE buttons write the
+                rating you chose; sending either twice is the same as sending it once. %>
             <form action="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete" method="post"
                   hx-post="/workouts/<%= @workout[:id] %>/sets/<%= set[:id] %>/complete"
                   hx-disabled-elt="find button"
                   hx-target="#lift-panel-<%= position %>" hx-swap="outerHTML">
               <%== csrf_tag("/workouts/#{@workout[:id]}/sets/#{set[:id]}/complete") %>
+              <%# What this tap is asking for, rather than an instruction to flip. #542.
+
+                  The form is rendered from the row, so it already knows which of the two
+                  words its button is showing -- three lines below, in exactly this
+                  expression -- and saying that out loud costs nothing and no query. What it
+                  buys is a request that can be sent twice: a tap held on a phone with no
+                  signal and replayed when it comes back may land on a set the server already
+                  recorded, and "flip it" would then un-do the set it had just saved. The set
+                  edit form has sent an explicit state all along; this is the two of them
+                  finally agreeing, which is the fix #516 found twelve lines from the bug.
+
+                  A value rather than a checkbox's presence, which is what the edit form
+                  uses, because this field needs three answers and a checkbox has two:
+                  absence is already spoken for here as the toggle a no-JS post falls back
+                  to. %>
+              <input type="hidden" name="is_completed" value="<%= set[:is_completed] ? 'false' : 'true' %>">
               <%# The name a screen reader hears, which the visible word cannot be. #338: a
                   twelve-set session draws twelve buttons called "Done", and a list of the
                   page's controls read as "Done, button" twelve times with no way to tell the
@@ -334,8 +387,12 @@
             </form>
           </div>
 
-          <%# A tap on this row that never reached the server, as on the warmup rows above.
-              #516, and the argument for it is written out there. %>
+          <%# A tap on this row that is waiting to go out, and one that is not going out at
+              all, as on the warmup rows above. #516 and #542, and the argument for both is
+              written out there. %>
+          <p data-waiting hidden class="mt-2 text-sm font-semibold text-gray-700">
+            Waiting to send.
+          </p>
           <p data-unsaved hidden class="mt-2 text-sm font-semibold text-amber-800">
             Not saved.
           </p>

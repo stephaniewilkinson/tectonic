@@ -1192,9 +1192,27 @@ class Tectonic < Roda
               revised = revised.reject { |_, value| value.to_s.empty? }
               # Three ways in, and they do not all mean the same thing.
               #
-              # No parameters is the primary tap, which toggles, so a mis-tap is undone by
-              # tapping again. A rating completes: choosing an RPE is saying you lifted it,
-              # and there is nothing else an RPE could be about.
+              # The primary tap is the Done button, and **it says which state it is asking
+              # for** rather than asking for a flip. That is #542's stage zero, and the
+              # reason is that a flip cannot be sent twice: a tap held on a phone with no
+              # signal and replayed when it comes back may arrive at a server that already
+              # recorded it -- the request reached the database and the response was what the
+              # network ate -- and "flip it" would then un-do the set it had just saved, long
+              # after the lifter stopped looking. A queue of toggles is worse still, being a
+              # list of instructions whose meaning depends on the state at the moment they
+              # land, which by then the poll or an assistant writing over MCP may have moved.
+              # `asked_state` and `completion_to` between them make a completion a statement
+              # about where the set should end up, and repeating a statement is free.
+              #
+              # A tap that says nothing still toggles, and that is the no-JS fallback rather
+              # than a leftover: with JavaScript off there is no htmx either, Done is a plain
+              # form post, and a hand-made post carries whatever it carries. The button's own
+              # word for what it does is the honest reading of a request that names no state.
+              #
+              # A rating completes: choosing an RPE is saying you lifted it, and there is
+              # nothing else an RPE could be about. That path was already absolute; what it
+              # lacked was the no-op, so rating a set that was already done re-stamped the
+              # completion. See completion_to.
               #
               # A corrected weight or rep count does neither. It used to complete the set,
               # which is what #215 is about: "the bar actually had 145 on it" and "I have
@@ -1211,19 +1229,25 @@ class Tectonic < Roda
               # differently is the same fact as a working set lifted differently -- the
               # generator writes planned_weight and planned_reps for both -- and a second
               # branch here would be two ways of recording one thing.
-              # Through WorkoutSet.completion so the stamp and the flag are written together
-              # (#281). The empty branch is the one that matters: a correction changes
-              # neither, so it must not touch the stamp either -- fixing a weight two reps
-              # into a set is not doing the set, and re-stamping it would move a turnaround
-              # the lifter never took.
+              # Through completion_to so the stamp and the flag are written together (#281)
+              # and so a state the set is already in writes neither (#542). The empty branch
+              # is the one that matters: a correction changes neither, so it must not touch
+              # the stamp either -- fixing a weight two reps into a set is not doing the set,
+              # and re-stamping it would move a turnaround the lifter never took.
               completion = if revised.empty?
-                             WorkoutSet.completion(!set.is_completed)
+                             set.completion_to(asked_state(r.params, set), at: asked_stamp(r.params))
                            elsif revised.key?(:rpe)
-                             WorkoutSet.completion(true)
+                             set.completion_to(true, at: asked_stamp(r.params))
                            else
                              {}
                            end
-              set.update(**revised, **completion)
+              # Nothing at all where nothing is being asked for, which is what a replayed tap
+              # on a set the server already recorded amounts to: no columns to write, so no
+              # UPDATE and no row touched. Guarded rather than left to Sequel, which raises
+              # on `update()` with no arguments -- and the screen below still re-renders, so
+              # the response is the panel as it stands, which is the right answer to a tap
+              # asking for what is already true.
+              set.update(**revised, **completion) unless revised.empty? && completion.empty?
               if r.env['HTTP_HX_REQUEST']
                 session_body(workout_id, set_id)
               else
@@ -1268,6 +1292,11 @@ class Tectonic < Roda
               # cleared box that left completed_at behind would violate
               # sets_completed_at_needs_a_completion -- which reaches a person as a 500 and
               # a lost edit, which is the failure #213 was about.
+              # `completion_to` rather than `completion` since #542, which fixes something
+              # this form was doing quietly: saving any edit with the box left ticked
+              # re-stamped completed_at, so correcting a weight an hour afterwards moved when
+              # the set was lifted. A box that was ticked and stayed ticked is not a
+              # completion, it is a completion being left alone.
               # `commanded?` rather than the bare parameter the two flags above use,
               # because sets_commanded_reps_are_counted refuses one on a set held for time.
               # The form does not draw the box on a timed set, so the browser cannot send
@@ -1276,7 +1305,7 @@ class Tectonic < Roda
               set.update(weight: r.params['weight'],
                          is_warmup: r.params['is_warmup'] || false,
                          is_commanded: commanded?(set, r.params),
-                         **WorkoutSet.completion(!r.params['is_completed'].nil?),
+                         **set.completion_to(!r.params['is_completed'].nil?),
                          **quantity,
                          **substitution(set, r.params['exercise_id']))
               r.redirect "/workouts/#{workout_id}"
@@ -2405,6 +2434,61 @@ class Tectonic < Roda
     return nil if typed.to_s.strip.empty?
 
     set.timed? ? { duration_seconds: typed, reps: nil } : { reps: typed, duration_seconds: nil }
+  end
+
+  # Which state a Done tap is asking the set to end up in. #542.
+  #
+  # The session screen's form is rendered from the row, so it already knows whether its
+  # button says Done or Undo, and this is that word said out loud in a hidden field. It is
+  # the shape the set edit form has always used -- #516 found the fix twelve lines below the
+  # bug -- and bringing the two into agreement is the whole change rather than an invention.
+  #
+  # A request that says nothing falls back to the toggle, which is the no-JS path and the
+  # hand-made post. So does a request carrying a word this does not know: choosing between
+  # "done" and "not done" on the strength of a string nobody defined is how a set comes to be
+  # un-done by a typo, and the toggle is at least the behaviour the button's own word
+  # describes. Only the two exact spellings the form sends are read as a statement.
+  #
+  # `on` is deliberately not among them, though that is what the edit form's checkbox sends.
+  # A checkbox says true by being present and false by being absent, and absence is already
+  # spoken for here -- it is the toggle -- so this field cannot be a checkbox and must not
+  # pretend to be one.
+  def asked_state(params, set)
+    { 'true' => true, 'false' => false }.fetch(params['is_completed'].to_s) { !set.is_completed }
+  end
+
+  # When a completion says it happened, which is not always when it arrives. #542.
+  #
+  # A tap made at 18:04 in a basement and flushed at 18:40 on the street happened at 18:04,
+  # and stamping it on arrival would record the phone finding signal rather than the lifter
+  # finishing a set. That is exactly the distinction health data draws between measured_at
+  # and created_at, and getting it wrong here is quieter: every turnaround Timing computes
+  # from these stamps would describe the outage.
+  #
+  # Milliseconds since the epoch, because that is what `Date.now()` hands the script on the
+  # phone and it carries no timezone to be read wrongly. An ISO string would arrive with the
+  # phone's offset on it, or without one, and the difference between those two is hours.
+  #
+  # **The server's own clock wins wherever the offered one is not believable**, and the
+  # window is a day. A phone's clock is wrong more often than anybody expects -- a dead
+  # battery, a timezone typed in by hand -- and the two implausible readings fail in
+  # different ways: a stamp from the future sorts above every honest set and hands Timing a
+  # negative rest to explain, and one from last year would file a set into a session that
+  # ended months ago. Falling back rather than clamping is what create_set already says about
+  # a session typed up in the evening: where we cannot know when it was lifted, the honest
+  # thing to record is when we heard about it, and to say so.
+  #
+  # A day rather than an hour because the queue survives the tab being closed, so a session
+  # that lost signal at the end and was reopened the next morning still replays with the
+  # right stamps. Beyond that, a tap is no longer something anybody is standing in the
+  # middle of.
+  STAMP_REACH = 24 * 60 * 60
+  def asked_stamp(params, now: Time.now)
+    offered = Float(params['completed_at'].to_s, exception: false)
+    return now unless offered
+
+    at = Time.at(offered / 1000)
+    at.between?(now - STAMP_REACH, now) ? at : now
   end
 
   # Whether the set edit form is saying this set was done under meet commands. #311.
