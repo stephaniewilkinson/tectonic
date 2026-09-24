@@ -1,5 +1,16 @@
 <div class="mx-auto max-w-2xl">
   <h1 class="text-3xl font-semibold text-gray-900">Start here</h1>
+  <%# #628. This account signed up to connect an assistant, confirmed its address somewhere the
+      consent screen could not follow -- a phone, a mail app's browser -- and has not connected
+      it since. Said first, because it is what they came for, and it says what will happen:
+      pressing Connect again asks them to sign in, and since #628 that sign-in comes back to
+      the consent screen rather than here. Gone once the connection exists. %>
+  <%- if @connecting %>
+    <p class="mt-4 rounded-md bg-sky-50 p-4 text-sm text-sky-900 ring-1 ring-sky-200" role="status">
+      You were connecting <%= @connecting %>. Go back to where you started and press Connect
+      again. If it asks you to sign in, do, and you will come straight back to approve it.
+    </p>
+  <%- end %>
   <p class="mt-2 text-sm text-gray-600">
     Tectonic Plates is a barbell log. It keeps what you lifted, works out what to load on
     the bar, and charts whether the weight is going up.
