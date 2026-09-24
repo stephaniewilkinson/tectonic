@@ -40,9 +40,15 @@
     watched the waiting count go to zero. So the queue says when it is done and this element
     listens, which keeps one thing asking the server what the panels should look like. The
     event is dispatched on the body, hence `from:body`: the queue's script lives outside
-    #session-body with the banner it draws, and this element is inside it. %>
+    #session-body with the banner it draws, and this element is inside it.
+
+    **The third is the doorbell** (#592): a held-open stream that says `changed` the moment the
+    sets differ, so a set an assistant logged shows up in a second or two rather than up to
+    fifteen later. It rings this element rather than delivering anything, so everything above
+    still holds -- see _session_stream.erb. The fifteen-second timer stays: it is what keeps the
+    screen current wherever the stream cannot connect. %>
 <div id="session-poll"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %>
      hx-get="/workouts/<%= workout_id %>/session/changes?since=<%= fingerprint %>"
-     hx-trigger="every 15s, queue-drained from:body"
+     hx-trigger="every 15s, queue-drained from:body, session-changed from:body"
      hx-target="#lift-panels"
      hx-swap="innerHTML"></div>

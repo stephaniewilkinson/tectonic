@@ -1,0 +1,69 @@
+<%# Opening the doorbell #592 adds, and answering it. The argument, including why it carries no
+    markup of its own, is in lib/tectonic/session_stream.rb.
+
+    Outside #session-body for the reason everything stateful on this screen is: that region is
+    replaced on every tap and every poll, and an open connection is state. It reads the poller
+    for where to connect and which fingerprint to ask about, rather than being rendered with
+    either, because the poller is the one element that is always current about both -- it
+    replaces itself on every swap for exactly that reason.
+
+    A `changed` event fires the poll, by the same route the write queue already uses to ask it
+    for news early (`queue-drained`); the poll does the rest, and answers 204 if a swap already
+    brought the screen up to date. The stream is closed first and reopened a second later, by
+    which time the poller has usually been replaced and carries the new fingerprint -- and if
+    not, the worst case is one more doorbell answered by one more 204.
+
+    A failed connection backs off, doubling to half a minute, and a clean `done` reconnects at
+    once. A hidden tab holds no connection: a phone locked on this screen is a server thread
+    held for nobody, and the poll catches the screen up the moment it is looked at again.
+    Without EventSource none of this runs, and the fifteen-second poll is the whole story, as it
+    was before. %>
+<script>
+  (function () {
+    if (!window.EventSource) { return; }
+    var source = null;
+    var timer = null;
+    var failures = 0;
+
+    function poller() { return document.getElementById('session-poll'); }
+
+    function address() {
+      var poll = poller();
+      return poll && poll.getAttribute('hx-get').replace('/session/changes?', '/session/stream?');
+    }
+
+    function close() {
+      if (source) { source.close(); source = null; }
+      clearTimeout(timer);
+    }
+
+    function later(delay) {
+      close();
+      timer = setTimeout(connect, delay);
+    }
+
+    function connect() {
+      var url = address();
+      if (document.hidden || !url) { return; }
+      source = new EventSource(url);
+      source.addEventListener('changed', function () {
+        failures = 0;
+        document.body.dispatchEvent(new CustomEvent('session-changed'));
+        later(1000);
+      });
+      source.addEventListener('done', function () {
+        failures = 0;
+        later(0);
+      });
+      source.onerror = function () {
+        failures += 1;
+        later(Math.min(30000, 1000 * Math.pow(2, failures)));
+      };
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { close(); } else { later(0); }
+    });
+    later(0);
+  })();
+</script>
