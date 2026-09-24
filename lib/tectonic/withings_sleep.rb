@@ -326,7 +326,7 @@ class Tectonic < Roda
     # is what this read added rather than what the week contained. Sequel's `insert` under ON
     # CONFLICT DO NOTHING answers nil when nothing was written, which is the whole check.
     #
-    # Do-nothing rather than an upsert, which is `WithingsMeasures.store_measure`'s choice and
+    # Do-nothing rather than an upsert, which is `WithingsWeighIn.store_measure`'s choice and
     # is made here for its reason and one more of its own. A count that meant "rows written"
     # would be a count that said nothing about whether anything arrived, and the freshness note
     # a reader is given is built from it. The cost is that a night Withings later re-analyses
@@ -349,7 +349,7 @@ class Tectonic < Roda
 
     # The source's id for one row, scoped to the account and to the service that produced it.
     #
-    # The account id is in front for `WithingsMeasures.external_id`'s reason: the unique index
+    # The account id is in front for `WithingsWeighIn.external_id`'s reason: the unique index
     # is on `[source, external_id]` across the whole table rather than per account, so a bare
     # id would mean one account's stored night silently swallowing another's -- which is what
     # somebody with a second account connected to one Withings login does on purpose.

@@ -317,7 +317,7 @@ describe 'a press that meets the stranded proposal #555 describes' do
   def collides
     recent = activity(id: 'w-now', starts: Time.new(this_year, 3, 1, 10, 0, 0), minutes: 48)
     colliding = ->(_account_id) { raise Sequel::UniqueConstraintViolation, 'proposed_workout_id' }
-    Tectonic::WithingsBackfill.stub(:pair, colliding) { press(answering(recent)) }
+    Tectonic::WithingsPairing.stub(:pair, colliding) { press(answering(recent)) }
   end
 
   it 'does not reach the lifter as a 500' do

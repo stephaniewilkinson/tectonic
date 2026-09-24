@@ -73,10 +73,10 @@ class Tectonic < Roda
     # Derived from the writers rather than kept by hand, because by hand it drifted on four
     # names of eight (#585): `muscle_mass`, `hydration` and `bone_mass` had been written since
     # #518 and never offered, so a model could read them only by already knowing they existed.
-    # A metric is one line in `WithingsMeasures::METRICS` or one constant in `WithingsSleep`,
+    # A metric is one line in `WithingsWeighIn::METRICS` or one constant in `WithingsSleep`,
     # and now that line is also what makes it known. Read off constants, not the table, so it
     # costs nothing per request and does not hide a metric just because nobody has one yet.
-    KNOWN = (WithingsMeasures::METRICS.values.map(&:first) + [WithingsSleep::SLEPT, WithingsSleep::WINDOW]).freeze
+    KNOWN = (WithingsWeighIn::METRICS.values.map(&:first) + [WithingsSleep::SLEPT, WithingsSleep::WINDOW]).freeze
 
     # The three figures a body composition read reports, in the order a reader wants them:
     # the bodyweight first, because it is the denominator everything else is read against.

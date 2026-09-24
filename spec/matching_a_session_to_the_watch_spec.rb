@@ -66,7 +66,7 @@ module MatchingTheWatch
   # the record page now knows.
   def record(workout_id, found = [])
     @workout_id = workout_id
-    found.each { |activity| Tectonic::WithingsWorkouts.store(@account_id, activity) }
+    found.each { |activity| Tectonic::WithingsActivity.store(@account_id, activity) }
     get "/workouts/#{workout_id}"
   end
 
@@ -497,7 +497,7 @@ describe 'what the app calls a Withings category' do
   # is how "is 17 lifting" and "what is 17 called" come to be answered from the same place
   # and then drift.
   it 'uses the name Withings publishes' do
-    assert_equal 'Bicycling', Tectonic::WithingsWorkouts.called(6)
+    assert_equal 'Bicycling', Tectonic::WithingsActivity.called(6)
   end
 
   # 17 is "Fitness", which is what Withings' own OpenAPI document says and what 042's comment
@@ -509,20 +509,20 @@ describe 'what the app calls a Withings category' do
   # The string is shown to a lifter as the watch's own word for what they did, so it has to be
   # the watch's word and not a mirror's guess at it.
   it 'calls 17 what Withings calls it rather than what a mirror called it' do
-    assert_equal 'Fitness', Tectonic::WithingsWorkouts.called(17)
+    assert_equal 'Fitness', Tectonic::WithingsActivity.called(17)
   end
 
   # 193 and 194 were left out entirely because the mirrors had them the other way round. They
   # are the right way round here, from the source, and the order is the whole content of it.
   it 'tells hockey from ice hockey, in the order Withings publishes them' do
-    assert_equal 'Hockey', Tectonic::WithingsWorkouts.called(193)
-    assert_equal 'Ice hockey', Tectonic::WithingsWorkouts.called(194)
+    assert_equal 'Hockey', Tectonic::WithingsActivity.called(193)
+    assert_equal 'Ice hockey', Tectonic::WithingsActivity.called(194)
   end
 
   # A real tag that a lifter can tap, and the one word `called` may never invent for an id it
   # does not recognise -- which is why it mattered that it was missing.
   it 'names the category Withings actually calls Other' do
-    assert_equal 'Other', Tectonic::WithingsWorkouts.called(36)
+    assert_equal 'Other', Tectonic::WithingsActivity.called(36)
   end
 end
 
@@ -535,16 +535,16 @@ describe 'a category Withings has published no name for' do
   # This asserted 306 until #579, on the strength of a table transcribed from mirrors that
   # were missing it. 306 is "Indoor walk", which is why the example had to move.
   it 'is the id and nothing more' do
-    assert_equal 'Withings category 533', Tectonic::WithingsWorkouts.called(533)
+    assert_equal 'Withings category 533', Tectonic::WithingsActivity.called(533)
   end
 
   # The id the fallback used to be demonstrated with, named.
   it 'is not what happens to 306, which Withings does publish' do
-    assert_equal 'Indoor walk', Tectonic::WithingsWorkouts.called(306)
+    assert_equal 'Indoor walk', Tectonic::WithingsActivity.called(306)
   end
 
   it 'is said plainly where Withings sent no category at all' do
-    assert_equal 'An activity Withings did not name', Tectonic::WithingsWorkouts.called(nil)
+    assert_equal 'An activity Withings did not name', Tectonic::WithingsActivity.called(nil)
   end
 end
 
@@ -713,8 +713,8 @@ describe 'confirming a match' do
   # the unique index on workout_id would make it an exception rather than a no-op.
   it 'refuses a second activity for a session already matched' do
     answer('match', 'activity' => 'w-1')
-    again = Tectonic::WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout_id,
-                                               external_id: 'w-9')
+    again = Tectonic::WithingsAnswers.confirm(account_id: @account_id, workout_id: @workout_id,
+                                              external_id: 'w-9')
 
     assert_equal 0, again
   end

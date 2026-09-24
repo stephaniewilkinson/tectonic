@@ -134,7 +134,7 @@ class Tectonic < Roda
     # Postgres applies this one to the handful of rows that survive it. Dropping one of the
     # three would be the change that silently costs a scan.
     #
-    # It is also the second half of a pair. `WithingsWorkouts.confirm` withdraws these at the
+    # It is also the second half of a pair. `WithingsAnswers.confirm` withdraws these at the
     # moment the session is answered, so nothing new arrives in this state; this is what keeps
     # the queue honest about the rows stranded before that shipped, which no answer will ever
     # visit again. A filter and a cure rather than one or the other, because the filter alone

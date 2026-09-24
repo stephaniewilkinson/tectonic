@@ -14,46 +14,6 @@ Metrics/BlockLength:
 Metrics/ClassLength:
   Enabled: false
 
-# ProgramWriter is the one module every program write path goes through, and that is the
-# point of it: the alternative is the same rules written twice -- once for the browser and
-# once for MCP -- drifting apart, with the browser's copy the one that drifts, because an
-# assistant's calls are specced in a way a form never quite is. It is long because the rules
-# about how a lift may be written are long, and splitting it to satisfy a line count would
-# put related rules in two files, which is the thing it exists to prevent. Same reasoning as
-# ClassLength above, applied to the one module it matters for.
-# WithingsBackfill is the second, and it is long for the same kind of reason: it is the one
-# walk over a lifter's Withings history, and both the things that drive it -- the rake task
-# that reads a decade and the settings button that reads a year (#558) -- go through the same
-# fetch, the same storage and the same pairing. Splitting it to satisfy a line count would put
-# "which years to ask for" in one file and "what to do with a year that did not answer" in
-# another, and the second walker is precisely how the `more` bug in #553 came about: one
-# caller learned that Withings can answer `more: 0` and the other did not. The module is also
-# most of comment by volume, because the provider's behaviour is not guessable from its
-# documentation and every trap in it has been paid for once already.
-# WithingsWorkouts is the third, and the same argument again with a different seam. It is the
-# one answer to "is this recording of this session", and the split somebody would reach for --
-# fetching and storing on one side, scoring and wording on the other -- cuts straight through
-# what the two halves share: one interval, one MARGIN_DAYS either side of it, one rule about
-# which rows are still a question. The fetch asks Withings for a window and the score is
-# computed over that window, so putting them in two files is putting one definition of "around
-# this session" in two places. #553 is what that costs, and it is cited twice above for the
-# same reason.
-# WithingsMeasures is the fourth, and it is the sibling of the second: the one read of the
-# scale, which since #557 asks for its window a piece at a time so that a read refused partway
-# has something to show for the pieces that arrived. What makes it long is one invariant with
-# two halves -- which piece to ask for next, and what a piece that arrived whole is allowed to
-# claim -- and those two halves are the same sentence read forwards and backwards: the stretch
-# from `measures_read_back_to` up to `synced_at` is what has been fetched. Splitting them into
-# two files would put the question in one and the answer in the other, which is the shape both
-# #554 and #557 already are: a watermark written by code that could not see what the next read
-# would do with it.
-Metrics/ModuleLength:
-  Exclude:
-    - "lib/tectonic/mcp/tools/program_writer.rb"
-    - "lib/tectonic/withings_backfill.rb"
-    - "lib/tectonic/withings_workouts.rb"
-    - "lib/tectonic/withings_measures.rb"
-
 AllCops:
   NewCops: enable
 

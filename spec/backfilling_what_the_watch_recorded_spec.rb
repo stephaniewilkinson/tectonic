@@ -261,7 +261,7 @@ describe 'a whole history walked from a terminal in an earlier year' do
   end
 
   it 'leaves the import button offering the years that have happened since' do
-    assert_equal Date.today.year - 2, Tectonic::WithingsBackfill.pending(@account_id)[:year]
+    assert_equal Date.today.year - 2, Tectonic::WithingsReadRange.pending(@account_id)[:year]
   end
 
   # And the task itself already floors a later run at the year the stamp was written in, so
@@ -321,7 +321,7 @@ describe 'what a narrowed walk says for itself afterwards' do
   # lifter who ran the task from a terminal should not be asked to press for the years it
   # already fetched.
   it 'leaves the import button offering the first year the walk did not reach' do
-    assert_equal Date.today.year - 2, Tectonic::WithingsBackfill.pending(@account_id)[:year]
+    assert_equal Date.today.year - 2, Tectonic::WithingsReadRange.pending(@account_id)[:year]
   end
 end
 
@@ -458,7 +458,7 @@ describe 'what a backfill does with the two kinds of nothing' do
   # #520 requires a no to stick per session and permanently. A backfill re-proposing to a
   # session the lifter waved away would be that nagging arriving months later and in bulk.
   it 'leaves a session the lifter has already dismissed alone' do
-    Tectonic::WithingsWorkouts.dismiss(account_id: @account_id, workout_id: @workout_id)
+    Tectonic::WithingsAnswers.dismiss(account_id: @account_id, workout_id: @workout_id)
     report = backfill(@account_id, answering(activity(starts: @at + 60, minutes: 48)))
 
     assert_equal 0, report[:proposed]
@@ -500,16 +500,16 @@ describe 'a re-run and an answer the lifter has already given' do
 
   # The lifter's answer is not Withings' to overwrite, and Withings keep sending an activity
   # that has been answered because it is still sitting in their account. This inherits the
-  # guarantee from `WithingsWorkouts.store` rather than restating it.
+  # guarantee from `WithingsActivity.store` rather than restating it.
   it 'does not un-answer a confirmed match' do
-    Tectonic::WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout_id, external_id: 'w-1')
+    Tectonic::WithingsAnswers.confirm(account_id: @account_id, workout_id: @workout_id, external_id: 'w-1')
     again
 
     assert_equal @workout_id, DB[:withings_workouts].where(external_id: 'w-1').get(:workout_id)
   end
 
   it 'does not un-refuse a dismissed activity' do
-    Tectonic::WithingsWorkouts.dismiss(account_id: @account_id, workout_id: @workout_id, external_id: 'w-1')
+    Tectonic::WithingsAnswers.dismiss(account_id: @account_id, workout_id: @workout_id, external_id: 'w-1')
     again
 
     refute_nil DB[:withings_workouts].where(external_id: 'w-1').get(:dismissed_at)
@@ -680,7 +680,7 @@ describe 'the list of proposals waiting for an answer' do
   end
 
   it 'empties as they are answered, without promising more are coming' do
-    Tectonic::WithingsWorkouts.confirm(account_id: @account_id, workout_id: @workout_id, external_id: 'w-1')
+    Tectonic::WithingsAnswers.confirm(account_id: @account_id, workout_id: @workout_id, external_id: 'w-1')
     get '/workouts/withings'
 
     assert_includes last_response.body, 'Nothing is waiting'
