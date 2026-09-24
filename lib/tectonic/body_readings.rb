@@ -4,6 +4,8 @@ require 'date'
 require 'time'
 require_relative 'db'
 require_relative 'plates'
+require_relative 'withings_measures'
+require_relative 'withings_sleep'
 
 class Tectonic < Roda
   # What the scale said, and how much of what it said is worth reading. #519.
@@ -67,7 +69,14 @@ class Tectonic < Roda
     # and chose carefully: a pulse taken standing on a scale or sitting with a cuff on is not
     # a resting heart rate in the sense anybody means by that. That file declined to claim
     # `resting_hr`; this stops advertising it.
-    KNOWN = %w[weight fat_mass lean_mass fat_ratio standing_hr sleep_hours sleep_window_hours].freeze
+    #
+    # Derived from the writers rather than kept by hand, because by hand it drifted on four
+    # names of eight (#585): `muscle_mass`, `hydration` and `bone_mass` had been written since
+    # #518 and never offered, so a model could read them only by already knowing they existed.
+    # A metric is one line in `WithingsMeasures::METRICS` or one constant in `WithingsSleep`,
+    # and now that line is also what makes it known. Read off constants, not the table, so it
+    # costs nothing per request and does not hide a metric just because nobody has one yet.
+    KNOWN = (WithingsMeasures::METRICS.values.map(&:first) + [WithingsSleep::SLEPT, WithingsSleep::WINDOW]).freeze
 
     # The three figures a body composition read reports, in the order a reader wants them:
     # the bodyweight first, because it is the denominator everything else is read against.
