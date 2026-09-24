@@ -41,8 +41,10 @@ class Tectonic < Roda
       @dumbbell_pairs = dumbbell_pairs
     end
 
-    def self.for_account(account_id)
-      account = DB[:accounts].where(id: account_id).first || {}
+    # `account` is the row, for a caller that has it in hand already -- a page, where rodauth
+    # loaded it (#603). The generator and the rake tasks have only the id and ask.
+    def self.for_account(account_id, account: nil)
+      account ||= DB[:accounts].where(id: account_id).first || {}
       new(bar_weight: account[:bar_weight] || DEFAULT_BAR,
           pairs: barbell_pairs(account_id),
           dumbbell_handle_weight: numeric(account[:dumbbell_handle_weight]),

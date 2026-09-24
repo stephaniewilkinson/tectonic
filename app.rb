@@ -589,7 +589,7 @@ class Tectonic < Roda
       # rather than asked for four times, so the month, the grid and the tally cannot land on
       # different sides of midnight -- which is the third failure that issue names: a Monday
       # evening session marked missed on the calendar while it was being lifted.
-      today = Clock.today_for(@account_id)
+      today = Clock.today(account_row[:time_zone])
       # And here, because a session signed in once and left open for a fortnight would
       # otherwise never pass the hook above again -- and this is the page somebody lands on to
       # ask what they are doing this week.
@@ -600,7 +600,7 @@ class Tectonic < Roda
       @month = Calendar.month_of(r.params['month'], today)
       @previous = @month << 1
       @following = @month >> 1
-      @week_starts_on = week_starts_on(@account_id)
+      @week_starts_on = week_starts_on
       @weeks = Calendar.weeks(@account_id, @month, today, @week_starts_on)
       @tally = Calendar.tally(@weeks, today)
       view('home')
@@ -839,7 +839,7 @@ class Tectonic < Roda
         #
         # Completed sets are safe because refresh never touches them, so this cannot rewrite
         # training that has already happened -- see RackChange.
-        moved = RackChange.reround(@account_id, today: Clock.today(Clock.zone_of(@account_id)))
+        moved = RackChange.reround(@account_id, today: Clock.today(account_row[:time_zone]))
         # The fragment goes after the query string, which is the order a URL is written in and
         # not a detail a browser is forgiving about: everything after the first `#` is the
         # fragment, so `/settings#weight-plates?rerounded=2` would be a fragment nothing on the
@@ -853,10 +853,10 @@ class Tectonic < Roda
         # to Rodauth. `to_i` floors anything else to zero, so a hand-typed value can say
         # nothing worse than nothing.
         @rerounded = r.params['rerounded'].to_i
-        @time_budget_minutes = DB[:accounts].where(id: @account_id).get(:time_budget_minutes)
-        @week_starts_on = week_starts_on(@account_id)
-        @equipment = Equipment.for_account(@account_id)
-        @time_zone = Clock.zone_of(@account_id)
+        @time_budget_minutes = account_row[:time_budget_minutes]
+        @week_starts_on = week_starts_on
+        @equipment = equipment
+        @time_zone = account_row[:time_zone]
         @today = Clock.today(@time_zone)
         # Whether Withings is connected, and whether the connection still works -- three
         # states rather than two, because a grant revoked from Withings' own app leaves a row
@@ -1089,7 +1089,7 @@ class Tectonic < Roda
           # so that filling in a blank as two, which is what the app was already assuming,
           # correctly counts as no change and reports nothing. #439.
           if @exercise.dumbbells != was_dumbbells
-            rerounded = RackChange.reround(@account_id, today: Clock.today(Clock.zone_of(@account_id)))
+            rerounded = RackChange.reround(@account_id, today: Clock.today(account_row[:time_zone]))
             session['exercise.notice'] = dumbbell_notice(rerounded, @exercise.dumbbells) if rerounded.positive?
           end
           r.redirect "/exercises/#{@exercise.id}/"
@@ -1207,7 +1207,7 @@ class Tectonic < Roda
           # (#434). Built here rather than in the template because it asks the database
           # several questions and a view that queries is a view nobody can read.
           @progress = ProgressChart.of(account_id: @account_id, exercise: @exercise,
-                                       today: Clock.today_for(@account_id))
+                                       today: Clock.today(account_row[:time_zone]))
           # What the last edit did to sets already logged, read once and taken out of the
           # session (#392). Delete rather than read, so a reload does not re-announce an edit
           # made ten minutes ago -- the same shape program_action uses for its refusals.
@@ -1776,7 +1776,7 @@ class Tectonic < Roda
         # Two further queries whatever the list holds, and nothing about what either field means
         # changes: the focus is still read through the day, so renaming a programme day still
         # renames every session it wrote.
-        @today = Clock.today_for(@account_id)
+        @today = Clock.today(account_row[:time_zone])
         planned, history = Workout.where(account_id: @account_id).with_performed_on.with_set_count
                                   .eager(:program_day, :created_by_oauth_application)
                                   .reverse(:date).all
@@ -1998,13 +1998,25 @@ class Tectonic < Roda
 
   # Which day this account's week begins on, as a Date#wday number. #189.
   #
-  # Read straight off the table rather than through a model, because there is no Account
-  # model in this app -- Rodauth owns that table and works it as a dataset -- and inventing
-  # one for a single integer would be a larger thing than the integer. The fallback is
+  # Read off the account row rather than through a model, because there is no Account model
+  # in this app -- Rodauth owns that table and works it as a dataset -- and inventing one for
+  # a single integer would be a larger thing than the integer. The fallback is
   # belt and braces: the column is NOT NULL with a default, so a row without one cannot
   # exist, and a reader that assumes so anyway costs nothing.
-  def week_starts_on(account_id)
-    DB[:accounts].where(id: account_id).get(:week_starts_on) || 0
+  def week_starts_on
+    account_row[:week_starts_on] || 0
+  end
+
+  # The signed-in account's row, which rodauth already loaded to find @account_id and which
+  # carries every per-account setting a page reads: zone, week start, time budget, bar. #603
+  # measured /settings fetching that one row five times in a request, a column at a time by
+  # primary key, one helper after another. Read off what is already in hand instead.
+  #
+  # Every route that writes to the row redirects rather than rendering, so there is no request
+  # in which this could be read after a change it predates. The lookup is for a caller that set
+  # @account_id without going through rodauth's session.
+  def account_row
+    @account_row ||= rodauth.account || DB[:accounts].where(id: @account_id).first || {}
   end
 
   # What comes back from a tap: the panel of the lift that was tapped, and the progress
@@ -2688,7 +2700,7 @@ class Tectonic < Roda
   # The rack the signed-in account lifts on, read once per request: the session view asks
   # for a plate breakdown per set, and every one of them wants the same inventory.
   def equipment
-    @equipment ||= Equipment.for_account(@account_id)
+    @equipment ||= Equipment.for_account(@account_id, account: account_row)
   end
 
   # What to hang on each side of the bar, as plain text. Blank only for work that is not
