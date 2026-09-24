@@ -26,8 +26,15 @@ your behalf — which tool, when, whether it succeeded, **and the arguments it w
 That last part means the contents of a write (a weight, a rep count, a note) appear in that
 log. It exists so that a change you did not expect can be traced to the call that made it.
 
-**Nothing else.** We do not ask for your name, your date of birth, your bodyweight, your
-location or your payment details, and we have no field to put them in.
+**What Withings sends, if you connect it.** Only if you connect a Withings account, and only
+what Withings holds: your weight and body composition (lean mass, fat mass, fat percentage,
+muscle mass, hydration, bone mass), the heart rate taken with a measurement, how long you slept
+and over what window, and the activities your watch recorded, with their heart rate and
+calories. Weights you type into the Withings app are included. We read these; we never write
+anything back to Withings. Disconnecting stops any further reading.
+
+**Nothing else.** We do not ask for your name, your date of birth, your location or your
+payment details, and we have no field to put them in.
 
 ## What we do not do
 
@@ -49,7 +56,8 @@ One session cookie, so that being logged in survives loading the next page, and 
 | **Render** (United States, Oregon) | Everything above — they host the app and the database | Hosting |
 | **Fathom Analytics** | Page views and referrers, aggregated | Knowing which pages are used |
 | **Sentry** | Error reports: the exception, and where in the code it happened | Finding crashes |
-| **[EMAIL PROVIDER]** | Your email address, when we send you a password reset | Sending that email |
+| **Resend** | Your email address, when we send you a confirmation link or a password reset | Sending that email |
+| **Withings** | Nothing from us: we only read from them, and only if you connect your account | Reading your weight, sleep and watch activities |
 | **Your AI assistant's operator** | Whatever you say to it, and whatever it reads from your account | Only if you connect one |
 
 Two of those are worth stating precisely, because the usual version of this sentence is
