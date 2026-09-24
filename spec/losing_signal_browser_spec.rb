@@ -56,6 +56,9 @@ module LosingSignal
                        is_completed: false, is_barbell: true)
     end
     visit "/workouts/#{workout_id}/session"
+    # Before any tap: the queue's store opens a moment after the page does, and a tap in that
+    # moment has nowhere to be kept. A person is never that fast; this driver is. #650.
+    find('[data-store]', visible: :all)
     workout_id
   end
 

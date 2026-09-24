@@ -299,11 +299,20 @@
     // indexedDB.open outright, a phone can be out of quota, and a browser can be configured
     // to have no storage at all. None of those is an error worth reporting to a lifter mid
     // set -- what they change is which sentence the banner is allowed to say.
+    // Says on the banner whether the store is open, once the answer is known. #650: a spec
+    // tapped Done in the moment between the page loading and the store opening, and the tap was
+    // reported unkept because there was not yet anywhere to keep it. A person cannot tap that
+    // fast; a browser driving the page can, and it now waits for this.
+    function settled(state) {
+      banner.setAttribute('data-store', state);
+    }
+
     function openStore(after) {
       var request;
       try {
         request = window.indexedDB.open('tectonic', 1);
       } catch (error) {
+        settled('none');
         after();
         return;
       }
@@ -326,10 +335,11 @@
           store.close();
           store = null;
         };
+        settled('open');
         after();
       };
-      request.onerror = function () { after(); };
-      request.onblocked = function () { after(); };
+      request.onerror = function () { settled('none'); after(); };
+      request.onblocked = function () { settled('none'); after(); };
     }
 
     function taps(mode) {
