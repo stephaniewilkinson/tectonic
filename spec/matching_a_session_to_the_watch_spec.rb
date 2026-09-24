@@ -874,18 +874,6 @@ describe 'storing what Withings sent' do
     assert_equal 310.5, stored(@account_id).first[:calories].to_f
   end
 
-  # #586. 042 added `effective_seconds` for `effduration`, which turns out not to be a field
-  # Withings has: the column is written by nothing now and reads null on every row, which is
-  # what it read before while something appeared to be writing it. Asserted rather than left
-  # implicit because a null here used to mean "this watch did not record it", and the
-  # difference between that and "nobody is asking" is the whole of the issue. The column
-  # itself goes in a migration of its own, #607.
-  it 'writes nothing to the column the retired field used to aim at' do
-    record(@workout_id, [activity])
-
-    assert_nil stored(@account_id).first[:effective_seconds]
-  end
-
   # A watch with no optical sensor records no heart rate. Nil and zero are different facts.
   it 'leaves a measurement the watch did not take as nothing rather than zero' do
     record(@workout_id, [activity.merge('data' => {})])
