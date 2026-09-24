@@ -43,7 +43,14 @@ class Tectonic < Roda
       time_budget_minutes || DB[:accounts].where(id: account_id).get(:time_budget_minutes)
     end
 
+    #
+    # Off the weeks already loaded where a caller eager loaded them, which `ensure_ahead` does
+    # so that asking after two weeks of every running block is not a query per question (#595).
+    # Only then: a block whose weeks were never loaded asks the table, so a caller that has just
+    # added a week is not answered from a list read before it existed.
     def week(number)
+      return program_weeks.find { |week| week.number == number } if associations.key?(:program_weeks)
+
       program_weeks_dataset.where(number:).first
     end
 

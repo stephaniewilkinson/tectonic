@@ -29,10 +29,18 @@ class Tectonic < Roda
     # from nowhere. Nil for the rake task, which is a person at a command line.
     def initialize(program, created_by: nil)
       @program = program
-      # The rack this account lifts on. Every weight below is rounded to something it can
-      # actually load, and warmups start at its bar rather than at an assumed 45.
-      @equipment = Equipment.for_account(program.account_id)
       @created_by = created_by
+    end
+
+    # The rack this account lifts on. Every weight below is rounded to something it can
+    # actually load, and warmups start at its bar rather than at an assumed 45.
+    #
+    # Read when something is about to be loaded onto it rather than on the way in. A week whose
+    # sessions are all written already loads nothing, and `ensure_ahead` asks that of every
+    # running block on every front page -- where reading the rack up front was three queries a
+    # week for an answer nobody used (#595).
+    def equipment
+      @equipment ||= Equipment.for_account(@program.account_id)
     end
 
     # Inserts a workout per program day of the numbered week, with every set
@@ -56,9 +64,18 @@ class Tectonic < Roda
       # detail that lets the failure be reproduced.
       ErrorReporting.note('program', program_id: @program.id, week: number,
                                      account_id: @program.account_id, block: @program.block)
-      DB.transaction do
-        week.program_days.sort_by(&:weekday).map { |day| generate_day(week, day, week.date_for(day.weekday)) }
-      end
+      DB.transaction { generate_week(week) }
+    end
+
+    # One question for the whole week about which days are written already, rather than one
+    # per day (#595). `generate_day` still asks for itself before writing, which is the check
+    # that matters; this only saves a week that is already written from asking five times to
+    # be told so.
+    def generate_week(week)
+      days = week.program_days.sort_by(&:weekday)
+      written = Workout.where(account_id: @program.account_id, program_day_id: days.map(&:id))
+                       .to_hash(:program_day_id)
+      days.map { |day| written[day.id] || generate_day(week, day, week.date_for(day.weekday)) }
     end
 
     # What a refresh did, in enough detail to say so. The outcome is what it always was, and
@@ -230,7 +247,7 @@ class Tectonic < Roda
     end
 
     def ramp(lift, top)
-      Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: @equipment.bar_weight,
+      Warmup.ramp(top, is_barbell: lift.is_barbell, bar_weight: equipment.bar_weight,
                        loading: loading(lift), rungs: lift.warmup_sets)
     end
 
@@ -258,7 +275,7 @@ class Tectonic < Roda
     # not a different prescription.
     def top_weight(week, lift)
       planned = prescribed_weight(week, lift)
-      week.is_deload ? Progression.deloaded(planned, increment: @equipment.increment) : planned
+      week.is_deload ? Progression.deloaded(planned, increment: equipment.increment) : planned
     end
 
     # fixed keeps the number it was written with. percent takes one of the account's training
@@ -329,8 +346,8 @@ class Tectonic < Roda
       max = TrainingMax.for(account_id: @program.account_id, exercise:, on: @program.start_date)
       raise ArgumentError, no_max_message(exercise, lift) unless max
 
-      @equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell,
-                                                                    dumbbells: dumbbells_for(lift))
+      equipment.loadable(max.pounds * lift.percent_of_max / 100.0, is_barbell: lift.is_barbell,
+                                                                   dumbbells: dumbbells_for(lift))
     end
 
     # Whose max this lift is a percentage of: another movement where the prescription names
@@ -462,7 +479,7 @@ class Tectonic < Roda
     # than by luck -- and the ramp and the working sets are handed the same one, so the two
     # halves of a lift cannot round differently.
     def loading(lift)
-      @equipment.loading(is_barbell: lift.is_barbell, dumbbells: dumbbells_for(lift))
+      equipment.loading(is_barbell: lift.is_barbell, dumbbells: dumbbells_for(lift))
     end
 
     # How many dumbbells this lift is done with, off the movement rather than the

@@ -47,13 +47,22 @@ class Tectonic < Roda
     # Safe to call on every page load, which is what lets it be lazy at all: after the first
     # visit of a week it is a handful of indexed lookups that find everything already there.
     #
+    # A handful was the claim and it had stopped being true: #595 measured 25 queries on a
+    # visit that wrote nothing, on the front page and on every login. Each running block's
+    # weeks and days are loaded once here now rather than asked after a row at a time; a block
+    # that has not started is not read at all; and each week asks once which of its days
+    # already have a session. What it reads is still the sessions themselves -- nothing here
+    # remembers having generated anything, because the workouts table is the only record of
+    # that and a second one would be something to disagree with.
+    #
     # Nothing here may raise into a request. Somebody arriving has come to look at their
     # training, and a block the generator refuses -- an unloadable percentage, a movement that
     # was deleted -- must not turn the front page into a 500 on the way past. The failure is
     # reported and the page renders whatever does exist, which is the same trade config.ru
     # already makes for error reporting itself.
     def ensure_ahead(account_id, today = Date.today)
-      Program.where(account_id:).each { |program| fill(program, today) }
+      Program.where(account_id:).where { start_date <= today }.eager(program_weeks: :program_days)
+             .all.each { |program| fill(program, today) }
       nil
     rescue StandardError => e
       ErrorReporting.note('program_schedule', account_id:, today: today.to_s)
@@ -68,8 +77,9 @@ class Tectonic < Roda
       current = program.week_on(today)
       return unless current
 
+      generator = ProgramGenerator.new(program)
       (current.number..(current.number + WEEKS_AHEAD)).each do |number|
-        ProgramGenerator.new(program).generate(number) if program.week(number)
+        generator.generate(number) if program.week(number)
       end
     end
 

@@ -2,6 +2,7 @@
 
 require_relative 'spec_helper'
 require_relative 'route_ownership_spec' # reuses its account/login helpers; idempotent require
+require_relative 'query_count_spec' # its query tally; idempotent require
 require_relative '../lib/tectonic/program_schedule'
 require 'securerandom'
 
@@ -26,10 +27,22 @@ module SessionsExist
 
   def training_week(program, exercise, number, weekday)
     week = Tectonic::ProgramWeek.create(program_id: program.id, number:)
+    training_day(week, exercise.id, weekday)
+  end
+
+  def training_day(week, exercise_id, weekday)
     day = Tectonic::ProgramDay.create(program_week_id: week.id, weekday:)
-    Tectonic::ProgramLift.create(program_day_id: day.id, exercise_id: exercise.id, position: 0,
+    Tectonic::ProgramLift.create(program_day_id: day.id, exercise_id:, position: 0,
                                  sets: 3, reps: 5, top_weight: 155, progression: 'linear',
                                  is_barbell: true, is_main: true)
+  end
+
+  # Every week of a block made `days` training days long rather than one.
+  def widen(program, days)
+    exercise_id = program.program_weeks.first.program_days.first.program_lifts.first.exercise_id
+    program.program_weeks.each do |week|
+      (1...days).each { |offset| training_day(week, exercise_id, (program.start_date.wday + offset) % 7) }
+    end
   end
 
   def sessions(account_id) = Tectonic::Workout.where(account_id:).count
@@ -168,6 +181,41 @@ describe 'the pages that keep sessions written' do
     Tectonic.new({}).login_destination(account_id)
 
     assert_operator sessions(account_id), :>, 0
+  end
+end
+
+# #595. "A handful of indexed lookups" was the claim, and a visit that wrote nothing was
+# measured at 25 queries -- on the front page and on every login. It grew with the days in
+# the running block, since each day asked separately whether it had a session, and with every
+# block the account had ever run, since each finished one was still read to be told it had
+# finished. A lifter a few years in pays for all of that on every visit.
+#
+# So a steady-state visit costs the same whatever the running block's week looks like and
+# however many blocks are behind it, and it is a handful.
+describe 'a visit when every session is already written' do
+  include SessionsExist
+  include QueryCount
+
+  def account_with(days:, finished:)
+    account_id = DB[:accounts].insert(email: "#{SecureRandom.hex}@e.com", password_hash: 'x')
+    finished.times { |ago| block(account_id, start_date: @monday - (7 * 4 * (ago + 1)) - 7) }
+    widen(block(account_id, start_date: @monday), days)
+    Tectonic::ProgramSchedule.ensure_ahead(account_id, @monday)
+    account_id
+  end
+
+  def visit_cost(account_id)
+    queries_while { Tectonic::ProgramSchedule.ensure_ahead(account_id, @monday) }
+  end
+
+  before { @monday = Date.today - ((Date.today.wday - 1) % 7) }
+
+  it 'does not grow with the days in a week or the blocks behind it' do
+    small = visit_cost(account_with(days: 1, finished: 0))
+    large = visit_cost(account_with(days: 5, finished: 4))
+
+    assert_equal small, large
+    assert_operator large, :<=, 6
   end
 end
 
