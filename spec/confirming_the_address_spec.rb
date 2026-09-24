@@ -174,11 +174,13 @@ describe 'what a sign-up is told on the way out' do
   # notice is indistinguishable from the button being broken -- while the one instruction
   # that matters is "go and read your email". This app rendered no notice flash anywhere
   # until views/_flash_notice.erb, so the sentence Rodauth has always set was set into a void.
+  # Since #633 the page itself says it rather than a flash above a sign-in form.
   it 'says what to do next, on the page it lands on' do
     sign_up
     follow_redirect!
 
-    assert_includes notice_text, 'Check your email'
+    assert_equal '/check-your-email', last_request.path
+    assert_includes last_response.body, 'Check your email'
   end
 
   # The same silence the other way round, and the one that was already there: #344's reset

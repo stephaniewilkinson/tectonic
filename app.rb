@@ -301,10 +301,12 @@ class Tectonic < Roda
     # page behind `require_login`. After this change that is a redirect straight into the
     # login screen, with the sign-up's notice flash consumed on the way past.
     #
-    # `/login` rather than `/welcome`, because the sentence the flash is about to say is
-    # "check your email", and the page to be standing on once the email has been read is the
-    # one you come back to.
-    create_account_redirect { '/login' }
+    # Not /login, which it was until #633. The argument was that /login is the page you come
+    # back to once the email has been read -- but the emailed link signs you in by itself, so
+    # nobody ever came back to it. It was only ever seen while waiting, and what it showed a
+    # person with no password was a form asking for one. /check-your-email is the page for
+    # waiting: it names the address, says where the password is chosen, and can send again.
+    create_account_redirect { '/check-your-email' }
     # The zone question, moved here from `create_account_redirect` one flow later. #349, #575.
     #
     # It is asked at the first moment there is a session to ask it in, and that moment used
@@ -343,15 +345,22 @@ class Tectonic < Roda
     # connect. See migrate/056. The session value is left where it is for the redirect above.
     after_create_account do
       scope.remember_the_connection(account_id, session[login_redirect_session_key])
+      # The address this browser just signed up with, for /check-your-email to name (#633). In
+      # this browser's own session, so the page tells nobody anything they did not type.
+      session['signed_up_as'] = account[login_column]
     end
-    verify_account_email_sent_redirect { '/login' }
+    # A resend from the browser that signed up goes back to the waiting page it came from;
+    # anybody else's resend -- from a failed sign-in, say -- goes to /login as before.
+    verify_account_email_sent_redirect { session['signed_up_as'] ? '/check-your-email' : '/login' }
     # Two flashes where Rodauth uses one. `verify_account_email_sent_notice_flash` is the
     # answer to *both* the sign-up form and the resend form (`verify_account.rb:185-187`),
     # and those two need different sentences, because only one of them knows an email was
     # sent. The resend form is answered identically for an address with no account -- see the
     # hook below -- so its wording has to stay true when nothing was sent at all, the same
     # way views/reset-password-request.erb's does. Sign-up does know, and gets to say so.
-    create_account_notice_flash 'Check your email. The link in it is where you choose a password'
+    # Nothing, since #633: /check-your-email says it at length, and a flash above it repeating
+    # the headline would be the same sentence twice.
+    create_account_notice_flash nil
     verify_account_email_sent_notice_flash \
       'If that address has an account waiting to be confirmed, a new link is on its way to it'
     verify_account_notice_flash 'Your address is confirmed. Welcome to tectonic plates'
@@ -610,6 +619,13 @@ class Tectonic < Roda
     # which is the only question a new account has. It stays reachable at its own address
     # rather than only through the login redirect, so it can be linked to and so someone
     # who has trained for a year can still come back and read what a block is.
+    # Waiting for the confirmation email. #633. Only for the browser that signed up -- it names
+    # the address from that browser's own session -- and anybody else is sent to sign in.
+    r.get('check-your-email') do
+      @address = session['signed_up_as']
+      r.redirect '/login' unless @address
+      view('check-your-email')
+    end
     r.get('start') do
       rodauth.require_login
       @connecting = connecting_to(rodauth.account_from_session[:id])

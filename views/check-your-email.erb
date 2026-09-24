@@ -1,0 +1,41 @@
+<%# The page for waiting on the confirmation email. #633.
+
+    Sign-up used to land on /login, where the biggest thing on the page was a form asking for a
+    password nobody had chosen yet -- since #575 the password is chosen from the emailed link --
+    and the only way to have the link sent again was to fail that sign-in first. This page
+    says what happened, to which address, and what to do if nothing arrives.
+
+    The address is shown because a typo is otherwise invisible until no mail comes. It comes
+    from this browser's own session, set at sign-up, so it tells nobody anything they did not
+    just type; and the resend below is answered the same way whether or not the address has an
+    account, so this page opens no new enumeration door (app.rb's resend hook has the argument).
+
+    "Start over" goes to the sign-up form rather than doing anything to the account behind the
+    wrong address. That account can never be confirmed by anybody but whoever reads that inbox,
+    which is the whole of what #575 promises about it. %>
+<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+  <div class="sm:mx-auto sm:w-full sm:max-w-sm">
+    <h1 class="text-center text-3xl font-semibold tracking-tight text-gray-900">Check your email</h1>
+    <p class="mt-4 text-center text-sm text-gray-600">
+      We sent a link to <span class="font-semibold text-gray-900"><%= @address %></span>.
+      Open it to confirm the address; that is where you choose your password.
+    </p>
+    <p class="mt-2 text-center text-sm text-gray-600">
+      Nothing there after a few minutes? Look in junk or spam, since a first message from a new
+      sender often lands there.
+    </p>
+  </div>
+
+  <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+    <form action="<%= rodauth.verify_account_resend_path %>" method="post" role="form" id="resend-form">
+      <%== rodauth.csrf_tag(rodauth.verify_account_resend_path) %>
+      <input type="hidden" name="login" value="<%= @address %>">
+      <button type="submit" class="<%= button_style %> flex min-h-11 w-full items-center justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Send it again</button>
+    </form>
+
+    <p class="mt-10 text-center text-sm text-gray-500">
+      Wrong address?
+      <a href="/create-account" class="font-semibold leading-6 text-lime-700 hover:text-lime-800">Start over</a>
+    </p>
+  </div>
+</div>

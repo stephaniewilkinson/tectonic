@@ -43,6 +43,7 @@ Style/FrozenStringLiteralComment:
 # route it serves.
 Naming/FileName:
   Exclude:
+    - "views/check-your-email.erb"
     - "views/create-account.erb"
     - "views/reset-password.erb"
     - "views/reset-password-request.erb"
