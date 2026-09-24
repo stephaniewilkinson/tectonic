@@ -71,11 +71,18 @@ class Tectonic < Roda
     # per day (#595). `generate_day` still asks for itself before writing, which is the check
     # that matters; this only saves a week that is already written from asking five times to
     # be told so.
+    #
+    # A day with nothing written on it is a rest day and gets no session (#584). It used to get
+    # an empty one every week, which the calendar then drew as missed -- a session nobody could
+    # have done, counted against the lifter. A session that already exists for such a day is
+    # still handed back rather than ignored: somebody may have added lifts to it by hand.
     def generate_week(week)
       days = week.program_days.sort_by(&:weekday)
       written = Workout.where(account_id: @program.account_id, program_day_id: days.map(&:id))
                        .to_hash(:program_day_id)
-      days.map { |day| written[day.id] || generate_day(week, day, week.date_for(day.weekday)) }
+      days.filter_map do |day|
+        written[day.id] || (generate_day(week, day, week.date_for(day.weekday)) unless day.program_lifts.empty?)
+      end
     end
 
     # What a refresh did, in enough detail to say so. The outcome is what it always was, and
