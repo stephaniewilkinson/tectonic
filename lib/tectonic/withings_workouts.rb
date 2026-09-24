@@ -436,21 +436,14 @@ class Tectonic < Roda
     # name. Nil rather than zero where one is absent: a watch that recorded no heart rate and
     # a watch that recorded a resting one are different, and a zero would read as the second.
     #
-    # `effective_seconds` is no longer among them, and the column it was written to is still
-    # in the schema. #586: `effduration` is not a Withings field -- it appears nowhere in the
-    # OpenAPI document behind their reference, and 042 added the column for it on the strength
-    # of a name in `WORKOUT_FIELDS` that nothing had ever checked. `Withings::WORKOUT_FIELDS`
-    # carries the accounting. Taking the key out of here rather than leaving it reading a key
-    # that can never arrive is the point: a lookup that is always nil is indistinguishable
-    # from a measurement this watch happens not to take, and that ambiguity is the one thing
-    # this integration has spent the most effort removing.
-    #
-    # The column goes in a migration of its own -- #607 -- rather than in this change, because
-    # two other branches hold the next migration numbers and a third would land after both or
-    # not at all. Until then it is dead at both ends, which is exactly the shape
-    # spec/dead_columns_spec.rb was written about. `insert_conflict` updates only the keys this
-    # returns, so dropping it here leaves whatever any existing row holds alone rather than
-    # nulling it; on every row this app has, that is already null.
+    # `effective_seconds` is no longer among them. #586: `effduration` is not a Withings field --
+    # it appears nowhere in the OpenAPI document behind their reference, and 042 added a column
+    # for it on the strength of a name in `WORKOUT_FIELDS` that nothing had ever checked.
+    # `Withings::WORKOUT_FIELDS` carries the accounting, and 053 dropped the column (#607).
+    # Taking the key out of here rather than leaving it reading a key that can never arrive
+    # was the point: a lookup that is always nil is indistinguishable from a measurement this
+    # watch happens not to take, and that ambiguity is the one thing this integration has
+    # spent the most effort removing.
     def fields(data)
       data = {} unless data.is_a?(Hash)
       { calories: data['calories'], hr_average: data['hr_average']&.to_i,
