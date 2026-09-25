@@ -15,7 +15,7 @@ class Tectonic < Roda
         tool_name 'create_set'
         title 'Log a set'
         description 'Log a set of an exercise (by name) into a workout (by date, ' \
-                    "'today' by default). Weights are integer pounds, rpe is how hard " \
+                    "'today' by default). Weights are pounds, fractions allowed; rpe is how hard " \
                     'that set was on the 1-10 scale. Leave weight out for work carrying ' \
                     'no external load -- a plank, a band pull-apart, a bodyweight hip ' \
                     'thrust -- which is recorded as a rep count with no weight at all. ' \
