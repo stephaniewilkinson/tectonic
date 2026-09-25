@@ -123,3 +123,18 @@ describe 'the record of a session with nothing lifted in it' do
   end
 end
 
+# Workout 43 once read "-4275s active over 25m elapsed". A session marked finished before its
+# last sets were ticked has a span that ends at the finish, and the long gap in front of those
+# later sets was still being subtracted from it. Active time sits inside the span it is part of.
+describe 'active time on a session finished before its last sets' do
+  it 'is never negative, and never longer than the session' do
+    start = Time.new(2026, 9, 16, 13, 27, 0)
+    stamps = [start, start + 600, start + 1500, start + 7300, start + 7900] # a 97-minute gap, then two more
+    timing = Tectonic::Timing.session({ finished_at: start + 1500 }, stamps.map { |at| { completed_at: at } })
+
+    assert_equal 1500, timing[:overall]
+    assert_operator timing[:active], :>=, 0
+    assert_operator timing[:active], :<=, timing[:overall]
+  end
+end
+

@@ -117,10 +117,18 @@ class Tectonic < Roda
     # Only the gaps *between stamps* come out. A long tail from the last set to `finished_at`
     # stays in, because finishing is a thing the lifter said rather than something inferred
     # from silence, and the ten minutes spent putting plates away is time the session cost.
+    #
+    # And only the gaps inside the span. Workout 43 once read "-4275s active over 25m elapsed":
+    # a session marked finished before its last sets were ticked has a span that ends at the
+    # finish, while the long gap in front of those later sets was still subtracted from it.
+    # A gap outside the window being measured is not time taken out of that window, and active
+    # time can be neither negative nor longer than the span it is a part of -- so the stamps
+    # are cut at the span's end first, and the answer is held inside it after.
     def active(span, stamps)
       return nil if span.nil?
 
-      span - long_gaps(stamps).sum
+      inside = stamps.select { |stamp| stamp <= stamps.first + span }
+      (span - long_gaps(inside).sum).clamp(0, span)
     end
 
     # The gaps that were too long to be training, which two callers now want in two ways:
