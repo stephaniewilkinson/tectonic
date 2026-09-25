@@ -43,7 +43,10 @@ class Tectonic < Roda
                     'at the lifter\'s own tempo, and belongs only on a lift counted in reps. ' \
                     'Send only what changes. To swap ' \
                     'how the load is written, set one of top_weight/percent_of_max and null ' \
-                    'the other. Returns what actually moved.'
+                    'the other. every_week true makes the same change to this lift on the same ' \
+                    'day of every week of the block, in one call -- for a note, a swap or a ' \
+                    'removal of the load, not for numbers meant to progress week to week. ' \
+                    'Returns what actually moved.'
         scope :write
         input_schema(
           type: 'object',
@@ -57,19 +60,42 @@ class Tectonic < Roda
             warmup_sets: NUMBER_OR_NULL,
             percent_of: { type: %w[string null] }, is_weighted: { type: 'boolean' },
             is_per_side: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
-            duration_seconds: { type: 'integer' }, note: { type: 'string' }
+            duration_seconds: { type: 'integer' }, note: { type: 'string' },
+            every_week: { type: 'boolean' }
           },
           required: ['program_lift_id'], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)
           lift = ProgramFinder.lift(context, arguments[:program_lift_id])
-          changed = DB.transaction { revise(context, lift, arguments) }
+          return across_weeks(context, ProgramFinder.counterparts(lift), arguments) if arguments[:every_week]
+
+          one(lift, DB.transaction { revise(context, lift, arguments) })
+        end
+
+        def self.one(lift, changed)
           day = lift.program_day
           refreshed = SessionRefresh.apply(day)
           ok("#{lift.exercise.name}: #{Changes.describe(changed)}.#{SessionRefresh.sentence(refreshed, day)}",
              structured: ProgramView.lift(lift.refresh).merge(changed:, session: refreshed.to_s))
         end
+
+        # The same change to this lift in every week of its block. The audit log (2026-09) is
+        # full of the same note or swap sent once per week; this is one call and one
+        # transaction, so a check that refuses week 3 leaves weeks 1 and 2 as they were rather
+        # than half changed. Each week's day is refreshed after, and each week's lift returned.
+        def self.across_weeks(context, lifts, arguments)
+          DB.transaction { lifts.each { |lift| revise(context, lift, arguments) } }
+          views = lifts.map { |lift| ProgramView.lift(lift.refresh) }
+          ok("#{views.first[:exercise]} on #{Date::DAYNAMES[lifts.first.program_day.weekday]}, changed in " \
+             "#{weeks_phrase(lifts.length)}.#{refreshed(lifts)}", structured: { lifts: views })
+        end
+
+        def self.refreshed(lifts)
+          lifts.map(&:program_day).map { |day| SessionRefresh.sentence(SessionRefresh.apply(day), day) }.join
+        end
+
+        def self.weeks_phrase(count) = "#{count} #{count == 1 ? 'week' : 'weeks'}"
 
         def self.revise(context, lift, arguments)
           attributes = fields(context, lift, arguments)
