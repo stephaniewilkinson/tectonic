@@ -35,7 +35,7 @@
           on a working set, which is the layout difference the note at the top keeps. A span
           either way, `block` where it was a div, so the element does not depend on the kind. %>
       <%- if set[:is_barbell] %>
-        <span class="<%= set[:is_warmup] ? 'ml-2' : 'block' %> text-xs text-gray-500">
+        <span class="<%= set[:is_warmup] ? 'ml-2 inline-block' : 'block' %> text-xs text-gray-500">
           <span class="uppercase tracking-wide">Plate math</span>
           <%= plate_label(set) %>
         </span>
@@ -45,7 +45,7 @@
           up -- for the rack the plate math cannot speak for. Silent unless the movement has
           said how many it is done with; see dumbbell_label. %>
       <%- if (dumbbells = dumbbell_label(set)) %>
-        <span class="<%= set[:is_warmup] ? 'ml-2' : 'block' %> text-xs text-gray-500">
+        <span class="<%= set[:is_warmup] ? 'ml-2 inline-block' : 'block' %> text-xs text-gray-500">
           <span class="uppercase tracking-wide">Dumbbells</span>
           <%= dumbbells %>
         </span>
@@ -284,11 +284,23 @@
         <input value="<%= weight_label(set[:weight]) %>" id="weight-<%= set[:id] %>" name="weight" type="number" min="0" step="any" inputmode="numeric" autocomplete="off"
                class="<%= field_style %> mt-1 block w-24 py-2 text-center text-lg text-gray-900">
       </label>
-      <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
-        Reps
-        <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off"
-               class="<%= field_style %> mt-1 block w-20 py-2 text-center text-lg text-gray-900">
-      </label>
+      <%# Seconds for a set held for time, reps for one counted: a plank offered a Reps box, and a
+          lifter typing how long they held it into the only box there was sent a rep count onto
+          a set measured in seconds, which the database refuses -- a 500 on the gym floor. The
+          set's own measure decides, as it does on the set edit form (#213). %>
+      <%- if set.timed? %>
+        <label class="text-xs text-gray-500" for="seconds-<%= set[:id] %>">
+          Seconds
+          <input value="<%= set[:duration_seconds] %>" id="seconds-<%= set[:id] %>" name="duration_seconds" type="number" min="0" step="1" inputmode="numeric" autocomplete="off"
+                 class="<%= field_style %> mt-1 block w-20 py-2 text-center text-lg text-gray-900">
+        </label>
+      <%- else %>
+        <label class="text-xs text-gray-500" for="reps-<%= set[:id] %>">
+          Reps
+          <input value="<%= set[:reps] %>" id="reps-<%= set[:id] %>" name="reps" type="number" min="0" step="1" inputmode="numeric" autocomplete="off"
+                 class="<%= field_style %> mt-1 block w-20 py-2 text-center text-lg text-gray-900">
+        </label>
+      <%- end %>
       <%# Saving an edit is the same kind of thing as tapping Done -- an action,
           not a state -- so it wears the same fill. Its hover used to jump to
           lime-500, which turned a blue button green under the thumb and said the
