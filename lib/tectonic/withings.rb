@@ -245,6 +245,19 @@ class Tectonic < Roda
                             enddateymd: to.strftime('%Y-%m-%d'), offset:)
     end
 
+    # The watch's heart rate, reading by reading, between two instants. #656.
+    #
+    # `getintradayactivity` on the measure v2 path, which takes unix seconds rather than the
+    # civil dates `getworkouts` wants, and answers one window of at most a day with no paging:
+    # `series` is keyed by the reading's own unix time. #579 probed it twice before a line of
+    # this was written -- every ten minutes outside a workout the watch knows about, every
+    # fifteen seconds or faster inside one -- which is why a caller asks for a session's own
+    # window and says how much of it came back, rather than assuming.
+    def intraday_heart_rate(token, from:, to:)
+      post(MEASURE_V2_PATH, token:, action: 'getintradayactivity', data_fields: 'heart_rate',
+                            startdate: from.to_i, enddate: to.to_i)
+    end
+
     # One page of a range of nights, as summaries. #579.
     #
     # Civil dates like `getworkouts` and unlike `getmeas`, and the same mutually-exclusive

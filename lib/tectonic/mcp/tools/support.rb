@@ -13,6 +13,8 @@ require_relative '../../timing'
 require_relative '../../session_diagnosis'
 require_relative '../../setup'
 require_relative '../../turnarounds'
+require_relative '../../heart_rates'
+require_relative '../../withings_workouts'
 
 class Tectonic < Roda
   module MCP
@@ -610,11 +612,32 @@ class Tectonic < Roda
         def view_workout_detail(workout, on: Date.today)
           sets = workout.sets_dataset.order(:id).eager(:exercise).all
           timing = Timing.session(workout, sets.map(&:values))
+          heart = heart_rate(workout, sets, timing)
           view_workout(workout, sets).merge(
             status: workout.status(on).to_s, program_day_id: workout.program_day_id,
-            timing:, diagnosis: diagnosis(workout, sets, timing),
-            sets: sets.map { |set| view_set(set) }
+            timing:, diagnosis: diagnosis(workout, sets, timing), heart_rate: heart&.except(:per_set),
+            sets: detail_sets(sets, heart)
           )
+        end
+
+        def detail_sets(sets, heart)
+          sets.map { |set| view_set(set).merge(heart_rate: heart && heart[:per_set][set.id]) }
+        end
+
+        # The watch's heart rate over the session, where any is stored (#656): per set, the peak
+        # around it and the lowest point before the next, each with the number of readings it
+        # rests on; for the session, how many readings there are and the stretch they cover
+        # densely. Figures only -- whether a rest was long enough is the reader's call, and the
+        # reading counts are there so a figure off one reading is not mistaken for one off
+        # twelve. Nil where nothing is stored, which is most sessions.
+        def heart_rate(workout, sets, timing)
+          window = WithingsWorkouts.interval(timing)
+          readings = window ? HeartRates.within(workout.account_id, window) : []
+          return nil if readings.empty?
+
+          dense = HeartRates.dense_stretch(readings)
+          { readings: readings.length, dense_from: dense&.first&.iso8601, dense_to: dense&.last&.iso8601,
+            per_set: HeartRates.per_set(sets, readings) }
         end
 
         # Why the session ran the way it did. #409, and the same three facts the record page

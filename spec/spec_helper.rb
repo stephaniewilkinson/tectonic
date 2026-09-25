@@ -68,7 +68,7 @@ module CleanDatabase
     sets program_lifts withings_workouts workouts program_days program_weeks programs
     mcp_audit_log oauth_grants account_plates account_dumbbell_plates
     account_training_maxes account_training_max_statements
-    account_goals account_exercise_rests health_metrics account_withings
+    account_goals account_exercise_rests health_metrics heart_rates account_withings
     account_remember_keys account_password_reset_keys account_verification_keys exercises
     oauth_applications accounts
   ].freeze
