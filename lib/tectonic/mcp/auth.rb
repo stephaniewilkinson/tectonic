@@ -50,7 +50,14 @@ class Tectonic < Roda
         return signpost if claims.nil? && browsing?(env)
         return unauthorized('Missing or invalid bearer token.') unless claims
 
-        env[CONTEXT_KEY] = RequestContext.from_claims(claims)
+        context = RequestContext.from_claims(claims)
+        # A valid token that stands for no account is refused, not served. Every tool scopes
+        # itself by the context's account, and an account of nil is not "nobody's data" -- it
+        # is the library, the rows every lifter shares. Checked here, once, so no tool can be
+        # written that forgets to.
+        return unauthorized('This token does not belong to an account.') unless context.account_id
+
+        env[CONTEXT_KEY] = context
         @app.call(env)
       end
 

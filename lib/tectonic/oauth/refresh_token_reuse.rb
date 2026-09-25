@@ -100,7 +100,7 @@ class Tectonic < Roda
 
       # Same contract as the library's: mint the token, leave its hash in `params`,
       # return the token. Falls back to the untagged original when there is no grant to
-      # name, which is the client-credentials path, where no refresh token is issued.
+      # name -- which no grant this app enables reaches, but costs nothing to keep.
       def _generate_refresh_token(params)
         return super unless @tagged_grant_id && oauth_grants_refresh_token_hash_column
 

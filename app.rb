@@ -173,10 +173,16 @@ class Tectonic < Roda
     # User login plus the OAuth 2.1 authorization server that issues the tokens every
     # MCP client authenticates with. All auth -- web sessions and machine access --
     # runs through this one Rodauth config rather than any hand-rolled path.
+    #
+    # **No client-credentials grant.** It was enabled and nothing used it -- no client in
+    # production ever asked for one -- and with registration open to anybody it was a way to
+    # mint a valid token with no account behind it. The connector then acted on "no account",
+    # and library movements are the rows that have no account: create_exercise from a stranger
+    # wrote a movement into the library every lifter shares. A token here always stands for a
+    # person who approved it on the consent screen.
     enable :login, :logout, :create_account, :remember, :json, :reset_password,
            :verify_account,
-           :oauth_authorization_code_grant, :oauth_pkce,
-           :oauth_client_credentials_grant, :oauth_jwt,
+           :oauth_authorization_code_grant, :oauth_pkce, :oauth_jwt,
            :oauth_resource_indicators, :oauth_dynamic_client_registration,
            :oauth_token_introspection, :oauth_token_revocation
     # Each of the two things a person types is typed once. Rodauth defaults both of these to

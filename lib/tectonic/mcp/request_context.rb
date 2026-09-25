@@ -26,8 +26,7 @@ class Tectonic < Roda
       # Builds a context from a verified access token's JWT claims: `sub` is the
       # account (the resource owner for the authorization-code grant), `client_id`
       # identifies the OAuth application (the LLM, for provenance and audit), and
-      # `scope` is the space-separated grant. A client-credentials token carries the
-      # client_id in `sub`, so the account falls back to the application's owner.
+      # `scope` is the space-separated grant.
       def self.from_claims(claims)
         application = OAuthApplication.where(client_id: claims['client_id']).first
         account_id = account_id_from(claims, application)
@@ -37,11 +36,16 @@ class Tectonic < Roda
             scopes: claims['scope'].to_s.split, application_id: application&.id)
       end
 
-      # The account a token acts on: the numeric `sub` of a user grant, else the owner
-      # of the client (a client-credentials grant carries no resource owner).
-      def self.account_id_from(claims, application)
+      # The account a token acts on: the numeric `sub` of a user grant, and nothing else.
+      #
+      # It used to fall back to the client's owner for a token with no resource owner, which
+      # is what a client-credentials grant issues. Registered clients have no owner, so that
+      # fallback answered nil, and a nil account reached every tool -- where it matched the
+      # library, the one set of rows with no account. There is no such grant any more, and a
+      # token that names no account is refused at the door (Auth) rather than resolved here.
+      def self.account_id_from(claims, _application)
         sub = claims['sub'].to_s
-        sub.match?(/\A\d+\z/) ? sub.to_i : application&.account_id
+        sub.match?(/\A\d+\z/) ? sub.to_i : nil
       end
 
       def initialize(account_id:, email:, scopes:, application_id:, time_zone: nil)
