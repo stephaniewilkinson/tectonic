@@ -21,8 +21,13 @@ require 'date'
 # them disagreeing in a way anybody would recognise. They are fixed, so the run cannot land on
 # a month boundary or a day whose name depends on when the suite is run.
 module SessionDates
-  PLANNED = Date.new(2026, 9, 25)   # a Friday: what the programme wrote
-  PERFORMED = Date.new(2026, 9, 23) # a Wednesday: when it was actually lifted
+  # 2020 rather than 2026, the year the report came from: the weekdays are the same, and the
+  # whole session is safely in the past. In 2026 the planned day was still in the future when
+  # these were written, which kept the session out of the exercise page's chart altogether --
+  # and hid that the chart dated it by the planned day, until the 25th arrived and the spec
+  # failed. Exercise#lifted_sets has the fix; a past date is what lets this spec see it.
+  PLANNED = Date.new(2020, 9, 25)   # a Friday: what the programme wrote
+  PERFORMED = Date.new(2020, 9, 23) # a Wednesday: when it was actually lifted
 
   # A second session whose two dates disagree the other way about: written for the Monday
   # before the one above and trained the Thursday after it. One session cannot show that a
@@ -30,8 +35,8 @@ module SessionDates
   # that merely differ cannot either, because plan order and training order would agree and
   # the list would look right whichever it used. These two are deliberately in opposite orders
   # under the two readings, so the review list can only satisfy one of them.
-  OTHER_PLANNED = Date.new(2026, 9, 21)   # a Monday: written first, and trained last
-  OTHER_PERFORMED = Date.new(2026, 9, 24) # a Thursday
+  OTHER_PLANNED = Date.new(2020, 9, 21)   # a Monday: written first, and trained last
+  OTHER_PERFORMED = Date.new(2020, 9, 24) # a Thursday
 
   # A movement of this account's own, so nothing here depends on the shared library.
   def a_movement(account_id)
@@ -158,7 +163,7 @@ describe 'a session trained two days before the day it was written for' do
   end
 
   it 'is titled on its record page with the day it was trained' do
-    assert_equal 'Wednesday September 23, 2026', heading_on("/workouts/#{@workout_id}")
+    assert_equal 'Wednesday September 23, 2020', heading_on("/workouts/#{@workout_id}")
   end
 
   it 'is headed on the gym floor screen with the day it was trained' do
@@ -185,19 +190,19 @@ describe 'the sets of a session trained before the day it was written for' do
   end
 
   it 'is subtitled on its set list with the day it was trained' do
-    assert_includes dates_on("/workouts/#{@workout_id}/sets"), 'Wednesday September 23, 2026'
+    assert_includes dates_on("/workouts/#{@workout_id}/sets"), 'Wednesday September 23, 2020'
   end
 
   it 'is not subtitled on its set list with the day it was written for' do
-    refute_includes dates_on("/workouts/#{@workout_id}/sets"), 'Friday September 25, 2026'
+    refute_includes dates_on("/workouts/#{@workout_id}/sets"), 'Friday September 25, 2020'
   end
 
   it 'is named on a single set page with the day it was trained' do
-    assert_includes dates_on("/workouts/#{@workout_id}/sets/#{@set_id}"), 'Wednesday September 23, 2026'
+    assert_includes dates_on("/workouts/#{@workout_id}/sets/#{@set_id}"), 'Wednesday September 23, 2020'
   end
 
   it 'is not named on a single set page with the day it was written for' do
-    refute_includes dates_on("/workouts/#{@workout_id}/sets/#{@set_id}"), 'Friday September 25, 2026'
+    refute_includes dates_on("/workouts/#{@workout_id}/sets/#{@set_id}"), 'Friday September 25, 2020'
   end
 end
 
@@ -215,20 +220,20 @@ describe 'a session listed among others it was trained before' do
   end
 
   it 'is listed on the workouts list with the day it was trained' do
-    assert_includes dates_on('/workouts'), 'Sep 23, 2026'
+    assert_includes dates_on('/workouts'), 'Sep 23, 2020'
   end
 
   it 'is not listed on the workouts list with the day it was written for' do
-    refute_includes dates_on('/workouts'), 'Sep 25, 2026'
+    refute_includes dates_on('/workouts'), 'Sep 25, 2020'
   end
 
   # The one #572 calls the worst of them: a lifter's own record of what they lifted and when.
   it 'is dated in exercise history with the day it was trained' do
-    assert_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 23, 2026'
+    assert_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 23, 2020'
   end
 
   it 'is not dated in exercise history with the day it was written for' do
-    refute_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 25, 2026'
+    refute_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 25, 2020'
   end
 end
 
@@ -249,11 +254,11 @@ describe 'a session the watch has a question waiting about' do
   end
 
   it 'is listed on the review list with the day it was trained' do
-    assert_includes dates_on('/workouts/withings'), 'Sep 23, 2026'
+    assert_includes dates_on('/workouts/withings'), 'Sep 23, 2020'
   end
 
   it 'is not listed on the review list with the day it was written for' do
-    refute_includes dates_on('/workouts/withings'), 'Sep 25, 2026'
+    refute_includes dates_on('/workouts/withings'), 'Sep 25, 2020'
   end
 end
 
@@ -279,7 +284,7 @@ describe 'the order the review list asks its questions in' do
   # Asserted as the whole sequence rather than as "the 24th is present", because what is
   # wrong when this regresses is the relationship between the rows and not any one of them.
   it 'asks first about the session trained most recently' do
-    assert_equal ['Sep 24, 2026', 'Sep 23, 2026'], dates_on('/workouts/withings')
+    assert_equal ['Sep 24, 2020', 'Sep 23, 2020'], dates_on('/workouts/withings')
   end
 end
 
@@ -321,7 +326,7 @@ describe 'a session nobody has trained yet' do
   end
 
   it 'is still titled on its record page with the day it is written for' do
-    assert_equal 'Friday September 25, 2026', heading_on("/workouts/#{@workout_id}")
+    assert_equal 'Friday September 25, 2020', heading_on("/workouts/#{@workout_id}")
   end
 
   it 'is still headed on the gym floor screen with the day it is written for' do
@@ -329,19 +334,19 @@ describe 'a session nobody has trained yet' do
   end
 
   it 'is still subtitled on its set list with the day it is written for' do
-    assert_includes dates_on("/workouts/#{@workout_id}/sets"), 'Friday September 25, 2026'
+    assert_includes dates_on("/workouts/#{@workout_id}/sets"), 'Friday September 25, 2020'
   end
 
   it 'is still named on a single set page with the day it is written for' do
-    assert_includes dates_on("/workouts/#{@workout_id}/sets/#{@set_id}"), 'Friday September 25, 2026'
+    assert_includes dates_on("/workouts/#{@workout_id}/sets/#{@set_id}"), 'Friday September 25, 2020'
   end
 
   it 'is still listed on the workouts list with the day it is written for' do
-    assert_includes dates_on('/workouts'), 'Sep 25, 2026'
+    assert_includes dates_on('/workouts'), 'Sep 25, 2020'
   end
 
   it 'is still dated in exercise history with the day it is written for' do
-    assert_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 25, 2026'
+    assert_includes dates_on("/exercises/#{@exercise_id}"), 'Sep 25, 2020'
   end
 end
 
@@ -358,7 +363,7 @@ describe 'a session completed with no stamp to read' do
     workout_id, = a_session(account_id, trained_on: nil)
     DB[:sets].where(workout_id:).update(is_completed: true, completed_at: nil)
 
-    assert_equal 'Friday September 25, 2026', heading_on("/workouts/#{workout_id}")
+    assert_equal 'Friday September 25, 2020', heading_on("/workouts/#{workout_id}")
   end
 end
 
@@ -403,12 +408,12 @@ describe 'the form that reschedules a session' do
   end
 
   it 'loads the stored plan into its date box' do
-    assert_includes body_of("/workouts/#{@workout_id}/edit"), 'value="2026-09-25"'
+    assert_includes body_of("/workouts/#{@workout_id}/edit"), 'value="2020-09-25"'
   end
 
   it 'posts the stored plan back when nothing about the date is touched' do
     token = token_for("/workouts/#{@workout_id}/edit")
-    post '/workouts', { 'id' => @workout_id.to_s, 'date' => '2026-09-25',
+    post '/workouts', { 'id' => @workout_id.to_s, 'date' => '2020-09-25',
                         'name' => 'Squats', 'note' => '', '_csrf' => token }
 
     assert_equal SessionDates::PLANNED, DB[:workouts].where(id: @workout_id).get(:date).to_date
@@ -416,10 +421,10 @@ describe 'the form that reschedules a session' do
 
   it 'writes the day it was given, rather than the day the session was trained' do
     token = token_for("/workouts/#{@workout_id}/edit")
-    post '/workouts', { 'id' => @workout_id.to_s, 'date' => '2026-09-28',
+    post '/workouts', { 'id' => @workout_id.to_s, 'date' => '2020-09-28',
                         'name' => '', 'note' => '', '_csrf' => token }
 
-    assert_equal Date.new(2026, 9, 28), DB[:workouts].where(id: @workout_id).get(:date).to_date
+    assert_equal Date.new(2020, 9, 28), DB[:workouts].where(id: @workout_id).get(:date).to_date
   end
 end
 
@@ -436,7 +441,7 @@ describe 'a session shown under a day it was not written for' do
     account_id = login
     workout_id, = a_session(account_id)
 
-    assert_equal 'Written for Friday September 25, 2026.', plan_note_on("/workouts/#{workout_id}")
+    assert_equal 'Written for Friday September 25, 2020.', plan_note_on("/workouts/#{workout_id}")
   end
 
   it 'says nothing where the two agree' do

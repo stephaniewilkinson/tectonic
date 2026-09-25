@@ -12,7 +12,7 @@ require_relative 'query_count_spec' # its fixture and its login; idempotent requ
 # Counted by what the read selects rather than by how many queries the page makes, because
 # this is about one statement repeated, not about the total.
 class HistoryReads < QueryCount::Tally
-  def queries = @statements.count { |statement| statement.include?('"sets"."is_warmup", "workouts"."date"') }
+  def queries = @statements.count { |statement| statement.include?('"sets"."is_warmup", coalesce(') }
 end
 
 describe "a movement's page reads its history once" do
