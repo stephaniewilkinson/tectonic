@@ -96,6 +96,30 @@ class Tectonic < Roda
         def missing(kind, id)
           raise Tool::Refusal, "No #{kind} with id #{id.inspect} on this account."
         end
+
+        # The same lift in every week of its block, this one included, in week order: the lift
+        # of the same movement on the same weekday, and where a day holds that movement more
+        # than once, the one in the same place among them.
+        #
+        # For `every_week` (the audit log, 2026-09): removing five movements from a three-week
+        # block took fifteen delete_program_lift calls, and a note or a weight changed "for the
+        # block" was the same call once per week. A block is written by copying a week, so the
+        # copies are findable by what they are rather than by an id nobody has seen.
+        def counterparts(lift)
+          day = lift.program_day
+          week = day.program_week
+          rank = rank_of(lift, day)
+          week.program.program_weeks.sort_by(&:number).filter_map do |other|
+            same_day = other.program_days.find { |candidate| candidate.weekday == day.weekday }
+            same_day && same_movement(same_day, lift.exercise_id)[rank]
+          end
+        end
+
+        def rank_of(lift, day) = same_movement(day, lift.exercise_id).index { |row| row.id == lift.id }
+
+        def same_movement(day, exercise_id)
+          day.program_lifts.select { |row| row.exercise_id == exercise_id }.sort_by(&:position)
+        end
       end
 
       # How a program and its parts read back to a model. A block is described the way it
