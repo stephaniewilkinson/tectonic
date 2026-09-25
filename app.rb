@@ -1429,7 +1429,10 @@ class Tectonic < Roda
               set = own_set(set_id, workout_id)
               r.redirect "/workouts/#{workout_id}/session" unless set
 
-              revised = { weight: r.params['weight'], reps: r.params['reps'], rpe: r.params['rpe'] }
+              # Seconds for a set held for time, reps for one counted -- whichever the set is, and
+              # never the other, which the database refuses on a set of the other measure.
+              count = set.timed? ? { duration_seconds: r.params['duration_seconds'] } : { reps: r.params['reps'] }
+              revised = { weight: r.params['weight'], **count, rpe: r.params['rpe'] }
               revised = revised.reject { |_, value| value.to_s.empty? }
               # Three ways in, and they do not all mean the same thing.
               #
