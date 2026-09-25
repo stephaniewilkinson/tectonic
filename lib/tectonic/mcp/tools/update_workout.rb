@@ -23,9 +23,18 @@ class Tectonic < Roda
       # **Two sessions on a date is a feature and not a collision**, which is what settles
       # the shape of this. #89 asked for it, `workouts.name` exists to tell the two apart,
       # `Calendar.by_day` groups a day's rows rather than taking one, and the index on
-      # (account_id, date) is non-unique on purpose. So a move onto an occupied day is not
-      # refused, and it does not merge -- merging would delete a row from a tool called
-      # "update", and destroy the exact arrangement two_a_day_spec exists to protect.
+      # (account_id, date) is non-unique on purpose. So a move onto an occupied day does not
+      # merge -- merging would delete a row from a tool called "update", and destroy the
+      # exact arrangement two_a_day_spec exists to protect.
+      #
+      # **But it asks first**, since the issues list's item 4. This used to make every such
+      # move and report the collision afterwards, on the grounds that the assistant could judge
+      # whether two was meant. In practice it could not un-say it: 28 September ended up
+      # holding squat and bench from two separate moves, neither of which looked first, and
+      # the lifter found it rather than the app. Most lifters never train twice in a day, so an
+      # unasked-for second session is nearly always a mistake -- and a two-a-day that is meant
+      # costs one flag, `alongside`, which makes it a deliberate act rather than something an
+      # assistant can cause by not looking.
       #
       # **What is reported instead is the day.** The thing worth surfacing was never the two
       # rows; it is that `Resolver.workout` and `find_workout` both take `order(:id).first`,
@@ -39,23 +48,43 @@ class Tectonic < Roda
         description 'Correct a session: its date, its name, or its note. Moving a session ' \
                     'to another date is how a workout logged under the wrong day is fixed, ' \
                     'since create_workout would open a second one. Send only what changes; ' \
-                    'send name or note as an empty string to clear it. A day may hold more ' \
-                    'than one session, so this never refuses a move -- it reports every ' \
-                    'session on the day afterwards, and which one a call by date resolves to.'
+                    'send name or note as an empty string to clear it. Moving onto a date that ' \
+                    'already holds a session is refused, naming what is there, unless ' \
+                    'alongside is true -- a deliberate two-a-day. When two share a day, the ' \
+                    'reply says which one a call by date resolves to.'
         scope :write
         input_schema(
           type: 'object',
           properties: { workout_id: { type: 'integer' }, date: { type: 'string' },
-                        name: { type: 'string' }, note: { type: 'string' } },
+                        name: { type: 'string' }, note: { type: 'string' },
+                        alongside: { type: 'boolean' } },
           required: ['workout_id'], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)
           workout = find(context, arguments[:workout_id])
+          refuse_a_taken_day(context, workout, arguments)
           changed = Changes.apply(workout, attributes(arguments))
           day = sharing(context, workout.refresh)
           ok(sentence(workout, changed, day),
              structured: Presenter.view_workout(workout).merge(changed:, day_holds: day))
+        end
+
+        # Nothing is moved onto a day that already holds a session unless `alongside` says a
+        # second one is meant. Named, so the caller can ask the lifter about the right one.
+        def self.refuse_a_taken_day(context, workout, arguments)
+          return if arguments[:alongside] || !arguments[:date]
+
+          day = Resolver.parse_date(arguments[:date])
+          there = context.workouts.where(Sequel.cast(:date, :date) => day).exclude(id: workout.id).order(:id).all
+          return if there.empty?
+
+          raise Tool::Refusal, "#{day.strftime('%Y-%m-%d')} already holds #{named(there)}. Nothing was moved. " \
+                               'Send alongside: true to keep both on that day, or move the other session first.'
+        end
+
+        def self.named(workouts)
+          workouts.map { |other| "#{other.label || 'a session'} (#{other.id})" }.join(' and ')
         end
 
         # `key?` rather than a nil check on the two text columns, so "leave it alone" and
