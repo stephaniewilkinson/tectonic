@@ -181,7 +181,7 @@ class Tectonic < Roda
     # wrote a movement into the library every lifter shares. A token here always stands for a
     # person who approved it on the consent screen.
     enable :login, :logout, :create_account, :remember, :json, :reset_password,
-           :verify_account,
+           :verify_account, :lockout,
            :oauth_authorization_code_grant, :oauth_pkce, :oauth_jwt,
            :oauth_resource_indicators, :oauth_dynamic_client_registration,
            :oauth_token_introspection, :oauth_token_revocation
@@ -252,6 +252,20 @@ class Tectonic < Roda
     send_reset_password_email do
       Mailer.deliver(to: account[login_column], subject: 'Reset your tectonic plates password',
                      text: scope.reset_password_body(reset_password_email_link))
+    end
+
+    # A limit on wrong passwords, which sign-in did not have (security pass, 2026-09-25): a
+    # password could be guessed at forever, at bcrypt's pace and nothing slower.
+    #
+    # Ten, not Rodauth's hundred, because a hundred barely slows a guesser down. The cost of a
+    # low number is that somebody who knows an address can lock its owner out on purpose, so
+    # the lock is short -- an hour, then it lifts by itself -- and the email it sends lets the
+    # owner straight back in without waiting. The email goes through Resend like the others.
+    # The hour is the table's default (migrate/059), which is where Rodauth reads it from here.
+    max_invalid_logins 10
+    send_unlock_account_email do
+      Mailer.deliver(to: account[login_column], subject: 'Your tectonic plates account is locked',
+                     text: scope.unlock_account_body(unlock_account_email_link))
     end
 
     # An address has to be proved before the account is worth anything. #575.
@@ -3365,6 +3379,18 @@ class Tectonic < Roda
   # questions somebody receiving an unexpected one actually has. It does not say "ignore this
   # email" and stop there: a reset request nobody made is worth knowing about, so the last
   # line names the address it was requested for.
+  def unlock_account_body(link)
+    <<~TEXT
+      Somebody typed the wrong password for your tectonic plates account ten times, so it is
+      locked for an hour. If that was you, open this link to unlock it now:
+
+      #{link}
+
+      If it was not you, your password was not guessed -- the lock is what stopped it. You may
+      want to choose a longer one from the settings page once you are back in.
+    TEXT
+  end
+
   def reset_password_body(link)
     <<~TEXT
       Somebody asked to reset the password for your tectonic plates account.

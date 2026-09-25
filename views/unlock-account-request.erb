@@ -1,0 +1,26 @@
+<%# The page a sign-in lands on once the account is locked for too many wrong passwords.
+    Security pass, 2026-09-25; the limit and why it is short are beside `max_invalid_logins` in
+    app.rb. Rodauth renders this in place of the sign-in form, with the address already typed
+    carried as a hidden field, so the one thing to do here is ask for the unlock email.
+
+    The action and token name the unlock path explicitly for the reason
+    verify-account-resend.erb gives: this renders at /login, and a token bound to that path
+    would be refused by the post. %>
+<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+  <div class="sm:mx-auto sm:w-full sm:max-w-sm">
+    <h1 class="text-center text-3xl font-semibold tracking-tight text-gray-900">This account is locked</h1>
+    <%== render('_form_error') %>
+    <p class="mt-4 text-center text-sm text-gray-600">
+      Too many wrong passwords, so sign-in is paused for an hour. It unlocks by itself after
+      that, or we can email a link that unlocks it now.
+    </p>
+  </div>
+
+  <div class="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
+    <form action="<%= rodauth.unlock_account_request_path %>" method="post" role="form" id="unlock-account-request-form">
+      <%== rodauth.csrf_tag(rodauth.unlock_account_request_path) %>
+      <%== rodauth.login_hidden_field %>
+      <button type="submit" class="<%= button_style %> flex min-h-11 w-full items-center justify-center bg-lime-500 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 hover:bg-lime-600">Email me an unlock link</button>
+    </form>
+  </div>
+</div>
