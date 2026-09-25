@@ -2757,14 +2757,6 @@ class Tectonic < Roda
     @timing = Timing.session(@workout, @sets.map(&:values))
   end
 
-  # The session's sets grouped into the lifts they belong to. Insertion order is program
-  # order, so consecutive sets of one movement are one lift and a movement that comes
-  # round twice in a session is two.
-  #
-  # It lives here rather than in the template it serves because the panel row asks for it
-  # three times over -- once to walk it, then inside every panel to number that panel and
-  # to draw a dot per lift -- and a local assigned in one ERB tag and read in the next is
-  # an offence to erb_lint, which hands each tag to rubocop as a program of its own.
   # The sets of a lift nobody has lifted yet, which is exactly what a swap may move (#365)
   # and therefore what the swap control counts and hides itself over.
   #
@@ -2777,8 +2769,35 @@ class Tectonic < Roda
     lift.reject { |set| set[:is_completed] }
   end
 
+  # The session's sets grouped into the lifts they belong to. Insertion order is program
+  # order, so consecutive sets of one movement are one lift and a movement that comes
+  # round twice in a session is two.
+  #
+  # **Except a set added afterwards**, which joins the lift its movement already has. A set
+  # appended to a session lands at the end by id, so without this a third clamshell logged
+  # over MCP -- or "Add a set" pressed on any panel but the last -- opened a second panel
+  # of the same movement after unrelated ones, and the lifter saw clamshells in two places
+  # with "6 of 7" counted against neither (the issues list, item 3). What tells the two
+  # cases apart is the plan: the generator writes planned_weight or planned_reps onto every
+  # set it prescribes, and a set added afterwards carries neither. So a run of sets with no
+  # plan on any of them folds into the last earlier lift of the same movement, and a movement
+  # the programme itself lists twice -- heavy bench, then back-off bench -- stays two.
+  #
+  # It lives here rather than in the template it serves because the panel row asks for it
+  # three times over -- once to walk it, then inside every panel to number that panel and
+  # to draw a dot per lift -- and a local assigned in one ERB tag and read in the next is
+  # an offence to erb_lint, which hands each tag to rubocop as a program of its own.
   def session_lifts
-    @session_lifts ||= @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }.to_a
+    @session_lifts ||= @sets.chunk_while { |before, after| before[:exercise_id] == after[:exercise_id] }
+                            .each_with_object([]) { |run, lifts| place_run(lifts, run) }
+  end
+
+  # Where one run of consecutive sets goes: onto the end of an earlier lift of the same movement
+  # where the run carries no plan, and into a lift of its own otherwise. See session_lifts.
+  def place_run(lifts, run)
+    unplanned = run.none? { |set| set[:planned_weight] || set[:planned_reps] }
+    home = unplanned && lifts.rfind { |lift| lift.first[:exercise_id] == run.first[:exercise_id] }
+    home ? home.concat(run) : lifts << run
   end
 
   # A set is only reachable through a workout the logged in account owns, so a set

@@ -55,9 +55,45 @@ class Tectonic < Roda
           check_range(arguments)
           exercise = Resolver.exercise(context, name: arguments[:exercise])
           workout = Resolver.workout(context, date: arguments[:date])
-          set = WorkoutSet.create(attributes(arguments, exercise, workout, context))
-          ok("Logged #{Presenter.load_phrase(set)} of #{exercise.name} (id #{set.id}).",
-             structured: Presenter.view_set(set))
+          twin = twin_of(workout, exercise, arguments)
+          reply(WorkoutSet.create(attributes(arguments, exercise, workout, context)), exercise, twin)
+        end
+
+        def self.reply(set, exercise, twin)
+          place = place_of(set)
+          ok("Logged #{Presenter.load_phrase(set)} of #{exercise.name} (id #{set.id}), " \
+             "set #{place[:set]} of #{place[:of]} of it in this session.#{twin_note(twin)}",
+             structured: Presenter.view_set(set).merge(place, duplicate_of: twin&.id))
+        end
+
+        # Where the set landed, said rather than left to be discovered (the issues list, item 3).
+        # A set of a movement the session already has joins that movement's lift on the session
+        # screen -- `session_lifts` folds an unplanned run into it -- and this says so in the one
+        # place an assistant reads: "set 4 of 4 of Banded Clamshell". Counted over every set of
+        # the movement in the session, which is what the lifter sees in its panel.
+        def self.place_of(set)
+          mine = WorkoutSet.where(workout_id: set.workout_id, exercise_id: set.exercise_id)
+          { set: mine.where { id <= set.id }.count, of: mine.count }
+        end
+
+        # A completed set of the same movement, weight and reps logged into the same session in
+        # the last two minutes -- which is almost always one call made twice, the way the
+        # restore attempt in item 3 doubled two clamshells. Reported and not refused: two
+        # identical sets really can be done a minute apart, and deciding which is the mistake
+        # belongs to whoever can ask the lifter.
+        def self.twin_of(workout, exercise, arguments)
+          return nil unless arguments[:is_completed]
+
+          WorkoutSet.where(workout_id: workout.id, exercise_id: exercise.id, is_completed: true,
+                           weight: arguments[:weight], reps: arguments[:reps])
+                    .where { created_at > Time.now - 120 }.order(:id).last
+        end
+
+        def self.twin_note(twin)
+          return '' unless twin
+
+          " A set identical to this one (id #{twin.id}) was logged less than two minutes ago; " \
+            'if this call repeated it, delete one with delete_set.'
         end
 
         # The ranges are Bounds', shared with every other tool that writes a weight or a
