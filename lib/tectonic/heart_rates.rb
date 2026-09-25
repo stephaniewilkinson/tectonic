@@ -48,6 +48,28 @@ class Tectonic < Roda
       Reading.new(stored.positive? || any?(account_id, window) ? :stored : :none, stored)
     end
 
+    # The read a match makes. #656: heart rate is not something to go and ask for, it comes with
+    # the recording -- so saying "yes, that was this session" reads the session's window there
+    # and then, and the recording is marked read when Withings answered, with readings or
+    # without. A read Withings did not answer leaves the mark off, which is what the record page
+    # reads to offer one more try; nothing else ever asks again.
+    def read_for_match(account_id, workout_id, window)
+      return nil unless window
+
+      reading = read(account_id, window)
+      return reading unless %i[stored none].include?(reading.outcome)
+
+      DB[:withings_workouts].where(account_id:, workout_id:).update(heart_rate_read_at: Time.now)
+      reading
+    end
+
+    # Whether the recording matched to a session still needs its heart rate read: matched, and
+    # never read -- because it was matched before reads happened on matching, or because the
+    # read at matching went unanswered.
+    def still_to_read?(workout_id)
+      !DB[:withings_workouts].where(workout_id:, heart_rate_read_at: nil).empty?
+    end
+
     # Readings are keyed by their own instant, and one already held is left alone.
     def store(account_id, series)
       return 0 unless series.is_a?(Hash)

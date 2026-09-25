@@ -49,6 +49,19 @@ module HeartRatePerSet
 
   def reading(bpm) = { 'heart_rate' => bpm, 'model' => 93, 'deviceid' => 'x' }
 
+  # The watch's recording of the session, as a proposal waiting to be answered.
+  def a_recording(account_id, workout_id)
+    DB[:withings_workouts].insert(account_id:, external_id: 'w-1', started_at: NOTICED, ended_at: START + (21 * 60),
+                                  category: 16, attrib: 7, proposed_workout_id: workout_id)
+  end
+
+  # "Yes, that was this session", with Withings answering the heart-rate read it sets off.
+  def match(body = { 'series' => series })
+    get "/workouts/#{@workout_id}"
+    token = last_response.body[%r{action="/workouts/\d+/withings/match".*?name="_csrf" value="([^"]+)"}m, 1]
+    answering_with(body) { post "/workouts/#{@workout_id}/withings/match", { '_csrf' => token, 'activity' => 'w-1' } }
+  end
+
   def press(body = { 'series' => series })
     get "/workouts/#{@workout_id}"
     token = last_response.body[%r{action="/workouts/\d+/withings/heart-rate".*?name="_csrf" value="([^"]+)"}m, 1]
@@ -60,7 +73,7 @@ module HeartRatePerSet
   end
 end
 
-describe 'reading the watch for a session' do
+describe 'matching a session to the watch' do
   include Rack::Test::Methods
   include RouteOwnership
   include HeartRatePerSet
@@ -69,31 +82,34 @@ describe 'reading the watch for a session' do
     @account_id = login
     a_connection(@account_id)
     @workout_id = a_session_with_sets(@account_id)
+    a_recording(@account_id, @workout_id)
   end
 
-  it 'keeps every reading once, and drops a sample with no heart rate' do
-    2.times { press }
+  # The ask: heart rate comes with the match, and nobody has to go and get it.
+  it 'reads the heart rate as part of saying yes' do
+    match
 
     assert_equal series.count { |_, r| r['heart_rate'] }, DB[:heart_rates].where(account_id: @account_id).count
   end
 
-  it 'says which part of the session the readings cover' do
-    press
-    follow_redirect!
-
-    assert_includes last_response.body, 'recorded heart rate every few seconds from'
-    assert_includes last_response.body, 'Sets outside that stretch'
-  end
-
-  it 'gives each set measured densely its peak and the lowest point before the next' do
-    press
-    follow_redirect!
+  it 'shows each set its peak and the lowest point before the next, with no button to press' do
+    match
+    get "/workouts/#{@workout_id}"
 
     assert_includes last_response.body, '150, down to 100'
+    assert_includes last_response.body, 'recorded heart rate every few seconds from'
+    refute_includes last_response.body, 'Read it now'
+  end
+
+  it 'asks Withings nothing on a view' do
+    asked = []
+    Tectonic::Withings.stub(:post, ->(_path, **form) { asked << form[:action] }) { get "/workouts/#{@workout_id}" }
+
+    assert_empty asked
   end
 end
 
-describe 'the heart rate box before and after asking' do
+describe 'a match whose heart rate Withings did not give' do
   include Rack::Test::Methods
   include RouteOwnership
   include HeartRatePerSet
@@ -102,19 +118,23 @@ describe 'the heart rate box before and after asking' do
     @account_id = login
     a_connection(@account_id)
     @workout_id = a_session_with_sets(@account_id)
+    a_recording(@account_id, @workout_id)
+    match(nil)
+    get "/workouts/#{@workout_id}"
   end
 
-  it 'offers to read it, and nothing is fetched on a view' do
+  # The one case a hand is needed: the match still took, and the page offers the read once.
+  it 'keeps the match and offers one more try' do
+    refute_nil DB[:withings_workouts].where(workout_id: @workout_id).get(:workout_id)
+    assert_includes last_response.body, 'Read it now'
+  end
+
+  it 'stops offering once the read has been made' do
+    press
     get "/workouts/#{@workout_id}"
 
-    assert_includes last_response.body, 'Read heart rate from the watch'
-  end
-
-  it 'says so when Withings does not answer' do
-    press(nil)
-    follow_redirect!
-
-    assert_includes last_response.body, 'Withings did not answer'
+    refute_includes last_response.body, 'Read it now'
+    assert_includes last_response.body, '150, down to 100'
   end
 end
 

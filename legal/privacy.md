@@ -30,7 +30,8 @@ log. It exists so that a change you did not expect can be traced to the call tha
 what Withings holds: your weight and body composition (lean mass, fat mass, fat percentage,
 muscle mass, hydration, bone mass), the heart rate taken with a measurement, how long you slept
 and over what window, the activities your watch recorded, with their heart rate and
-calories, and the watch's heart rate reading by reading over a session you ask it to read.
+calories, and the watch's heart rate reading by reading over each session you match to one of
+its recordings.
 Weights you type into the Withings app are included. We read these; we never write
 anything back to Withings. Disconnecting stops any further reading.
 
