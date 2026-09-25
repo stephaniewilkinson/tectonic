@@ -1735,6 +1735,11 @@ class Tectonic < Roda
             check_csrf!
             linked = WithingsAnswers.confirm(account_id: @account_id, workout_id: @workout.id,
                                              external_id: r.params['activity'].to_s)
+            # And the heart rate the watch recorded over the session, read now rather than left
+            # behind a button (#656): the match is the moment it is known to be this session's.
+            # One request, after the answer is saved, so a slow or silent Withings delays the
+            # redirect and never the match.
+            read_heart_rate(workout_id) if linked.positive?
             r.redirect(linked.positive? ? answered_from(workout_id, r.params['back']) : "/workouts/#{workout_id}")
           end
           r.post 'dismiss' do
@@ -1767,11 +1772,11 @@ class Tectonic < Roda
           # Reading the watch's heart rate over this session's own window. #656. A post behind a
           # button for the reasons `check` below is: it calls Withings and writes what comes
           # back, and a page view must do neither (#560).
+          # The one more try, for a recording whose heart rate was never read: matched before
+          # reads happened on matching, or matched while Withings was not answering. #656.
           r.post 'heart-rate' do
             check_csrf!
-            timing = Timing.session(@workout, WorkoutSet.where(workout_id:).order(:id).all.map(&:values))
-            window = WithingsWorkouts.interval(timing)
-            outcome = window ? HeartRates.read(@account_id, window).outcome : :none
+            outcome = read_heart_rate(workout_id)&.outcome || :none
             r.redirect "/workouts/#{workout_id}?heart=#{outcome}"
           end
           r.post 'check' do
@@ -2395,6 +2400,12 @@ class Tectonic < Roda
   CHECK_OUTCOMES = %w[answered unreachable].freeze
   HEART_OUTCOMES = %w[stored none unreachable absent].freeze
 
+  # Read the watch's heart rate for a session whose recording has just been matched. #656.
+  def read_heart_rate(workout_id)
+    timing = Timing.session(@workout, WorkoutSet.where(workout_id:).order(:id).all.map(&:values))
+    HeartRates.read_for_match(@account_id, workout_id, WithingsWorkouts.interval(timing))
+  end
+
   # Whether any set on the record page has a heart rate figure, which is what decides whether
   # the column is drawn at all. #656.
   def heart_figures?
@@ -2424,11 +2435,13 @@ class Tectonic < Roda
     return nil unless window
 
     readings = HeartRates.within(@account_id, window)
-    connected = WithingsConnection.connected?(@account_id)
-    return nil if readings.empty? && !connected
+    # Offered only where a matched recording's read is still owed; a session with no match has
+    # no recording to read, and the ordinary match has already been read.
+    owed = WithingsConnection.connected?(@account_id) && HeartRates.still_to_read?(@workout[:id])
+    return nil if readings.empty? && !owed
 
     { readings: readings.length, dense: HeartRates.dense_stretch(readings), session: window,
-      per_set: HeartRates.per_set(sets, readings), connected: }
+      per_set: HeartRates.per_set(sets, readings), owed: }
   end
 
   # Where an answer about a session sends the lifter next.

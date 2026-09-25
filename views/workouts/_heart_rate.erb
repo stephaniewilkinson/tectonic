@@ -7,7 +7,9 @@
     part way through, and every set before it is next to unmeasured. Saying the stretch in
     clock times beside the sets' own is what stops a blank early column reading as a flat heart.
 
-    Fetched only when asked, by the button, never on a view (#560). %>
+    Read when the recording is matched to the session, never on a view (#560) and never behind
+    a button in the ordinary case. The button below is the exception: a recording matched
+    before reads happened on matching, or one whose read Withings did not answer. %>
 <%- if @heart %>
   <div class="mt-4 rounded-md border border-gray-300 bg-white px-4 py-3">
     <h2 class="text-sm font-semibold text-gray-900">Heart rate</h2>
@@ -31,13 +33,14 @@
         around this session, which is what it does when no workout is started on it.
       </p>
     <%- end %>
-    <%- if @heart[:connected] %>
+    <%- if @heart[:owed] %>
+      <p class="mt-1 text-sm text-gray-700">
+        The watch&rsquo;s heart rate for this session has not been read yet.
+      </p>
       <form method="post" action="/workouts/<%= @workout[:id] %>/withings/heart-rate" class="mt-2">
         <%== csrf_tag("/workouts/#{@workout[:id]}/withings/heart-rate") %>
         <button type="submit" class="<%= button_style %> min-h-11 border border-gray-300 bg-white px-3 text-sm
-                                      font-medium text-gray-700 hover:bg-gray-50">
-          <%= @heart[:readings].positive? ? 'Read it again' : 'Read heart rate from the watch' %>
-        </button>
+                                      font-medium text-gray-700 hover:bg-gray-50">Read it now</button>
       </form>
     <%- end %>
   </div>

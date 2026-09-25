@@ -15,6 +15,13 @@ ENV['DATABASE_URL'] = ENV.fetch('TEST_DATABASE_URL', 'postgres:///tectonic_test'
 # The OAuth resource identifier the MCP endpoint verifies tokens against and advertises
 # in its discovery document; tests sign and expect tokens for this audience.
 ENV['MCP_PUBLIC_BASE_URL'] ||= 'https://example.org'
+# Withings, pointed at a port nothing listens on. A spec that means to talk to Withings stubs
+# `Withings.post`; one that reaches it without meaning to -- #656 made saying yes to a match
+# read the heart rate, and specs that answer matches with a connected account did not stub
+# it -- must fail fast on this machine rather than send a request to the real API with a
+# made-up token. Refused, not hung: the request errors at once and reads as Withings not
+# answering, which every caller already handles.
+ENV['WITHINGS_API_ENDPOINT'] = 'http://127.0.0.1:9'
 
 # bcrypt is deliberately slow, and in a test suite that is the whole cost of the run.
 #
