@@ -493,3 +493,26 @@ describe 'every response carries the baseline security headers' do
   end
 end
 
+# Cancel on the consent screen is an error response, and RFC 6749 §4.1.2.1 requires it to carry
+# the request's `state` when there was one. It did not, so a client checking state had to read
+# the lifter's "no" as a forged response.
+describe 'cancelling on the consent screen' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  it 'answers the assistant with access_denied and the state it sent' do
+    _, email, password = create_account
+    login(email, password)
+    client = register_client
+    _, challenge = pkce
+    get '/authorize', client_id: client['client_id'], redirect_uri: client['redirect_uris'].first,
+                      response_type: 'code', code_challenge: challenge, code_challenge_method: 'S256',
+                      scope: 'read write', resource: OAuthFlow::RESOURCE, state: 'xyz 123'
+    cancel = last_response.body[/<a href="([^"]+)"[^>]*>\s*Cancel/m, 1]
+    query = Rack::Utils.parse_query(URI(CGI.unescapeHTML(cancel)).query)
+
+    assert_equal 'access_denied', query['error']
+    assert_equal 'xyz 123', query['state']
+  end
+end
+

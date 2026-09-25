@@ -2037,6 +2037,24 @@ class Tectonic < Roda
     @workout[:date].to_date <= Clock.today(account_row[:time_zone])
   end
 
+  # Where Cancel on the consent screen sends the browser: back to the assistant, saying no.
+  #
+  # It dropped `state`, which RFC 6749 §4.1.2.1 requires on an error response whenever the
+  # request carried one. A client that checks it -- the point of state is to tie a response to
+  # the request that asked for it -- has to treat an answer without it as a forgery and show
+  # its own error, so pressing Cancel read as the connection breaking rather than as a no. The
+  # description and the state are rodauth-oauth's own template's, and the query is joined
+  # rather than appended so a redirect URI that already has one stays well-formed.
+  def consent_cancel_url
+    uri = URI(rodauth.redirect_uri)
+    answer = { 'error' => 'access_denied',
+               'error_description' => 'The resource owner or authorization server denied the request' }
+    state = rodauth.param_or_nil('state')
+    answer['state'] = state if state
+    uri.query = [uri.query, URI.encode_www_form(answer)].compact.join('&')
+    uri.to_s
+  end
+
   # Which assistant an account signed up to connect, from the consent screen it was sent to
   # sign in for (#628). Nothing where the saved page was anything else, or there was none.
   def remember_the_connection(account_id, saved)
