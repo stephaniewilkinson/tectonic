@@ -337,15 +337,27 @@ class Tectonic < Roda
     # it groups these by day, `group_by` keeps first-seen order, and a SELECT with no ORDER BY
     # comes back in whatever order the table's physical layout suggests. That is what the
     # chart's own copy of this query found out in #593, before #596 folded it into this one.
+    #
+    # **Dated by when each set was lifted, not by when its session was planned.** #479 and #572
+    # moved every other screen onto the day a session was trained; this read went on answering
+    # with `workouts.date`, the day it was written for, so the progress chart on a movement's
+    # page drew a Wednesday's squats on the Friday the block had pencilled them in for, and the
+    # "as of" bound a max is read against cut on the planned day too. A spec about exactly that
+    # passed for months only because its session was planned for a day still in the future,
+    # which kept it off the chart altogether -- and failed the one day the future arrived.
+    #
+    # The set's own `completed_at`, which is when the Done was tapped, and the session's date
+    # where a set has none: one logged by hand, or completed before #281 stamped anything.
     def lifted_sets(account_id, on, since: nil)
-      mine = Workout.where(account_id:).where { date < (on + 1) }
-      mine = mine.where { date >= since } if since
-      WorkoutSet.where(exercise_id: id, workout_id: mine.select(:id), is_completed: true)
-                .join(:workouts, id: :workout_id).select(*READ_COLUMNS)
-                .order(*IN_ORDER).all
+      rows = WorkoutSet.where(exercise_id: id, workout_id: Workout.where(account_id:).select(:id),
+                              is_completed: true)
+                       .join(:workouts, id: :workout_id).where(Sequel.expr(LIFTED_ON) < (on + 1))
+      rows = rows.where(Sequel.expr(LIFTED_ON) >= since) if since
+      rows.select(*READ_COLUMNS).order(*IN_ORDER).all
     end
 
-    IN_ORDER = [Sequel[:workouts][:date], Sequel[:sets][:id]].freeze
+    LIFTED_ON = Sequel.function(:coalesce, Sequel[:sets][:completed_at], Sequel[:workouts][:date])
+    IN_ORDER = [LIFTED_ON, Sequel[:sets][:id]].freeze
 
     # Qualified because `date` is on workouts while the rest are on sets, and unqualified it
     # is ambiguous the moment the two tables meet.
@@ -360,9 +372,12 @@ class Tectonic < Roda
     # also what let the progress chart read through here rather than keep a second copy of
     # this query that differed only by `is_warmup` (#596) -- the heaviest-set line and the
     # estimate both have to leave warmups out.
+    #
+    # `date` is LIFTED_ON under the name every reader already uses, so a reading's `on`, a
+    # window's edge and a chart's x axis all mean the day the set was lifted.
     READ_COLUMNS = [
       Sequel[:sets][:weight], Sequel[:sets][:reps], Sequel[:sets][:rpe],
-      Sequel[:sets][:planned_rpe], Sequel[:sets][:is_warmup], Sequel[:workouts][:date]
+      Sequel[:sets][:planned_rpe], Sequel[:sets][:is_warmup], Sequel.as(LIFTED_ON, :date)
     ].freeze
   end
 end

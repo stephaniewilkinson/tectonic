@@ -29,7 +29,10 @@ module Proposing
     Tectonic::WorkoutSet.create(workout_id: workout.id, exercise_id: exercise.id,
                                 weight: set[:weight], reps: set[:reps],
                                 rpe: is_warmup ? nil : set[:rpe], is_warmup:, is_barbell: true,
-                                **Tectonic::WorkoutSet.completion(true))
+                                # Lifted on the session's day, as a real one is. Stamped now,
+                                # a set from 300 days ago read as today's once the history was
+                                # dated by when each set was lifted.
+                                **Tectonic::WorkoutSet.completion(true, at: workout.date))
   end
 
   def propose(raw, **arguments)
