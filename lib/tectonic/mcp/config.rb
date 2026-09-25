@@ -91,10 +91,17 @@ class Tectonic < Roda
       #
       # The last sentence is #262. Every edit tool takes an id and nothing said how to get
       # one; the answer is list_* or search, and an MCP audit found it by trial instead.
+      #
+      # The unit sentence said "integer pounds" long after 012 widened set weights to
+      # numeric(7, 2): a model told the weights are integers rounds 137.5 before it sends it,
+      # and the one fact every numeric tool leans on was wrong in the first thing it reads.
+      # And the body readings a connected Withings adds carry their own unit, kilograms
+      # usually, so "all weights" was wrong twice.
       def instructions
         'Tectonic is a barbell strength-training tracker: accounts log workouts, each ' \
-          'containing sets of an exercise with a weight and rep count. All weights are ' \
-          'integer pounds. Every tool acts only on the authenticated account. ' \
+          'containing sets of an exercise with a weight and rep count. Training weights are ' \
+          'in pounds and may be fractional (137.5); body readings carry their own unit. ' \
+          'Every tool acts only on the authenticated account. ' \
           'The edit tools take ids: get them from list_workouts, list_programs and ' \
           'list_exercises, or from search, whose results fetch resolves.'
       end

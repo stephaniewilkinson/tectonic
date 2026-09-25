@@ -134,5 +134,16 @@ describe 'what the server tells a client on connecting' do
     assert_includes instructions, 'search'
     assert_includes instructions, 'fetch'
   end
+
+  # It said "All weights are integer pounds" for years after 012 made set weights decimal, so
+  # a model rounded 137.5 before sending it. Pinned against the column rather than the
+  # sentence: if the weights can hold a fraction, the instructions may not call them integers.
+  it 'does not tell a model the weights are integers when they are not' do
+    scale = DB.schema(:sets).to_h[:weight][:db_type]
+
+    assert_match(/numeric\(\d+,[1-9]\)/, scale)
+    refute_match(/integer pounds/i, Tectonic::MCP::Config.instructions)
+    assert_includes Tectonic::MCP::Config.instructions, 'may be fractional'
+  end
 end
 
