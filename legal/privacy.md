@@ -29,8 +29,9 @@ log. It exists so that a change you did not expect can be traced to the call tha
 **What Withings sends, if you connect it.** Only if you connect a Withings account, and only
 what Withings holds: your weight and body composition (lean mass, fat mass, fat percentage,
 muscle mass, hydration, bone mass), the heart rate taken with a measurement, how long you slept
-and over what window, and the activities your watch recorded, with their heart rate and
-calories. Weights you type into the Withings app are included. We read these; we never write
+and over what window, the activities your watch recorded, with their heart rate and
+calories, and the watch's heart rate reading by reading over a session you ask it to read.
+Weights you type into the Withings app are included. We read these; we never write
 anything back to Withings. Disconnecting stops any further reading.
 
 **Nothing else.** We do not ask for your name, your date of birth, your location or your

@@ -244,6 +244,7 @@
     length to print and the block draws nothing for it, but it can still be a session an
     account with a watch wants to stop being asked about. %>
 <%== render('workouts/_withings_match') %>
+<%== render('workouts/_heart_rate') %>
 
 <%# The clock times above, put into the reader's own timezone. #397.
 
@@ -306,6 +307,9 @@
             <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Reps</th>
             <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Warmup?</th>
             <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Completed?</th>
+            <%- if heart_figures? %>
+              <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold">Heart rate</th>
+            <%- end %>
             <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-0">
               <span class="sr-only">Edit</span>
             </th>
@@ -326,6 +330,12 @@
                     column of boxes is scanned. %>
                 <td class="whitespace-nowrap px-3 py-4"><%== ticked(set[:is_warmup], 'warmup') %></td>
                 <td class="whitespace-nowrap px-3 py-4"><%== ticked(set[:is_completed], 'completed') %></td>
+                <%# Peak around the set, then the lowest before the next one (#656): two
+                    readings of the same heart a minute apart, and nothing said about whether
+                    the second was low enough. Blank where no reading falls near the set. %>
+                <%- if heart_figures? %>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-700"><%= heart_label(set[:id]) %></td>
+                <%- end %>
                 <%# lime-700, the same link colour as everywhere else. This was lime-400
                     hovering to lime-300 -- 1.51:1 on white going to 1.31:1 -- so the only
                     way to correct a set from the workout record faded as you reached for

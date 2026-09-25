@@ -37,6 +37,7 @@ require_relative 'lib/tectonic/withings_measures'
 require_relative 'lib/tectonic/withings_workouts'
 require_relative 'lib/tectonic/withings_answers'
 require_relative 'lib/tectonic/session_stream'
+require_relative 'lib/tectonic/heart_rates'
 # The proposals a backfill left, which this app reads. #534.
 require_relative 'lib/tectonic/withings_proposals'
 # And the walk that makes them, which this app now reaches in one place and one shape only:
@@ -1763,6 +1764,16 @@ class Tectonic < Roda
           # It is only an outcome and never content: the page re-derives what to say from the
           # rows the fetch has just stored, so a bookmarked `?checked=answered` can claim
           # nothing that is not independently true.
+          # Reading the watch's heart rate over this session's own window. #656. A post behind a
+          # button for the reasons `check` below is: it calls Withings and writes what comes
+          # back, and a page view must do neither (#560).
+          r.post 'heart-rate' do
+            check_csrf!
+            timing = Timing.session(@workout, WorkoutSet.where(workout_id:).order(:id).all.map(&:values))
+            window = WithingsWorkouts.interval(timing)
+            outcome = window ? HeartRates.read(@account_id, window).outcome : :none
+            r.redirect "/workouts/#{workout_id}?heart=#{outcome}"
+          end
           r.post 'check' do
             check_csrf!
             timing = Timing.session(@workout, WorkoutSet.where(workout_id:).order(:id).all.map(&:values))
@@ -1831,6 +1842,10 @@ class Tectonic < Roda
           # Read against a fixed set rather than printed, so the only thing a hand-typed
           # value can do is say nothing.
           @withings_checked = CHECK_OUTCOMES.include?(r.params['checked']) ? r.params['checked'] : nil
+          # The heart rate stored for this session's window, and what it says per set. #656.
+          # Read from rows, never from Withings: the post above is how rows arrive.
+          @heart = heart_for(@sets, @timing)
+          @heart_read = HEART_OUTCOMES.include?(r.params['heart']) ? r.params['heart'] : nil
           view 'workouts/show'
         end
       end
@@ -2378,6 +2393,43 @@ class Tectonic < Roda
   # outcome of `WithingsWorkouts.check` and it has nothing to report, so it falls through to
   # the same silence as a value nobody recognises.
   CHECK_OUTCOMES = %w[answered unreachable].freeze
+  HEART_OUTCOMES = %w[stored none unreachable absent].freeze
+
+  # Whether any set on the record page has a heart rate figure, which is what decides whether
+  # the column is drawn at all. #656.
+  def heart_figures?
+    @heart && @heart[:per_set].values.any? { |figure| figure[:peak] }
+  end
+
+  # "142, down to 108": the peak around a set and the lowest point before the next. Blank where
+  # the set has no reading near it, and only the peak for the last set, which has no next.
+  #
+  # A peak off one or two readings -- a set in the stretch before the watch noticed the workout
+  # -- says how many, so it does not pass for one measured every few seconds.
+  def heart_label(set_id)
+    figure = @heart[:per_set][set_id]
+    return '' unless figure&.dig(:peak)
+
+    peak = figure[:peak].to_s
+    peak += " (#{readings_phrase(figure[:peak_readings])})" if figure[:peak_readings] < 3
+    figure[:low_before_next] ? "#{peak}, down to #{figure[:low_before_next]}" : peak
+  end
+
+  def readings_phrase(count) = "#{count} reading#{'s' unless count == 1}"
+
+  # What the record page shows about heart rate: the readings' dense stretch and the figures
+  # per set, or nil where there is no window or nothing stored and no connection to ask. #656.
+  def heart_for(sets, timing)
+    window = WithingsWorkouts.interval(timing)
+    return nil unless window
+
+    readings = HeartRates.within(@account_id, window)
+    connected = WithingsConnection.connected?(@account_id)
+    return nil if readings.empty? && !connected
+
+    { readings: readings.length, dense: HeartRates.dense_stretch(readings), session: window,
+      per_set: HeartRates.per_set(sets, readings), connected: }
+  end
 
   # Where an answer about a session sends the lifter next.
   #
