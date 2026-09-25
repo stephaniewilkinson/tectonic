@@ -95,10 +95,10 @@ describe 'correcting what a session is called' do
   end
 end
 
-# Two sessions on a date is a feature, not a collision: #89 asked for it, workouts.name exists
-# to tell them apart, and the index on (account_id, date) is non-unique on purpose. So the move
-# goes through -- what gets reported is the day.
-describe 'moving a session onto a day that already has one' do
+# The issues list, item 4: a move onto a day that already has a session is refused unless the
+# caller says a second one is meant. 28 September ended up holding squat and bench from two moves
+# that each went through and reported the collision after the fact.
+describe 'moving a session onto a day that already has one, without saying so' do
   include Rack::Test::Methods
   include MovingASession
 
@@ -110,7 +110,32 @@ describe 'moving a session onto a day that already has one' do
                                 arguments: { workout_id: @moving, date: Date.today.to_s })
   end
 
-  it 'goes through rather than refusing' do
+  it 'is refused, and nothing moves' do
+    assert tool_result['isError']
+    assert_equal yesterday, date_of(@moving)
+  end
+
+  it 'names what is already there' do
+    assert_includes tool_result.dig('content', 0, 'text'), "Morning (#{@sitting})"
+  end
+end
+
+# Two sessions on a date is still a feature: #89 asked for it, workouts.name exists to tell them
+# apart, and the index on (account_id, date) is non-unique on purpose. Asked for with alongside,
+# the move goes through -- and what gets reported is the day.
+describe 'moving a session onto a day that already has one, alongside it' do
+  include Rack::Test::Methods
+  include MovingASession
+
+  before do
+    @minted = mint(scopes: %w[read write])
+    @sitting = a_trained_session(@minted.account_id, date: Date.today, name: 'Morning')
+    @moving = a_trained_session(@minted.account_id, date: yesterday, name: 'Evening')
+    call_tool('update_workout', raw: @minted.raw,
+                                arguments: { workout_id: @moving, date: Date.today.to_s, alongside: true })
+  end
+
+  it 'goes through' do
     assert_equal Date.today, date_of(@moving)
   end
 
@@ -143,7 +168,8 @@ describe 'the day a moved session landed on, in the payload' do
     sitting = a_trained_session(minted.account_id, date: Date.today, name: 'Morning')
     moving = a_trained_session(minted.account_id, date: yesterday, name: 'Evening')
 
-    call_tool('update_workout', raw: minted.raw, arguments: { workout_id: moving, date: Date.today.to_s })
+    call_tool('update_workout', raw: minted.raw,
+                                arguments: { workout_id: moving, date: Date.today.to_s, alongside: true })
     day = tool_result.dig('structuredContent', 'day_holds')
 
     assert_equal([sitting, moving], day.map { |other| other['id'] })
