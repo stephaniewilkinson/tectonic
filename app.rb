@@ -212,6 +212,30 @@ class Tectonic < Roda
     # now is; the #575 note further down has that argument.
     require_login_confirmation? false
     require_password_confirmation? false
+    # An address is only taken if it can be mailed. Since #575 sign-up is nothing but an
+    # address and a confirmation sent to it, so an address Resend will not deliver to is an
+    # account that can never be finished -- and the person was told to go and check their
+    # inbox. Resend answered one with a 422 "Invalid `to` field" in production.
+    #
+    # Rodauth's default pattern only asks for something@something.something with no spaces,
+    # commas or semicolons, which lets through doubled and trailing dots, quotes, angle
+    # brackets and tabs. The form's `type="email"` catches some of that in a browser, but not
+    # all of it, and the JSON route has no browser at all. This is the dot-atom an ordinary
+    # mailbox has: no quoted local parts, and a domain of hostname labels ending in a TLD,
+    # punycode included, which is what a browser sends for a non-ASCII domain.
+    #
+    # Only sign-up checks it. Logging in looks the address up and never validates it, so an
+    # account made under the old rule can still sign in.
+    login_email_regexp(
+      %r{\A[A-Za-z0-9!\#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!\#$%&'*+/=?^_`{|}~-]+)*
+        @(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+(?:[A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})\z}x
+    )
+    # Lower case and no full stop, for the reason given on already_an_account_with_this_login_message.
+    login_not_valid_email_message 'not an address mail can be delivered to. Check it for a typo'
+    # A space typed or pasted either side of the address is not part of it. A browser trims
+    # these from a `type="email"` box already; the JSON route and a pasted non-breaking space
+    # are what this is for.
+    normalize_login { |login| login.gsub(/\A[[:space:]\u200B\uFEFF]+|[[:space:]\u200B\uFEFF]+\z/, '') }
     # Losing a password no longer loses the account. #344.
     #
     # This app had no reset flow at all, and said so in two places -- views/create-account.erb
