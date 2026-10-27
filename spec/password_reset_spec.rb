@@ -221,6 +221,41 @@ describe 'the mailer' do
   end
 end
 
+# A slow or dropped send, which is the case TECTONIC-3 caught on /create-account.
+describe 'the mailer, when Resend does not answer' do
+  # TECTONIC-3. One dropped request should not cost somebody their confirmation email --
+  # and the second try must carry the first one's key, because a timeout does not mean the
+  # first was not sent.
+  it 'tries a timed-out send once more under the same idempotency key' do
+    keys = []
+    flaky = lambda do |key:, **|
+      keys << key
+      raise HTTP::TimeoutError, 'slow' if keys.one?
+
+      true
+    end
+    Tectonic::Mailer.stub(:configured?, true) do
+      Tectonic::Mailer.stub(:post, flaky) do
+        assert Tectonic::Mailer.deliver(to: 'a@example.com', subject: 'x', text: 'y')
+      end
+    end
+
+    assert_equal 2, keys.size
+    assert_equal 1, keys.uniq.size
+  end
+
+  it 'gives up after the second timeout rather than holding the request open' do
+    tries = 0
+    Tectonic::Mailer.stub(:configured?, true) do
+      Tectonic::Mailer.stub(:post, ->(**) { tries += 1 and raise HTTP::TimeoutError, 'slow' }) do
+        capture_io { refute Tectonic::Mailer.deliver(to: 'a@example.com', subject: 'x', text: 'y') }
+      end
+    end
+
+    assert_equal Tectonic::Mailer::ATTEMPTS, tries
+  end
+end
+
 describe 'what the reset email says' do
   include Rack::Test::Methods
   include RouteOwnership

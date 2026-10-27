@@ -2,6 +2,7 @@
 
 require 'http'
 require 'json'
+require 'securerandom'
 
 class Tectonic < Roda
   # The one email this app sends: a password reset link. #344.
@@ -24,9 +25,16 @@ class Tectonic < Roda
   # it, and the flow stays walkable end to end without a key or a network.
   module Mailer
     ENDPOINT = 'https://api.resend.com/emails'
-    # Ten seconds, because this is on the request path. A provider that is merely slow must
-    # not hold a Puma thread open behind somebody's password reset.
-    TIMEOUT = 10
+    # Four seconds a try and two tries, so the worst case stays under the ten seconds a
+    # single try used to get. This is on the request path, and a provider that is merely
+    # slow must not hold a Puma thread open behind somebody's sign-up -- but one that drops
+    # a single request (TECTONIC-3: a confirmation timed out on /create-account) should not
+    # cost that person their email either. Resend normally answers in well under a second.
+    TIMEOUT = 4
+    ATTEMPTS = 2
+    # Only the failures where trying again could help. A refusal (4xx) comes back as a
+    # response, not one of these, and sending it again would be refused again.
+    RETRYABLE = [HTTP::TimeoutError, HTTP::ConnectionError].freeze
 
     module_function
 
@@ -48,7 +56,7 @@ class Tectonic < Roda
     def deliver(to:, subject:, text:)
       return log_instead(to, subject, text) unless configured?
 
-      post(to:, subject:, text:)
+      post_with_retry(to:, subject:, text:)
     rescue StandardError => e
       # Any transport failure at all: DNS, TLS, timeout. Reported, never raised, for the
       # reason on the module above.
@@ -56,9 +64,25 @@ class Tectonic < Roda
       false
     end
 
-    def post(to:, subject:, text:)
+    # One key for every try. A timeout does not mean Resend dropped the request -- it may have
+    # sent the email and been slow to say so -- and the key is what makes the second try a
+    # no-op rather than a second copy in somebody's inbox.
+    def post_with_retry(to:, subject:, text:)
+      key = SecureRandom.uuid
+      attempt = 0
+      begin
+        attempt += 1
+        post(to:, subject:, text:, key:)
+      rescue *RETRYABLE
+        retry if attempt < ATTEMPTS
+        raise
+      end
+    end
+
+    def post(to:, subject:, text:, key:)
       response = HTTP.timeout(TIMEOUT)
                      .auth("Bearer #{api_key}")
+                     .headers('Idempotency-Key' => key)
                      .post(ENDPOINT, json: { from: sender, to: [to], subject:, text: })
       return true if response.status.success?
 
