@@ -62,7 +62,7 @@ class Tectonic < Roda
                     'defaults to the Monday of the current week; weeks are numbered by ' \
                     'their position unless numbered explicitly. time_budget_minutes says ' \
                     'how long a session of this block is meant to take; set it and ' \
-                    'generate_program_week says so when a day runs past it.'
+                    "generate_program_week says so when a day runs past it. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

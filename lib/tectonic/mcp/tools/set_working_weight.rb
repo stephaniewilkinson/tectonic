@@ -46,7 +46,7 @@ class Tectonic < Roda
                     'after a bad set. Takes a workout_id and an exercise name. Skips ' \
                     'warmups and anything already completed, and leaves the prescription ' \
                     'alone so what was planned stays readable beside what was done. ' \
-                    'Returns how many sets moved and how many were left.'
+                    "Returns how many sets moved and how many were left. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

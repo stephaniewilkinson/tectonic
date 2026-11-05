@@ -48,7 +48,7 @@ class Tectonic < Roda
                     'changes. Returns what actually moved. ' \
                     'Changing the weight or reps of a completed set needs confirm true, ' \
                     'which you should only send if the user asked for the correction; ' \
-                    'changing its exercise is refused, since that is a different set.'
+                    "changing its exercise is refused, since that is a different set. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

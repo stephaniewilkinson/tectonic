@@ -19,6 +19,15 @@ require_relative '../../withings_workouts'
 class Tectonic < Roda
   module MCP
     module Tools
+      # What a dumbbell weight is the weight *of*, said on every tool that writes or reads one.
+      # #674. The app stores one dumbbell -- dumbbell_label in app.rb and the quantity line
+      # get_workout prints both read it that way -- and no tool said so. On 3 November an
+      # assistant wrote a pair's total, then saw the session screen say "two at 68 lb" and told
+      # the lifter in the session note that the screen was a display bug. The screen was the
+      # one thing that was right. One constant so the sentence cannot drift between tools.
+      ONE_DUMBBELL = 'On a movement done with dumbbells a weight is one dumbbell, not the ' \
+                     'pair: two 25 lb dumbbells is 25.'
+
       # The ranges every tool that writes a number checks its arguments against. They
       # live here rather than on the tool that first needed them because a weight means
       # the same thing whether it is being logged, revised or prescribed, and because a

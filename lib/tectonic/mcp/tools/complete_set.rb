@@ -19,7 +19,7 @@ class Tectonic < Roda
         title 'Mark a set as lifted'
         description 'Mark a set as lifted. Pass weight, reps or rpe to record what was ' \
                     'actually done, which leaves what was prescribed intact for comparison. ' \
-                    'Pass completed false to undo.'
+                    "Pass completed false to undo. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',
