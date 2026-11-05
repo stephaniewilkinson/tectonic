@@ -1,0 +1,54 @@
+<%# The poll holds off while a tap is out. #669.
+
+    A tap's answer is the panel it changed and the rest cue that starts the next rest, and
+    htmx swaps the panel into the element that sent the tap. A poll that comes back first
+    replaces every panel -- the tapping form with them -- and htmx, finding the sender gone
+    from the page, throws the tap's whole answer away. The rows look right, because the poll
+    drew the same ones, and the rest timer never hears that a set was finished: it goes on
+    counting the last set's rest. That is what "tapping RPE doesn't reset the timer" was.
+
+    It is not a rare overlap. The tap's own write rings the session stream (#592), the stream
+    fires the poll, and that poll still asks about the fingerprint the page loaded with --
+    the tap's answer is the thing that brings the new one -- so it finds a change and sends
+    every panel back, racing the answer it was caused by.
+
+    So while any set tap is out, a poll is not sent, and one already sent is not swapped. It
+    loses nothing: the tap's answer re-arms the poller with what the tap made true (#249),
+    and the fifteen-second poll and the next doorbell carry on from there. A poll is only
+    ever a catch-up, and nothing is behind while the screen is waiting on its own tap.
+
+    Counted, not flagged, because two taps can be out at once -- a superset ticked off in
+    one motion. And released on the request's own loadend rather than on htmx:afterRequest:
+    that event is fired on the form that sent the tap, and a form swapped out of the page
+    fires it into nothing, which would leave the count up and the poll held for good. loadend
+    fires on the request whatever has happened to the page, for an answer, an error, a
+    timeout or an abort alike.
+
+    Outside #session-body with the stream and the banner, for their reason: everything in
+    there is replaced on every swap, and this has to outlive the swaps it is about. %>
+<script>
+  (function () {
+    var out = 0;
+
+    function isTap(event) {
+      var config = event.detail && event.detail.requestConfig;
+      return !!(config && config.path && /\/sets\/\d+\/complete$/.test(config.path));
+    }
+
+    function isPoll(event) {
+      var config = event.detail && event.detail.requestConfig;
+      return !!(config && config.path && config.path.indexOf('/session/changes') !== -1);
+    }
+
+    document.body.addEventListener('htmx:beforeRequest', function (event) {
+      if (isPoll(event) && out > 0) { event.preventDefault(); return; }
+      if (!isTap(event) || !event.detail.xhr) { return; }
+      out += 1;
+      event.detail.xhr.addEventListener('loadend', function () { out = Math.max(0, out - 1); });
+    });
+
+    document.body.addEventListener('htmx:beforeSwap', function (event) {
+      if (isPoll(event) && out > 0) { event.detail.shouldSwap = false; }
+    });
+  })();
+</script>
