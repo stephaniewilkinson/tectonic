@@ -3495,6 +3495,22 @@ class Tectonic < Roda
       'focus:ring-2 focus:ring-inset focus:ring-sky-800'
   end
 
+  # A session's sets of one movement, the way a lifter says them: "3 × 5 at 135" for three
+  # alike, joined with commas where they differ -- "2 × 5 at 135, 185 × 3". Runs of the same
+  # weight and reps collapse, in the order lifted, so a ramp still reads as a ramp. A set with
+  # no weight is its rep count alone.
+  def sets_summary(sets)
+    sets.chunk_while { |a, b| a[:weight] == b[:weight] && a[:reps] == b[:reps] }
+        .map { |run| set_run(run.length, weight_label(run.first[:weight]), run.first[:reps]) }
+        .join(', ')
+  end
+
+  def set_run(count, weight, reps)
+    return (weight ? "#{count} × #{reps} at #{weight}" : "#{count} × #{reps}") if count > 1
+
+    weight ? "#{weight} × #{reps}" : "#{reps} reps"
+  end
+
   # How wide a page is. DESIGN.md. Seven widths were in use -- sm, md, xl, 2xl, 3xl, 5xl and
   # 7xl -- and which one a page got said more about who wrote it than what was on it: the
   # exercise page drew its chart in 28rem while the workout list stretched a five-column

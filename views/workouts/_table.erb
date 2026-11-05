@@ -7,39 +7,35 @@
 <%- @htmx = true %>
 <%# One table of workouts, rendered once for the sessions still ahead and once for
     training already done, so the two lists cannot drift apart in how a row reads. %>
-<div class="mt-4 flow-root">
-  <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-    <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-      <table class="min-w-full divide-y divide-gray-300">
-        <thead>
+<%# A card with three columns, since DESIGN.md: the date, which is the way into the session,
+    the set count, and the two things you can do to a row. It was five columns -- Date, Sets,
+    Show, Edit, Delete -- which made an admin table of a training log and spent a column on
+    "Show" when the date was the obvious thing to tap. %>
+<div class="mt-4 overflow-x-auto <%= card_style %>">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
           <tr>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Date
+            <th scope="col" class="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 sm:pl-6">
+              Session
             </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+            <th scope="col" class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
               Sets
             </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Show
-            </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Edit
-            </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-              Delete
-            </th>
+            <th scope="col" class="py-3 pl-3 pr-4 sm:pr-6"><span class="sr-only">Edit or delete</span></th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200 bg-white">
+        <tbody class="divide-y divide-gray-100">
           <%- workouts.each do |workout| %>
             <tr>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-gray-500 sm:pl-6">
                 <%# The day it was trained, falling back to the day it is written for. #572,
                     and Workout#performed_or_planned_on is the rule. Free of a query per row:
                     the route fetches this list `with_performed_on`, so the stamp is a column
                     on the row already and the fallback inside that method never fires here.
                     spec/query_count_spec.rb is what notices if that stops being true. %>
-                <%= workout.performed_or_planned_on.strftime('%b %d, %Y') %>
+                <a href="/workouts/<%= workout[:id] %>/" class="font-medium text-lime-700 hover:text-lime-800">
+                  <%= workout.performed_or_planned_on.strftime('%b %d, %Y') %>
+                </a>
                 <%# @today is the lifter's, not the server's (#349): on the server's clock a
                     Monday evening session in New York is already Tuesday and reads as missed
                     while it is being lifted. %>
@@ -75,34 +71,24 @@
                   which on this page is a query per session and grew with the history. It comes off
                   the row now, counted in the query that fetched the page (#234). %>
               <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= workout.set_count %></td>
-              <%# These two carried no class at all, so Tailwind's preflight left them the
-                  cell's text-gray-500 and they read as two more facts about the row, next
-                  to the set count, rather than as the two ways into a workout. lime-700 is
-                  the link colour throughout the app: 4.99:1 on white, the only step in this
-                  scale that clears WCAG AA for body text. %>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <a href="/workouts/<%= workout[:id] %>/" class="font-medium text-lime-700 hover:text-lime-800">
-                  Show
-                </a>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                <a href="/workouts/<%= workout[:id] %>/edit/" class="font-medium text-lime-700 hover:text-lime-800">
-                  Edit
-                </a>
-              </td>
-              <td class="whitespace-nowrap px-3 py-4 text-sm">
-                <form action="/workouts/<%= workout[:id] %>/delete" method="post"
-                      hx-post="/workouts/<%= workout[:id] %>/delete"
-                      hx-target="closest tr"
-                      hx-swap="outerHTML">
-                  <%== csrf_tag("/workouts/#{workout[:id]}/delete") %>
-                  <button type="submit" class="font-medium text-red-600 hover:text-red-800">Delete</button>
-                </form>
+              <%# Edit and Delete together at the end of the row, where the eye looks for what can
+                  be done to a row rather than read about it. Show went: the date is the link now.
+                  lime-700 is the link colour throughout the app -- 4.99:1 on white, the only
+                  step in this scale that clears WCAG AA for body text. %>
+              <td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
+                <div class="flex items-center justify-end gap-4">
+                  <a href="/workouts/<%= workout[:id] %>/edit/" class="font-medium text-lime-700 hover:text-lime-800">Edit</a>
+                  <form action="/workouts/<%= workout[:id] %>/delete" method="post"
+                        hx-post="/workouts/<%= workout[:id] %>/delete"
+                        hx-target="closest tr"
+                        hx-swap="outerHTML">
+                    <%== csrf_tag("/workouts/#{workout[:id]}/delete") %>
+                    <button type="submit" class="font-medium text-red-700 hover:text-red-800">Delete</button>
+                  </form>
+                </div>
               </td>
             </tr>
           <%- end %>
         </tbody>
       </table>
-    </div>
-  </div>
 </div>

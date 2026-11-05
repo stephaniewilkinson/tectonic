@@ -52,19 +52,19 @@
         look at first if the face turns out to be wrong anywhere. The labels stay in the
         system face: a label is read at a glance and is not the thing on display. %>
     <dl class="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-      <div class="rounded-lg bg-gray-50 px-4 py-3">
+      <div class="<%= card_style %> px-4 py-3">
         <dt class="text-sm text-gray-500">Tonnage</dt>
         <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:tonnage].to_i %></dd>
       </div>
-      <div class="rounded-lg bg-gray-50 px-4 py-3">
+      <div class="<%= card_style %> px-4 py-3">
         <dt class="text-sm text-gray-500">Working sets</dt>
         <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:sets] %></dd>
       </div>
-      <div class="rounded-lg bg-gray-50 px-4 py-3">
+      <div class="<%= card_style %> px-4 py-3">
         <dt class="text-sm text-gray-500">Reps</dt>
         <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:reps].to_i %></dd>
       </div>
-      <div class="rounded-lg bg-gray-50 px-4 py-3">
+      <div class="<%= card_style %> px-4 py-3">
         <dt class="text-sm text-gray-500">Weeks trained</dt>
         <dd class="serif text-2xl font-semibold text-gray-900"><%= @summary[:weeks] %> / <%= @rows.length %></dd>
       </div>
