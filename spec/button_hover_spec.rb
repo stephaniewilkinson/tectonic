@@ -60,8 +60,8 @@ describe 'the buttons on the pages a visitor sees' do
   include RouteOwnership
   include ButtonHover
 
-  # welcome.erb's Log in rests at lime-600 rather than lime-500, so it is the one button
-  # in the app whose hover is lime-700. It used to hover to lime-500 and got lighter.
+  # welcome.erb's Log in used to rest at lime-600 and hover to lime-500, getting lighter. It is
+  # a text link now, and Sign up is the page's one filled button.
   it 'steps every one of them down its own scale' do
     ['/welcome', '/login', '/create-account'].each { |path| assert_hover_steps_down_its_own_scale(path) }
   end

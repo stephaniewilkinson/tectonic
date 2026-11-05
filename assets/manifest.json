@@ -1,7 +1,7 @@
 {
   "name": "tectonic plates",
   "short_name": "tectonic",
-  "description": "A barbell strength tracker with an MCP connector.",
+  "description": "Log your barbell training, and let your AI assistant plan it.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
