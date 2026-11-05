@@ -49,14 +49,16 @@
           brand face where the brand face works, which is large. The headline keeps it, the
           section title below keeps it, and the running text is set in the system face like
           every other paragraph in the app. %>
-      <p class="mt-6 text-lg leading-8 text-gray-600">Connect tectonic plates to your AI assistant and it writes your next block, changes it when the week does, and reads back what you actually lifted.</p>
-      <p class="mt-4 text-lg leading-8 text-gray-600">Underneath it is a lifting log: your bar, your plates, and your heaviest lifts charted day by day.</p>
-      <div class="mt-10 flex items-center gap-x-6">
-        <%# Log in rests a step darker than the primary button everywhere else, so its hover is
-            lime-700 rather than the usual lime-600. It hovered to lime-500 before, which made it
-            the one button in the app that got lighter when you pointed at it. %>
-        <a href="/login" class="<%= button_style %> bg-lime-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-lime-700">Log in</a>
-        <a href="/create-account" class="<%= button_style %> bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">Sign up</a>
+      <p class="mt-6 text-lg leading-8 text-gray-600">Connect tectonic plates to your AI assistant. It writes your next few weeks of training, adjusts them when life gets in the way, and checks them against what you actually lifted.</p>
+      <p class="mt-4 text-lg leading-8 text-gray-600">Underneath, it&rsquo;s a full lifting log: weights rounded to the plates you own, warmups worked out for you, a rest timer between sets, and a chart of your best set every session.</p>
+      <div class="mt-10 flex flex-wrap items-center gap-x-6 gap-y-4">
+        <%# Sign up first and the only filled button, because this page is for somebody who has
+            not got an account yet; somebody who has one is usually signed in and never sees it.
+            Log in sat first, filled in lime and just as loud, which put the returning visitor's
+            door ahead of the new one's on the page written for the new one. "Free" repeats the
+            price line below on the button itself, at the moment the question is being asked. %>
+        <a href="/create-account" class="<%= button_style %> bg-sky-800 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-900">Sign up free</a>
+        <a href="/login" class="text-sm font-semibold leading-6 text-sky-800">Log in</a>
         <%# This said "Learn more" and went to /about, which is a colophon: a name, a
             twitter handle and the Noun Project icon credits. The reader most likely to
             sign up is the one who clicks it, and they were sent to attribution for the

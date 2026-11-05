@@ -67,10 +67,11 @@
         what makes it the right fallback for forty pages behind a login that no crawler will
         ever see. %>
     <%- @page_title ||= 'tectonic plates — a barbell tracker Claude and ChatGPT can plan' %>
-    <%- @page_description ||= 'A barbell strength tracker with an MCP connector. Ask Claude or ' \
-                              'ChatGPT to write a whole training block - weeks, days, ' \
-                              'progressions, warmup ramps, plate maths for your own rack - ' \
-                              'then log every set against it. Free while it is in beta.' %>
+    <%- @page_description ||= 'A barbell lifting log your AI assistant can plan for. Ask ' \
+                              'Claude or ChatGPT, through its MCP connector, for a ' \
+                              'four-week programme, with sets, ' \
+                              'weights and warmups rounded to the plates you own, then ' \
+                              'log every set against it. Free while in beta.' %>
     <!-- HTML Meta Tags -->
     <title><%= @page_title %></title>
     <meta name="description" content="<%= @page_description %>">
