@@ -1,12 +1,15 @@
-<div class="mx-auto max-w-3xl">
+<div class="<%= page_style(:reading) %>">
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <h1 class="text-3xl font-semibold text-gray-900">Welcome to tectonic plates</h1>
+    <h1 class="<%= heading_style(:page) %>">Welcome to tectonic plates</h1>
     <div class="flex gap-2">
-      <a href="/workouts/new" class="<%= button_style %> bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Start a new workout</a>
+      <%# One filled button per view (DESIGN.md). These were lime and sky side by side, two
+          equally loud answers to "what now". Continuing is the plain one: it goes to the list
+          of sessions rather than into one, so it is not the session's sky either. %>
+      <a href="/workouts/new" class="<%= primary_button_style %>">Start a new workout</a>
       <%# Not on an account with no sessions at all, where it led to an empty list with
           nothing in it to continue. #636. %>
       <%- if @anything %>
-        <a href="/workouts/" class="<%= button_style %> bg-sky-800 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-900">Continue a workout</a>
+        <a href="/workouts/" class="<%= secondary_button_style %>">Continue a workout</a>
       <%- end %>
     </div>
   </div>
@@ -20,7 +23,7 @@
        class="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
       &larr; <%= @previous.strftime('%b') %>
     </a>
-    <h2 class="text-lg font-semibold text-gray-900"><%= @month.strftime('%B %Y') %></h2>
+    <h2 class="<%= heading_style(:section) %>"><%= @month.strftime('%B %Y') %></h2>
     <a href="/?month=<%= @following.strftime('%Y-%m') %>" rel="next"
        class="inline-flex min-h-11 items-center rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100">
       <%= @following.strftime('%b') %> &rarr;

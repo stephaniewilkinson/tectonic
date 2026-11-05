@@ -19,7 +19,7 @@
     whether the connector can do the thing they are about to ask for, which is four sentences.
     It would also go stale in the opposite direction from the truth -- a list that is right
     about names and silent about what they mean. %>
-<div class="mx-auto max-w-2xl">
+<div class="<%= page_style(:reading) %>">
   <h1 class="serif text-4xl font-semibold text-gray-900">Connect tectonic plates to Claude or ChatGPT</h1>
 
   <p class="mt-4 text-lg text-gray-700">
@@ -32,7 +32,7 @@
       from the same two constants the app serves itself under, so a change to either cannot
       leave this pointing at an endpoint that moved. %>
   <div class="mt-8 rounded-xl border border-sky-200 bg-sky-50 p-5">
-    <h2 class="text-lg font-semibold text-gray-900">Add it in one click</h2>
+    <h2 class="<%= heading_style(:section) %>">Add it in one click</h2>
     <p class="mt-2 text-sm text-gray-700">
       Opens Claude&rsquo;s add-connector dialog with the address already filled in. If you are
       not signed in to Claude it will ask you to, then bring you back here.
@@ -57,7 +57,7 @@
     </p>
   </div>
 
-  <h2 class="mt-10 text-2xl font-semibold text-gray-900">What it can do</h2>
+  <h2 class="<%= heading_style(:section) %> mt-10">What it can do</h2>
   <p class="mt-3 text-gray-700">
     It writes training, not just records it. You can ask for a whole block &mdash; weeks, the
     days in each week, the lifts in each day, how each one progresses, which weeks deload
@@ -77,7 +77,7 @@
     can be finished the other.
   </p>
 
-  <h2 class="mt-10 text-2xl font-semibold text-gray-900">What it will not do</h2>
+  <h2 class="<%= heading_style(:section) %> mt-10">What it will not do</h2>
   <%# The honest half, and the more useful one. A reader deciding whether to connect an app to
       an assistant is deciding what it might do without being asked, and a page that only
       lists capabilities answers the wrong question. %>
@@ -102,7 +102,7 @@
     </li>
   </ul>
 
-  <h2 class="mt-10 text-2xl font-semibold text-gray-900">Turning it off</h2>
+  <h2 class="<%= heading_style(:section) %> mt-10">Turning it off</h2>
   <p class="mt-3 text-gray-700">
     Authorisation is per account and revocable at any time from
     <a href="/connections" class="text-lime-700 underline hover:text-lime-800">your connections
@@ -110,7 +110,7 @@
     nothing you have already logged is touched.
   </p>
 
-  <h2 class="mt-10 text-2xl font-semibold text-gray-900">What is stored</h2>
+  <h2 class="<%= heading_style(:section) %> mt-10">What is stored</h2>
   <%# #634. This said "no bodyweight, no measurements ... and no health data of any other
       kind" until the Withings work made it false, and it went on saying so on the one page a
       stranger reads before granting access. The list below is pinned against

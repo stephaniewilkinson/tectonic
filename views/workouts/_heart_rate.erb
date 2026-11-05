@@ -12,7 +12,7 @@
     before reads happened on matching, or one whose read Withings did not answer. %>
 <%- if @heart %>
   <div class="mt-4 rounded-md border border-gray-300 bg-white px-4 py-3">
-    <h2 class="text-sm font-semibold text-gray-900">Heart rate</h2>
+    <h2 class="<%= heading_style(:label) %>">Heart rate</h2>
     <%- if @heart_read == 'unreachable' %>
       <p class="mt-1 text-sm text-amber-800" role="alert">Withings did not answer. Try again in a minute.</p>
     <%- elsif @heart_read == 'none' %>

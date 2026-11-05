@@ -44,13 +44,13 @@
         surviving review because white on gray-500 is 4.83:1 and white on lime-500 is 1.98:1,
         so the broken state was the more legible one. Each colour steps one down its own scale
         now, sky included -- a secondary that turns primary under the pointer is no hierarchy. %>
-    <a href="/workouts/<%= @workout[:id] %>/session" type="button" class="<%= button_style %> inline-flex items-center gap-x-1.5 hover:bg-sky-900 bg-sky-800 px-2.5 py-1.5 text-sm font-semibold text-white">
+    <a href="/workouts/<%= @workout[:id] %>/session" type="button" class="<%= primary_button_style(:session) %> inline-flex items-center gap-x-1.5">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
         <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm14.024-.983a1.125 1.125 0 010 1.966l-5.603 3.113A1.125 1.125 0 019 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113z" clip-rule="evenodd" />
       </svg>
       Run session
     </a>
-    <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="<%= button_style %> inline-flex items-center gap-x-1.5 hover:bg-lime-600 bg-lime-500 px-2.5 py-1.5 text-sm font-semibold text-gray-900">
+    <a href="/workouts/<%= @workout[:id] %>/sets/new" type="button" class="<%= secondary_button_style %> inline-flex items-center gap-x-1.5">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
         <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 9a.75.75 0 00-1.5 0v2.25H9a.75.75 0 000 1.5h2.25V15a.75.75 0 001.5 0v-2.25H15a.75.75 0 000-1.5h-2.25V9z" clip-rule="evenodd" />
       </svg>
@@ -279,7 +279,7 @@
         erb_lint hands each tag to rubocop as a snippet of its own and a local assigned in
         one tag and read in the next is a useless assignment to every cop that sees it. %>
     <%- @exercise = @exercises[exercise_id] %>
-    <div class="relative overflow-hidden rounded-xl bg-white px-4 pt-5 shadow sm:px-6 sm:pt-6">
+    <div class="relative overflow-hidden <%= card_style %> px-4 py-5 sm:p-6">
       <dt class="inline-flex">
         <div class="absolute rounded-md bg-lime-500 p-2">
           <%# The movement's own icon, not one figure for all of them. The icons the app
@@ -293,7 +293,7 @@
             ask. It read in the display face before only because `text-xl` happened to be
             in the font rule, which meant the day it became `sm:text-xl` the face would
             have gone with nobody touching a font. %>
-        <a href="/exercises/<%= exercise_id %>" class="brand ml-20 md:ml-20 text-xl sm:text-4xl text-gray-500 hover:text-lime-500">
+        <a href="/exercises/<%= exercise_id %>" class="brand ml-20 text-2xl text-gray-900 hover:text-lime-700 sm:text-3xl">
           <%= @exercise.name %>
         </a>
       </dt>

@@ -29,7 +29,7 @@
     The route reads rows the backfill already wrote. Opening this page asks Withings nothing,
     which is what keeps it safe to leave open and reload. %>
 <div class="px-4 sm:px-6 lg:px-8">
-  <h1 class="text-3xl font-semibold text-gray-900">Matches from your watch</h1>
+  <h1 class="<%= heading_style(:page) %>">Matches from your watch</h1>
   <%- if @proposals.empty? %>
     <%# **Absent is absent here.** The record page tells a session minutes old to check back
         in a minute, because the watch's upload really is seconds to minutes behind. This
