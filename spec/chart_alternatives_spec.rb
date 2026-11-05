@@ -178,7 +178,7 @@ describe 'the chart on a movement page' do
   end
 
   it 'points at the table that is already there' do
-    assert_includes last_response.body, 'Every set is listed below'
+    assert_includes last_response.body, 'Every session is listed below'
   end
 
   # **This reverses in #434, and the reasoning that changed is worth keeping.** The old chart

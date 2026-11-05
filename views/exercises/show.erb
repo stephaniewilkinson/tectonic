@@ -374,21 +374,28 @@
         <%== render('_chart_dates_table',
                     locals: { series: @progress, caption: "#{@exercise[:name]} progress against the goal" }) %>
         <p class="mt-1 text-xs text-gray-500">
-          Heaviest completed working set each session. Every set is listed below, newest first.
+          Heaviest completed working set each session. Every session is listed below, newest first.
         </p>
       </div>
     <%- end %>
 
-    <table class="mt-6 min-w-full divide-y divide-gray-300">
-      <thead>
+    <%# One row per session, newest first, since DESIGN.md. It was one row per set, oldest
+        first, under a caption saying newest first -- so "when did I last squat this" meant
+        scrolling to the bottom of a table that repeated the date three to five times a
+        session. sets_summary writes a session's sets the way a lifter says them. %>
+    <h2 class="<%= heading_style(:label) %> mt-8">History</h2>
+    <div class="mt-3 overflow-x-auto <%= card_style %>">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
         <tr>
-          <th scope="col" class="py-3.5 pr-3 text-left text-sm font-semibold text-gray-900">Date</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Weight</th>
-          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Reps</th>
+          <th scope="col" class="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 sm:pl-6">Date</th>
+          <th scope="col" class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sets</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200">
-        <%- @sets.each do |set| %>
+      <tbody class="divide-y divide-gray-100">
+        <%- @sets.group_by(&:workout)
+                 .sort_by { |workout, _| [workout.performed_or_planned_on, workout.id] }
+                 .reverse_each do |workout, sets| %>
           <tr>
             <%# The day the set was lifted, not the day a programme asked for it. #572 calls
                 this the worst of the seven, and it is right to: this table is a lifter's own
@@ -398,14 +405,16 @@
                 The route eager-loads these workouts `with_performed_on`, so the stamp is on
                 the row and Workout#performed_or_planned_on never falls back to a query here --
                 which in a table of a year of sets would be a year of queries. %>
-            <td class="whitespace-nowrap py-4 pr-3 text-sm text-gray-500">
-              <%= set.workout.performed_or_planned_on.strftime('%b %d, %Y') %>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+              <a href="/workouts/<%= workout.id %>/" class="font-medium text-lime-700 hover:text-lime-800">
+                <%= workout.performed_or_planned_on.strftime('%b %d, %Y') %>
+              </a>
             </td>
-            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= weight_label(set[:weight]) %></td>
-            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= set[:reps] %></td>
+            <td class="px-3 py-4 text-sm tabular-nums text-gray-700"><%= sets_summary(sets.sort_by(&:id)) %></td>
           </tr>
         <%- end %>
       </tbody>
     </table>
+    </div>
   <%- end %>
 </div>
