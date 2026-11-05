@@ -18,7 +18,7 @@
         It matters more here than anywhere, because this is the screen somebody is holding
         while they train: a session opened in the gym and headed with Friday, two days from
         now, reads as having opened the wrong one. %>
-    <h1 class="text-3xl font-semibold text-gray-900">
+    <h1 class="<%= heading_style(:page) %>">
       <%= @workout.performed_or_planned_on.strftime('%A %b %-d') %>
     </h1>
     <%# "record" was the noun -- the page that records this session -- and read as the verb,

@@ -4,7 +4,7 @@
     went to a read-only page with nowhere onward. It comes back here now, and the line below
     says what landed, with the way back to the workout for when the session is all in. From the
     session screen the form still goes back to the session instead, as #578 made it. %>
-<h1 class="text-2xl font-semibold text-gray-900">
+<h1 class="<%= heading_style(:page) %>">
   Add a set to <%= [@workout.label, @workout.performed_or_planned_on.strftime('%A %-d %B')].compact.join(', ') %>
 </h1>
 <%- if @set_notice %>

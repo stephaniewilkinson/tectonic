@@ -8,7 +8,7 @@
     would be refused by the post. %>
 <div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
   <div class="sm:mx-auto sm:w-full sm:max-w-sm">
-    <h1 class="text-center text-3xl font-semibold tracking-tight text-gray-900">This account is locked</h1>
+    <h1 class="<%= heading_style(:page) %> text-center">This account is locked</h1>
     <%== render('_form_error') %>
     <p class="mt-4 text-center text-sm text-gray-600">
       Too many wrong passwords, so sign-in is paused for an hour. It unlocks by itself after

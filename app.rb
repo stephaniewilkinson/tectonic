@@ -3495,6 +3495,56 @@ class Tectonic < Roda
       'focus:ring-2 focus:ring-inset focus:ring-sky-800'
   end
 
+  # How wide a page is. DESIGN.md. Seven widths were in use -- sm, md, xl, 2xl, 3xl, 5xl and
+  # 7xl -- and which one a page got said more about who wrote it than what was on it: the
+  # exercise page drew its chart in 28rem while the workout list stretched a five-column
+  # table across 64. Three, by what the page is for: a form you fill in once, a page you
+  # read down, and a page of data laid out side by side.
+  PAGE_WIDTHS = { form: 'max-w-sm', reading: 'max-w-2xl', wide: 'max-w-5xl' }.freeze
+
+  def page_style(width)
+    "mx-auto w-full #{PAGE_WIDTHS.fetch(width)}"
+  end
+
+  # Three kinds of heading, which were twenty different class lists. DESIGN.md.
+  #
+  # :page is the screen's title and :section a part of it, both in the display face, which
+  # h1 and h2 take from app.css. :label is the small capitalised line over a group of
+  # fields or a block of figures -- BARBELL, WITHINGS, Progress -- and it is in the system
+  # face, because Blonde at fourteen pixels in capitals is not letters any more, it is
+  # texture. `font-sans` outranks the element rule on specificity, which is what lets an h2
+  # be a label without becoming an h3 it is not.
+  HEADINGS = {
+    page: 'text-3xl font-semibold tracking-tight text-gray-900',
+    section: 'text-xl font-semibold text-gray-900',
+    label: 'font-sans text-sm font-semibold uppercase tracking-wide text-gray-500'
+  }.freeze
+
+  def heading_style(kind)
+    HEADINGS.fetch(kind)
+  end
+
+  # A white surface on the grey page, which was five: three radii, two shadows, rings inset
+  # and not, gray-200 and gray-900/10. Padding stays at the call site, because a card
+  # holding a table wants none and a card holding prose wants room.
+  def card_style
+    'rounded-lg bg-white shadow-sm ring-1 ring-gray-900/5'
+  end
+
+  # The two filled buttons and the plain one, with the shape button_style already settles.
+  # DESIGN.md: one filled button per view. Lime is the action everywhere; sky is the session
+  # -- Done, Run session, Continue a workout -- since lime on that screen means a set is
+  # finished, and a lime control would wear the colour of the state it changes.
+  def primary_button_style(kind = :action)
+    fill = kind == :session ? 'bg-sky-800 text-white hover:bg-sky-900' : 'bg-lime-500 text-gray-900 hover:bg-lime-600'
+    "#{button_style} #{fill} px-3.5 py-2.5 text-sm font-semibold"
+  end
+
+  def secondary_button_style
+    "#{button_style} bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 " \
+      'ring-1 ring-inset ring-gray-300 hover:bg-gray-50'
+  end
+
   # A nav link, which appeared ten times written out in full. What differs between them is
   # only whether the link is the one you are on -- colour, hover, and a transparent bottom
   # border -- so that stays at the call site and the rest is here.

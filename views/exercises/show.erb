@@ -8,9 +8,9 @@
     into @charts, so the volume page -- whose weeks are evenly spaced categories and which
     parses no dates at all -- goes on not paying for it. %>
 <%- @calendar = @charts %>
-<div class="mx-auto max-w-md">
+<div class="<%= page_style(:reading) %>">
   <div class="flex items-center justify-between">
-    <h1 class="text-3xl font-semibold text-gray-900"><%= @exercise[:name] %></h1>
+    <h1 class="<%= heading_style(:page) %>"><%= @exercise[:name] %></h1>
     <%- if @exercise.account_id == @account_id %>
       <a href="/exercises/<%= @exercise[:id] %>/edit" class="<%= button_style %> bg-lime-500 px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-lime-600">Edit</a>
     <%- else %>
@@ -102,7 +102,7 @@
       it is the one that goes stale over a layoff -- which is the case this feature is for.
       Neither is worth saying plainly too: it is the state in which a percentage lift
       refuses to generate, and the refusal names this page. %>
-  <h2 class="mt-8 text-xl font-semibold text-gray-900">Training max</h2>
+  <h2 class="<%= heading_style(:section) %> mt-8">Training max</h2>
   <p class="mt-2 text-sm text-gray-600">
     <%- if @training_max&.stated? %>
       Percentages of this movement are worked out from <strong><%= weight_label(@training_max.pounds) %> lb</strong>,
@@ -274,7 +274,7 @@
       block are library rows, Back Squat and Bench Press among them, and while this field lived
       on the edit form the bell could be switched on for accessories and never for the lifts
       where three minutes actually matters. %>
-  <h2 class="mt-8 text-xl font-semibold text-gray-900">Rest between sets</h2>
+  <h2 class="<%= heading_style(:section) %> mt-8">Rest between sets</h2>
   <p class="mt-2 text-sm text-gray-600">
     <%- if @rest %>
       The session screen counts <strong><%= Tectonic::Timing.named(@rest) %></strong> down after
@@ -310,7 +310,7 @@
       block moves a max in a way a hypertrophy block deliberately does not, and an app that
       did the arithmetic would call a correctly-run offseason a failure every time. The app
       reports the gap and the days; the judgement is somebody else's, which is #263. %>
-  <h2 class="mt-8 text-xl font-semibold text-gray-900">Goal</h2>
+  <h2 class="<%= heading_style(:section) %> mt-8">Goal</h2>
   <p class="mt-2 text-sm text-gray-600">
     <%- if @goal %>
       Aiming at <strong><%= weight_label(@goal.pounds) %> lb</strong><%= @goal.deadline_phrase %>.
@@ -349,7 +349,7 @@
   <%- else %>
     <%- if @charts %>
       <div class="mt-6">
-        <h2 class="text-sm font-semibold text-gray-900">Progress</h2>
+        <h2 class="<%= heading_style(:label) %>">Progress</h2>
         <%# The chart #434 asks for, and it replaces "heaviest weight each day" rather than
             sitting beside it. That chart's line is this chart's first series, so keeping both
             would be the same training drawn twice a few inches apart -- and a reader would

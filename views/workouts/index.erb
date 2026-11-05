@@ -1,7 +1,7 @@
 <div class="px-4 sm:px-6 lg:px-8">
   <div class="sm:flex sm:items-center">
     <div class="sm:flex-auto">
-      <h1 class="text-3xl font-semibold text-gray-900">Workouts</h1>
+      <h1 class="<%= heading_style(:page) %>">Workouts</h1>
       <p class="mt-2 text-sm text-gray-700">Sessions still to train, then the training already done.</p>
     </div>
     <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
@@ -59,9 +59,9 @@
   <%# Written sessions are only worth a heading of their own once there are some, so an
       account that has never generated a week sees the list it always saw. %>
   <%- unless @upcoming.empty? %>
-    <h2 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Upcoming</h2>
+    <h2 class="<%= heading_style(:label) %> mt-8">Upcoming</h2>
     <%== render('workouts/_table', locals: { workouts: @upcoming }) %>
-    <h2 class="mt-10 text-sm font-semibold uppercase tracking-wide text-gray-500">History</h2>
+    <h2 class="<%= heading_style(:label) %> mt-10">History</h2>
   <%- end %>
   <%# A header row with nothing under it said nothing to a new account, and this is where
       several first clicks land (#636). A sentence instead, with the two ways a session gets

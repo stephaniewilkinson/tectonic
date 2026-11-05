@@ -1,5 +1,5 @@
-<div class="mx-auto max-w-md">
-  <h1 class="text-3xl font-semibold text-gray-900">
+<div class="<%= page_style(:reading) %>">
+  <h1 class="<%= heading_style(:page) %>">
     <%= @set.exercise[:name] %> &mdash; <%= weight_label(@set[:weight]) %> &times; <%= @set[:reps] %>
   </h1>
   <%- if provenance(@set) %>

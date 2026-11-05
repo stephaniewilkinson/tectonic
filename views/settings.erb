@@ -1,5 +1,5 @@
-<div class="mx-auto max-w-md">
-  <h1 class="text-3xl font-semibold text-gray-900">Settings</h1>
+<div class="<%= page_style(:reading) %>">
+  <h1 class="<%= heading_style(:page) %>">Settings</h1>
 
   <%# What the last thing you did here actually did. #472 needs it most: connecting to
       Withings leaves the site, comes back through a redirect, and can fail in four
@@ -88,7 +88,7 @@
       section arrives looking like the top of something rather than like a line that happens to
       be first. %>
   <section id="weight-plates" class="scroll-mt-4">
-    <h2 class="mt-8 text-xl font-semibold text-gray-900">Weight plates</h2>
+    <h2 class="<%= heading_style(:section) %> mt-8">Weight plates</h2>
     <p class="mt-2 text-sm text-gray-600">
       What you lift with. Every weight the app works out &mdash; warmups, working sets, the
       plate breakdown, and how much a programme adds after a good week &mdash; is rounded to
@@ -127,7 +127,7 @@
           plates and a dumbbell pairs/plates option", and the separation is what makes either of
           them readable: without a heading the second block of ten spin buttons is ten more of
           the first, and the counts mean different things. %>
-      <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-500">Barbell</h3>
+      <h3 class="<%= heading_style(:label) %>">Barbell</h3>
 
       <div>
         <%# Named rather than just "Bar", which is #439's complaint about every field on this
@@ -195,7 +195,7 @@
           nobody should have to fill this in to be described correctly. It is also the way back:
           clearing the handle returns the account to the assumption, which would otherwise be
           unsayable once it had been said. %>
-      <h3 class="border-t border-gray-200 pt-6 text-sm font-semibold uppercase tracking-wide text-gray-500">
+      <h3 class="<%= heading_style(:label) %> border-t border-gray-200 pt-6">
         Dumbbells
       </h3>
 
@@ -290,13 +290,13 @@
       The brand keeps the heading below, where it belongs: it is which wearable, not what the
       section is for, and a second one lands here as another h3 rather than as a rewrite. %>
   <section id="wearables" class="scroll-mt-4">
-    <h2 class="mt-10 text-xl font-semibold text-gray-900">Wearables</h2>
+    <h2 class="<%= heading_style(:section) %> mt-10">Wearables</h2>
     <p class="mt-2 text-sm text-gray-600">
       What the app may read from something you wear. One device so far, and everything it
       reads sits alongside your training rather than replacing any of it.
     </p>
 
-    <h3 class="mt-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Withings</h3>
+    <h3 class="<%= heading_style(:label) %> mt-4">Withings</h3>
 
     <%# The connection is asked about *before* the credentials, and the order is load-bearing.
         Disconnecting is a local delete -- it forgets a row, it does not call Withings -- so it
@@ -577,7 +577,7 @@
       what lets somebody decide not to follow the link -- and it is one query that reads no
       assistant's details, because this page has no use for them. %>
   <section id="ai-agents" class="scroll-mt-4">
-    <h2 class="mt-10 text-xl font-semibold text-gray-900">AI agents</h2>
+    <h2 class="<%= heading_style(:section) %> mt-10">AI agents</h2>
     <p class="mt-2 text-sm text-gray-600">
       An assistant you have connected can read your training and write it: plan a block, log a
       session, correct a set you typed wrong. It sees your account and nothing else. Connecting
@@ -608,7 +608,7 @@
       somebody who came looking for the other. Two forms still, and two saves, for the reason
       the top of this page gives -- the heading is the grouping, not the submission. %>
   <section id="time-and-week" class="scroll-mt-4">
-    <h2 class="mt-10 text-xl font-semibold text-gray-900">Time and week</h2>
+    <h2 class="<%= heading_style(:section) %> mt-10">Time and week</h2>
 
     <%# The date under the picker is the point of the whole setting, so it is shown rather than
         described: it is either today or it is not, and a lifter can tell at a glance which.
@@ -618,7 +618,7 @@
         because this is set on a phone. Whatever is already stored stays in the list even when
         it is not one of the offerings, so a zone set by hand is never quietly replaced by the
         nearest one on offer. %>
-    <h3 class="mt-4 text-sm font-semibold uppercase tracking-wide text-gray-500">Time zone</h3>
+    <h3 class="<%= heading_style(:label) %> mt-4">Time zone</h3>
     <p class="mt-2 text-sm text-gray-600">
       What counts as today, which decides which session you land on when you sign in and which
       day a workout is logged against. Unset means UTC.
@@ -642,7 +642,7 @@
                      text-gray-900 hover:bg-lime-600">Save</button>
     </form>
 
-    <h3 class="mt-8 text-sm font-semibold uppercase tracking-wide text-gray-500">Week</h3>
+    <h3 class="<%= heading_style(:label) %> mt-8">Week</h3>
     <p class="mt-2 text-sm text-gray-600">
       Which day the calendar grid begins on. It has always begun on Sunday, and not by
       decision &mdash; that is simply the day <code>Date#wday</code> counts from.
@@ -700,7 +700,7 @@
       Last of the five, and the only one #529 left where it was: it is one number, set once, and
       the section index above is what stops being last meaning being unfindable. %>
   <section id="session-length" class="scroll-mt-4">
-    <h2 class="mt-10 text-xl font-semibold text-gray-900">Session length</h2>
+    <h2 class="<%= heading_style(:section) %> mt-10">Session length</h2>
     <p class="mt-2 text-sm text-gray-600">
       How long you have for a session. When a week is generated, any day estimated to run past
       this is named along with how far over it is. Leave it blank for no warning.

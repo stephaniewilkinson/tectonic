@@ -111,7 +111,10 @@ describe 'the stylesheet behind the brand class' do
 
     refute_nil rule, 'no heading rule names Blonde Sans'
 
-    %w[h1 h2 h3 h4 h5 h6].each { |selector| assert_includes rule, selector }
+    %w[h1 h2].each { |selector| assert_includes rule, selector }
+    # And only those two. DESIGN.md: h3 and below are small group headings, and Blonde at
+    # that size is texture rather than letters.
+    %w[h3 h4 h5 h6].each { |selector| refute_includes rule, selector }
     refute_match(/\.text-/, rule)
   end
 end

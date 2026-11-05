@@ -75,12 +75,12 @@
    responsive variants would have fixed the nav and handed the face to every future element
    that merely happens to be 20px, which is the same bug again. The question is whether a
    thing is a heading or a brand surface, so that is what the selectors ask. */
+/* h1 and h2 only, since DESIGN.md. h3 and below are the small headings over a group of
+   fields or figures, and Blonde at that size is texture rather than letters: "BARBELL"
+   over the plate form and "WITHINGS" over the connection read as decoration nobody could
+   make out. A small h2 doing the same job says font-sans through heading_style(:label). */
 h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h2 {
     font-family: Blonde Sans;
 }
 

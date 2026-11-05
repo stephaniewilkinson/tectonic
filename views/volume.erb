@@ -1,8 +1,8 @@
 <%# Nothing to plot means nothing to load: the charting libraries are a quarter of a
     megabyte, and an account with no completed work yet gets a sentence instead. %>
 <%- @charts = !@rows.empty? %>
-<div class="mx-auto max-w-3xl">
-  <h1 class="text-3xl font-semibold text-gray-900">Volume</h1>
+<div class="<%= page_style(:wide) %>">
+  <h1 class="<%= heading_style(:page) %>">Volume</h1>
   <p class="mt-2 text-sm text-gray-600">
     Working sets only &mdash; warmups are not training, and a set that has not been marked
     done is a plan rather than work, so neither is counted here.
@@ -71,7 +71,7 @@
     </dl>
 
     <div class="mt-8">
-      <h2 class="text-sm font-semibold text-gray-900">Weekly tonnage</h2>
+      <h2 class="<%= heading_style(:label) %>">Weekly tonnage</h2>
       <p class="mt-1 text-xs text-gray-500">Weight times reps, summed. A week with no training is a real zero, so it is drawn as one.</p>
       <%# aria-hidden because the table below carries every number in it, and an unlabelled
           canvas announced before the table is furniture read aloud (#337). %>
@@ -82,7 +82,7 @@
     </div>
 
     <div class="mt-8">
-      <h2 class="text-sm font-semibold text-gray-900">Weekly working sets</h2>
+      <h2 class="<%= heading_style(:label) %>">Weekly working sets</h2>
       <div aria-hidden="true"><%== column_chart(Tectonic::Volume.chart(@rows, :sets), ytitle: 'Sets') %></div>
       <%== render('_chart_table', locals: { caption: 'Weekly working sets', label_heading: 'Week',
                                             value_heading: 'Sets',
@@ -91,7 +91,7 @@
 
     <%- if @top_sets.any? %>
       <div class="mt-8">
-        <h2 class="text-sm font-semibold text-gray-900">Top set each week</h2>
+        <h2 class="<%= heading_style(:label) %>">Top set each week</h2>
         <%# Intensity is plotted apart from volume because more work and heavier work are
             different things, and a block can move one without the other. Unlike the bars
             above this line skips the weeks a lift was not trained: a week off squats is
@@ -120,7 +120,7 @@
 
     <%- if @by_exercise&.any? %>
       <div class="mt-8">
-        <h2 class="text-sm font-semibold text-gray-900">Working sets per lift</h2>
+        <h2 class="<%= heading_style(:label) %>">Working sets per lift</h2>
         <p class="mt-1 text-xs text-gray-500">Where the work went over the last <%= @weeks %> weeks.</p>
         <div aria-hidden="true"><%== bar_chart(@by_exercise, ytitle: 'Sets') %></div>
         <%== render('_chart_table', locals: { caption: 'Working sets per lift', label_heading: 'Lift',
