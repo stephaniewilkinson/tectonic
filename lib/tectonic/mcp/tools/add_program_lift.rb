@@ -55,7 +55,7 @@ class Tectonic < Roda
                     'percent_of names a different movement whose max the percentage is of: ' \
                     'a deficit deadlift written at 70% of the competition deadlift, or ' \
                     'supplemental work off the main lift. It defaults to the lift itself. ' \
-                    'It goes last in the day unless position says otherwise.'
+                    "It goes last in the day unless position says otherwise. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

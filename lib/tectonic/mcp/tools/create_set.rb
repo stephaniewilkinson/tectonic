@@ -29,7 +29,7 @@ class Tectonic < Roda
                     "reps -- a plank, a walk, a bike interval -- sends measure 'time' and " \
                     'duration_seconds instead of reps, and carries no rpe: RPE is reps in ' \
                     'reserve and a held position has none. bench_angle_degrees, rack_hole ' \
-                    'and safety_hole record how the room was set up for this set.'
+                    "and safety_hole record how the room was set up for this set. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

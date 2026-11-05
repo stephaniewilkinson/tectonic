@@ -24,7 +24,7 @@ class Tectonic < Roda
                     'search return. The date argument matches the day the session was ' \
                     'written for, which is the `date` field; the reply also carries ' \
                     'performed_or_planned_on, the day it was actually trained and the one ' \
-                    'the app shows, and performed_on, which is null until it has been.'
+                    "the app shows, and performed_on, which is null until it has been. #{ONE_DUMBBELL}"
         scope :read
         input_schema(
           type: 'object',

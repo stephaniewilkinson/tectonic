@@ -46,7 +46,7 @@ class Tectonic < Roda
                     'the other. every_week true makes the same change to this lift on the same ' \
                     'day of every week of the block, in one call -- for a note, a swap or a ' \
                     'removal of the load, not for numbers meant to progress week to week. ' \
-                    'Returns what actually moved.'
+                    "Returns what actually moved. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',
