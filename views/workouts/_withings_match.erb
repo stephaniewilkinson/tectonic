@@ -199,14 +199,16 @@
         <%== render('workouts/_clock_time', locals: { at: @withings[:session].last }) %>.
       </p>
       <p class="mt-1 text-xs text-gray-600">
-        So something was recorded and it was not this session. Checking again will only help
-        if your watch has not finished uploading this one.
+        So something was recorded and it was not this session. If your watch recorded this
+        one, open that workout in the Withings app, then check again.
       </p>
     <%- else %>
       <p class="text-sm text-gray-700">Nothing from Withings for this session yet.</p>
+      <%# #680: the watch keeps a workout to itself until it is opened in the Withings app, so
+          waiting is not what fetches it -- opening it is, and that is the thing to ask for. %>
       <p class="mt-1 text-xs text-gray-600">
-        Closing a workout in the Withings app starts an upload that reaches their servers a
-        minute or two later, so it may still be on its way.
+        Withings only gets a workout from your watch once you open it in the Withings app.
+        Open this one there, then check again.
       </p>
     <%- end %>
     <%# What the press concluded, which is the one thing the stored rows cannot say.
@@ -225,7 +227,12 @@
         about the session with a note about a press on it, and a lifter is entitled to say
         "stop asking about this one" whether or not Withings answered. %>
     <%- if @withings_checked == 'answered' %>
-      <p class="mt-2 text-xs text-gray-600">Checked just now.</p>
+      <p class="mt-2 text-xs text-gray-600">
+        Checked just now.
+        <%- if @withings[:state] == :waiting %>
+          Still nothing: open the workout in the Withings app first, then check again.
+        <%- end %>
+      </p>
     <%- elsif @withings_checked == 'unreachable' %>
       <p class="mt-2 text-xs text-gray-600">
         Withings could not be reached just now, so none of this has changed.
