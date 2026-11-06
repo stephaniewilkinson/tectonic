@@ -345,7 +345,7 @@ module WhatArrivedInstead
   # which would read as the thing being asserted rather than as an artefact of reading it.
   def box_says
     text = last_response.body.gsub('<li>', ' • ').gsub(/<[^>]+>/, ' ').gsub('&mdash;', '—')
-    text.split.join(' ').gsub(' .', '.')[/Withings has .*?uploading this one\./]
+    text.split.join(' ').gsub(' .', '.')[/Withings has .*?then check again\./]
   end
 
   # How _clock_time.erb prints an instant where no JavaScript has localised it. The four
@@ -371,8 +371,8 @@ describe 'the activities a session did not match' do
                   "• Bicycling — the day before, #{shown(yesterday, 21, 17)} " \
                   "to #{shown(yesterday, 22, 23)}",
                   "This session ran #{shown(Date.today, 13, 10)} to #{shown(Date.today, 13, 48)}.",
-                  'So something was recorded and it was not this session. Checking again will',
-                  'only help if your watch has not finished uploading this one.'].join(' '),
+                  'So something was recorded and it was not this session. If your watch recorded',
+                  'this one, open that workout in the Withings app, then check again.'].join(' '),
                  box_says
   end
 end
@@ -603,6 +603,7 @@ describe 'a fetch that came back empty' do
 
     assert_includes last_response.body, 'Nothing from Withings for this session yet'
     refute_includes last_response.body, 'No activity'
+    assert_includes last_response.body, 'open it in the Withings app'
   end
 
   # A lifter who simply did not wear the watch has nothing to confirm, and would otherwise
@@ -1150,6 +1151,14 @@ describe 'a lifter asking Withings about one session' do
     check_now([])
 
     assert_includes last_response.body, 'Checked just now'
+  end
+
+  # #680: the watch holds a workout until it is opened in the Withings app, so an empty
+  # answer says what will fetch it rather than leaving the lifter to press check forever.
+  it 'says to open the workout in the Withings app when a check finds nothing' do
+    check_now([])
+
+    assert_includes last_response.body, 'open the workout in the Withings app first'
   end
 end
 
