@@ -66,14 +66,13 @@ class Tectonic < Roda
     end
 
     # Fetches the message and sends it on. True when Resend accepted the forward.
-    # rubocop:disable Naming/PredicateMethod -- reports whether work landed, as Mailer.deliver does.
+    # rubocop:disable-next Naming/PredicateMethod -- reports whether work landed, as Mailer.deliver does.
     def forward(email_id)
       received = fetch(email_id)
       response = HTTP.timeout(TIMEOUT).auth("Bearer #{Mailer.api_key}")
                      .post(Mailer::ENDPOINT, json: message(received))
       response.status.success?
     end
-    # rubocop:enable Naming/PredicateMethod
 
     def fetch(email_id)
       response = HTTP.timeout(TIMEOUT).auth("Bearer #{Mailer.api_key}").get(format(RECEIVED, email_id))
