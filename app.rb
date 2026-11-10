@@ -63,6 +63,7 @@ require_relative 'lib/tectonic/first_touch'
 # which is what the first deploy of #692 did, a minute after boot, announcing nothing.
 require_relative 'lib/tectonic/index_now'
 require_relative 'lib/tectonic/example_block'
+require_relative 'lib/tectonic/support_mail'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
