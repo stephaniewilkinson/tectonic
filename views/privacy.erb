@@ -12,16 +12,17 @@
     nobody implemented.
 
     Who runs it and how to reach them come from PRIVACY_OPERATOR in app.rb. The route serves
-    this page only once all three are filled in, so it can never go out saying "[ADDRESS]". %>
+    this page only once both are filled in, so it can never go out with a blank. %>
 <div class="<%= page_style(:reading) %> space-y-4 text-sm text-gray-700">
   <h1 class="serif text-3xl font-semibold text-gray-900">Privacy policy</h1>
   <p class="text-gray-500">Last updated: <%= PRIVACY_UPDATED %></p>
 
   <h2 class="<%= heading_style(:section) %> pt-4">Who we are</h2>
   <p>
-    tectonic plates is run by <strong><%= PRIVACY_OPERATOR[:name] %></strong>,
-    <%= PRIVACY_OPERATOR[:address] %>. For anything in this policy, including a request to see or
-    delete your data, write to <strong><%= PRIVACY_OPERATOR[:email] %></strong>.
+    tectonic plates is run by <strong><%= PRIVACY_OPERATOR[:name] %></strong>. For anything in
+    this policy, including a request to see or delete your data, write to
+    <a href="mailto:<%= PRIVACY_OPERATOR[:email] %>"
+       class="font-semibold text-sky-800 hover:text-sky-900"><%= PRIVACY_OPERATOR[:email] %></a>.
   </p>
 
   <h2 class="<%= heading_style(:section) %> pt-4">What we store</h2>

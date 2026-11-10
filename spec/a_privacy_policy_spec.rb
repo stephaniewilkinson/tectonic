@@ -23,18 +23,17 @@ describe 'the privacy policy' do
   def app = Tectonic.app
 
   it 'is not served while who runs it or how to reach them is missing' do
-    with_operator({ name: 'A Lifter', address: nil, email: 'help@example.org' }) do
+    with_operator({ name: 'A Lifter', email: nil }) do
       get '/privacy'
       assert_equal 404, last_response.status
     end
   end
 
-  it 'names who runs it and where to write once all three are known' do
-    with_operator({ name: 'A Lifter', address: 'PO Box 1, Portland, OR', email: 'help@example.org' }) do
+  it 'names who runs it and where to write once both are known' do
+    with_operator({ name: 'A Lifter', email: 'help@example.org' }) do
       get '/privacy'
       assert_equal 200, last_response.status
       assert_includes last_response.body, 'A Lifter'
-      assert_includes last_response.body, 'PO Box 1, Portland, OR'
       assert_includes last_response.body, 'help@example.org'
       refute_match(/\[[A-Z ]+\]/, last_response.body)
     end
@@ -50,12 +49,37 @@ describe 'the privacy policy, against the app' do
   # Two sentences the draft had that the app did not back up. If either feature arrives, this is
   # the spec that says the page has to change with it.
   it 'promises only what the app does about deletion and retention' do
-    with_operator({ name: 'A Lifter', address: 'PO Box 1', email: 'help@example.org' }) do
+    with_operator({ name: 'A Lifter', email: 'help@example.org' }) do
       get '/privacy'
 
       assert_includes last_response.body, 'To delete your account'
       assert_includes last_response.body, 'assistant activity logs included'
     end
+  end
+end
+
+# What is live: the owner's name and the forwarding support address, and no postal address.
+describe 'the published privacy policy' do
+  include Rack::Test::Methods
+
+  def app = Tectonic.app
+
+  it 'is served, with the support address and without a postal one' do
+    get '/privacy'
+
+    assert_equal 200, last_response.status
+    assert_includes last_response.body, 'mailto:support@tectonicplates.app'
+    refute Tectonic::PRIVACY_OPERATOR.key?(:address)
+  end
+
+  it 'is linked from the connector docs and the about page, and offered to crawlers' do
+    %w[/docs /about].each do |page|
+      get page
+      assert_includes last_response.body, 'href="/privacy"', page
+    end
+    assets = File.expand_path('../assets', __dir__)
+    assert_includes File.read("#{assets}/sitemap.xml"), '<loc>https://tectonicplates.app/privacy</loc>'
+    assert_includes File.read("#{assets}/robots.txt"), "Allow: /privacy\n"
   end
 end
 

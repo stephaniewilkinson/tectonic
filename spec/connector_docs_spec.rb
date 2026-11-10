@@ -105,10 +105,14 @@ describe 'what the page says is stored' do
 
   # #346 wrote the terms and deliberately did not publish them: they sit in legal/ with no
   # route and no link, because section 6 is waiting on a lawyer's read. A documentation page
-  # linking to them would be a 404 on the one page a directory submission points at.
-  it 'does not link to terms that are not served' do
+  # linking to them would be a 404 on the one page a directory submission points at. The
+  # privacy policy was held back the same way until #682 published it, so the rule this keeps
+  # is the general one: every legal page the docs link to answers.
+  it 'links only to legal pages that are served' do
     refute_includes docs, 'href="/terms"'
-    refute_includes docs, 'href="/privacy"'
+    assert_includes docs, 'href="/privacy"'
+    get '/privacy'
+    assert_equal 200, last_response.status
   end
 end
 
