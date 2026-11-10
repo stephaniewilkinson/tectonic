@@ -62,6 +62,7 @@ require_relative 'lib/tectonic/first_touch'
 # after_booted hook runs, and a module defined inside a frozen class raises FrozenError --
 # which is what the first deploy of #692 did, a minute after boot, announcing nothing.
 require_relative 'lib/tectonic/index_now'
+require_relative 'lib/tectonic/example_block'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -660,6 +661,11 @@ class Tectonic < Roda
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
+    # A real block, planned against lifted, for anyone without an account. #693.
+    r.get('example') do
+      @page_title = 'A real training block, planned and lifted'
+      view('example')
+    end
     # The connector's documentation, and the fifth public page. #359.
     #
     # Public and unauthenticated, because it is what a directory submission points at and what

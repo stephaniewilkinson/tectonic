@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  The five public pages, and all of them. #359.
+  The six public pages, and all of them. #359; /example is #693.
 
   assets/robots.txt held a Sitemap line open for the day there was a public page nothing
   linked to, and named the connector documentation as the likely first one. It was right about
@@ -22,6 +22,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tectonicplates.app/welcome</loc></url>
   <url><loc>https://tectonicplates.app/docs</loc></url>
+  <url><loc>https://tectonicplates.app/example</loc></url>
   <url><loc>https://tectonicplates.app/about</loc></url>
   <url><loc>https://tectonicplates.app/login</loc></url>
   <url><loc>https://tectonicplates.app/create-account</loc></url>
