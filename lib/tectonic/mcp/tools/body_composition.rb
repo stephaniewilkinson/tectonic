@@ -60,7 +60,7 @@ class Tectonic < Roda
                     'bodyweight it was taken at: the latest, or the last on or before on ' \
                     '(YYYY-MM-DD). The percentage carries its day-to-day variation on the same ' \
                     "instrument over days (default #{DEFAULT_BAND_DAYS}). Per source, never mixed. " \
-                    'May fetch new readings from Withings first.'
+                    'May fetch new readings from Withings first and save them to the account.'
         scope :read
         input_schema(
           type: 'object',

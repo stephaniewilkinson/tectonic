@@ -23,6 +23,9 @@ class Tectonic < Roda
       # never as a stack trace.
       class Refusal < StandardError; end
 
+      # Every id and count here is a Postgres integer; see Invocation#out_of_range.
+      INTEGER_RANGE = (-2_147_483_648..2_147_483_647)
+
       class << self
         # Declares the scope a token must carry to call this tool. Required; a tool that
         # declares none refuses to run.
@@ -193,7 +196,15 @@ class Tectonic < Roda
           return "This tool needs the '#{@tool.scope}' scope; this token grants: #{granted}." unless authorized?
           return 'Writes are disabled on this server right now, so nothing was changed.' if writes_blocked?
 
-          nil
+          out_of_range
+        end
+
+        # Every id and count here is a Postgres integer. A bigger one -- get_program with
+        # program_id 99999999999, a week numbered the same -- passed the JSON schema, reached the
+        # database, and came back as a crash. Refused here instead, once for every tool.
+        def out_of_range
+          key, = @arguments.find { |_, value| value.is_a?(Integer) && !Tool::INTEGER_RANGE.cover?(value) }
+          "#{key} is out of range: no #{key} that large exists." if key
         end
 
         def authorized?
@@ -314,7 +325,24 @@ class Tectonic < Roda
           return unless @tool.scope == :write || @tool.audit_reads? || Config.audit_reads?
 
           McpAuditLog.record(context: @context, tool_name: @tool.tool_name,
-                             arguments: @arguments, status: status, error: error)
+                             arguments: storable(@arguments), status: status, error: storable(error))
+        rescue StandardError => e
+          # An audit row that cannot be written must not become the caller's error. It was
+          # possible: a NUL in any argument is valid JSON and invalid jsonb, so Postgres refused
+          # the row, the exception escaped this rescue-of-a-rescue, and the client got the
+          # gem's bare "Internal error" -- the generic message the directory criteria reject.
+          MCP.log_call(tool: @tool.tool_name, account: @context.account_id,
+                       status: "audit-failed:#{e.class}", duration_ms: elapsed_ms)
+        end
+
+        # Postgres text and jsonb refuse NUL; nothing a lifter means contains one.
+        def storable(value)
+          case value
+          when String then value.delete("\u0000")
+          when Hash then value.to_h { |key, inner| [key, storable(inner)] }
+          when Array then value.map { |inner| storable(inner) }
+          else value
+          end
         end
 
         def text_of(response)

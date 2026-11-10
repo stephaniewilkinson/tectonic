@@ -315,9 +315,13 @@ class Tectonic < Roda
         # it. That keeps the decision in one place and keeps it deliberate: a model that meant
         # a new movement says so once, rather than every set-writing tool carrying a flag that
         # waves the check through.
+        # Longer than any movement's real name; a 100,000-character one was accepted before.
+        NAME_LIMIT = 100
+
         def exercise(context, name:, icon_url: nil, is_barbell: nil, new_exercise: false)
           clean = name.to_s.strip
           raise Tool::Refusal, 'An exercise needs a non-empty name.' if clean.empty?
+          raise Tool::Refusal, "An exercise name can be at most #{NAME_LIMIT} characters." if clean.length > NAME_LIMIT
 
           found = Exercise.matching(context.account_id, clean)
           return found if found
@@ -428,10 +432,18 @@ class Tectonic < Roda
           text = raw.to_s.strip
           return on if text.empty? || text.casecmp('today').zero?
 
-          Date.iso8601(text)
+          date = Date.iso8601(text)
+          return date if PLAUSIBLE_DATES.cover?(date)
+
+          raise Tool::Refusal, "#{date.iso8601} is outside the dates this app keeps " \
+                               "(#{PLAUSIBLE_DATES.begin.year} to #{PLAUSIBLE_DATES.end.year})."
         rescue ArgumentError
           raise Tool::Refusal, "Couldn't read #{raw.inspect} as a date; use 'today' or YYYY-MM-DD."
         end
+
+        # Wide enough for any real history and any block written ahead; narrow enough that
+        # 0001-01-01 or the year 99999 is refused rather than stored as a session.
+        PLAUSIBLE_DATES = (Date.new(1970, 1, 1)..Date.new(2100, 12, 31))
       end
 
       # Turns a model row into the hash a tool returns, so a read tool and a write

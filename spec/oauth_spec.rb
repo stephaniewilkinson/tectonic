@@ -516,3 +516,20 @@ describe 'cancelling on the consent screen' do
   end
 end
 
+# The client names itself at registration, so the name proves nothing; where the grant is
+# sent does. The MCP specification and Claude's connector guidance both ask for that host to
+# be shown on the consent screen.
+describe 'the consent screen, and where it sends you' do
+  include Rack::Test::Methods
+  include OAuthFlow
+
+  it 'names the host the authorization goes back to' do
+    id, email, password = create_account
+    login(email, password)
+    consent_page(register_client(redirect_uri: 'https://claude.ai/api/mcp/auth_callback'))
+
+    assert_equal 200, last_response.status, "account #{id}"
+    assert_match(%r{sends you back to\s*<span[^>]*>claude\.ai</span>}, last_response.body)
+  end
+end
+

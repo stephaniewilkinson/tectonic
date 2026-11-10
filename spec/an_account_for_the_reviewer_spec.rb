@@ -59,8 +59,10 @@ describe 'the reviewer account, over time' do
     sets = sets_of(reset)
     squat = DB[:exercises].where(name: 'Back Squat', account_id: nil).get(:id)
 
-    assert_equal [225, 235, 245], sets.where(exercise_id: squat, reps: 5, is_completed: true)
-                                      .order(:date).select_map(:weight).uniq
+    # The three history weeks only: this week's block session is lifted too, ramp and all.
+    history = sets.where(exercise_id: squat, reps: 5, is_completed: true, is_warmup: false)
+                  .where { date < Date.new(2026, 11, 9) }
+    assert_equal [225, 235, 245], history.order(:date).select_map(:weight).uniq
   end
 end
 
@@ -122,6 +124,22 @@ describe 'the reviewer account, asked about its body' do
     responses.each do |name, response|
       refute_predicate response, :error?, "#{name}: #{response.content.first[:text]}"
       refute_match(/no (readings|weigh-ins?|data)/i, response.content.first[:text], name)
+    end
+  end
+end
+
+# What a reviewer sees in the list: sessions trained on their own days, none skipped.
+describe 'the reviewer account, as its workouts list reads' do
+  include ReviewerFixture
+
+  it 'has every past session trained on the day it was for, and none skipped' do
+    id = reset
+    past = DB[:workouts].where(account_id: id).where { date < ReviewerFixture::TODAY }.select_map(%i[id date])
+
+    refute_empty past
+    past.each do |workout, date|
+      days = DB[:sets].where(workout_id: workout).select_map(Sequel.cast(:completed_at, Date)).uniq
+      assert_equal [date.to_date], days, "workout #{workout} reads as trained on #{days.inspect}"
     end
   end
 end

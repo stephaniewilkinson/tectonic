@@ -119,6 +119,7 @@ class Tectonic < Roda
       HISTORY_WEEKS.times { |week| log_week(context, monday - (7 * (HISTORY_WEEKS - week)), week) }
       targets(context, today)
       block(context, id, monday)
+      ReviewerDays.lift(id, today)
       ReviewerReadings.write(id, today)
     end
 
@@ -211,6 +212,28 @@ class Tectonic < Roda
       fat = (weight * (0.21 + (back * 0.0005))).round(2)
       [['fat_mass', fat, 'kg'], ['lean_mass', (weight - fat).round(2), 'kg'],
        ['fat_ratio', (fat / weight * 100).round(1), '%'], ['standing_hr', 58 + (back % 3), 'bpm']]
+    end
+  end
+
+  # Every session before today was lifted on its own day, as prescribed.
+  #
+  # Sets logged through create_set are stamped with the moment of the reset, which made all
+  # nine history sessions read as trained today, and the block's sessions earlier this week
+  # read as skipped. So each set before today is completed, if the block wrote it unlifted,
+  # and dated to its session's evening a few minutes after the set before it.
+  module ReviewerDays
+    module_function
+
+    def lift(account_id, today)
+      DB[:workouts].where(account_id:).where { date < today }.select_map(%i[id date]).each do |workout, date|
+        stamp(workout, Time.utc(date.year, date.month, date.day, 18))
+      end
+    end
+
+    def stamp(workout, evening)
+      DB[:sets].where(workout_id: workout).order(:id).select_map(:id).each_with_index do |set, index|
+        DB[:sets].where(id: set).update(is_completed: true, completed_at: evening + (index * 180))
+      end
     end
   end
 end

@@ -38,8 +38,10 @@
   </p>
   <p>
     <strong>Assistant activity.</strong> If you connect an AI assistant, we record each call it
-    makes that changes your data: which tool, when, whether it succeeded, <strong>and the
-    arguments it was given</strong>. Calls that only read are not recorded. That means the contents of a write (a weight, a rep count, a note) appear
+    makes that would change your data, including ones that were refused: which tool, when,
+    whether it succeeded, <strong>and the arguments it was given</strong>. Calls that only read
+    are not kept there; our server logs note the tool, the time and the outcome of every call,
+    without its arguments. That means the contents of a write (a weight, a rep count, a note) appear
     in that log. It exists so that a change you did not expect can be traced to the call that
     made it.
   </p>
