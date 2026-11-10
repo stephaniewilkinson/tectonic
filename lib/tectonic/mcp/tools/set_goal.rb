@@ -24,14 +24,10 @@ class Tectonic < Roda
       class SetGoal < Tool
         tool_name 'set_goal'
         title 'Set a goal'
-        description 'Set what a movement (by name) is aiming at, in pounds, and optionally ' \
-                    'a date to reach it by (YYYY-MM-DD). This is a target, NOT the number ' \
-                    'percentages are taken of -- use set_training_max for that. A goal is ' \
-                    'read back by block_progress beside what each block actually opened at, ' \
-                    'which is what makes "am I on pace" answerable. Omit pounds, or send 0, ' \
-                    'to drop the goal. The date is optional: a target with no deadline is ' \
-                    'still a target. Works on shared library movements; the goal belongs to ' \
-                    'this account, not to the movement.'
+        description 'Set the target weight in pounds for a movement (by name), with an optional ' \
+                    'by_date (YYYY-MM-DD). A goal is not the number percentages are taken of; ' \
+                    'that is set_training_max. block_progress reports it beside each block. Omit ' \
+                    "pounds or send 0 to drop it. Works on library movements; it is this account's."
         scope :write
         input_schema(
           type: 'object',

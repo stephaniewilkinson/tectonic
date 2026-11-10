@@ -11,18 +11,12 @@ class Tectonic < Roda
       class CreateExercise < Tool
         tool_name 'create_exercise'
         title 'Add a movement'
-        description 'Add an exercise for the account, deduplicating by name against the ' \
-                    "account's own movements and the shared library. Set is_barbell for a " \
-                    'movement loaded on a bar, which is what gives its sets plate math; a ' \
-                    'name the library already knows is treated as one without being told. ' \
-                    'note is coaching intent for the movement -- why it is in the ' \
-                    'program, what to watch for, a cue like "this helps correct valgus" ' \
-                    "-- and the lifter reads it on the movement's page, so write it to " \
-                    'them. Use update_exercise to change a note later. If the account ' \
-                    'already has movements the name could mean -- "Squat" where there is ' \
-                    'a "Back Squat" -- this refuses and lists them, so the lifter is not ' \
-                    'given two rows for one movement; send new_exercise true to add it ' \
-                    'anyway once you are sure none of them is the one wanted.'
+        description "Add an exercise, deduplicated by name against the account's movements " \
+                    'and the shared library; an existing match is returned instead. is_barbell ' \
+                    'gives its sets plate math (library names are barbell already). note is shown ' \
+                    "to the lifter on the movement's page. If the name could mean an existing " \
+                    'movement ("Squat" beside "Back Squat") it refuses and lists them; ' \
+                    'new_exercise true adds it anyway.'
         scope :write
         input_schema(
           type: 'object',

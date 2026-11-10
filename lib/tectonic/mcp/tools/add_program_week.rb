@@ -16,9 +16,8 @@ class Tectonic < Roda
       class AddProgramWeek < Tool
         tool_name 'add_program_week'
         title 'Add a week to a block'
-        description 'Add a week to the end of a block, or at a given number. Pass ' \
-                    "copy_from_week to duplicate that week's days and lifts into it, then " \
-                    'edit the loads that differ. Mark is_deload for a lighter week.'
+        description 'Add a week to the end of a block, or at a given number. copy_from_week ' \
+                    "copies that week's days and lifts into it. is_deload marks a lighter week."
         scope :write
         input_schema(
           type: 'object',

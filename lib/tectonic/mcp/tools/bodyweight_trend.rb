@@ -43,6 +43,10 @@ class Tectonic < Roda
       class BodyweightTrend < Tool
         DEFAULT_DAYS = 90
         DEFAULT_METRIC = 'weight'
+        # The most daily points include_series returns per instrument: a year, the latest ones.
+        # The window is otherwise unbounded, and a wide from/to returned a point for every day
+        # in it. The reply says when it was cut.
+        SERIES_LIMIT = 366
 
         # What a hole in the window does to *this* answer. Worth spelling out in the sentence
         # rather than left to a flag, because a rolling mean over a window missing three days
@@ -56,18 +60,12 @@ class Tectonic < Roda
 
         title 'Bodyweight trend and its noise band'
 
-        description 'What a measured number is doing over a window, as a rolling mean, with ' \
-                    'the day-to-day variation that says how much of the movement is noise. ' \
-                    'Defaults to weight; any stored metric can be named. Reports the trend ' \
-                    'at the start and end of the window, the change between them, the ' \
-                    'observed rate per week, and whether that change is larger than the ' \
-                    'band a single reading moves in -- a change inside the band is one this ' \
-                    'instrument cannot tell from nothing. Narrow with from/to (YYYY-MM-DD) ' \
-                    "and set the smoothing with days (default #{BodyReadings::DEFAULT_WINDOW_DAYS}). " \
-                    'Summary by default; pass include_series for the daily trend points. ' \
-                    'Reported separately per source and unit, never averaged across them. ' \
-                    'It reports the numbers and does not say whether the direction is good, ' \
-                    'what the weight should be, or how fast it should change.'
+        description 'Rolling-mean trend of a stored metric (weight by default) over from/to ' \
+                    "(YYYY-MM-DD; last #{DEFAULT_DAYS} days by default), smoothed over days " \
+                    "(default #{BodyReadings::DEFAULT_WINDOW_DAYS}). Per source and unit: trend at " \
+                    'start and end, the change, rate per week, and whether the change exceeds the ' \
+                    "day-to-day noise band. include_series adds daily points, the latest #{SERIES_LIMIT}. " \
+                    'May fetch new readings from Withings first.'
         scope :read
         input_schema(
           type: 'object',
@@ -136,7 +134,9 @@ class Tectonic < Roda
           view = { source:, unit:, readings: group.length, window_days: smoothing(arguments),
                    window: BodyReadings.covered(group), opened: series.first, latest: series.last }
                  .merge(moved).merge(resolution(group, moved[:change]))
-          arguments[:include_series] ? view.merge(series:) : view
+          return view unless arguments[:include_series]
+
+          view.merge(series: series.last(SERIES_LIMIT), series_truncated: series.length > SERIES_LIMIT)
         end
 
         # The change across the window, and the same change as a weekly rate.
@@ -201,7 +201,14 @@ class Tectonic < Roda
         def self.summary(metric, from, to, instruments)
           ["#{metric} trend, #{from} to #{to}, by instrument:",
            *instruments.map { |view| line(view) },
-           '  Whether that direction is the right one is not something these numbers say.']
+           truncated(instruments),
+           '  Whether that direction is the right one is not something these numbers say.'].compact
+        end
+
+        def self.truncated(instruments)
+          return nil unless instruments.any? { |view| view[:series_truncated] }
+
+          "  The series shows the latest #{SERIES_LIMIT} days per instrument; narrow from/to for earlier points."
         end
 
         def self.line(view)

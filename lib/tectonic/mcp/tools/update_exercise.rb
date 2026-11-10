@@ -24,23 +24,10 @@ class Tectonic < Roda
         tool_name 'update_exercise'
 
         title 'Edit a movement'
-        description 'Change a movement this account owns: its name, its note, its ' \
-                    'icon_url, whether it is loaded on a bar, whether its reps are counted ' \
-                    'per side, how many dumbbells it takes, and how long it is rested. ' \
-                    'note is coaching intent for the movement -- why it is in the program, ' \
-                    'what to watch for, a cue like "this helps correct valgus" -- and the ' \
-                    "lifter reads it on the movement's page, so write it to them. " \
-                    'dumbbell_count is 1 or 2 and decides which weights exist for the ' \
-                    'movement at all, since every plate size has to go on both ends of ' \
-                    'every handle in use; null means nobody has said, and the app then ' \
-                    'assumes two. default_rest_seconds is what the session timer counts down ' \
-                    'and rings at after a set of this movement is ticked off; it is yours ' \
-                    'alone, so it can be set on a shared library movement as well as your ' \
-                    'own. Send only what changes; send note as null or an empty string to ' \
-                    'clear it. Everything other than the rest belongs to the movement itself, ' \
-                    'so on a shared library movement only the rest can be set. Returns what ' \
-                    'actually moved, and says so when a change rewrote logged sets or ' \
-                    'upcoming sessions.'
+        description 'Change a movement this account owns: name, note, icon_url, is_barbell, ' \
+                    'per-side reps, dumbbell_count (1 or 2; null assumes 2), default_rest_seconds. ' \
+                    'On a library movement only default_rest_seconds can be set. Send only what ' \
+                    'changes. Returns what moved, including logged sets or sessions it rewrote.'
         scope :write
         input_schema(
           type: 'object',

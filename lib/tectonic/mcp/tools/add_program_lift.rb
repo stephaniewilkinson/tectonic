@@ -15,51 +15,15 @@ class Tectonic < Roda
       class AddProgramLift < Tool
         tool_name 'add_program_lift'
         title 'Add a lift to a day'
-        description 'Add a lift to a training day. Give either top_weight in pounds or ' \
-                    'percent_of_max, or is_weighted false for work carrying no external ' \
-                    'load. measure is reps or time; a timed lift gives duration_seconds ' \
-                    'instead of reps. is_per_side says the count is per side. Each defaults ' \
-                    'to how the movement is usually done. target_rpe, 1 to 10, is the ' \
-                    'effort the working sets are meant to be taken at -- how autoregulated ' \
-                    'programming is written, and the better instruction than a percentage ' \
-                    'coming off a layoff. It belongs only on a loaded lift counted in reps. ' \
-                    'rest_seconds, 5 to 1800, is the rest the working sets are meant to take ' \
-                    'between them, and is what the session screen counts down after one is ' \
-                    'ticked off. Unlike target_rpe it applies to any movement, held or ' \
-                    'counted, loaded or not. Left out, the timer falls back to the median ' \
-                    'rest this lifter actually takes between sets of the movement, so give ' \
-                    'it when the programme genuinely prescribes one and leave it out rather ' \
-                    'than inventing a number. When it does prescribe one, the usual ranges ' \
-                    'are 180 to 240 seconds for a heavy main lift and 60 to 120 for ' \
-                    'accessory work -- longer rest supports maximal strength on compound ' \
-                    'lifts, shorter suits accessories. warmup_sets, 0 to 6, is how many rungs ' \
-                    'the warmup ramp gets including the empty bar; leave it out and it is ' \
-                    'worked out from how far the top weight is above the bar, which is what ' \
-                    'you want almost always. Send 0 for no ramp at all -- worth it on an ' \
-                    'accessory late in a session that follows the same pattern as the lift ' \
-                    'before it. Worth setting deliberately on the ' \
-                    'main lifts of a strength block, because without one the gaps become ' \
-                    'whatever happens, and what happens is uneven. ' \
-                    'is_commanded says the working sets are done under meet commands -- ' \
-                    'start, press, rack -- rather than at the lifter\'s own tempo. It is a ' \
-                    'competition condition, not a tempo: a paused bench in training is not ' \
-                    'a commanded one, and the library already has Paused Bench Press as its ' \
-                    'own movement for that. It belongs only on a lift counted in reps. ' \
-                    'bench_angle_degrees, rack_hole and safety_hole say how the room is set ' \
-                    'up for this lift -- the bench angle in degrees (0 is flat, negative is ' \
-                    'decline), and which numbered hole the J-hooks and the safeties go in. ' \
-                    'They are copied onto every set the lift generates, warmups included, and ' \
-                    'printed on the session screen, so a lifter does not have to guess what ' \
-                    '"incline bench" meant. Bench angle changes what a movement trains, so it ' \
-                    'is a programming variable rather than a preference. ' \
-                    'percent_of names a different movement whose max the percentage is of: ' \
-                    'a deficit deadlift written at 70% of the competition deadlift, or ' \
-                    'supplemental work off the main lift. It defaults to the lift itself. ' \
-                    "It goes last in the day unless position says otherwise. #{ONE_DUMBBELL}"
+        # Short on purpose (directory review: describe, do not instruct). What each field means
+        # is on the field, from Tools::LIFT_FIELDS, shared with the other two lift writers.
+        description 'Add a lift to a training day. Load it with top_weight, percent_of_max, or ' \
+                    'is_weighted false; a timed lift sends measure time and duration_seconds ' \
+                    "instead of reps. It goes last in the day unless position is given. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',
-          properties: {
+          properties: Tools.described(
             program_day_id: { type: 'integer' }, exercise: { type: 'string' },
             sets: { type: 'integer' }, reps: { type: 'integer' },
             top_weight: { type: 'number' }, percent_of_max: { type: 'integer' },
@@ -72,7 +36,7 @@ class Tectonic < Roda
             bench_angle_degrees: { type: 'integer' }, rack_hole: { type: 'integer' },
             safety_hole: { type: 'integer' },
             percent_of: { type: 'string' }, note: { type: 'string' }
-          },
+          ),
           required: %w[program_day_id exercise sets], additionalProperties: false
         )
 

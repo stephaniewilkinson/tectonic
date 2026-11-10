@@ -21,15 +21,11 @@ class Tectonic < Roda
         tool_name 'list_workouts'
 
         title 'List sessions'
-        description "List the account's workouts, most recent first, with set counts, " \
-                    'whether each is planned, performed or skipped, and how long each one ' \
-                    'took. Each row carries three dates: performed_or_planned_on is the day ' \
-                    'it was trained and is the one the app itself shows; date is the day the ' \
-                    'session was written for, and is what from/to match on and what ' \
-                    'get_workout takes; performed_on is null until something in it has been ' \
-                    'ticked off. They differ whenever a session was trained early or late. ' \
-                    'Narrow with from/to (YYYY-MM-DD) and limit; the default is the ' \
-                    "#{DEFAULT_LIMIT} most recent."
+        description "The account's workouts, most recent first, with set counts, status " \
+                    '(planned, performed, skipped) and duration. Each row has date (written for; ' \
+                    'what from/to and get_workout match), performed_on (null until a set is ' \
+                    'ticked) and performed_or_planned_on (the day trained). Narrow with from/to ' \
+                    "(YYYY-MM-DD) and limit, default #{DEFAULT_LIMIT}, at most #{MAX_LIMIT}."
         scope :read
         input_schema(
           type: 'object',

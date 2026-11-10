@@ -54,15 +54,11 @@ class Tectonic < Roda
         tool_name 'create_program'
 
         title 'Create a training block'
-        description 'Write a whole training block: its weeks, the days in each week (0 is ' \
-                    'Sunday, 6 is Saturday) and the lifts of each day, in one call. Each ' \
-                    'lift gives either top_weight in pounds or percent_of_max, or ' \
-                    'is_weighted false for work carrying no external load; measure is ' \
-                    'reps or time, and a timed lift gives duration_seconds. start_date ' \
-                    'defaults to the Monday of the current week; weeks are numbered by ' \
-                    'their position unless numbered explicitly. time_budget_minutes says ' \
-                    'how long a session of this block is meant to take; set it and ' \
-                    "generate_program_week says so when a day runs past it. #{ONE_DUMBBELL}"
+        description 'Write a whole training block in one call: weeks, days (weekday 0 is Sunday) ' \
+                    'and lifts. Each lift is loaded by top_weight (pounds), percent_of_max, or ' \
+                    'is_weighted false. start_date defaults to this Monday. time_budget_minutes ' \
+                    'is the intended session length, which generate_program_week checks days ' \
+                    "against. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

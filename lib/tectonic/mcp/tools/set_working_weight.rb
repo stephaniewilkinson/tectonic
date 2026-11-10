@@ -41,12 +41,9 @@ class Tectonic < Roda
       class SetWorkingWeight < Tool
         tool_name 'set_working_weight'
         title 'Set a working weight'
-        description 'Put one weight on every working set of one movement in a session, ' \
-                    'for switching a lift from ascending to flat or dropping what is left ' \
-                    'after a bad set. Takes a workout_id and an exercise name. Skips ' \
-                    'warmups and anything already completed, and leaves the prescription ' \
-                    'alone so what was planned stays readable beside what was done. ' \
-                    "Returns how many sets moved and how many were left. #{ONE_DUMBBELL}"
+        description 'Put one weight on every uncompleted working set of one movement (by name) ' \
+                    'in a session (workout_id). Warmups, completed sets and the prescription are ' \
+                    "left alone. Returns how many sets moved. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

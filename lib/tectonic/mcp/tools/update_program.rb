@@ -31,13 +31,10 @@ class Tectonic < Roda
         tool_name 'update_program'
 
         title 'Edit a training block'
-        description "Change a training block's own settings: its name, block number, " \
-                    'notes, start date, whether working sets ascend to the top weight, ' \
-                    'the rep count main work is converted to, and time_budget_minutes -- ' \
-                    'how long its sessions are meant to take, which generate_program_week ' \
-                    'then warns against. Send only what changes. ' \
-                    'is_ascending and preferred_reps take effect on weeks generated after ' \
-                    'this; weeks already generated are not rewritten.'
+        description "Change a block's settings: name, block number, notes, start date, " \
+                    'is_ascending (working sets climb to the top weight), preferred_reps and ' \
+                    'time_budget_minutes. Send only what changes. is_ascending and preferred_reps ' \
+                    'apply to weeks generated afterwards only.'
         scope :write
         input_schema(
           type: 'object',

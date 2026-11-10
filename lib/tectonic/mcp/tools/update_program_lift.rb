@@ -22,35 +22,18 @@ class Tectonic < Roda
         tool_name 'update_program_lift'
 
         title 'Edit a prescribed lift'
-        description 'Change a prescribed lift: sets, reps, top_weight or percent_of_max, ' \
-                    'the exercise it is, whether it is the main work, or its position in ' \
-                    'the day (0 is first). is_weighted, is_per_side, measure and ' \
-                    'duration_seconds change how the lift is done -- loading a movement that ' \
-                    'was written unweighted, holding one that was counted in reps, or ' \
-                    'flagging a count as per side after the fact. target_rpe, 1 to 10, is ' \
-                    'the effort its working ' \
-                    'sets are meant to be taken at, on a loaded lift counted in reps; send ' \
-                    'null to clear it. rest_seconds, 5 to 1800, is the rest its working sets ' \
-                    'are meant to take between them and what the session screen counts down ' \
-                    'after one; it applies to any movement, and null clears it back to the ' \
-                    'median rest this lifter actually takes. warmup_sets, 0 to 6, is how many ' \
-                    'rungs the warmup ramp gets including the empty bar; 0 is no ramp at all, ' \
-                    'and null goes back to working it out from how far the top weight is ' \
-                    'above the bar. bench_angle_degrees, ' \
-                    'rack_hole and safety_hole say how the room is set up for this ' \
-                    'lift; null clears any of them. is_commanded says its working ' \
-                    'sets are done under meet commands -- start, press, rack -- rather than ' \
-                    'at the lifter\'s own tempo, and belongs only on a lift counted in reps. ' \
-                    'Send only what changes. To swap ' \
-                    'how the load is written, set one of top_weight/percent_of_max and null ' \
-                    'the other. every_week true makes the same change to this lift on the same ' \
-                    'day of every week of the block, in one call -- for a note, a swap or a ' \
-                    'removal of the load, not for numbers meant to progress week to week. ' \
-                    "Returns what actually moved. #{ONE_DUMBBELL}"
+        # Short on purpose (directory review: describe, do not instruct); each field's meaning is
+        # on the field, from Tools::LIFT_FIELDS. It used to also offer bench_angle_degrees,
+        # rack_hole and safety_hole, which this schema has never accepted -- a description that
+        # promised a field the call would refuse.
+        description 'Change a prescribed lift. Send only what changes; null clears target_rpe, ' \
+                    'rest_seconds, warmup_sets, top_weight or percent_of_max. every_week applies ' \
+                    'the same change to this lift in every week of the block. Returns what moved. ' \
+                    "#{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',
-          properties: {
+          properties: Tools.described(
             program_lift_id: { type: 'integer' }, exercise: { type: 'string' },
             sets: { type: 'integer' }, reps: { type: 'integer' },
             top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
@@ -61,8 +44,9 @@ class Tectonic < Roda
             percent_of: { type: %w[string null] }, is_weighted: { type: 'boolean' },
             is_per_side: { type: 'boolean' }, measure: { type: 'string', enum: %w[reps time] },
             duration_seconds: { type: 'integer' }, note: { type: 'string' },
-            every_week: { type: 'boolean' }
-          },
+            every_week: { type: 'boolean',
+                          description: 'Apply the change to this lift on the same day of every week.' }
+          ),
           required: ['program_lift_id'], additionalProperties: false
         )
 

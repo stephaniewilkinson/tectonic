@@ -14,22 +14,11 @@ class Tectonic < Roda
       class CreateSet < Tool
         tool_name 'create_set'
         title 'Log a set'
-        description 'Log a set of an exercise (by name) into a workout (by date, ' \
-                    "'today' by default). Weights are pounds, fractions allowed; rpe is how hard " \
-                    'that set was on the 1-10 scale. Leave weight out for work carrying ' \
-                    'no external load -- a plank, a band pull-apart, a bodyweight hip ' \
-                    'thrust -- which is recorded as a rep count with no weight at all. ' \
-                    'is_per_side says the rep count is per side; leave it out and the ' \
-                    "movement's own default decides, which is right for most callers. " \
-                    'is_commanded says the set was done under meet commands -- start, ' \
-                    'press, rack -- rather than at the lifter\'s own tempo. It is a ' \
-                    'competition condition and not a tempo, so it is not the same thing as ' \
-                    'a paused rep; it defaults to false and should be sent only when the ' \
-                    'lifter says the set was commanded. Work counted in seconds rather than ' \
-                    "reps -- a plank, a walk, a bike interval -- sends measure 'time' and " \
-                    'duration_seconds instead of reps, and carries no rpe: RPE is reps in ' \
-                    'reserve and a held position has none. bench_angle_degrees, rack_hole ' \
-                    "and safety_hole record how the room was set up for this set. #{ONE_DUMBBELL}"
+        description 'Log a set of an exercise (by name) into a workout (by date, today by ' \
+                    'default). Weight in pounds; omit it for no external load. rpe 1-10. A timed ' \
+                    'set sends measure time and duration_seconds instead of reps, and no rpe. ' \
+                    'is_commanded: done under meet commands. Bench angle and rack and safety ' \
+                    "holes record the setup. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

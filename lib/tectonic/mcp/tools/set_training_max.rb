@@ -23,24 +23,13 @@ class Tectonic < Roda
       class SetTrainingMax < Tool
         tool_name 'set_training_max'
         title 'Set a training max'
-        description 'Set the number percentages of one movement (by name) are taken of, ' \
-                    'in pounds. Which number that should be depends on the programme and ' \
-                    'the app does not guess: a 5/3/1-style block wants roughly 90% of a ' \
-                    'one-rep max, while percentage programming in the Sheiko tradition is ' \
-                    'written against a competition max directly -- so ask the lifter which ' \
-                    'convention they train on rather than sending a tested single by ' \
-                    'default. Without a stated max the app falls back to an estimated ' \
-                    'one-rep max off completed sets, which is a lifetime best with no lower ' \
-                    'bound -- right most of the time, and wrong in the two cases this ' \
-                    'exists for: coming off a layoff, where it reads work done before the ' \
-                    'break, and a movement never logged, where there is nothing to read. ' \
-                    'Omit pounds, or send 0, to clear it and go back to the estimate. Works ' \
-                    'on shared library movements too: the value belongs to this account, ' \
-                    'not to the movement. train_at_percent, 50 to 100, is the fraction of ' \
-                    'that number percentages are actually taken of -- send pounds 500 and ' \
-                    'train_at_percent 90 for a 5/3/1 lifter with a tested 500 single, or ' \
-                    'leave it out to train off the whole number, which is what a ' \
-                    'competition-max convention means.'
+        # Facts only (directory review). It used to tell the model to ask the lifter which
+        # convention they train on; that judgement is the conversation's, not the tool's.
+        description 'Set the max, in pounds, that percentages of one movement (by name) are ' \
+                    'taken of, for this account; works on library movements too. Without one the ' \
+                    'app uses the estimated one-rep max from completed sets, a lifetime best. ' \
+                    'Omit pounds or send 0 to clear. train_at_percent, 50-100, takes percentages ' \
+                    'of that fraction of it: pounds 500 with 90 trains off 450.'
         scope :write
         input_schema(
           type: 'object',

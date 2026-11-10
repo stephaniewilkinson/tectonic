@@ -56,17 +56,10 @@ class Tectonic < Roda
 
         tool_name 'propose_training_maxes'
         title 'Propose training maxes'
-        description 'What recent training implies the next block should be priced off, ' \
-                    'movement by movement. For each one it returns the training max in ' \
-                    'force now, the best estimate from completed rated sets in the window, ' \
-                    'the set that estimate came from, and the difference. Narrow to one ' \
-                    'movement with exercise, and change the window with weeks (8 by ' \
-                    'default, about one block). It proposes and writes nothing: which ' \
-                    'number a block opens at depends on what kind of block it is, and that ' \
-                    'is a coaching decision rather than arithmetic. Use set_training_max to ' \
-                    'act on it. Readings further than six reps from a single are not ' \
-                    'proposed from, which is the same bar the app holds before letting an ' \
-                    'estimate become a training max on its own.'
+        description 'Per movement: the training max in force now, the best estimate from ' \
+                    'completed rated sets in the last weeks (default 8), the set it came from, ' \
+                    'and the difference. Narrow with exercise. Sets more than six reps from a ' \
+                    'single are not estimated from. Writes nothing; set_training_max changes a max.'
         scope :read
         input_schema(
           type: 'object',
