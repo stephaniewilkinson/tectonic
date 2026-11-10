@@ -392,6 +392,9 @@ class Tectonic < Roda
     after_create_account do
       scope.remember_the_connection(account_id, session[login_redirect_session_key])
       Tectonic::FirstTouch.record(account_id, session)
+      # Fired by the next page, which is always /check-your-email, and only once: a resend from
+      # that page does not create an account and does not set this again. #687.
+      session['fathom.account_created'] = true
       # The address this browser just signed up with, for /check-your-email to name (#633). In
       # this browser's own session, so the page tells nobody anything they did not type.
       session['signed_up_as'] = account[login_column]
@@ -2136,6 +2139,18 @@ class Tectonic < Roda
     client_id = Rack::Utils.parse_query(URI(saved).query.to_s)['client_id']
     application_id = client_id && DB[:oauth_applications].where(client_id:).get(:id)
     DB[:accounts].where(id: account_id).update(signed_up_connecting_id: application_id) if application_id
+  end
+
+  # Fathom events this page should fire as it loads. #687; views/_fathom_events.erb.
+  #
+  # account_created is a one-shot flag set at sign-up and spent here, so a reload of the waiting
+  # page does not count a second account. connect_unfinished is whatever /start is already
+  # showing: the note that a connection an account signed up for never happened (#628).
+  def fathom_events_now
+    events = []
+    events << 'account_created' if session.delete('fathom.account_created')
+    events << 'connect_unfinished' if @connecting
+    events
   end
 
   # The assistant's name, while the connection it came here for has still not been made: the

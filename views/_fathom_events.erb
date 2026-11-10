@@ -1,0 +1,49 @@
+<%# The few things Fathom cannot see from pageviews alone. #687.
+
+    Pageviews count where people went. These count what they did, for the weekly Fathom email:
+    an account made, a set ticked off at the rack, the button that adds the connector to Claude,
+    a connection that did not finish, the connector URL copied for another client, and a session
+    logged by hand. #687 has the list, what was rejected and why.
+
+    Every name here is a literal written in this repository. An attribute names the event on the
+    element that triggers it, and the listener below sends whatever that attribute says -- so
+    the attribute must only ever be typed, never interpolated. Fathom event names cannot be
+    deleted, and a client's own name (oauth_applications.name) is chosen by the client.
+
+    Page-load events wait for `load` because the Fathom tag is deferred and would not exist yet
+    for an inline script at the end of the body. trackEvent sends with sendBeacon, so a click on a
+    link that navigates away -- Add to Claude, most of all -- is still delivered. Nothing here
+    fires where Fathom is not loaded: the guard is the same check the script itself makes, and
+    the consent screen has its own layout with no Fathom at all (analytics_spec). %>
+<script>
+  (function () {
+    function track(name) { if (window.fathom) { window.fathom.trackEvent(name); } }
+    <%- unless (now = fathom_events_now).empty? %>
+    window.addEventListener('load', function () {
+      <%- now.each do |name| %>
+      track(<%== name.to_json %>);
+      <%- end %>
+    });
+    <%- end %>
+    document.addEventListener('click', function (event) {
+      var named = event.target.closest && event.target.closest('[data-fathom-click]');
+      if (named) { track(named.getAttribute('data-fathom-click')); }
+    });
+    document.addEventListener('submit', function (event) {
+      var name = event.target.getAttribute && event.target.getAttribute('data-fathom-submit');
+      if (name) { track(name); }
+    });
+    // The Done tap. Only one that succeeded, only on the complete route -- the same pattern
+    // _poll_waits_for_taps matches -- and only one asking for done: the same form sends
+    // is_completed=false to undo, and an undo is not a set completed. Read from what the request
+    // sent, not from the form: by now the panel holding it has been swapped out, and htmx names
+    // the panel's wrapper as the element rather than the form.
+    document.addEventListener('htmx:afterRequest', function (event) {
+      var detail = event.detail || {};
+      var path = (detail.pathInfo && detail.pathInfo.requestPath) || '';
+      if (!detail.successful || !/\/sets\/\d+\/complete$/.test(path)) { return; }
+      var sent = detail.requestConfig && detail.requestConfig.formData;
+      if (sent && sent.get('is_completed') === 'true') { track('set_completed'); }
+    });
+  })();
+</script>

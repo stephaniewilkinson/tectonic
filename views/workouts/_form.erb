@@ -11,7 +11,7 @@
     <%= @notice %>
   </p>
 <%- end %>
-<form action="/workouts" method="post">
+<form action="/workouts" method="post" data-fathom-submit="workout_logged">
   <%== csrf_tag('/workouts') %>
   <div>
     <label for="date" class="block text-sm font-medium leading-6 text-gray-900">Date</label>
