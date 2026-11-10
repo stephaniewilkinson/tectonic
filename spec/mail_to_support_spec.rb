@@ -56,7 +56,9 @@ describe 'the support webhook' do
     end
   end
 
-  def received(id) = %({"type":"email.received","data":{"email_id":"#{id}"}})
+  def received(id, to: 'support@tectonicplates.app')
+    %({"type":"email.received","data":{"email_id":"#{id}","to":["#{to}"]}})
+  end
 
   it 'forwards a received email, and says so' do
     forwarded = []
@@ -86,7 +88,9 @@ describe 'the support webhook, refusing' do
     end
   end
 
-  def received(id) = %({"type":"email.received","data":{"email_id":"#{id}"}})
+  def received(id, to: 'support@tectonicplates.app')
+    %({"type":"email.received","data":{"email_id":"#{id}","to":["#{to}"]}})
+  end
 
   it 'does nothing for an unsigned request' do
     forwarded = []
@@ -118,6 +122,32 @@ describe 'the forwarded message' do
     assert_equal 'lifter@example.org', message[:reply_to]
     assert_equal '[support] Delete my data', message[:subject]
     assert_includes message[:text], 'Attachments, in Resend under Receiving: id.png.'
+  end
+end
+
+# The account's other domains receive mail too, and a Resend webhook hears all of it.
+describe 'the support webhook, and mail for somebody else' do
+  include Rack::Test::Methods
+  include SignedWebhook
+
+  def app = Tectonic::SupportMail::Webhook.new
+
+  it 'forwards only what was sent to the support address' do
+    forwarded = []
+    Tectonic::SupportMail.stub(:secret, SignedWebhook::SECRET) do
+      Tectonic::SupportMail.stub(:forward, ->(id) { forwarded << id }) do
+        { 'em_ours' => 'Support <SUPPORT@tectonicplates.app>', 'em_other' => 'hello@another-domain.example' }
+          .each do |id, to|
+            body = %({"type":"email.received","data":{"email_id":"#{id}","to":["#{to}"]}})
+            request = signed(body, at: Time.now.to_i)
+            post '/', body, { 'HTTP_SVIX_ID' => request[:id], 'HTTP_SVIX_TIMESTAMP' => request[:timestamp],
+                              'HTTP_SVIX_SIGNATURE' => request[:signatures] }
+            assert_equal 200, last_response.status
+          end
+      end
+    end
+
+    assert_equal ['em_ours'], forwarded
   end
 end
 
