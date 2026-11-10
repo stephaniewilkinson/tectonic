@@ -80,7 +80,6 @@ describe 'announcing the public pages' do
   end
 end
 
-
 # The order production boots in: config.ru freezes the app, and only then does Puma's
 # after_booted hook require the module that does the announcing. The first deploy of #692
 # raised FrozenError there, a minute after boot, because the module was first defined inside
@@ -95,3 +94,4 @@ describe 'announcing from a frozen app' do
     assert_equal 'tectonicplates.app', output.lines.last
   end
 end
+
