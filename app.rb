@@ -3577,10 +3577,14 @@ class Tectonic < Roda
     label: 'font-sans text-sm font-semibold uppercase tracking-wide text-gray-500'
   }.freeze
 
-  # Who the privacy policy names, and how to reach them. #682. Your own name until the Oregon
-  # LLC is registered, then the LLC's, which is the whole of the change when it is. An address
-  # and an email left nil keep /privacy unpublished; see the route.
-  PRIVACY_OPERATOR = { name: 'Stephanie Wilkinson', address: nil, email: nil }.freeze
+  # Who the privacy policy names, and how to reach them. #682. The owner's own name until the
+  # Oregon LLC is registered, then the LLC's, which is the whole of the change when it is.
+  #
+  # An email and no postal address, by the owner's choice: a privacy policy has to say who is
+  # responsible and how to reach them, and an address that forwards to a person does that. The
+  # one place a postal address will be asked for is Stripe, and the LLC's registered agent can
+  # give it one without it being anybody's home. A blank field keeps /privacy unpublished.
+  PRIVACY_OPERATOR = { name: 'Stephanie Wilkinson', email: 'support@tectonicplates.app' }.freeze
   PRIVACY_UPDATED = '10 November 2026'
 
   def privacy_published? = PRIVACY_OPERATOR.values.all? { |value| value.to_s.strip != '' }
