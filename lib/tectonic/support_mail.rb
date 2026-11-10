@@ -29,6 +29,7 @@ class Tectonic < Roda
   # originals stay in Resend's dashboard under Receiving.
   module SupportMail
     RECEIVED = 'https://api.resend.com/emails/receiving/%s'
+    ADDRESS = 'support@tectonicplates.app'
     # Svix, which signs Resend's webhooks, leaves the window to the receiver. Five minutes is the
     # window its own libraries use: long enough for clock skew, short enough that a captured
     # request cannot be replayed later.
@@ -116,11 +117,18 @@ class Tectonic < Roda
         [500, {}, []]
       end
 
-      # Any other event is acknowledged and ignored, so Resend stops retrying it.
+      # Only mail to the support address is forwarded. Resend webhooks belong to the account,
+      # not the domain, and the owner's other domains receive mail too -- without this, all of it
+      # would arrive here and be forwarded as tectonic support mail. Anything else, of any event
+      # type, is acknowledged and ignored so Resend stops retrying it.
       def handle(event)
-        return 200 unless event['type'] == 'email.received'
+        return 200 unless event['type'] == 'email.received' && for_support?(event)
 
         SupportMail.forward(event.dig('data', 'email_id')) ? 200 : 500
+      end
+
+      def for_support?(event)
+        Array(event.dig('data', 'to')).any? { |to| to.to_s.downcase.include?(ADDRESS) }
       end
 
       def verified?(env, body)
