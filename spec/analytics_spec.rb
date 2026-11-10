@@ -53,3 +53,19 @@ describe 'the pages an account is counted on' do
   end
 end
 
+# The third, from #688: that a page served anywhere but the live site counts nothing.
+#
+# The firewall on the Fathom site was supposed to do this and could not, because the script
+# reports the canonical URL -- always production -- instead of the address the browser is
+# on. So every browser spec counted as a production visitor: 99% of pageviews from August to
+# November. The attribute is checked against window.location.hostname, which a canonical tag
+# cannot change, and it is an allow list so a host nobody thought of is excluded too.
+describe 'the Fathom tag' do
+  it 'counts only the live hostname, whatever the canonical URL says' do
+    layout = File.read(File.expand_path('../views/layout.erb', __dir__))
+    tag = layout[%r{<script src="https://cdn\.usefathom\.com/script\.js"[^>]*>}m]
+
+    assert_includes tag, 'data-included-domains="tectonicplates.app"'
+  end
+end
+
