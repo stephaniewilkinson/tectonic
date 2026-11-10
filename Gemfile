@@ -68,7 +68,8 @@ end
 group :test do
   gem 'capybara-selenium'
   gem 'minitest'
-  gem 'minitest-capybara'
+  # Object#stub and Minitest::Mock, which Minitest 6 moved out into their own gem. #709.
+  gem 'minitest-mock'
   gem 'rack-test'
 end
 

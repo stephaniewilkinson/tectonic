@@ -32,7 +32,7 @@ JS
 
 describe 'tapping Done twice before the first tap answers' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   before { a_session_with_one_set_at 135 }
@@ -56,7 +56,7 @@ end
 # broken rather than do nothing, so the screen has to say the first one landed.
 describe 'what the screen does while a tap is in flight' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   before { a_session_with_one_set_at 135 }

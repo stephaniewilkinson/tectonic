@@ -68,7 +68,7 @@ module OvertakenTap
 end
 
 describe 'a tap the poll cannot overtake' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
   include OvertakenTap

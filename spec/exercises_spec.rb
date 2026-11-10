@@ -27,7 +27,7 @@ end
 
 describe 'the exercise library' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'loads idempotently, with no duplicate rows on a second run' do
     created, skipped = Tectonic::Exercise.load_library
@@ -39,7 +39,7 @@ end
 
 describe 'a new account' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'sees the library and can add its own alongside it' do
     sign_in_as_somebody_new
@@ -54,7 +54,7 @@ end
 
 describe 'a private exercise' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'is invisible to and uneditable by another account' do
     sign_in_as_somebody_new
@@ -74,7 +74,7 @@ end
 
 describe 'a library exercise' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'shows as read-only and refuses a direct edit' do
     sign_in_as_somebody_new
@@ -101,7 +101,7 @@ NOTE_WITH_MARKUP = 'watch the knee: <b id="pwned">valgus</b>'
 
 describe 'a note on a movement you own' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'is written from the form and read back on the movement page' do
     sign_in_as_somebody_new
@@ -139,7 +139,7 @@ end
 
 describe 'a note containing markup' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'is shown as the characters that were typed rather than run as HTML' do
     sign_in_as_somebody_new

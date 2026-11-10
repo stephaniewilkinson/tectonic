@@ -5,7 +5,7 @@ require 'securerandom'
 
 describe Tectonic do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include Rack::Test::Methods
 

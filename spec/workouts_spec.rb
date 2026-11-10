@@ -14,7 +14,7 @@ Tectonic::Exercise.load_library
 
 describe 'editing a set' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'saves the new weight from the edit form' do
     sign_in_as_somebody_new
@@ -36,7 +36,7 @@ end
 
 describe 'a fresh account' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it "sees none of another account's workouts" do
     sign_in_as_somebody_new
@@ -47,7 +47,7 @@ end
 
 describe "another account's workout" do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
 
   it 'is out of reach, redirecting a stranger to the index' do
     sign_in_as_somebody_new

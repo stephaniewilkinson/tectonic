@@ -24,7 +24,7 @@ module FathomRecorder
 end
 
 describe 'what Fathom is told about a set' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
   include FathomRecorder

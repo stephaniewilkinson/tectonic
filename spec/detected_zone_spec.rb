@@ -195,7 +195,7 @@ end
 # IANA name, which is exactly what the column stores. If this were an offset or an
 # abbreviation there would be a mapping to write and keep in step, and there is neither.
 describe 'what a real browser knows about itself' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include Capybara::DSL
 
@@ -263,7 +263,7 @@ module ZoneInABrowser
 end
 
 describe 'a real browser saying where it is' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include Capybara::DSL
   include ZoneInABrowser
@@ -280,7 +280,7 @@ end
 # The other way in. Signing in goes through rodauth's `login` and creating an account does
 # not, so the two paths set the flag in different places and both are worth driving.
 describe 'a real browser signing in for the first time' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include Capybara::DSL
 

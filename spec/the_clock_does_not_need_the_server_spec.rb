@@ -47,7 +47,7 @@ end
 
 describe 'tapping Done when the tap does not arrive' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -84,7 +84,7 @@ end
 # else on this bar came off the cue, and the cue is exactly what did not arrive.
 describe 'what the bar can claim with no cue behind it' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -117,7 +117,7 @@ end
 
 describe 'tapping Done twice when neither tap arrives' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -146,7 +146,7 @@ end
 # exactly like the timer working.
 describe 'the cue that turns up late' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -170,7 +170,7 @@ end
 # and what the cue brings is the prescription this browser had no way to know.
 describe 'the prescription a late cue brings with it' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -203,7 +203,7 @@ end
 # running".
 describe 'a cue for a set other than the one that was lost' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -217,7 +217,7 @@ end
 
 describe 'a late cue arriving on a bell the lifter already chose' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
@@ -244,7 +244,7 @@ end
 # cue, read back on the browser's side of the wire.
 describe 'a lost tap that was never going to finish a set' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestWithoutTheServer
 
