@@ -8,7 +8,7 @@ require 'securerandom'
 # appear at the next fifteen-second poll. It should appear in a second or two.
 describe 'a set changed behind an open session screen' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   before do

@@ -44,7 +44,7 @@ end
 
 describe 'the session progress bar while swiping' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SwipeMarks
 
@@ -83,7 +83,7 @@ end
 # session here is longer than any other spec's.
 describe 'the progress bar on a session long enough for the drift to show' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SwipeMarks
 

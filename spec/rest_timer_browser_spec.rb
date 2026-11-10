@@ -71,7 +71,7 @@ module RestingBrowser
 end
 
 describe 'the rest timer arming' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -107,7 +107,7 @@ end
 # the clock stays silent -- and when somebody does name one, the clock goes on exactly as it
 # was and the bar grows a bell.
 describe 'the rest timer before a length is chosen' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -150,7 +150,7 @@ end
 # That it is a clock and not a picture of one. These read the number off the screen twice
 # with a real gap between, which is the only assertion that says it ticks.
 describe 'the rest timer counting' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -192,7 +192,7 @@ describe 'the rest timer counting' do
 end
 
 describe 'the rest timer under a thumb' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -226,7 +226,7 @@ describe 'the rest timer under a thumb' do
 end
 
 describe 'a bell wound back and forth past the clock' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -252,7 +252,7 @@ end
 # shown under "prescribed" would be the app passing its own measurement off as the programme's
 # instruction, and the reverse would disown an instruction somebody wrote.
 describe 'the rest the programme prescribed' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -304,7 +304,7 @@ end
 # between the 95lb and 135lb rungs -- so tapping one counts up and rings at nothing, exactly
 # as a session with no block at all does.
 describe 'a warmup rung under a block that prescribes a rest' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -321,7 +321,7 @@ end
 # The reason the whole thing lives outside #session-body. The poll swaps every panel every
 # fifteen seconds; a countdown inside that region would restart four times a minute.
 describe 'the rest timer against the poll' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
 
@@ -403,7 +403,7 @@ end
 # thing it is about could have happened: the bell's own word on screen is the proof that the
 # timer reached the state, and the count is the claim about it.
 describe 'the rest timer and the phone it is on' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
   include WatchingTheWakeLock
@@ -440,7 +440,7 @@ end
 # separately: a length the block wrote arms the bell on its own, with no tap on this bar at
 # all.
 describe 'a prescribed rest and the phone it is on' do
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include RestingBrowser
   include WatchingTheWakeLock

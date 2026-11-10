@@ -44,7 +44,7 @@ end
 
 describe 'the signal coming back while the session is open' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
   include WaitingTaps
@@ -91,7 +91,7 @@ end
 
 describe 'a queue outliving the page that made it' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
   include WaitingTaps
@@ -127,7 +127,7 @@ end
 
 describe 'a held tap the server will not take' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
   include WaitingTaps

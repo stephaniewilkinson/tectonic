@@ -249,14 +249,21 @@ describe 'a warmup row against a working-set row' do
   include RouteOwnership
   include SessionRow
 
-  # The <li> of each list, by their opening tags. The warmup list is rendered first.
+  # The <li> of each set row, by their opening tags. The warmup list is rendered first.
+  #
+  # Matched on data-set-row rather than on a bare `<li class=`: once the row gained that
+  # attribute ahead of its class, the old pattern matched nothing, both sides came back nil,
+  # and this compared nil with nil and passed for as long as it took Minitest 6 to refuse
+  # that. The guard below is so it cannot go quiet the same way again.
   def rows(body)
-    body.scan(/<li class="([^"]*)"/).flatten
+    body.scan(/<li data-set-row="[^"]*"[^>]*\bclass="([^"]*)"/).flatten
   end
 
   it 'wears the same classes on the row itself' do
-    warmup, working = rows(session)
+    found = rows(session)
+    assert_operator found.size, :>=, 2, 'found no warmup and working rows to compare'
 
+    warmup, working = found
     assert_equal working, warmup
   end
 

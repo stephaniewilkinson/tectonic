@@ -62,7 +62,7 @@ end
 
 describe 'walking out of a session with nothing written for it' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include EmptySessionInABrowser
 
@@ -85,7 +85,7 @@ end
 
 describe 'the way in to a new lift, while the session swaps itself' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include EmptySessionInABrowser
 

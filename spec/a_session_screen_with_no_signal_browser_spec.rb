@@ -129,7 +129,7 @@ end
 
 describe 'what is kept of a session screen' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include NoSignal
 
   before { a_session_open }
@@ -161,7 +161,7 @@ end
 
 describe 'a session screen reopened with no signal' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include NoSignal
 
   before { a_session_open }
