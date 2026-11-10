@@ -823,7 +823,10 @@ namespace :stats do
     require_relative 'lib/tectonic/reviewer_account'
     excluding = ENV.fetch('EXCLUDE', '').split(',').map(&:strip).reject(&:empty?)
     excluding << Tectonic::ReviewerAccount::EMAIL
-    puts Tectonic::SignupReport.format(Tectonic::SignupReport.rows(excluding:))
+    report = Tectonic::SignupReport
+    puts report.format(report.rows(excluding:))
+    puts "\nWhere they came from (#691)\n#{report.format_sources(report.sources(excluding:))}"
+    puts "\n#{report.format_hosts(report.hosts(excluding:))}"
   end
 end
 

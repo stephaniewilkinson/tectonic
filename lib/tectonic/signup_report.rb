@@ -59,19 +59,79 @@ class Tectonic < Roda
     end
 
     # A plain fixed-width table, for a terminal.
-    def format(rows)
-      lines = [HEADINGS] + rows.map { |row| cells(row) }
-      widths = HEADINGS.each_index.map { |column| lines.map { |line| line[column].length }.max }
+    def format(rows) = table(HEADINGS, rows.map { |row| cells(row) })
+
+    def cells(row)
+      [row.week&.iso8601 || UNDATED, row.signups, row.via_assistant, row.logged_a_set, row.connected]
+    end
+
+    def table(headings, rows)
+      lines = [headings, *rows].map { |line| line.map(&:to_s) }
+      widths = lines.transpose.map { |column| column.map(&:length).max }
       lines.map { |line| aligned(line, widths) }.join("\n")
     end
 
-    def cells(row)
-      [row.week&.iso8601 || UNDATED, row.signups, row.via_assistant, row.logged_a_set, row.connected].map(&:to_s)
+    def aligned(line, widths) = line.zip(widths).map { |cell, width| cell.ljust(width) }.join('  ').rstrip
+
+    # Where signups came from. #691.
+    #
+    # A `ref` or `utm_source` on the first page wins outright and is shown as written: it is
+    # the one signal nothing strips, and a link posted as `?ref=r-weightroom` should be
+    # counted as exactly that. Otherwise the referring host is sorted into a channel, with the
+    # raw hosts in a table of their own so a new one is never hidden under "other site".
+    #
+    # "assistant" undercounts, and cannot help it: assistants' apps often send no referrer,
+    # and those signups land in "none". The came-via-an-assistant column above counts the
+    # connect flow, which is the other half of that answer.
+    CHANNELS = {
+      'assistant' => %w[chatgpt.com chat.openai.com claude.ai perplexity.ai www.perplexity.ai gemini.google.com
+                        copilot.microsoft.com],
+      'reddit' => %w[reddit.com www.reddit.com old.reddit.com out.reddit.com],
+      'hacker news' => %w[news.ycombinator.com],
+      'search' => %w[www.google.com google.com www.bing.com bing.com duckduckgo.com search.brave.com
+                     search.yahoo.com www.ecosia.org kagi.com]
+    }.freeze
+    NOT_RECORDED = 'not recorded'
+    NO_SOURCE = 'none'
+    OTHER = 'other site'
+    SOURCE_HEADINGS = ['week', 'source', 'signups', 'logged a set'].freeze
+    HOST_HEADINGS = ['referring site', 'signups'].freeze
+
+    def source(ref:, host:, landing:)
+      return NOT_RECORDED if landing.nil?
+      return ref if ref
+      return NO_SOURCE if host.nil?
+
+      CHANNELS.find { |_, hosts| hosts.include?(host) }&.first || OTHER
     end
 
-    def aligned(line, widths)
-      line.each_with_index.map { |cell, column| cell.ljust(widths[column]) }.join('  ').rstrip
+    # Dated signups only: the undated ones predate #580 and so predate this by two months.
+    def signups(excluding: [])
+      DB[:accounts].exclude(email: excluding).exclude(created_at: nil)
+                   .select(Sequel.function(:date_trunc, 'week', :created_at).cast(Date).as(:week),
+                           :signup_ref, :signup_referrer_host, :signup_landing_path,
+                           Sequel.as(lifted, :lifted))
+                   .all
     end
+
+    # One line per week and source, newest week first, busiest source first within it.
+    def sources(excluding: [])
+      signups(excluding:).group_by { |row| [row[:week], source_of(row)] }
+                         .map { |(week, from), rows| [week, from, rows.size, rows.count { |row| row[:lifted] }] }
+                         .sort_by { |week, _, count, _| [-week.jd, -count] }
+    end
+
+    def hosts(excluding: [])
+      signups(excluding:).filter_map { |row| row[:signup_referrer_host] }.tally.sort_by { |host, count| [-count, host] }
+    end
+
+    def source_of(row)
+      source(ref: row[:signup_ref], host: row[:signup_referrer_host], landing: row[:signup_landing_path])
+    end
+
+    def format_sources(lines) = table(SOURCE_HEADINGS, lines.map { |week, *rest| [week.iso8601, *rest] })
+
+    def format_hosts(lines) = table(HOST_HEADINGS, lines)
   end
 end
 
