@@ -32,7 +32,7 @@ module ButtonShape
   # sky-800 rather than lime-500 on the ring since #333: the ring was the same colour as the
   # button it had to appear on, so tabbing onto Save drew lime on lime and there was no
   # indicator at all.
-  SHAPE = %w[rounded-md shadow-sm focus-visible:outline focus-visible:outline-2
+  SHAPE = %w[rounded-md shadow-xs focus-visible:outline-solid focus-visible:outline-2
              focus-visible:outline-offset-2 focus-visible:outline-sky-800].freeze
 
   def filled_controls(body)
@@ -74,7 +74,7 @@ module ButtonShape
     # Present is not enough: a call site that keeps its old radius alongside the shared one
     # leaves which of the two wins to the order Tailwind happens to emit them in.
     assert_equal ['rounded-md'], classes.grep(/\Arounded/), "a button on #{path} has a radius of its own"
-    assert_equal ['shadow-sm'], classes.grep(/\Ashadow/), "a button on #{path} has a shadow of its own"
+    assert_equal ['shadow-xs'], classes.grep(/\Ashadow/), "a button on #{path} has a shadow of its own"
   end
 end
 

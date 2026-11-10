@@ -42,7 +42,7 @@
 <div id="session-progress"<%== ' hx-swap-oob="true"' if defined?(oob) && oob %> class="sticky top-0 bg-gray-100 py-2">
   <div class="flex gap-0.5" aria-label="Session progress">
     <%- session_lifts.each_with_index do |lift, position| %>
-      <div data-lift-segment="<%= position %>" class="flex h-2 flex-1 overflow-hidden rounded-sm bg-gray-300">
+      <div data-lift-segment="<%= position %>" class="flex h-2 flex-1 overflow-hidden rounded-xs bg-gray-300">
         <%- lift.each do |set| %>
           <div class="flex-1 <%= set[:is_completed] ? 'bg-lime-500' : '' %>"></div>
         <%- end %>

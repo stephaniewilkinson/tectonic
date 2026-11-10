@@ -23,7 +23,7 @@ module Fields
   # rather than this app's; #524 replaced it with a native date input on field_style, so it is
   # simply one of these now and the rule reaches it without anything being said.
   def shared_controls(path)
-    controls_on(path).select { |classes| classes.include?('rounded-md') && classes.include?('shadow-sm') }
+    controls_on(path).select { |classes| classes.include?('rounded-md') && classes.include?('shadow-xs') }
   end
 end
 
