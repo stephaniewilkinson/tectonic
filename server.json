@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "app.tectonicplates/tectonic-plates",
+  "name": "app.tectonicplates/barbell-lifting-strength-training-workout-log",
   "title": "tectonic plates",
-  "description": "Write whole barbell programmes, not just workouts: weeks, progressions, ramps, and plate maths.",
-  "version": "0.1.0",
+  "description": "Barbell strength log Claude or ChatGPT can program: multi-week plans, checked against your lifts",
+  "version": "0.2.0",
   "websiteUrl": "https://tectonicplates.app/docs",
   "repository": {
     "url": "https://github.com/stephaniewilkinson/tectonic",
