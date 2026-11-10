@@ -6,12 +6,13 @@
 
 User-agent: *
 
-# The public surface, and all of it. Five pages and the root, which redirects to the
-# first of them.
+# The public surface, and all of it. Six pages and the root, which redirects to the
+# first of them. /example is #693's: a real block anyone can read.
 Allow: /$
 Allow: /welcome
 Allow: /about
 Allow: /docs
+Allow: /example
 Allow: /login
 Allow: /create-account
 
