@@ -810,3 +810,36 @@ def announce_proposals(report)
   puts "#{report[:activities_without_session]} activity(ies) the watch recorded match no session logged here."
 end
 
+# Signups per week, and whether the people behind them did anything. #684.
+#
+# Read-only and counts only, so it is safe to point at production: run it with that
+# database's external URL in DATABASE_URL. EXCLUDE names addresses to leave out, comma
+# separated -- your own account, which would otherwise read as a lifter. The reviewer
+# account is always left out.
+namespace :stats do
+  desc 'Signups per week, and how many lifted or connected an assistant (EXCLUDE=me@example.com)'
+  task :signups do
+    require_relative 'lib/tectonic/signup_report'
+    require_relative 'lib/tectonic/reviewer_account'
+    excluding = ENV.fetch('EXCLUDE', '').split(',').map(&:strip).reject(&:empty?)
+    excluding << Tectonic::ReviewerAccount::EMAIL
+    puts Tectonic::SignupReport.format(Tectonic::SignupReport.rows(excluding:))
+  end
+end
+
+# The account a directory reviewer signs in to. #683.
+#
+# Creates it the first time and resets it every time after, so the same command is the way
+# back once a reviewer has written to it. The password is read from the environment and
+# never printed or stored except as a hash: it goes into the directory portal, where only
+# reviewers see it.
+namespace :reviewer do
+  desc 'Create or reset the directory reviewer account (REVIEWER_PASSWORD=...)'
+  task :reset do
+    require_relative 'lib/tectonic/reviewer_account'
+    password = ENV.fetch('REVIEWER_PASSWORD') { abort 'Set REVIEWER_PASSWORD, at least 12 characters.' }
+    id = Tectonic::ReviewerAccount.reset!(password:)
+    puts "Reviewer account #{id} (#{Tectonic::ReviewerAccount::EMAIL}) is reset and populated."
+  end
+end
+
