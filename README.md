@@ -112,7 +112,7 @@ Rebuild it after adding a Tailwind class that was not already in use. CI rebuild
 on a difference, so a stale file is caught before it ships rather than after: a purged class
 breaks nothing anywhere except on the page it was meant to style, in production, silently.
 
-`tailwind.config.js` scans `app.rb` and `lib/**/*.rb` as well as the templates, because
+`assets/css/app.css` names what to scan (its `@source` lines): `app.rb` and `lib/` as well as the templates, because
 `button_style`, `rpe_style`, `row_style` and the calendar's `STYLES` table build class names
 in Ruby and appear in no template.
 
