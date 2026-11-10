@@ -6,10 +6,17 @@
     <%== assets(:css) %>
     <%== assets(:img) %>
     <%# Fathom rather than Google Analytics: no cookie, no personal data, no consent
-        banner. Development and staging are kept out of the numbers by the allowed-domains
-        firewall on the Fathom site rather than by a condition here, which is Fathom's own
-        advice and is better than one -- it filters every hostname that is not the live
-        one, including a local run that happens to boot with RACK_ENV=production.
+        banner. Development, CI and the test suite are kept out of the numbers by
+        `data-included-domains` on the tag below, which the script checks against the
+        browser's real hostname before it sends anything. Not by a condition on RACK_ENV,
+        which would miss a local run that boots with RACK_ENV=production.
+
+        This comment used to say the allowed-domains firewall on the Fathom site did that
+        job, and it cannot here. #688: the script reports the canonical URL rather than the
+        browser's address whenever the page has one, and canonical_url always names
+        https://tectonicplates.app -- so a headless Firefox on 127.0.0.1 beaconed as
+        production, the firewall passed it, and about 42,600 of the 42,700 pageviews from
+        August to November were the browser specs. analytics_spec holds the attribute.
 
         Deliberately not in views/oauth_layout.erb. That is the one page where a tap hands
         an API client the account, and the fewer origins in that moment the better. Since
@@ -26,7 +33,8 @@
         was never part of that decision. analytics_spec now holds both halves, because the
         wrong half of this to get wrong is the comment: it is what somebody reads when
         deciding whether the CSP can be tightened. %>
-    <script src="https://cdn.usefathom.com/script.js" data-site="VXQDPBHH" defer></script>
+    <script src="https://cdn.usefathom.com/script.js" data-site="VXQDPBHH"
+            data-included-domains="tectonicplates.app" defer></script>
 
     <%# The title and the description, and what they are competing for. #359.
 
