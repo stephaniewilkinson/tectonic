@@ -69,8 +69,13 @@ use Rack::Timeout, service_timeout: ENV.fetch('RACK_TIMEOUT_SERVICE_TIMEOUT', 20
 # bearer-token auth and the plain-Rack transport never touch Roda's sessions, CSRF, or
 # assets. URLMap routes by path prefix -- the endpoint path to the MCP stack,
 # everything else to Roda.
+#
+# Resend's webhook for mail to support@ is mounted the same way and for a related reason: its
+# signature covers the exact bytes Resend sent, so nothing in Roda may read or touch the body
+# before it is checked. lib/tectonic/support_mail.rb. #682.
 run Rack::URLMap.new(
   Tectonic::MCP::Config.endpoint_path => Tectonic::MCP.rack_app,
+  '/webhooks/resend' => Tectonic::SupportMail::Webhook.new,
   '/' => Tectonic.freeze.app
 )
 
