@@ -57,6 +57,7 @@ require_relative 'lib/tectonic/oauth/redirect_uri'
 require_relative 'lib/tectonic/oauth/grant_bound_tokens'
 require_relative 'lib/tectonic/oauth/refresh_token_reuse'
 require_relative 'lib/tectonic/mcp/config'
+require_relative 'lib/tectonic/first_touch'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -390,6 +391,7 @@ class Tectonic < Roda
     # connect. See migrate/056. The session value is left where it is for the redirect above.
     after_create_account do
       scope.remember_the_connection(account_id, session[login_redirect_session_key])
+      Tectonic::FirstTouch.record(account_id, session)
       # The address this browser just signed up with, for /check-your-email to name (#633). In
       # this browser's own session, so the page tells nobody anything they did not type.
       session['signed_up_as'] = account[login_column]
@@ -630,6 +632,10 @@ class Tectonic < Roda
     ErrorReporting.describe_request(path: r.path, account_id: rodauth.session_value)
     r.assets
     r.public
+    # Where a signed-out browser first arrived from, for the signup report. #691. After the
+    # assets so a stylesheet is never somebody's first page, and before rodauth so a person
+    # whose first page is /create-account is noted too.
+    FirstTouch.note(session, r, signed_in: rodauth.session_value)
     r.rodauth
     # RFC 9728 protected-resource metadata: rodauth-oauth does not ship it, and MCP
     # clients require it to discover the authorization server. It lives at the root

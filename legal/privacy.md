@@ -35,6 +35,12 @@ its recordings.
 Weights you type into the Withings app are included. We read these; we never write
 anything back to Withings. Disconnecting stops any further reading.
 
+**Where you arrived from.** When you create an account we record which website or link you
+arrived from: the referring site's name only (for example `www.reddit.com`, never the page
+or anything you searched for), any `ref` or `utm_source` tag on the link, and the first page
+you opened here. It is held in your session cookie until you sign up, then saved with your
+account, so we can tell which places people find us through. It is never shared.
+
 **Nothing else.** We do not ask for your name, your date of birth, your location or your
 payment details, and we have no field to put them in.
 
