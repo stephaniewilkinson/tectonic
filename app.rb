@@ -661,6 +661,15 @@ class Tectonic < Roda
 
     r.get('welcome') { view('welcome') }
     r.get('about') { view('about') }
+    # The privacy policy, once there is somebody to name on it. #682. Until PRIVACY_OPERATOR
+    # is complete this answers 404 like any unknown path, so the page can never be published
+    # with a placeholder where the address should be.
+    r.get('privacy') do
+      next unless privacy_published?
+
+      @page_title = 'Privacy policy'
+      view('privacy')
+    end
     # A real block, planned against lifted, for anyone without an account. #693.
     r.get('example') do
       @page_title = 'A real training block, planned and lifted'
@@ -3566,6 +3575,14 @@ class Tectonic < Roda
     section: 'text-xl font-semibold text-gray-900',
     label: 'font-sans text-sm font-semibold uppercase tracking-wide text-gray-500'
   }.freeze
+
+  # Who the privacy policy names, and how to reach them. #682. Your own name until the Oregon
+  # LLC is registered, then the LLC's, which is the whole of the change when it is. An address
+  # and an email left nil keep /privacy unpublished; see the route.
+  PRIVACY_OPERATOR = { name: 'Stephanie Wilkinson', address: nil, email: nil }.freeze
+  PRIVACY_UPDATED = '10 November 2026'
+
+  def privacy_published? = PRIVACY_OPERATOR.values.all? { |value| value.to_s.strip != '' }
 
   def heading_style(kind)
     HEADINGS.fetch(kind)
