@@ -45,13 +45,10 @@ class Tectonic < Roda
       class UpdateWorkout < Tool
         tool_name 'update_workout'
         title 'Edit a session'
-        description 'Correct a session: its date, its name, or its note. Moving a session ' \
-                    'to another date is how a workout logged under the wrong day is fixed, ' \
-                    'since create_workout would open a second one. Send only what changes; ' \
-                    'send name or note as an empty string to clear it. Moving onto a date that ' \
-                    'already holds a session is refused, naming what is there, unless ' \
-                    'alongside is true -- a deliberate two-a-day. When two share a day, the ' \
-                    'reply says which one a call by date resolves to.'
+        description "Correct a session's date, name or note; send only what changes, and an " \
+                    'empty string clears name or note. Moving onto a date that already has a ' \
+                    'session is refused unless alongside is true (a two-a-day); the reply then ' \
+                    'says which one a call by date resolves to.'
         scope :write
         input_schema(
           type: 'object',

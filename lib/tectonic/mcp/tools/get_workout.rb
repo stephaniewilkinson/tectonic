@@ -17,14 +17,13 @@ class Tectonic < Roda
       class GetWorkout < Tool
         tool_name 'get_workout'
         title 'Read a session'
-        description 'Read one session in full: its sets in order with weight, reps, RPE, ' \
-                    'whether each was a warmup and whether it was completed, what the ' \
-                    'program prescribed, the session rating, and how long it took. Give a ' \
-                    "date ('today' or YYYY-MM-DD) or a workout_id, which list_workouts and " \
-                    'search return. The date argument matches the day the session was ' \
-                    'written for, which is the `date` field; the reply also carries ' \
-                    'performed_or_planned_on, the day it was actually trained and the one ' \
-                    "the app shows, and performed_on, which is null until it has been. #{ONE_DUMBBELL}"
+        # Heart rate is named because it is health data the reply carries: the directory policy
+        # (2B) wants no functionality a description does not disclose.
+        description 'Read one session in full: sets in order with weight, reps, RPE, warmup and ' \
+                    'completed flags, the prescription, the session rating and duration, and heart ' \
+                    'rate for the session and per set when a watch recording was matched. Give a ' \
+                    'date (today or YYYY-MM-DD, matched on the day the session was written for) or ' \
+                    "a workout_id from list_workouts or search. #{ONE_DUMBBELL}"
         scope :read
         input_schema(
           type: 'object',

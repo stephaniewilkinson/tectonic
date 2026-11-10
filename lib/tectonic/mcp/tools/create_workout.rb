@@ -11,12 +11,10 @@ class Tectonic < Roda
       class CreateWorkout < Tool
         tool_name 'create_workout'
         title 'Start a session'
-        description "Open the account's workout for a date ('today' or YYYY-MM-DD), " \
-                    'reusing an existing one on that day instead of creating a duplicate. ' \
-                    'An optional name says which session it is, for a day with more than ' \
-                    'one. An optional note says how it went -- "bar felt slow, slept badly" ' \
-                    '-- which is the context that explains an RPE or a long rest weeks later. ' \
-                    'Send either as an empty string to clear it; omit to leave it alone.'
+        description "Open the account's workout for a date (today or YYYY-MM-DD), reusing one " \
+                    'already on that day. Optional name (which session, on a day with two) and ' \
+                    'note (how it went). On a reused workout, a name or note given replaces the ' \
+                    'one there and an empty string clears it; omitted leaves it alone.'
         scope :write
         input_schema(
           type: 'object',

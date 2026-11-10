@@ -26,8 +26,7 @@ class Tectonic < Roda
         tool_name 'delete_workout'
         title 'Delete a session'
         description 'Delete a workout and every set in it. Returns what was removed. A ' \
-                    'session with completed sets is training history and needs confirm ' \
-                    'true, which you should only send if the user asked for it.'
+                    'session with completed sets requires confirm true.'
         scope :write
         destroys
         input_schema(

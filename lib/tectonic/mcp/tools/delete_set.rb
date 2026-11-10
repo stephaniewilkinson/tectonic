@@ -22,9 +22,8 @@ class Tectonic < Roda
       class DeleteSet < Tool
         tool_name 'delete_set'
         title 'Delete a set'
-        description 'Delete a set. Returns what was removed so it can be logged again if ' \
-                    'that was a mistake. A completed set is training history and needs ' \
-                    'confirm true, which you should only send if the user asked for it.'
+        description 'Delete a set. Returns what was removed, so it can be logged again. ' \
+                    'Deleting a completed set requires confirm true.'
         scope :write
         destroys
         input_schema(

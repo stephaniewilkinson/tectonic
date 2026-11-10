@@ -25,22 +25,10 @@ class Tectonic < Roda
         tool_name 'exercise_history'
 
         title 'History of a movement'
-        description "The account's own sets of one movement (by name), newest first, with " \
-                    'the dates they were lifted and the estimated one-rep max they support. ' \
-                    'Each set carries three dates: performed_or_planned_on is the day it was ' \
-                    'trained and is what the app itself shows; date is the day its session ' \
-                    'was written for, which is what from/to match on; performed_on is null ' \
-                    'until something in that session was ticked off. ' \
-                    'Narrow with from/to (YYYY-MM-DD). Completed sets only by default, which ' \
-                    'is what training history means; pass include_planned for written but ' \
-                    'unlifted sets too. Also reports how long this lifter typically takes ' \
-                    'between sets of this movement, measured from their own sessions, which ' \
-                    'is what to price a prescribed day with. ' \
-                    'estimated_1rm is the most that has ever been demonstrated, so it can be ' \
-                    'years old; `recent` reports what the last 12, 26 and 52 weeks each imply ' \
-                    'on their own, with the date and the number of sets behind each. Use the ' \
-                    'gap between them to judge what a next block should open at -- the app ' \
-                    'reports both and proposes neither.'
+        description 'Completed sets of one movement (by name), newest first; from/to ' \
+                    '(YYYY-MM-DD, matched on the session date) and limit narrow it, include_planned ' \
+                    'adds unlifted sets. Also returns typical rest between sets, estimated_1rm ' \
+                    '(lifetime best) and `recent`: what the last 12, 26 and 52 weeks each imply.'
         scope :read
         input_schema(
           type: 'object',

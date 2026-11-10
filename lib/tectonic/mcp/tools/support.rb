@@ -28,6 +28,40 @@ class Tectonic < Roda
       ONE_DUMBBELL = 'On a movement done with dumbbells a weight is one dumbbell, not the ' \
                      'pair: two 25 lb dumbbells is 25.'
 
+      # What each field of a programmed lift means, said once for the three tools that write
+      # one (create_program, add_program_lift, update_program_lift). On the field rather than in
+      # a paragraph of tool description, and as a fact rather than advice: the directory's
+      # review criteria reject descriptions that tell the model how to behave, and these used to
+      # carry recommended rest ranges and "worth setting deliberately". What remains is what a
+      # caller needs to send a correct value -- the unit, the bound, and what an omission means.
+      LIFT_FIELDS = {
+        top_weight: 'Working-set weight in pounds.',
+        percent_of_max: 'Working weight as a percentage of the training max.',
+        percent_of: 'Movement whose max percent_of_max is of. Defaults to this lift.',
+        is_weighted: 'False for work with no external load.',
+        measure: 'reps or time. Defaults to how the movement is usually done.',
+        is_per_side: 'The count is per side. Defaults per movement.',
+        duration_seconds: 'Hold or interval length in seconds, for measure time.',
+        position: 'Order in the day, 0 first.',
+        target_rpe: 'Effort for the working sets, 1-10. Loaded lifts counted in reps only.',
+        rest_seconds: 'Rest between working sets, 5-1800 seconds, counted down on the session ' \
+                      "screen. Omitted: the lifter's own median rest for the movement.",
+        is_commanded: 'Working sets done under meet commands (start, press, rack). Not a tempo; ' \
+                      'reps only.',
+        warmup_sets: 'Warmup ramp rungs including the empty bar, 0-6; 0 is no ramp. Omitted: ' \
+                     'worked out from the top weight.',
+        bench_angle_degrees: 'Bench angle; 0 flat, negative decline. Copied onto every set.',
+        rack_hole: 'J-hook hole number. Copied onto every set.',
+        safety_hole: 'Safety hole number. Copied onto every set.'
+      }.freeze
+
+      # A schema's properties with LIFT_FIELDS' descriptions attached where they apply.
+      def self.described(properties)
+        properties.to_h do |name, schema|
+          [name, LIFT_FIELDS.key?(name) ? schema.merge(description: LIFT_FIELDS[name]) : schema]
+        end
+      end
+
       # The ranges every tool that writes a number checks its arguments against. They
       # live here rather than on the tool that first needed them because a weight means
       # the same thing whether it is being logged, revised or prescribed, and because a

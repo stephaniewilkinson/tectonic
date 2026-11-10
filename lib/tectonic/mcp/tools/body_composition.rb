@@ -56,16 +56,11 @@ class Tectonic < Roda
 
         title 'Body composition from one weigh-in'
 
-        description 'Fat mass, lean mass and body-fat percentage from a single weigh-in, ' \
-                    'returned together with the bodyweight they were taken at. The most ' \
-                    'recent weigh-in by default; pass on (YYYY-MM-DD) for the last one at or ' \
-                    'before that day. The percentage comes with the day-to-day variation ' \
-                    "measured from this account's own weigh-ins on the same instrument, " \
-                    'because bioimpedance moves with hydration and recent food -- a ' \
-                    'difference smaller than that band is not a change this scale can see. ' \
-                    'Set how far back the band is measured over with days (default ' \
-                    "#{DEFAULT_BAND_DAYS}). Reported separately per source and never mixed " \
-                    'across them. Read-only, and it does not say what the figures should be.'
+        description 'Fat mass, lean mass and body-fat percentage from one weigh-in, with the ' \
+                    'bodyweight it was taken at: the latest, or the last on or before on ' \
+                    '(YYYY-MM-DD). The percentage carries its day-to-day variation on the same ' \
+                    "instrument over days (default #{DEFAULT_BAND_DAYS}). Per source, never mixed. " \
+                    'May fetch new readings from Withings first.'
         scope :read
         input_schema(
           type: 'object',

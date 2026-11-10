@@ -29,12 +29,9 @@ class Tectonic < Roda
       class UpdateWorkoutExercise < Tool
         tool_name 'update_workout_exercise'
         title 'Swap a movement in a session'
-        description 'Swap every set of one movement in a session for another, in one ' \
-                    'call, instead of one call per set. Sets already marked as lifted ' \
-                    'are left alone, since those record what was actually performed. Send ' \
-                    'relabel true only when those sets are right and their name is wrong -- ' \
-                    'the work was done, and logged under the wrong movement -- which moves ' \
-                    'them too.'
+        description 'Swap every set of one movement in a session for another movement. Sets ' \
+                    'already lifted are left alone unless relabel is true, which moves them too ' \
+                    '(for work logged under the wrong name).'
         scope :write
         input_schema(
           type: 'object',

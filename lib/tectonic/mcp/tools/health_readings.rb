@@ -36,6 +36,12 @@ class Tectonic < Roda
       # said afterwards about how whole the window is.
       class HealthReadings < Tool
         DEFAULT_DAYS = 90
+        # How many rows include_readings returns per instrument, newest first. A wide from/to
+        # used to return every row there was -- years of daily weigh-ins in one reply -- and the
+        # directory's review wants responses "reasonably sized for the task". The cut is said
+        # in the reply, with how to narrow it, so a short answer is never mistaken for all of it.
+        DEFAULT_READINGS = 100
+        MAX_READINGS = 500
 
         # What a hole in the window does to *this* answer, in this tool's own terms. Every
         # figure it reports is an aggregate -- a count, the ends of a range, a band -- so a
@@ -50,23 +56,20 @@ class Tectonic < Roda
 
         title 'Measurements from a scale or a band'
 
-        description 'Readings of one health metric for this account, newest first, as ' \
-                    'recorded by whatever instrument reported them. Names to try: ' \
-                    "#{BodyReadings::KNOWN.join(', ')}. Narrow with from/to (YYYY-MM-DD); " \
-                    "the default window is the last #{DEFAULT_DAYS} days. " \
-                    'Returns a summary by default -- how many readings, over what window, ' \
-                    'the latest, the range, and how much the number moves from one reading ' \
-                    'to the next -- because a year of readings is hundreds of rows that say ' \
-                    'one thing. Pass include_readings for the rows themselves. ' \
-                    'Results are reported separately per source and unit and are never ' \
-                    'averaged across them: a scale and a caliper are different instruments ' \
-                    'wearing one metric name, and so are kilograms and pounds. ' \
-                    'Read-only; nothing here records a measurement.'
+        description 'Readings of one health metric for this account, newest first: ' \
+                    "#{BodyReadings::KNOWN.join(', ')}. from/to (YYYY-MM-DD) default to the last " \
+                    "#{DEFAULT_DAYS} days. Returns a summary per source and unit (count, latest, " \
+                    'range, reading-to-reading variation), never averaged across them; ' \
+                    "include_readings adds the rows, up to #{DEFAULT_READINGS} per instrument by " \
+                    'default. May fetch new readings from Withings first.'
         scope :read
         input_schema(
           type: 'object',
           properties: { metric: { type: 'string' }, from: { type: 'string' }, to: { type: 'string' },
-                        source: { type: 'string' }, include_readings: { type: 'boolean' } },
+                        source: { type: 'string' }, include_readings: { type: 'boolean' },
+                        limit: { type: 'integer',
+                                 description: "Rows per instrument with include_readings, #{DEFAULT_READINGS} " \
+                                              "by default, at most #{MAX_READINGS}." } },
           required: ['metric'], additionalProperties: false
         )
 
@@ -149,9 +152,17 @@ class Tectonic < Roda
                    lowest: BodyReadings.number(BodyReadings.values(group).min),
                    highest: BodyReadings.number(BodyReadings.values(group).max),
                    day_to_day: BodyReadings.day_to_day(group) }
-          return view unless arguments[:include_readings]
+          arguments[:include_readings] ? view.merge(rows(group, arguments)) : view
+        end
 
-          view.merge(values: group.reverse.map { |row| BodyReadings.reading(row) })
+        # The newest rows up to the limit, and whether that was all of them.
+        def self.rows(group, arguments)
+          shown = group.reverse.first(readings_limit(arguments))
+          { values: shown.map { |row| BodyReadings.reading(row) }, values_truncated: shown.length < group.length }
+        end
+
+        def self.readings_limit(arguments)
+          (arguments[:limit] || DEFAULT_READINGS).clamp(1, MAX_READINGS)
         end
 
         # Said rather than answered with an empty list, and said with the metric names this
@@ -187,7 +198,7 @@ class Tectonic < Roda
         # was meant to qualify.
         def self.summary(metric, from, to, instruments, arguments)
           head = "#{metric}, #{from} to #{to}, by instrument:"
-          [head, *instruments.map { |view| line(view) }, tail(arguments)]
+          [head, *instruments.map { |view| line(view) }, tail(arguments, instruments)]
         end
 
         # The band is in the sentence and not only in the payload, for the reason #519 gives:
@@ -203,10 +214,12 @@ class Tectonic < Roda
 
         PLUS_MINUS = '±'
 
-        def self.tail(arguments)
-          return nil if arguments[:include_readings]
+        def self.tail(arguments, instruments)
+          return '  Ask again with include_readings for the rows themselves.' unless arguments[:include_readings]
+          return nil unless instruments.any? { |view| view[:values_truncated] }
 
-          '  Ask again with include_readings for the rows themselves.'
+          "  Showing the newest #{readings_limit(arguments)} reading(s) per instrument; narrow from/to, " \
+            "or raise limit up to #{MAX_READINGS}, for the rest."
         end
       end
     end

@@ -41,14 +41,10 @@ class Tectonic < Roda
         tool_name 'update_set'
 
         title 'Correct a set'
-        description 'Correct a set: weight, reps, rpe, whether it is a warmup, whether ' \
-                    'its reps are per side, whether it was done under meet commands ' \
-                    '(is_commanded -- start, press, rack, rather than the lifter\'s own ' \
-                    'tempo), or the exercise it is. Send only what ' \
-                    'changes. Returns what actually moved. ' \
-                    'Changing the weight or reps of a completed set needs confirm true, ' \
-                    'which you should only send if the user asked for the correction; ' \
-                    "changing its exercise is refused, since that is a different set. #{ONE_DUMBBELL}"
+        description 'Correct a set: weight, reps, rpe, warmup, per-side reps, is_commanded ' \
+                    '(meet commands) or its exercise. Send only what changes; returns what moved. ' \
+                    'Changing the weight or reps of a completed set requires confirm true; ' \
+                    "changing a completed set's exercise is refused. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',

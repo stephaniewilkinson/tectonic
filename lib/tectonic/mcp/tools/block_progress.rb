@@ -41,16 +41,10 @@ class Tectonic < Roda
         tool_name 'block_progress'
 
         title 'Block progress'
-        description 'What each training block opened at, movement by movement, against any ' \
-                    'goal set for that movement. Answers "am I on pace": it returns the ' \
-                    'training max each block was generated against, newest block first, ' \
-                    'plus the goal, its deadline and how far there is to go. Narrow to one ' \
-                    'movement with exercise, and how far back with blocks. Movements carrying ' \
-                    'no max, no goal and no opener are left out, since a block is mostly ' \
-                    'accessory work with nothing to compare; naming one in exercise reports ' \
-                    'it either way. Each block also carries commanded_reps, the reps done to ' \
-                    "a referee's timing in it, for training the pause a meet judges. It " \
-                    'reports the numbers and does not judge whether they are enough.'
+        description 'The training max each block was generated against, per movement, newest ' \
+                    'block first, with any goal, its deadline and the distance left, plus ' \
+                    'commanded_reps per block. Narrow with exercise and blocks. Movements with no ' \
+                    'max, goal or opener are left out unless named in exercise.'
         scope :read
         input_schema(
           type: 'object',
