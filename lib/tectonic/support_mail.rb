@@ -20,7 +20,7 @@ class Tectonic < Roda
   # the message from the receiving API, and sends it on with the existing sender. Resend's own
   # SDK forward helper does the same two calls; there is no single REST endpoint for it.
   #
-  # Where it goes is SUPPORT_FORWARD_TO, an environment variable rather than a constant, so a
+  # Where it goes is SUPPORT_EMAIL_FORWARD_TO, an environment variable rather than a constant, so a
   # personal inbox never appears in a public repository. Reply-To is the original sender, so
   # answering from that inbox answers the person who wrote.
   #
@@ -39,7 +39,7 @@ class Tectonic < Roda
     module_function
 
     def secret = ENV.fetch('RESEND_WEBHOOK_SECRET', '').to_s
-    def forward_to = ENV.fetch('SUPPORT_FORWARD_TO', '').to_s
+    def forward_to = ENV.fetch('SUPPORT_EMAIL_FORWARD_TO', '').to_s
 
     # Svix's scheme (docs.svix.com/receiving/verifying-payloads/how-manual): HMAC-SHA256 over
     # "id.timestamp.body" with the base64 key after the whsec_ prefix, compared in constant time
