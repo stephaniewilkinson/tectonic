@@ -19,11 +19,21 @@ module Annotated
   # The four that genuinely remove something a person would miss.
   DESTROYS = %w[delete_set delete_workout delete_program delete_program_lift].freeze
 
+  # The writes that only insert new rows, and so are the only writes not marked destructive.
+  ADDS_ONLY = %w[create_set create_program add_program_day add_program_lift add_program_week].freeze
+
+  # The tools that call Withings while they run.
+  REACHES_OUT = %w[health_readings body_composition bodyweight_trend].freeze
+
   # Methods rather than bare constant references in the describes: a constant defined in a
   # module is not resolved lexically from inside a block that merely includes it.
   def all_tools = TOOLS
 
   def destroying = DESTROYS
+
+  def adds_only = ADDS_ONLY
+
+  def reaching_out = REACHES_OUT
 
   def annotations_of(tool) = tool.to_h[:annotations]
 
@@ -56,12 +66,12 @@ describe 'every tool a client is offered' do
     assert_empty missing.map(&:tool_name), 'these tools emit no annotations'
   end
 
-  # Nothing here calls anything but this app's own Postgres, which is exactly what the hint
-  # is for -- and it is the one the gem defaults the wrong way.
-  it 'says it reaches nothing outside this app' do
-    wrong = all_tools.reject { |tool| annotations_of(tool)[:openWorldHint] == false }
+  # Only the health reads reach outside this app, to Withings, and the gem defaults the hint
+  # to true for everything -- so both directions are asserted.
+  it 'says it reaches outside this app only when it calls Withings' do
+    open_world = all_tools.select { |tool| annotations_of(tool)[:openWorldHint] }.map(&:tool_name)
 
-    assert_empty wrong.map(&:tool_name), 'these claim to reach outside the app'
+    assert_equal reaching_out.sort, open_world.sort
   end
 end
 
@@ -106,11 +116,19 @@ describe 'what a write tool says about itself' do
     assert_empty wrong.map(&:tool_name)
   end
 
-  # The word means something because only four tools say it.
-  it 'is marked destructive only where it removes something' do
+  # Anthropic's criteria: destructiveHint for "tools that modify or delete data". So every
+  # write that can change or remove what is already there says it, and only the writes that
+  # purely add do not -- which keeps logging a new set from asking permission every time.
+  it 'is marked destructive unless it only ever adds' do
+    unmarked = writes.reject { |tool| annotations_of(tool)[:destructiveHint] }.map(&:tool_name)
+
+    assert_equal adds_only.sort, unmarked.sort
+  end
+
+  it 'includes every tool that removes something among the destructive ones' do
     marked = writes.select { |tool| annotations_of(tool)[:destructiveHint] }.map(&:tool_name)
 
-    assert_equal destroying.sort, marked.sort
+    assert_empty destroying - marked
   end
 end
 
@@ -124,7 +142,7 @@ describe 'a tool that declares nothing but its scope' do
 
     assert_equal({ destructiveHint: false, idempotentHint: true, openWorldHint: false, readOnlyHint: true },
                  read.annotations_value.to_h)
-    assert_equal({ destructiveHint: false, idempotentHint: false, openWorldHint: false, readOnlyHint: false },
+    assert_equal({ destructiveHint: true, idempotentHint: false, openWorldHint: false, readOnlyHint: false },
                  write.annotations_value.to_h)
   end
 

@@ -45,6 +45,35 @@ class Tectonic < Roda
           @destroys || false
         end
 
+        # The writes that only ever insert new rows: they can add to an account but cannot
+        # change or remove anything already in it. Every other write is marked destructive.
+        #
+        # Anthropic's directory criteria: "`destructiveHint: true` for tools that modify or
+        # delete data". This used to be true only of the four delete tools, which left
+        # update_set, update_exercise and the rest -- tools that rewrite logged history --
+        # announcing themselves as harmless. Destructive tools always ask before running, so
+        # the line is drawn at the data rather than at the word "delete": logging a new set
+        # by conversation stays a single step, and anything that can change what is already
+        # there asks first.
+        #
+        # Listed by name rather than declared in each tool so the whole policy reads in one
+        # place, and so a new write tool is destructive until somebody decides otherwise.
+        # create_program is here because it refuses rather than touching a block that exists;
+        # create_exercise and create_workout are not, because each can rewrite an existing
+        # row's note, and generate_program_week is not, because it replaces unlifted sets.
+        ADDS_ONLY = %w[create_set create_program add_program_day add_program_lift add_program_week].freeze
+
+        # The tools that reach outside this app while they run: the three health reads check
+        # Withings for anything newer before answering (Freshness). Everything else touches
+        # this app's own Postgres and nothing else.
+        REACHES_OUT = %w[health_readings body_composition bodyweight_trend].freeze
+
+        def modifies_existing?
+          destroys? || (scope == :write && !ADDS_ONLY.include?(tool_name))
+        end
+
+        def reaches_out? = REACHES_OUT.include?(tool_name)
+
         # Opts a read tool into audit logging. Writes are always audited; a read is
         # logged only when its tool declares `audit_reads`.
         def audit_reads
@@ -72,9 +101,8 @@ class Tectonic < Roda
         # already encodes most of the answer. The two cannot drift, and a new tool is
         # annotated correctly by declaring the scope it had to declare anyway.
         #
-        # `open_world_hint` is false everywhere and not derived from anything: every tool
-        # here reads and writes this app's own Postgres and nothing outside it, which is
-        # exactly what that hint is for.
+        # `open_world_hint` is true only for the tools in REACHES_OUT, which call Withings
+        # mid-read. It was false everywhere until a review noticed they do.
         #
         # `idempotent_hint` follows the scope too. A read repeated is the same read; a write
         # is not promised to be, and several here plainly are not -- create_set logs a
@@ -86,8 +114,8 @@ class Tectonic < Roda
         # genuinely unusual shape should be able to say so at its own call site.
         def annotations_value
           super || ::MCP::Tool::Annotations.new(
-            title: title_value, read_only_hint: scope == :read, destructive_hint: destroys?,
-            idempotent_hint: scope == :read, open_world_hint: false
+            title: title_value, read_only_hint: scope == :read, destructive_hint: modifies_existing?,
+            idempotent_hint: scope == :read, open_world_hint: reaches_out?
           )
         end
 
@@ -141,7 +169,7 @@ class Tectonic < Roda
           reason = gate
           return refuse(reason) if reason
 
-          finish(Applications.during { @tool.perform(context: @context, arguments: @arguments) })
+          finish(Applications.during { atomically { @tool.perform(context: @context, arguments: @arguments) } })
         rescue Refusal => e
           refuse(e.message)
         rescue StandardError => e
@@ -149,6 +177,16 @@ class Tectonic < Roda
         end
 
         private
+
+        # A write runs as one transaction, so a tool that fails halfway leaves nothing behind.
+        # Before this, only some write tools opened a transaction of their own, and the crash
+        # message below promised "made no change" for all of them -- untrue for create_set or
+        # update_exercise failing after their first write. A refusal raised mid-body rolls
+        # back too, which is what a refusal means. Reads are left alone: they write nothing,
+        # and the health reads call Withings, which should not hold a transaction open.
+        def atomically(&)
+          @tool.scope == :write ? DB.transaction(&) : yield
+        end
 
         # The reason to refuse before the body runs, or nil to proceed.
         def gate
@@ -226,7 +264,19 @@ class Tectonic < Roda
         def crash(exception)
           report(exception)
           settle('error', exception.message)
-          @tool.refuse('The tool failed unexpectedly and made no change. Please try again.')
+          @tool.refuse(crash_message)
+        end
+
+        # Specific and true. A write was rolled back by `atomically`, so it can say nothing was
+        # saved and that a retry cannot double anything; a read changed nothing to begin with.
+        def crash_message
+          name = @tool.tool_name
+          if @tool.scope == :write
+            "#{name} hit an unexpected error and nothing it was doing was saved. It has been reported; " \
+              'calling it again with the same arguments is safe.'
+          else
+            "#{name} hit an unexpected error and could not answer. It has been reported; nothing was changed."
+          end
         end
 
         # What Sentry is told about a crash, and what it is deliberately not told.
