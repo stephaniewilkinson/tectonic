@@ -65,3 +65,26 @@ cluster do
   worker_timeout 60
 end
 
+# Announce the public pages to IndexNow once this version is serving. #692.
+#
+# Here rather than in the pre-deploy command, which runs before the new version takes
+# traffic: a changed /docs announced from there would send Bing to fetch the old page.
+# after_booted runs once Puma is listening, and the minute's wait covers Render switching
+# traffic over from the previous instance. It also needs no change to the dashboard's
+# start or pre-deploy fields, which render.yaml does not govern until the Blueprint is
+# linked.
+#
+# A thread, so boot never waits on a search engine, and IndexNow.ping never raises. Only on
+# Render (which sets RENDER=true), so a local run under RACK_ENV=production announces
+# nothing. It also fires on a restart that is not a deploy; that is five URLs on a rare
+# event, and IndexNow asks only that unchanged pages not be resubmitted constantly.
+after_booted do
+  next unless ENV['RENDER'] == 'true'
+
+  Thread.new do
+    sleep 60
+    require_relative '../lib/tectonic/index_now'
+    warn Tectonic::IndexNow.ping
+  end
+end
+

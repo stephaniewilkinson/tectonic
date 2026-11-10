@@ -846,3 +846,15 @@ namespace :reviewer do
   end
 end
 
+# Announce the public pages to IndexNow by hand. #692.
+#
+# A deploy already does this from config/puma.rb once the new version is serving; this is
+# for a change worth announcing without one. Exits 0 whatever happens, like the boot hook.
+namespace :indexnow do
+  desc 'Tell IndexNow (Bing and others) the pages in assets/sitemap.xml may have changed'
+  task :ping do
+    require_relative 'lib/tectonic/index_now'
+    puts Tectonic::IndexNow.ping
+  end
+end
+
