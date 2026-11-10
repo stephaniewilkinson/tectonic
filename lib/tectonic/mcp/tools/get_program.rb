@@ -20,14 +20,18 @@ class Tectonic < Roda
         scope :read
         input_schema(
           type: 'object',
-          properties: { program_id: { type: 'integer' } },
+          properties: { program_id: { type: 'integer' },
+                        week: { type: 'integer', description: 'Only this week of the block.' } },
           required: ['program_id'], additionalProperties: false
         )
 
         def self.perform(context:, arguments:)
           block = ProgramFinder.program(context, arguments[:program_id])
-          view = ProgramView.full_program(block)
-          ok([headline(view), *view[:weeks].flat_map { |week| week_lines(week) }].join("\n"), structured: view)
+          view = ProgramView.full_program(block, week: arguments[:week])
+          more = view[:weeks_not_shown] &&
+                 "#{view[:weeks_not_shown]} later week(s) not shown; pass week to read one."
+          ok([headline(view), *view[:weeks].flat_map { |week| week_lines(week) }, more].compact.join("\n"),
+             structured: view)
         end
 
         # The prose was one sentence -- "Block 0: 4 week(s) from 2026-08-24." -- under a

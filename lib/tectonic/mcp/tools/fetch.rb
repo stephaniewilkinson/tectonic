@@ -16,7 +16,7 @@ class Tectonic < Roda
       class Fetch < Tool
         tool_name 'fetch'
         title 'Fetch a record'
-        description 'Fetch one object (an exercise or workout) by the id a prior search returned.'
+        description 'Fetch one object (an exercise, workout or program) by the id a prior search returned.'
         scope :read
         input_schema(
           type: 'object',

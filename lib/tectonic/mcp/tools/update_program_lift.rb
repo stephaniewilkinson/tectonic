@@ -36,7 +36,7 @@ class Tectonic < Roda
           properties: Tools.described(
             program_lift_id: { type: 'integer' }, exercise: { type: 'string' },
             sets: { type: 'integer' }, reps: { type: 'integer' },
-            top_weight: NUMBER_OR_NULL, percent_of_max: NUMBER_OR_NULL,
+            top_weight: { type: %w[number null] }, percent_of_max: NUMBER_OR_NULL,
             position: { type: 'integer' }, is_main: { type: 'boolean' },
             is_barbell: { type: 'boolean' }, target_rpe: NUMBER_OR_NULL,
             rest_seconds: NUMBER_OR_NULL, is_commanded: { type: 'boolean' },

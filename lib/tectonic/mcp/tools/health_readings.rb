@@ -61,7 +61,7 @@ class Tectonic < Roda
                     "#{DEFAULT_DAYS} days. Returns a summary per source and unit (count, latest, " \
                     'range, reading-to-reading variation), never averaged across them; ' \
                     "include_readings adds the rows, up to #{DEFAULT_READINGS} per instrument by " \
-                    'default. May fetch new readings from Withings first.'
+                    'default. May fetch new readings from Withings first and save them to the account.'
         scope :read
         input_schema(
           type: 'object',

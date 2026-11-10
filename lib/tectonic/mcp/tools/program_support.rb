@@ -142,8 +142,18 @@ class Tectonic < Roda
 
         # The whole block, which is what an assistant asked to review or revise a plan
         # needs in one call rather than a walk down three levels of ids.
-        def full_program(block)
-          program(block).merge(weeks: block.program_weeks.map { |row| week(row) })
+        # Weeks shown in full in one response. A sixteen-week, four-day block was 145 KB from
+        # get_program and twice that from fetch -- past "reasonably sized for the task" -- and a
+        # block that long is read a few weeks at a time anyway. `week:` narrows to one. Applies
+        # to create_program's echo too, whose ids its callers go on to edit with.
+        MAX_WEEKS = 8
+
+        def full_program(block, week: nil)
+          rows = block.program_weeks
+          rows = rows.select { |row| row.number == week } if week
+          shown = rows.first(MAX_WEEKS)
+          view = program(block).merge(weeks: shown.map { |row| week(row) })
+          rows.size > shown.size ? view.merge(weeks_not_shown: rows.size - shown.size) : view
         end
 
         def week(row)

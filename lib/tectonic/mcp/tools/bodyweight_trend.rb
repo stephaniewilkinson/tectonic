@@ -65,7 +65,7 @@ class Tectonic < Roda
                     "(default #{BodyReadings::DEFAULT_WINDOW_DAYS}). Per source and unit: trend at " \
                     'start and end, the change, rate per week, and whether the change exceeds the ' \
                     "day-to-day noise band. include_series adds daily points, the latest #{SERIES_LIMIT}. " \
-                    'May fetch new readings from Withings first.'
+                    'May fetch new readings from Withings first and save them to the account.'
         scope :read
         input_schema(
           type: 'object',

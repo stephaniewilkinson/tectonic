@@ -8,6 +8,14 @@
       <%= @client_name %> wants to connect to your Tectonic account.
       Choose what it may do, then authorize it.
     </p>
+    <%# The name above is whatever the client called itself when it registered, so on its own
+        it proves nothing. Where the authorization is sent is what decides who gets it, and
+        both the MCP specification and Claude's connector guidance ask for that host to be
+        shown plainly on this screen. %>
+    <p class="mt-2 text-center text-sm text-gray-600">
+      Authorizing sends you back to
+      <span class="font-semibold text-gray-900"><%= URI(rodauth.redirect_uri).host %></span>.
+    </p>
   </div>
 
   <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">

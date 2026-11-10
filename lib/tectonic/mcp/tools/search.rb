@@ -15,7 +15,7 @@ class Tectonic < Roda
       class Search < Tool
         tool_name 'search'
         title 'Search'
-        description "Search the account's exercises (by name) and workouts (by date). " \
+        description "Search the account's exercises (by name), workouts (by date) and programs (by name). " \
                     'Returns id/title/url rows; pass an id to fetch for the full object.'
         scope :read
         input_schema(
