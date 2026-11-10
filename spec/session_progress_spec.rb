@@ -20,7 +20,7 @@ module SessionProgress
 
   # One chunk per lift. The track is the only element carrying the resting grey, so
   # splitting on it cuts the bar exactly at the lift boundaries.
-  def segments(body) = progress_bar(body).split('rounded-sm bg-gray-300"')[1..].to_a
+  def segments(body) = progress_bar(body).split('rounded-xs bg-gray-300"')[1..].to_a
 
   # A slice is one set. The trailing closing tags in the final chunk carry no class, so
   # they cannot be counted as one.

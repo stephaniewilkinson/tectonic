@@ -12,16 +12,148 @@
    Everything below the directives is this app's own and predates the build. It is here
    rather than in a separate file so that the fonts and the spin-button rules go through
    the same compile and the page loads one stylesheet rather than two. */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source(none);
+
+/* What to scan for class names, and it is not only the templates: app.rb builds button_style,
+   rpe_style and row_style from class names, and lib/tectonic/calendar.rb keeps a STYLES table,
+   none of which appear in a template. Named rather than left to Tailwind 4's automatic
+   detection, which would also read spec/ and the docs and compile whatever classes they
+   happen to mention. This is the list tailwind.config.js held before the upgrade. */
+@source '../../views';
+@source '../../app.rb';
+@source '../../lib';
+
+/* Tailwind 3's colours, pinned. Tailwind 4 redefined its palette in oklch, so the same class
+   names would paint slightly different, and on a wide-gamut phone noticeably more saturated,
+   colours. Every colour here was chosen against a contrast ratio -- links are lime-700
+   because it is the step that clears AA at 4.99:1 -- and those ratios were measured against
+   these values, so the upgrade changes the tool and not the look. Only the eight scales the
+   app uses; white and black are the same in both. */
+@theme {
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #030712;
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+  --color-amber-800: #92400e;
+  --color-amber-900: #78350f;
+  --color-amber-950: #451a03;
+  --color-yellow-50: #fefce8;
+  --color-yellow-100: #fef9c3;
+  --color-yellow-200: #fef08a;
+  --color-yellow-300: #fde047;
+  --color-yellow-400: #facc15;
+  --color-yellow-500: #eab308;
+  --color-yellow-600: #ca8a04;
+  --color-yellow-700: #a16207;
+  --color-yellow-800: #854d0e;
+  --color-yellow-900: #713f12;
+  --color-yellow-950: #422006;
+  --color-lime-50: #f7fee7;
+  --color-lime-100: #ecfccb;
+  --color-lime-200: #d9f99d;
+  --color-lime-300: #bef264;
+  --color-lime-400: #a3e635;
+  --color-lime-500: #84cc16;
+  --color-lime-600: #65a30d;
+  --color-lime-700: #4d7c0f;
+  --color-lime-800: #3f6212;
+  --color-lime-900: #365314;
+  --color-lime-950: #1a2e05;
+  --color-emerald-50: #ecfdf5;
+  --color-emerald-100: #d1fae5;
+  --color-emerald-200: #a7f3d0;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065f46;
+  --color-emerald-900: #064e3b;
+  --color-emerald-950: #022c22;
+  --color-sky-50: #f0f9ff;
+  --color-sky-100: #e0f2fe;
+  --color-sky-200: #bae6fd;
+  --color-sky-300: #7dd3fc;
+  --color-sky-400: #38bdf8;
+  --color-sky-500: #0ea5e9;
+  --color-sky-600: #0284c7;
+  --color-sky-700: #0369a1;
+  --color-sky-800: #075985;
+  --color-sky-900: #0c4a6e;
+  --color-sky-950: #082f49;
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-rose-800: #9f1239;
+  --color-rose-900: #881337;
+  --color-rose-950: #4c0519;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* Tailwind 4 gives buttons the browser's default cursor; 3 gave them a pointer, and every
+   button in this app was designed and tested with one. Restored as the upgrade guide suggests. */
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
 
 /* The palette, by what each colour means rather than by where it sits on a scale.
  *
- * These are plain CSS custom properties, which is the whole point of them: they are not
- * Tailwind, they survive Tailwind, and a future stylesheet built with anything at all can
- * read them. tailwind.config.js consumes them, so `bg-action` works today and resolves to
- * exactly what `bg-lime-500` resolves to -- there is a spec holding those two together.
+ * These are plain CSS custom properties, which is the whole point of them: Tailwind 4 emits
+ * every @theme variable on :root, so a future stylesheet built with anything at all can read
+ * them. Each one names the scale step it mirrors, so `bg-action` and `bg-lime-500` are the
+ * same colour by construction rather than by two numbers kept equal -- and a spec still
+ * holds the mapping, so changing which step a role is goes through it.
  *
  * Renaming the utilities was the other way to do this and it buys nothing here:
  * `bg-action-500` is as Tailwind-shaped as `bg-lime-500`, so it would have moved 150 class
@@ -31,37 +163,41 @@
  * them. What a framework swap actually needs is the values in a portable place, which is
  * this, and fewer utility runs in the markup, which is #239.
  *
- * Channels rather than hex, because Tailwind injects the alpha itself: written as
- * `rgb(var(--color-action) / <alpha-value>)` in the config, `bg-action/70` goes on working
- * the way `text-gray-900/70` does in the nav today. A hex value here would break the
- * opacity modifier and nothing would say so until somebody used one.
+ * Opacity modifiers need nothing special any more. Tailwind 3 could only apply `/70` to a
+ * colour written as bare channels inside rgb(... / <alpha-value>), which is why these used
+ * to be channels; Tailwind 4 mixes the alpha in with color-mix(), so `bg-action/70` works on
+ * any colour value, and the channels and tailwind.config.js went with the upgrade.
  *
- * Every existing utility is untouched. This adds names; it takes none away. */
-:root {
+ * Every existing utility is untouched. This adds names; it takes none away.
+ *
+ * `static` because Tailwind 4 otherwise emits only the theme variables some class uses, and
+ * no template uses a role class yet -- so the variables this block exists to make portable
+ * would not be in the stylesheet at all. */
+@theme static {
     /* The primary action, everywhere but the session screen. lime-500, its hover step, and
        the one step of the scale that clears AA for body text -- 4.99:1 on white, which is
        why links are lime-700 and not lime-500. */
-    --color-action: 132 204 22;
-    --color-action-strong: 101 163 13;
-    --color-action-text: 77 124 15;
+    --color-action: var(--color-lime-500);
+    --color-action-strong: var(--color-lime-600);
+    --color-action-text: var(--color-lime-700);
 
     /* The session screen's own action: Done, and Run session on the record. Sky rather than
        lime so that the control never wears the colour of the state it sits on -- lime means
        "completed" there, and a lime Done button meant the opposite of what it did. */
-    --color-session: 7 89 133;
-    --color-session-strong: 12 74 110;
+    --color-session: var(--color-sky-800);
+    --color-session-strong: var(--color-sky-900);
 
     /* A set that is done. Two states only, since #214 -- there is no third colour for a set
        finished differently from the plan, and the row says that in words instead. */
-    --color-done-surface: 247 254 231;
-    --color-done-edge: 190 242 100;
+    --color-done-surface: var(--color-lime-50);
+    --color-done-edge: var(--color-lime-300);
 
     /* A warning, and only a warning. #214 took amber off the set row for exactly this
        reason: it is the colour this app warns in, and a set lifted at 145 against a written
        150 is not a warning. The two callouts on /connections and the program page are. */
-    --color-warning-surface: 255 251 235;
-    --color-warning-edge: 253 230 138;
-    --color-warning-text: 146 64 14;
+    --color-warning-surface: var(--color-amber-50);
+    --color-warning-edge: var(--color-amber-200);
+    --color-warning-text: var(--color-amber-800);
 }
 
 /* A heading, and nothing else that is merely large. The size utilities from 20px up used
