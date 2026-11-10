@@ -30,6 +30,11 @@ class Tectonic < Roda
   module SupportMail
     RECEIVED = 'https://api.resend.com/emails/receiving/%s'
     ADDRESS = 'support@tectonicplates.app'
+    # Forwards go out from the support address itself, not from Mailer's noreply@. The first one
+    # sent from noreply@ landed in Gmail's spam: a no-reply sender relaying somebody else's
+    # message is what spam looks like. The domain is verified with Resend for sending as a whole,
+    # so any address on it can send.
+    SENDER = "tectonic plates support <#{ADDRESS}>".freeze
     # Svix, which signs Resend's webhooks, leaves the window to the receiver. Five minutes is the
     # window its own libraries use: long enough for clock skew, short enough that a captured
     # request cannot be replayed later.
@@ -82,7 +87,7 @@ class Tectonic < Roda
     end
 
     def message(received)
-      { from: Mailer.sender, to: [forward_to], reply_to: received['from'],
+      { from: SENDER, to: [forward_to], reply_to: received['from'],
         subject: "[support] #{received['subject']}",
         text: [received['text'] || '(no plain-text part)', footnote(received)].join("\n\n"),
         html: received['html'] }.compact

@@ -120,6 +120,7 @@ describe 'the forwarded message' do
 
     assert_equal ['owner@example.com'], message[:to]
     assert_equal 'lifter@example.org', message[:reply_to]
+    assert_equal 'tectonic plates support <support@tectonicplates.app>', message[:from]
     assert_equal '[support] Delete my data', message[:subject]
     assert_includes message[:text], 'Attachments, in Resend under Receiving: id.png.'
   end
