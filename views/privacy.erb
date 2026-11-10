@@ -37,9 +37,9 @@
     an account.
   </p>
   <p>
-    <strong>Assistant activity.</strong> If you connect an AI assistant, we record each tool call
-    it makes on your behalf: which tool, when, whether it succeeded, <strong>and the arguments it
-    was given</strong>. That means the contents of a write (a weight, a rep count, a note) appear
+    <strong>Assistant activity.</strong> If you connect an AI assistant, we record each call it
+    makes that changes your data: which tool, when, whether it succeeded, <strong>and the
+    arguments it was given</strong>. Calls that only read are not recorded. That means the contents of a write (a weight, a rep count, a note) appear
     in that log. It exists so that a change you did not expect can be traced to the call that
     made it.
   </p>
@@ -83,9 +83,9 @@
   <ul class="list-disc space-y-1 pl-5">
     <li><strong>Render</strong> (United States, Oregon) hosts the app and the database, so it holds everything above.</li>
     <li><strong>Fathom Analytics</strong> counts page views, referrers and a few named actions (an account created, a set completed), in aggregate. It is cookieless and builds no profile of you across sites.</li>
-    <li><strong>Sentry</strong> receives error reports: the exception and where in the code it happened. It is set up not to send request headers or IP addresses. An error message could in principle contain a value you entered; we do not send them on purpose and do not look for them.</li>
+    <li><strong>Sentry</strong> receives error reports: the exception, where in the code it happened, which tool was running, your account number, and the names (never the values) of the fields involved. It is set up not to send request headers or IP addresses. An error message could in principle contain a value you entered; we do not send them on purpose and do not look for them.</li>
     <li><strong>Resend</strong> receives your email address when we send you a confirmation link or a password reset.</li>
-    <li><strong>Withings</strong> receives nothing from us. We only read from it, and only if you connect your account.</li>
+    <li><strong>Withings</strong>, only if you connect it, receives the access you granted it and our requests to read your data. Nothing from your training is sent to it, and we never write to it.</li>
     <li><strong>Your AI assistant&rsquo;s operator</strong>, if you connect one, handles whatever you say to it and whatever it reads from your account, under its own privacy policy. We see the tool calls it makes, not what you said to it.</li>
   </ul>
 
@@ -104,7 +104,9 @@
   <p>
     If you are in the UK or EU, the lawful basis for storing your training data is performance of
     the contract between us (the service does not work without it), and for analytics and error
-    reporting, our legitimate interest in the service working and improving.
+    reporting, our legitimate interest in the service working and improving. What Withings sends
+    is health data, which we process only with your explicit consent: you give it by connecting
+    Withings, and you withdraw it by disconnecting, after which nothing more is read.
   </p>
 
   <h2 class="<%= heading_style(:section) %> pt-4">Where your data lives</h2>

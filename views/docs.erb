@@ -76,6 +76,22 @@
     sets you tap off on the session screen are the same rows, so a session started one way
     can be finished the other.
   </p>
+  <p class="mt-3 text-gray-700">
+    If you connect Withings in settings, it can also read your weight and body composition,
+    how you slept, and the heart rate your watch recorded during a session. Before answering
+    those questions it checks Withings for anything newer.
+  </p>
+
+  <%# Three or more prompts, which the directory's documentation guidance asks for: the fastest
+      way for a reader to learn what to say is to see things that work. %>
+  <h3 class="mt-6 font-semibold text-gray-900">Things to ask</h3>
+  <ul class="mt-2 list-disc space-y-1 pl-5 text-gray-700">
+    <li>&ldquo;Write me a four-week squat and bench block, three days a week, deload in week four.&rdquo;</li>
+    <li>&ldquo;Put next week of my block into sessions.&rdquo;</li>
+    <li>&ldquo;I did 225 for 5, 5 and 4 on squat today &mdash; log it.&rdquo;</li>
+    <li>&ldquo;How did Monday go against the plan?&rdquo;</li>
+    <li>&ldquo;What does my bench history say about my max right now?&rdquo;</li>
+  </ul>
 
   <%# #693: the same claims, shown on four real weeks instead of described. %>
   <p class="mt-4 text-sm">
@@ -96,7 +112,9 @@
     <li>
       It will not quietly overwrite training you have already logged. Changing the weight or
       reps of a set you marked as lifted has to be confirmed, and changing which movement such
-      a set was is refused outright &mdash; that is a different set, not an edited one.
+      a set was is refused outright &mdash; that is a different set, not an edited one. Your
+      assistant will also ask you before using any tool that changes or deletes something
+      already there; adding something new does not ask.
     </li>
     <li>
       It does not decide anything for you. The app measures and reports; how long to rest,
@@ -104,8 +122,36 @@
       stay with you and whoever you are talking to.
     </li>
     <li>
-      It cannot read your email, your files, or anything else. It reaches this app and nothing
-      else, over one address.
+      It cannot read your email, your files, or anything else. It reaches this app, and
+      Withings if you have connected it, and nothing else.
+    </li>
+  </ul>
+
+  <h2 class="<%= heading_style(:section) %> mt-10">If something goes wrong</h2>
+  <ul class="mt-3 list-disc space-y-2 pl-5 text-gray-700">
+    <li>
+      <strong>You signed up while connecting and ended up on a &ldquo;Start here&rdquo; page.</strong>
+      That happens when the confirmation link opens in a different browser. Go back to your
+      assistant and press Connect again; you are signed in now, so it goes straight through.
+    </li>
+    <li>
+      <strong>It says it can read but not write.</strong> The connection was granted read-only.
+      Disconnect it on
+      <a href="/connections" class="text-lime-700 underline hover:text-lime-800">your connections page</a>
+      and connect again, allowing both.
+    </li>
+    <li>
+      <strong>A weight comes out slightly different from what you asked for.</strong> Weights are
+      rounded to what your bar and plates can make. Add the plates you own on the settings page.
+    </li>
+    <li>
+      <strong>Withings numbers look out of date.</strong> Check Withings is still connected in
+      settings; if it was disconnected, reconnecting picks up from where it stopped.
+    </li>
+    <li>
+      <strong>Anything else.</strong> Write to
+      <a href="mailto:<%= PRIVACY_OPERATOR[:email] %>"
+         class="text-lime-700 underline hover:text-lime-800"><%= PRIVACY_OPERATOR[:email] %></a>.
     </li>
   </ul>
 
@@ -144,9 +190,9 @@
       about both. %>
   <p class="mt-3 text-gray-700">
     When an assistant writes a row, the row records that it did &mdash; so a set you can&rsquo;t
-    account for says where it came from. Every write through the connector is kept in your own
-    account&rsquo;s audit trail, with what was sent, so you can see exactly what was done on
-    your behalf. It stays in this app&rsquo;s database.
+    account for says where it came from. Every write through the connector is also kept in an
+    audit trail with what was sent, so a change you did not expect can be traced to the call
+    that made it. It stays in this app&rsquo;s database; write to support to see yours.
   </p>
   <p class="mt-3 text-gray-700">
     If something breaks, the crash report that goes to our error monitoring carries the names

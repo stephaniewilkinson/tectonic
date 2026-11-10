@@ -69,7 +69,7 @@ describe 'a tool that blows up' do
   it 'still answers a generic refusal rather than the exception' do
     response = invoke(@tool)
 
-    assert_includes text_of(response), 'failed unexpectedly'
+    assert_includes text_of(response), 'hit an unexpected error'
     refute_includes text_of(response), 'undefined method'
   end
 
@@ -104,7 +104,7 @@ describe 'a crash whose report fails' do
   it 'is not what the client hears about' do
     response = invoke(@tool)
 
-    assert_includes text_of(response), 'failed unexpectedly'
+    assert_includes text_of(response), 'hit an unexpected error'
   end
 
   it 'audits the original failure, not the reporting one' do

@@ -86,3 +86,43 @@ describe 'the reviewer account, reset' do
   end
 end
 
+describe 'the reviewer account, and its body' do
+  include ReviewerFixture
+
+  # So the three health tools have four weeks to answer a reviewer with, not an empty account.
+  it 'has four weeks of weigh-ins and sleep, and weekly body composition' do
+    id = reset
+    metrics = DB[:health_metrics].where(account_id: id).group_and_count(:metric).to_h do |row|
+      row.values_at(:metric, :count)
+    end
+
+    assert_equal 28, metrics['weight']
+    assert_equal 28, metrics['sleep_hours']
+    assert_equal 4, metrics['fat_mass']
+    assert_operator metrics.keys.size, :>=, 6
+  end
+end
+
+# Rows existing is not the claim; a reviewer asking the health tools and getting an answer is.
+describe 'the reviewer account, asked about its body' do
+  include ReviewerFixture
+
+  def ask(tool, **arguments)
+    context = Tectonic::MCP::RequestContext.new(account_id: reset, email: Tectonic::ReviewerAccount::EMAIL,
+                                                scopes: %w[read], application_id: nil, time_zone: 'UTC')
+    tool.call(server_context: context, **arguments)
+  end
+
+  it 'answers each of the three health tools with readings, not an empty account' do
+    from = (ReviewerFixture::TODAY - 30).iso8601
+    responses = { 'body_composition' => ask(Tectonic::MCP::Tools::BodyComposition, days: 28),
+                  'bodyweight_trend' => ask(Tectonic::MCP::Tools::BodyweightTrend, from:),
+                  'health_readings' => ask(Tectonic::MCP::Tools::HealthReadings, metric: 'sleep_hours', from:) }
+
+    responses.each do |name, response|
+      refute_predicate response, :error?, "#{name}: #{response.content.first[:text]}"
+      refute_match(/no (readings|weigh-ins?|data)/i, response.content.first[:text], name)
+    end
+  end
+end
+

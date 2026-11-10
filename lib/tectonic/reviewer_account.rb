@@ -119,6 +119,7 @@ class Tectonic < Roda
       HISTORY_WEEKS.times { |week| log_week(context, monday - (7 * (HISTORY_WEEKS - week)), week) }
       targets(context, today)
       block(context, id, monday)
+      ReviewerReadings.write(id, today)
     end
 
     def log_week(context, monday, week)
@@ -165,6 +166,51 @@ class Tectonic < Roda
       return response unless response.error?
 
       raise "#{tool.tool_name} refused while building the reviewer account: #{response.content.first[:text]}"
+    end
+  end
+
+  # Four weeks of what Withings would have sent, so the three health tools have something to
+  # answer a reviewer with. Anthropic asks for "credentials for a fully populated account",
+  # and without this body_composition, bodyweight_trend and health_readings answer an empty
+  # account. Written as rows already read from Withings rather than through a connection,
+  # because the reviewer account has none and should not: the tools say so in a clause and
+  # answer from what is stored, which is exactly the state they will see.
+  #
+  # The numbers move slowly and plausibly -- weight drifting down a little, sleep varying night
+  # to night -- and deterministically, so a reset gives the same account every time.
+  module ReviewerReadings
+    DAYS = 28
+    SOURCE = 'withings'
+
+    module_function
+
+    def write(account_id, today)
+      rows = (0...DAYS).flat_map { |back| day(account_id, today - back, back) }
+      DB[:health_metrics].multi_insert(rows)
+    end
+
+    def day(account_id, date, back)
+      at = Time.utc(date.year, date.month, date.day, 14)
+      readings(back).map do |metric, value, unit|
+        { account_id:, metric:, value:, unit:, measured_at: at, source: SOURCE }
+      end
+    end
+
+    def readings(back)
+      weight = (81.2 + (back * 0.04) + (0.3 * Math.sin(back))).round(2)
+      daily = [['weight', weight, 'kg'], *sleep(back)]
+      (back % 7).zero? ? daily + weekly(weight, back) : daily
+    end
+
+    def sleep(back)
+      hours = (7.1 + (0.6 * Math.cos(back * 1.3))).round(2)
+      [['sleep_hours', hours, 'h'], ['sleep_window_hours', (hours + 0.6).round(2), 'h']]
+    end
+
+    def weekly(weight, back)
+      fat = (weight * (0.21 + (back * 0.0005))).round(2)
+      [['fat_mass', fat, 'kg'], ['lean_mass', (weight - fat).round(2), 'kg'],
+       ['fat_ratio', (fat / weight * 100).round(1), '%'], ['standing_hr', 58 + (back % 3), 'bpm']]
     end
   end
 end
