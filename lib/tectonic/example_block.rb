@@ -9,6 +9,9 @@ class Tectonic < Roda
   # through the connector on 10 Nov 2026 (get_program 3, exercise_history for the three main
   # lifts) and copied by hand. No name, no dates, no account id.
   #
+  # What was lifted, never why: the reasons behind a skipped day or an added exercise are left
+  # out at the owner's request, and the plan's own notes on accessories stay off the page.
+  #
   # Shown as it happened, which is the point of it. Squat days in weeks 2 and 3 were skipped,
   # two deadlift sets were left undone twice, and the bench went over plan in week 2. A page
   # where every set matches the plan would be an advert; this one is a log.
@@ -52,9 +55,7 @@ class Tectonic < Roda
                    sets: [[100, 5, 7], [100, 5, 8], [100, 5, 8], [100, 5, 8]]),
           Lift.new(name: 'Deadlift', plan: '4 × 5 at 80% (150), RPE 8',
                    sets: [[150, 5, 7], [150, 5, 7]], not_done: 2)
-        ],
-        also: 'The accessory day gained Spanish squat holds (“should ease the knee, not provoke it”) ' \
-              'and banded clamshells for knee tracking.'
+        ]
       ),
       Week.new(
         number: 4, title: 'Deload', note: 'Deload. Bar speed should feel fast.',
