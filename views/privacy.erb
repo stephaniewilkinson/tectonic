@@ -1,0 +1,128 @@
+<%# The privacy policy. #682.
+
+    Both assistant directories ask for a link to one, and Claude's will not list a connector
+    without it. legal/privacy.md was the draft; this is the published text, and the draft now
+    points here so there is one copy to keep true.
+
+    Most of it is a description of what the app does, checked against the code rather than
+    taken from a template, which means it goes stale the moment the behaviour changes. Two
+    sentences were corrected on the way here because the draft promised more than the app
+    does: there is no delete-my-account button, so deletion is by email, and assistant activity
+    logs are never pruned, so they are kept as long as the account rather than for a period
+    nobody implemented.
+
+    Who runs it and how to reach them come from PRIVACY_OPERATOR in app.rb. The route serves
+    this page only once all three are filled in, so it can never go out saying "[ADDRESS]". %>
+<div class="<%= page_style(:reading) %> space-y-4 text-sm text-gray-700">
+  <h1 class="serif text-3xl font-semibold text-gray-900">Privacy policy</h1>
+  <p class="text-gray-500">Last updated: <%= PRIVACY_UPDATED %></p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Who we are</h2>
+  <p>
+    tectonic plates is run by <strong><%= PRIVACY_OPERATOR[:name] %></strong>,
+    <%= PRIVACY_OPERATOR[:address] %>. For anything in this policy, including a request to see or
+    delete your data, write to <strong><%= PRIVACY_OPERATOR[:email] %></strong>.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">What we store</h2>
+  <p>
+    <strong>Your account.</strong> An email address and a bcrypt hash of your password. We never
+    store the password itself and cannot recover it, only reset it.
+  </p>
+  <p>
+    <strong>Your training.</strong> Sessions, sets, exercises, loads, rep counts, RPE ratings,
+    training maxes, goals, your plate inventory and bar weight, your time zone, and any notes you
+    write on a session or a movement. This is the substance of the service and the reason to have
+    an account.
+  </p>
+  <p>
+    <strong>Assistant activity.</strong> If you connect an AI assistant, we record each tool call
+    it makes on your behalf: which tool, when, whether it succeeded, <strong>and the arguments it
+    was given</strong>. That means the contents of a write (a weight, a rep count, a note) appear
+    in that log. It exists so that a change you did not expect can be traced to the call that
+    made it.
+  </p>
+  <p>
+    <strong>What Withings sends, if you connect it.</strong> Only if you connect a Withings
+    account, and only what Withings holds: your weight and body composition (lean mass, fat mass,
+    fat percentage, muscle mass, hydration, bone mass), the heart rate taken with a measurement,
+    how long you slept and over what window, the activities your watch recorded with their heart
+    rate and calories, and the watch&rsquo;s heart rate over each session you match to one of its
+    recordings. Weights you type into the Withings app are included. We only read from Withings
+    and never write anything back. Disconnecting stops any further reading.
+  </p>
+  <p>
+    <strong>Where you arrived from.</strong> When you create an account we record which website or
+    link you arrived from: the referring site&rsquo;s name only (for example www.reddit.com, never
+    the page or anything you searched for), any <code>ref</code> or <code>utm_source</code> tag on
+    the link, and the first page you opened here. It is held in your session cookie until you sign
+    up, then saved with your account, so we can tell which places people find us through. It is
+    never shared.
+  </p>
+  <p>
+    <strong>Nothing else.</strong> We do not ask for your name, date of birth, location or payment
+    details, and we have nowhere to put them.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">What we do not do</h2>
+  <ul class="list-disc pl-5">
+    <li>We do not sell your data.</li>
+    <li>We do not use your training data to train machine-learning models.</li>
+    <li>We do not share it with advertisers, and there is no advertising on the service.</li>
+  </ul>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Cookies</h2>
+  <p>
+    One session cookie, so that being signed in survives loading the next page, and an optional
+    &ldquo;remember me&rdquo; token if you ask to stay signed in. That is all. There is no consent
+    banner because there is nothing to consent to: see Fathom below.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Who else handles it</h2>
+  <ul class="list-disc space-y-1 pl-5">
+    <li><strong>Render</strong> (United States, Oregon) hosts the app and the database, so it holds everything above.</li>
+    <li><strong>Fathom Analytics</strong> counts page views, referrers and a few named actions (an account created, a set completed), in aggregate. It is cookieless and builds no profile of you across sites.</li>
+    <li><strong>Sentry</strong> receives error reports: the exception and where in the code it happened. It is set up not to send request headers or IP addresses. An error message could in principle contain a value you entered; we do not send them on purpose and do not look for them.</li>
+    <li><strong>Resend</strong> receives your email address when we send you a confirmation link or a password reset.</li>
+    <li><strong>Withings</strong> receives nothing from us. We only read from it, and only if you connect your account.</li>
+    <li><strong>Your AI assistant&rsquo;s operator</strong>, if you connect one, handles whatever you say to it and whatever it reads from your account, under its own privacy policy. We see the tool calls it makes, not what you said to it.</li>
+  </ul>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">How long we keep it</h2>
+  <p>
+    For as long as you have an account, assistant activity logs included. To delete your account
+    and everything in it, write to <strong><%= PRIVACY_OPERATOR[:email] %></strong>.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Your rights</h2>
+  <p>
+    Whatever your jurisdiction gives you, and at minimum: you can ask for a copy of everything we
+    hold about you, ask for it to be corrected, or ask for it to be deleted. Write to
+    <strong><%= PRIVACY_OPERATOR[:email] %></strong>. We will respond within 30 days.
+  </p>
+  <p>
+    If you are in the UK or EU, the lawful basis for storing your training data is performance of
+    the contract between us (the service does not work without it), and for analytics and error
+    reporting, our legitimate interest in the service working and improving.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Where your data lives</h2>
+  <p>
+    On servers in the United States (Oregon). If you are outside the US, using the service means
+    your data is transferred there.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Security</h2>
+  <p>
+    Passwords are hashed with bcrypt and every page is served over HTTPS. Your account is reached
+    either with your password or with a token you granted to an assistant, and you can revoke any
+    of those at any time from your connections page. We are a small operation and cannot promise a
+    breach will never happen. If one does, we will tell affected people by email.
+  </p>
+
+  <h2 class="<%= heading_style(:section) %> pt-4">Changes</h2>
+  <p>
+    If this policy changes materially, we will email the address on your account before the change
+    takes effect.
+  </p>
+</div>
