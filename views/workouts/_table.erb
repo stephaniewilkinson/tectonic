@@ -40,7 +40,7 @@
                     Monday evening session in New York is already Tuesday and reads as missed
                     while it is being lifted. %>
                 <%- if workout.status(@today) == :skipped %>
-                  <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">skipped</span>
+                  <span class="ml-1 rounded-sm bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">skipped</span>
                 <%- end %>
                 <%# The one thing this list could not say. Every session with a single set
                     ticked read the same as one taken to the last rep, because status is
@@ -54,7 +54,7 @@
                     completed set here and on the session screen, and this is a statement
                     about the session rather than a count of its rows. %>
                 <%- if workout.finished? %>
-                  <span class="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">finished</span>
+                  <span class="ml-1 rounded-sm bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">finished</span>
                 <%- end %>
                 <%# Under the date rather than in a column of its own: most days have one
                     session and would leave that column empty, and the name is a caption on

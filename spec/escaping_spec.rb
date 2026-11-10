@@ -36,7 +36,7 @@ end
 
 describe 'a movement named with markup' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   before do
@@ -65,7 +65,7 @@ end
 
 describe 'a movement whose name would close an attribute' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   before do
@@ -88,7 +88,7 @@ end
 
 describe 'the helpers that exist to emit markup' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   # Each of these sits behind <%== and would be worthless escaped.
@@ -107,7 +107,7 @@ end
 
 describe 'a movement note' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   # A note is free prose an account or its assistant typed, so it is both the thing that
@@ -139,7 +139,7 @@ end
 
 describe 'an entity that passes through an expression' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   # The month tally joined on "&middot;" and load_label built its "&times;" the same way,

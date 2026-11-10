@@ -44,14 +44,16 @@ module Palette
     last_response.body
   end
 
-  # The three channels a variable is defined as, e.g. "132 204 22".
-  def variable(name) = stylesheet[/--color-#{name}:\s*([0-9]+ [0-9]+ [0-9]+)/, 1]
+  # What a custom property is set to in the compiled stylesheet, as written.
+  def variable(name) = stylesheet[/--color-#{Regexp.escape(name)}:\s*([^;}]+)/, 1]&.strip
 
-  # The three channels Tailwind compiled for one of its own colours. Matched on the class
-  # name and then on the next rgb() in that rule, so it finds the colour whichever utility
-  # happens to carry it -- lime-600 is only ever compiled behind a `hover:` prefix, and
-  # lime-300 only as a border.
-  def utility(name) = stylesheet[/[.\\][^{}]*#{Regexp.escape(name)}[^{}]*\{[^}]*?rgb\(([0-9]+ [0-9]+ [0-9]+)/, 1]
+  # Tailwind 3's value for each step a role mirrors. Pinned in assets/css/app.css's @theme
+  # because Tailwind 4 redefined its palette, and every contrast ratio here was measured
+  # against these. If one of them moves, a colour on the live site moved with it.
+  V3 = { 'lime-50' => '#f7fee7', 'lime-300' => '#bef264', 'lime-500' => '#84cc16',
+         'lime-600' => '#65a30d', 'lime-700' => '#4d7c0f', 'sky-800' => '#075985',
+         'sky-900' => '#0c4a6e', 'amber-50' => '#fffbeb', 'amber-200' => '#fde68a',
+         'amber-800' => '#92400e' }.freeze
 end
 
 describe 'the palette custom properties' do
@@ -64,23 +66,18 @@ describe 'the palette custom properties' do
     end
   end
 
-  # The one that matters. Two definitions of one colour, and this is what stops them parting.
+  # The one that matters. Each role names the scale step it mirrors, so the two cannot part;
+  # this holds which step that is, so changing it is a deliberate edit to a spec.
   it 'gives each role exactly the colour of the utility it names' do
     Palette::MIRRORS.each do |role, tailwind|
-      expected = utility(tailwind)
-
-      refute_nil expected, "#{tailwind} is not compiled, so this pairing cannot be checked"
-      assert_equal expected, variable(role),
-                   "--color-#{role} and #{tailwind} have drifted apart"
+      assert_equal "var(--color-#{tailwind})", variable(role), "--color-#{role} no longer mirrors #{tailwind}"
     end
   end
 
-  # Channels rather than hex, and not by preference: Tailwind substitutes an alpha into
-  # `rgb(var(--x) / <alpha-value>)`, so a hex here would compile and then quietly produce
-  # nothing for `bg-action/70`, the way `text-gray-900/70` is used in the nav today.
-  it 'writes them as space-separated channels, which is what the alpha modifier needs' do
-    Palette::MIRRORS.each_key do |role|
-      assert_match(/\A\d{1,3} \d{1,3} \d{1,3}\z/, variable(role), "--color-#{role} is not three channels")
+  # And each of those steps is still the colour it was before Tailwind 4.
+  it 'keeps every mirrored step at its Tailwind 3 value' do
+    Palette::V3.each do |step, hex|
+      assert_equal hex, variable(step), "--color-#{step} is not the colour the palette was chosen against"
     end
   end
 end

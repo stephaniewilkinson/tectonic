@@ -136,7 +136,7 @@ end
 
 describe 'searching the movement list' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 
@@ -176,7 +176,7 @@ end
 
 describe 'telling the library from your own movements' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 
@@ -202,7 +202,7 @@ end
 
 describe 'picking a movement from the keyboard' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 
@@ -254,7 +254,7 @@ end
 
 describe 'what the movement search says out loud' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 
@@ -282,7 +282,7 @@ end
 
 describe 'the edit form opening on the movement the set is on' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 
@@ -316,7 +316,7 @@ end
 
 describe 'changing the movement a set is on' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 
@@ -354,7 +354,7 @@ end
 
 describe 'logging a new set through the search box' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include FindingAMovement
 

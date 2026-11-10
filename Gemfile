@@ -15,7 +15,7 @@ gem 'jwt'
 # Pinned exactly: this gem is pre-1.0-ish and its API shifts between minor
 # releases. >= 0.23.0 is required for advisory GHSA-rjr6-rcgv-9m7m (Host/Origin
 # checks). The transport is constructed stateless, so no in-memory session state.
-gem 'mcp', '1.2.0'
+gem 'mcp', '1.9.0'
 # lib/tectonic/db.rb requires logger, which stopped being a default gem in Ruby
 # 4.0. It was only reaching production as a transitive dependency of the test and
 # development groups, which Render does not install.
@@ -68,7 +68,8 @@ end
 group :test do
   gem 'capybara-selenium'
   gem 'minitest'
-  gem 'minitest-capybara'
+  # Object#stub and Minitest::Mock, which Minitest 6 moved out into their own gem. #709.
+  gem 'minitest-mock'
   gem 'rack-test'
 end
 

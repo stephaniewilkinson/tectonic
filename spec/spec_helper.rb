@@ -47,8 +47,27 @@ BCrypt::Engine.cost = BCrypt::Engine::MIN_COST
 
 # require 'dotenv/load' #keeping this here until i need it later
 require 'minitest/autorun'
-require 'minitest/capybara'
+require 'minitest/mock'
 require 'minitest/pride'
+require 'capybara/dsl'
+require 'capybara/minitest'
+
+# What minitest-capybara provided, from Capybara itself. #709.
+#
+# That gem's last release (0.9.0) pins minitest to ~> 5.0 and will not be released again, so it
+# was all that held the suite on Minitest 5. Everything it gave these specs Capybara now ships
+# in capybara/minitest -- assert_text, refute_text, assert_selector, assert_button and the rest
+# -- and what is left is the DSL and resetting the browser between tests, which is this.
+module CapybaraBehaviour
+  include Capybara::DSL
+  include Capybara::Minitest::Assertions
+
+  def after_teardown
+    Capybara.reset_sessions!
+    Capybara.use_default_driver
+    super
+  end
+end
 require 'rack/test'
 
 require_relative '../app'

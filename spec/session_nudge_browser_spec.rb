@@ -33,7 +33,7 @@ end
 
 describe 'arriving at a session that has been quiet for three quarters of an hour' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SessionNudge
 
@@ -63,7 +63,7 @@ end
 # nothing to count from the bar never appears.
 describe 'a session the lifter has already finished' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SessionNudge
 
@@ -78,7 +78,7 @@ end
 
 describe 'a session that is plainly still running' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SessionNudge
 
@@ -92,7 +92,7 @@ end
 
 describe 'answering "still going"' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SessionNudge
 
@@ -112,7 +112,7 @@ end
 # actually renders rather than on the one a keyboard produces.
 describe 'answering "that is it"' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SessionNudge
 
@@ -145,7 +145,7 @@ end
 # asking about a silence that ended.
 describe 'a quiet session that starts moving again' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SessionNudge
 

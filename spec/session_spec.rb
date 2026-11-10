@@ -76,7 +76,7 @@ end
 
 describe 'the session view' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   it 'marks a set done in place with htmx, without reloading' do
@@ -100,7 +100,7 @@ end
 
 describe 'revising a set in the session' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   # #215: the correction and the completion are two statements, and this form only makes
@@ -151,7 +151,7 @@ end
 # have passed throughout. The failure is only visible where the bubble is.
 describe 'a weight that is not on the five pound grid' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   # A step is counted from a step base, which with no min attribute is the input's own
@@ -179,7 +179,7 @@ end
 
 describe 'a warmup taken differently from the ramp' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
 
   # The ramp is computed from a percentage of the top set, and a warmup row used to carry

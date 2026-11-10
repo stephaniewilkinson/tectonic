@@ -63,6 +63,7 @@ require_relative 'lib/tectonic/first_touch'
 # which is what the first deploy of #692 did, a minute after boot, announcing nothing.
 require_relative 'lib/tectonic/index_now'
 require_relative 'lib/tectonic/example_block'
+require_relative 'lib/tectonic/support_mail'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
@@ -3395,7 +3396,7 @@ class Tectonic < Roda
   # ring. Written out by hand it came to three radii, two shadow states and two focus
   # rings across two dozen sites -- and thirteen of those buttons named no focus style at
   # all, so tabbing onto one drew Firefox's own blue ring on a lime button, blue being a
-  # colour this brand does not otherwise contain. rounded-md and shadow-sm are what the
+  # colour this brand does not otherwise contain. rounded-md and shadow-xs are what the
   # majority already had; outline-lime-500 is what ten of the twelve that named a ring at
   # all had already chosen, the other two being welcome.erb's, a step darker at lime-600
   # for no reason anyone wrote down. One of the odd ones out was not even a decision:
@@ -3531,7 +3532,7 @@ class Tectonic < Roda
   # a select with a chevron, the search box with an icon -- still overrides one side by
   # naming it, and only the redundant symmetric copies came out of the call sites.
   def field_style
-    'rounded-md border-0 px-3 shadow-sm ring-1 ring-inset ring-gray-300 ' \
+    'rounded-md border-0 px-3 shadow-xs ring-1 ring-inset ring-gray-300 ' \
       'focus:ring-2 focus:ring-inset focus:ring-sky-800'
   end
 
@@ -3596,7 +3597,7 @@ class Tectonic < Roda
   # and not, gray-200 and gray-900/10. Padding stays at the call site, because a card
   # holding a table wants none and a card holding prose wants room.
   def card_style
-    'rounded-lg bg-white shadow-sm ring-1 ring-gray-900/5'
+    'rounded-lg bg-white shadow-xs ring-1 ring-gray-900/5'
   end
 
   # The two filled buttons and the plain one, with the shape button_style already settles.
@@ -3628,7 +3629,7 @@ class Tectonic < Roda
   #
   # outline-offset-2 was already here and is what keeps the ring clear of a filled edge.
   def button_style
-    'rounded-md shadow-sm focus-visible:outline focus-visible:outline-2 ' \
+    'rounded-md shadow-xs focus-visible:outline-solid focus-visible:outline-2 ' \
       'focus-visible:outline-offset-2 focus-visible:outline-sky-800'
   end
 

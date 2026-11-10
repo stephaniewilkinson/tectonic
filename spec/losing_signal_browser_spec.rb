@@ -107,7 +107,7 @@ end
 
 describe 'tapping Done with no signal' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
 
@@ -158,7 +158,7 @@ end
 
 describe 'tapping Done twice with no signal' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
 
@@ -180,7 +180,7 @@ end
 
 describe 'a tap the server refuses' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
 
@@ -210,7 +210,7 @@ end
 
 describe 'the signal coming back' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include LosingSignal
 

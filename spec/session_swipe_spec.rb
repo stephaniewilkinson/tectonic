@@ -103,7 +103,7 @@ end
 
 describe 'the lifts of a session on a phone' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SwipedPanels
 
@@ -138,7 +138,7 @@ end
 
 describe 'swiping from one lift to the next' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SwipedPanels
 
@@ -176,7 +176,7 @@ end
 # lands back on lift one, on every set, for the whole session.
 describe 'completing a set on a lift you swiped to' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SwipedPanels
 
@@ -200,7 +200,7 @@ end
 # being the stack they were, which is also what keeps the desktop page unchanged.
 describe 'the same session on a desktop' do
   include Capybara::DSL
-  include Minitest::Capybara::Behaviour
+  include CapybaraBehaviour
   include BrowserSpec
   include SwipedPanels
 
