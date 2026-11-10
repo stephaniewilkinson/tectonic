@@ -2,6 +2,7 @@
 
 require_relative 'spec_helper'
 require_relative '../lib/tectonic/index_now'
+require 'open3'
 
 # Telling IndexNow that the public pages may have changed. #692.
 module IndexNowStubs
@@ -76,6 +77,21 @@ describe 'announcing the public pages' do
     message = ping_with(IndexNowStubs::FakeClient.new(error: HTTP::ConnectionError.new('down')))
 
     assert_match(/could not be reached: HTTP::ConnectionError/, message)
+  end
+end
+
+# The order production boots in: config.ru freezes the app, and only then does Puma's
+# after_booted hook require the module that does the announcing. The first deploy of #692
+# raised FrozenError there, a minute after boot, because the module was first defined inside
+# the already-frozen class. A fresh process, because this one loaded the module long ago.
+describe 'announcing from a frozen app' do
+  it 'finds the module already loaded, so requiring it after the freeze changes nothing' do
+    root = File.expand_path('..', __dir__)
+    script = "require './app'; Tectonic.freeze; require './lib/tectonic/index_now'; print Tectonic::IndexNow::HOST"
+    output, status = Open3.capture2e({ 'RACK_ENV' => 'test' }, 'bundle', 'exec', 'ruby', '-e', script, chdir: root)
+
+    assert_predicate status, :success?, output
+    assert_equal 'tectonicplates.app', output.lines.last
   end
 end
 

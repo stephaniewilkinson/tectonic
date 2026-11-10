@@ -58,6 +58,10 @@ require_relative 'lib/tectonic/oauth/grant_bound_tokens'
 require_relative 'lib/tectonic/oauth/refresh_token_reuse'
 require_relative 'lib/tectonic/mcp/config'
 require_relative 'lib/tectonic/first_touch'
+# Loaded here though only config/puma.rb calls it: config.ru freezes this class before Puma's
+# after_booted hook runs, and a module defined inside a frozen class raises FrozenError --
+# which is what the first deploy of #692 did, a minute after boot, announcing nothing.
+require_relative 'lib/tectonic/index_now'
 
 class Tectonic < Roda
   SESSION_SECRET = ENV.fetch 'SESSION_SECRET'
