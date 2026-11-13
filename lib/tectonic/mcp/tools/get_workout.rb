@@ -177,13 +177,23 @@ class Tectonic < Roda
         # and `load_phrase` both do. A trailing qualifier on "40x8" postmodifies the whole
         # phrase, and a reader cannot tell from it whether the 40 is per side as well -- which
         # on a pair of dumbbells it half is, the stored weight being one dumbbell's.
+        # A timed set counts seconds -- "30s", or "50x30s" with a load -- as the session
+        # screen's `quantity_label` does. It used to fall through to the reps branch and
+        # read " reps", the nil count interpolated straight.
         def self.quantity(set)
-          count = if Load.carried?(set[:weight])
-                    "#{set[:weight]}x#{set[:reps]}#{' reps' if set[:is_per_side]}"
-                  else
-                    "#{set[:reps]} reps"
-                  end
-          "#{count}#{' per side' if set[:is_per_side]}#{' commanded' if set[:is_commanded]}"
+          "#{load_part(set)}#{count_part(set)}#{' per side' if set[:is_per_side]}" \
+            "#{' commanded' if set[:is_commanded]}"
+        end
+
+        def self.load_part(set)
+          Load.carried?(set[:weight]) ? "#{set[:weight]}x" : ''
+        end
+
+        def self.count_part(set)
+          return "#{set[:duration_seconds]}s" if set[:duration_seconds]
+          return "#{set[:reps]} reps" if set[:is_per_side] || !Load.carried?(set[:weight])
+
+          set[:reps].to_s
         end
 
         # Only worth printing where the prescription and the performance disagree; on a
