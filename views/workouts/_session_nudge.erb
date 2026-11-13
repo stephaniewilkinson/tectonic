@@ -28,7 +28,7 @@
     nothing here ever appears. That is right -- the question is only ever raised by a clock,
     and a scriptless page has none. Such a page loses nothing else: the finish control still
     works, and the automatic close is server-side and reaches it anyway. %>
-<div id="session-nudge" hidden
+<div id="session-nudge" hidden<%== footer_offset_data(:nudge) %>
      class="fixed inset-x-0 <%= nudge_offset %> z-40 border-t border-gray-300 bg-amber-50">
   <div class="mx-auto flex max-w-md items-center gap-3 px-4 py-3">
     <%# The number is the whole of the case for asking. "Still training?" on its own is a

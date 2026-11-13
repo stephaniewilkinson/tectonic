@@ -2441,11 +2441,7 @@ class Tectonic < Roda
   # Where the nudge sits: above the rest timer, because the two are true at once. A rest that
   # ran to twenty minutes is exactly when this fires, and covering the countdown at that moment
   # would hide the one thing on screen explaining why it is asking.
-  def nudge_offset
-    return 'bottom-[calc(2.75rem+3.5rem+env(safe-area-inset-bottom))]' if @sets.any?(&:ratable?)
-
-    'bottom-[calc(3.5rem+env(safe-area-inset-bottom))]'
-  end
+  def nudge_offset = footer_offset(:nudge)
 
   # When a session ended, according to who is saying so. #410.
   #
@@ -2727,10 +2723,26 @@ class Tectonic < Roda
   # A helper rather than a local assigned in the template, because erb_lint hands each ERB
   # tag to rubocop as a program of its own and a local set in one tag and read in the next
   # is an undefined variable to it. The same reason session_lifts lives here.
-  def rest_timer_offset
-    return 'bottom-[calc(2.75rem+env(safe-area-inset-bottom))]' if @sets.any?(&:ratable?)
+  def rest_timer_offset = footer_offset(:rest_timer)
 
-    'bottom-[env(safe-area-inset-bottom)]'
+  # Both heights for each element the footer pushes up: with the footer under it, and
+  # without. #716: the page used to decide once, at load, and a session whose ratable sets
+  # arrived afterwards -- an assistant writing them while the lifter already had the screen
+  # open -- never got its footer, because nothing outside #session-body is redrawn by a
+  # poll. The page now carries both and the session script picks one after every swap.
+  # Spelled out in full here so Tailwind, which scans this file, builds every class.
+  FOOTER_OFFSETS = {
+    rest_timer: %w[bottom-[calc(2.75rem+env(safe-area-inset-bottom))] bottom-[env(safe-area-inset-bottom)]],
+    nudge: %w[bottom-[calc(2.75rem+3.5rem+env(safe-area-inset-bottom))]
+              bottom-[calc(3.5rem+env(safe-area-inset-bottom))]]
+  }.freeze
+
+  def footer_offset(element) = FOOTER_OFFSETS.fetch(element)[@sets.any?(&:ratable?) ? 0 : 1]
+
+  # The attributes that let the session script move an element when the footer comes or goes.
+  def footer_offset_data(element)
+    with, without = FOOTER_OFFSETS.fetch(element)
+    %( data-offset-with="#{with}" data-offset-without="#{without}")
   end
 
   # The live region, sent back beside whatever else a response is swapping. #336.
