@@ -315,8 +315,9 @@ describe 'the rating scale on a session of nothing but warmups' do
     @body = last_response.body
   end
 
-  it 'is not on the page at all' do
-    assert_equal 0, @body.scan('RPE Advice').length
+  # Hidden rather than absent since #716, so a ratable set arriving by poll can bring it in.
+  it 'is not shown' do
+    assert_includes @body, '<details id="rpe-help" hidden'
   end
 
   # The page still renders, and still renders as a session rather than as an error, which

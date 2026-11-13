@@ -89,7 +89,9 @@ describe 'the rating scale on a lift measured in seconds' do
   include RouteOwnership
   include RpeScope
 
-  it 'is not drawn at all' do
+  # Hidden rather than absent since #716: the footer is on every session page so a ratable
+  # set arriving by poll can bring it in, and a page with none keeps it out of sight.
+  it 'is not shown' do
     account_id = login
     workout_id = DB[:workouts].insert(account_id:, date: Time.now)
     exercise_id = DB[:exercises].insert(name: "Plank #{SecureRandom.hex(4)}", account_id:)
@@ -99,7 +101,7 @@ describe 'the rating scale on a lift measured in seconds' do
     end
     get "/workouts/#{workout_id}/session"
 
-    refute_includes last_response.body, 'RPE Advice'
+    assert_includes last_response.body, '<details id="rpe-help" hidden'
     refute_includes last_response.body, 'name="rpe"'
   end
 end

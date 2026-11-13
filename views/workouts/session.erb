@@ -140,9 +140,37 @@
     above cannot know -- and is why pb-24 is unconditional there rather than clever here. A
     little dead space at the foot of a warmup-only session is worth less than a rule that
     reads two ways. %>
-<%- if @sets.any?(&:ratable?) %>
-  <%== render('workouts/_rpe_help') %>
-<%- end %>
+<%# Always on the page, hidden while nothing is ratable, and brought in by the script below. #716.
+
+    It used to be rendered only if a ratable set existed when the page loaded. An assistant
+    writing the session while the lifter already had this screen open -- warmups first, the
+    working sets a minute later -- left a page that loaded with nothing ratable, and the
+    poll that brought the working sets in redraws #session-body and nothing else. So the
+    footer never came, on exactly the sessions an assistant writes live, until a reload
+    nobody knew to do. %>
+<%== render('workouts/_rpe_help') %>
+<%# The footer, the rest timer above it and the nudge above that, kept in step with whatever
+    the last swap left on screen. The two fixed bars carry both of their heights in
+    data-offset-with and data-offset-without (footer_offset_data), and the footer's own
+    open-or-closed state survives because the element is never replaced, only shown. %>
+<script>
+  (function () {
+    var help = document.getElementById('rpe-help');
+    if (!help) { return; }
+    function fit() {
+      var rated = !!document.querySelector('#session-body [data-ratable]');
+      help.hidden = !rated;
+      var moved = document.querySelectorAll('[data-offset-with]');
+      for (var i = 0; i < moved.length; i++) {
+        var on = moved[i].getAttribute(rated ? 'data-offset-with' : 'data-offset-without');
+        var off = moved[i].getAttribute(rated ? 'data-offset-without' : 'data-offset-with');
+        moved[i].classList.remove(off);
+        moved[i].classList.add(on);
+      }
+    }
+    document.body.addEventListener('htmx:afterSwap', fit);
+  })();
+</script>
 
 <%# And whether any of the above is reaching the server at all. #516.
 

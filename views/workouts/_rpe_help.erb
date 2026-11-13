@@ -47,7 +47,7 @@
     Closed by default, which matters more now than it did: this one is on screen at all
     times, and a table that opens itself would be covering the session every time the page
     loads. %>
-<details class="group fixed inset-x-0 bottom-0 z-20 border-t border-gray-300 bg-gray-100
+<details id="rpe-help"<%== ' hidden' unless @sets.any?(&:ratable?) %> class="group fixed inset-x-0 bottom-0 z-20 border-t border-gray-300 bg-gray-100
                 pb-[env(safe-area-inset-bottom)]">
   <summary class="mx-auto flex min-h-11 max-w-md cursor-pointer items-center px-4 text-sm
                   font-medium text-gray-700"><%== render('_chevron') %>RPE Advice</summary>

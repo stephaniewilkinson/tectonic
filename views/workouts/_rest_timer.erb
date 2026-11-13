@@ -87,7 +87,7 @@
     z-30 puts it over the RPE footer's z-20, which only matters while the footer is open:
     an opened reference table covers the screen, and a running rest is the one thing
     that should stay visible through it. %>
-<div id="rest-timer" hidden
+<div id="rest-timer" hidden<%== footer_offset_data(:rest_timer) %>
      class="fixed inset-x-0 z-30 <%= rest_timer_offset %> border-t border-gray-300 bg-white">
   <div class="mx-auto flex max-w-md items-center gap-2 px-4 py-2">
     <%# The clock, which is on screen from the moment a set is ticked off rather than from the
@@ -219,7 +219,7 @@
     have been sitting there is the ordinary case, not an edge. Small and in the corner the
     bar sat in, so it does not become a second bar; shown only while there is a rest to
     reopen, and gone the moment the bar is back. %>
-<button type="button" id="rest-timer-reopen" hidden aria-label="Show rest timer"
+<button type="button" id="rest-timer-reopen" hidden aria-label="Show rest timer"<%== footer_offset_data(:rest_timer) %>
         class="fixed right-4 z-30 <%= rest_timer_offset %> mb-2 min-h-11 rounded-full border border-gray-300
                bg-white px-4 text-sm font-medium text-sky-900 shadow-sm hover:bg-sky-50">
   Rest timer
