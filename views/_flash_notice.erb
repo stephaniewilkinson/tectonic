@@ -31,8 +31,35 @@
     Green rather than the rose `_form_error` uses, and lime is not it -- lime is the brand
     colour and the colour of every primary button on the site, so a lime banner above a lime
     button reads as part of the furniture rather than as something that just happened. %>
+<%# It goes away by itself (#717), except where it is an instruction. "You have been logged in"
+    is true for one glance and then sits above the page for as long as the page is open,
+    reading as if something just happened every time the lifter looks up from a set.
+
+    The two that tell somebody to go and look at their email stay: they are the next step,
+    not a confirmation of the last one, and a sentence that vanishes while it is being
+    acted on is the swallowed instruction this partial exists to prevent. Named through the
+    Rodauth settings that produce them rather than by matching their words, so rewording
+    either one cannot quietly make it fade. %>
+<%# An instance variable rather than a local, as views/settings.erb explains: erb_lint lints each tag alone. %>
 <%- if flash['notice'] %>
-  <div role="status" class="mt-6 rounded-md bg-emerald-100 p-3 text-sm text-emerald-900 ring-1 ring-emerald-900/25">
+  <%- @notice_lasts = [rodauth.reset_password_email_sent_notice_flash,
+                       rodauth.verify_account_email_sent_notice_flash].include?(flash['notice']) %>
+  <div role="status" <%== 'data-fades' unless @notice_lasts %>
+       class="mt-6 rounded-md bg-emerald-100 p-3 text-sm text-emerald-900 ring-1 ring-emerald-900/25 transition-opacity duration-700">
     <%= flash['notice'] %>
   </div>
+  <%- unless @notice_lasts %>
+    <script>
+      (function () {
+        var notice = document.querySelector('[data-fades]');
+        if (!notice) { return; }
+        var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        setTimeout(function () {
+          if (still) { notice.hidden = true; return; }
+          notice.style.opacity = '0';
+          setTimeout(function () { notice.hidden = true; }, 700);
+        }, 5000);
+      })();
+    </script>
+  <%- end %>
 <%- end %>
