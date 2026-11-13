@@ -176,7 +176,7 @@ class Tectonic < Roda
         # invisible from here. An empty answer that cannot say which of the three it is, is
         # the silent lie #533 exists to remove.
         def self.empty(context, metric, from, to, fresh)
-          held = BodyReadings.metrics_held(context.health_metrics)
+          held = held_by(context)
           ok(Freshness.told(["No #{metric} readings between #{from} and #{to}.#{held_phrase(held)}"], fresh),
              structured: { metric:, asked_from: from.to_s, asked_to: to.to_s, instruments: [],
                            metrics_held: held, freshness: fresh })
@@ -185,7 +185,22 @@ class Tectonic < Roda
         def self.held_phrase(held)
           return ' Nothing has been recorded for this account yet.' if held.empty?
 
-          " Recorded for this account: #{held.map { |name, count| "#{name} (#{count})" }.join(', ')}."
+          " Recorded for this account: #{held.map { |name, count| "#{name} (#{count})" }.join(', ')}." \
+            "#{HEART_RATE_WHERE if held.key?(HEART_RATE)}"
+        end
+
+        # Everything stored, not only what this tool reads. #720: the watch's heart rate lives
+        # in heart_rates, so an account with thousands of readings was told it held
+        # "weight (1)" -- true of health_metrics and false of the account, and the reader
+        # concluded heart rate had never synced.
+        HEART_RATE = 'heart_rate'
+        HEART_RATE_WHERE = ' Heart rate from the watch is kept against sessions rather than as ' \
+                           'daily readings: get_workout reports it per set.'
+
+        def self.held_by(context)
+          held = BodyReadings.metrics_held(context.health_metrics)
+          beats = context.heart_rates.count
+          beats.positive? ? held.merge(HEART_RATE => beats) : held
         end
 
         # The prose, because plenty of clients render only the text -- #262's lesson, and a
