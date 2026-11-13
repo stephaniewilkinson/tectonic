@@ -112,7 +112,18 @@ class Tectonic < Roda
         # volume of every session read off this.
         def self.line(set)
           ["  #{set[:exercise]} #{quantity(set)}", *planned(set), *(['warmup'] if set[:is_warmup]),
-           set[:is_completed] ? 'done' : 'not done', *rated(set), *setup(set)].join(' ')
+           set[:is_completed] ? 'done' : 'not done', *rated(set), *setup(set), *heart(set)].join(' ')
+        end
+
+        # The watch's figures for a working set, in the words most clients show (#720). They
+        # were only ever in structuredContent, so a client rendering text said nothing about
+        # heart rate at all. A warmup is left out: its peak is the ramp, not the work.
+        def self.heart(set)
+          figures = set[:heart_rate]
+          return [] if set[:is_warmup] || figures.nil? || figures[:peak].nil?
+
+          low = figures[:low_before_next]
+          ["(HR peak #{figures[:peak]}#{", #{low} before next" if low})"]
         end
 
         # Both split out as arrays so `line` is one expression rather than six appends. The

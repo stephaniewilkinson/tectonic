@@ -186,6 +186,33 @@ describe 'heart rate for an assistant' do
   end
 end
 
+describe 'heart rate in the words an assistant reads' do
+  include Rack::Test::Methods
+  include HeartRatePerSet
+
+  # #720: the figures were only in structuredContent, and most clients show the text.
+  it 'is in the words get_workout prints, not only its payload' do
+    token = mint(scopes: ['read'])
+    workout_id = a_session_with_sets(token.account_id)
+    Tectonic::HeartRates.store(token.account_id, series)
+    call_tool('get_workout', raw: token.raw, arguments: { workout_id: })
+
+    assert_includes tool_result.dig('content', 0, 'text'), '(HR peak 150, 100 before next)'
+  end
+
+  # #720: health_readings counted health_metrics alone and called the account empty of it.
+  it 'is counted when health_readings says what the account holds' do
+    token = mint(scopes: ['read'])
+    a_session_with_sets(token.account_id)
+    Tectonic::HeartRates.store(token.account_id, series)
+    call_tool('health_readings', raw: token.raw, arguments: { metric: 'heart_rate', source: 'manual' })
+    text = tool_result.dig('content', 0, 'text')
+
+    assert_match(/heart_rate \(\d+\)/, text)
+    assert_includes text, 'get_workout reports it per set'
+  end
+end
+
 describe 'a set the watch barely measured, on the record page' do
   include Rack::Test::Methods
   include RouteOwnership

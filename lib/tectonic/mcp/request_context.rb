@@ -119,6 +119,12 @@ class Tectonic < Roda
         DB[:health_metrics].where(account_id: @account_id)
       end
 
+      # The watch's heart rate, which is its own table rather than a health_metrics metric:
+      # it is read against a session's sets, not as a daily figure. #656, #720.
+      def heart_rates
+        DB[:heart_rates].where(account_id: @account_id)
+      end
+
       # Whether the token carries a given scope; the tool base class checks this before
       # a tool body runs.
       def scope?(name)
