@@ -38,18 +38,26 @@ class Tectonic < Roda
         # completed set is rewriting history rather than fixing a row.
         LIFTED = %i[weight reps].freeze
 
+        # A rating can be taken back. #722: rpe was integer-only, so a rating written by
+        # mistake -- an agent passing the target as the rating, on a set nobody had lifted --
+        # could be undone only by deleting the set, which took its prescription with it.
+        # Null clears, as it already does for target_rpe on update_program_lift.
+        RATING_OR_NULL = { type: %w[integer null] }.freeze
+
         tool_name 'update_set'
 
         title 'Correct a set'
         description 'Correct a set: weight, reps, rpe, warmup, per-side reps, is_commanded ' \
-                    '(meet commands) or its exercise. Send only what changes; returns what moved. ' \
+                    '(meet commands) or its exercise. rpe is how hard it was; planned_rpe is the ' \
+                    'target. Either takes null to clear. Send only what changes; returns what moved. ' \
                     'Changing the weight or reps of a completed set requires confirm true; ' \
                     "changing a completed set's exercise is refused. #{ONE_DUMBBELL}"
         scope :write
         input_schema(
           type: 'object',
           properties: { set_id: { type: 'integer' }, weight: { type: 'number' },
-                        reps: { type: 'integer' }, rpe: { type: 'integer' },
+                        reps: { type: 'integer' }, rpe: RATING_OR_NULL,
+                        planned_rpe: RATING_OR_NULL,
                         is_warmup: { type: 'boolean' }, exercise: { type: 'string' },
                         is_per_side: { type: 'boolean' }, is_commanded: { type: 'boolean' },
                         duration_seconds: { type: 'integer' }, relabel: { type: 'boolean' },
@@ -163,6 +171,17 @@ class Tectonic < Roda
           # change a set's measure -- there is no `measure` in its schema, and a plank stays a
           # plank through every correction it accepts. #311.
           Bounds.commands_fit!(fields[:is_commanded], measure: set.measure)
+          target_fits!(set, fields)
+        end
+
+        # A target sits where sets_planned_rpe_only_on_working_reps lets it: a working set
+        # counted in reps. Refused by name here rather than as a check violation. #722.
+        def self.target_fits!(set, fields)
+          return if fields.fetch(:planned_rpe, set.planned_rpe).nil?
+          return unless fields.fetch(:is_warmup, set.is_warmup) || set.timed?
+
+          raise Tool::Refusal, 'A target RPE applies only to a working set counted in reps. ' \
+                               'Leave planned_rpe out, or clear is_warmup first.'
         end
 
         # The columns as they will be stored: range-checked, and a weight of zero read as
@@ -182,7 +201,7 @@ class Tectonic < Roda
           # confirm: it says how the set was performed rather than overwriting what was
           # measured, and remembering after the session that the top single was commanded is
           # the ordinary way round. #311.
-          fields = arguments.slice(:weight, :reps, :rpe, :is_warmup, :is_per_side, :is_commanded,
+          fields = arguments.slice(:weight, :reps, :rpe, :planned_rpe, :is_warmup, :is_per_side, :is_commanded,
                                    :duration_seconds, :bench_angle_degrees, :rack_hole, :safety_hole)
           check(fields)
           fields[:weight] = Load.stored(fields[:weight]) if fields.key?(:weight)
@@ -193,6 +212,7 @@ class Tectonic < Roda
           Bounds.check(Bounds::WEIGHT, fields[:weight], 'Weight', unit: ' lb')
           Bounds.check(Bounds::REPS, fields[:reps], 'Reps')
           Bounds.check(Bounds::RPE, fields[:rpe], 'RPE')
+          Bounds.check(Bounds::RPE, fields[:planned_rpe], 'Target RPE')
           Bounds.check(Bounds::SECONDS, fields[:duration_seconds], 'Duration', unit: ' seconds')
           Bounds.setup_fits!(fields)
         end
