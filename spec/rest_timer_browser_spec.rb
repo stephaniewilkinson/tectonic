@@ -225,6 +225,33 @@ describe 'the rest timer under a thumb' do
   end
 end
 
+# #718. Closing the bar used to be final for that rest; the clock kept counting underneath
+# with no way to see it again short of finishing another set.
+describe 'a rest timer brought back' do
+  include CapybaraBehaviour
+  include BrowserSpec
+  include RestingBrowser
+
+  before { session_with_a_set }
+
+  it 'is not offered before there is a rest to go back to' do
+    refute has_css?('#rest-timer-reopen', visible: true)
+  end
+
+  it 'comes back with the same bell and a clock that kept counting' do
+    start_a_rest_of '2:00'
+    standing = seconds_in(clock_text)
+    find('[data-rest-dismiss]').click
+    sleep 1.2
+    find('#rest-timer-reopen').click
+
+    assert has_css?('#rest-timer', visible: true)
+    refute has_css?('#rest-timer-reopen', visible: true)
+    assert_equal 120, seconds_in(bell_text)
+    assert_operator seconds_in(clock_text), :>, standing
+  end
+end
+
 describe 'a bell wound back and forth past the clock' do
   include CapybaraBehaviour
   include BrowserSpec

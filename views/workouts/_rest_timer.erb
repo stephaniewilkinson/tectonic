@@ -213,6 +213,17 @@
       is being read, and emptied again on the next arm so it cannot be re-read stale. %>
   <p data-rest-announce aria-live="polite" class="sr-only"></p>
 </div>
+<%# The way back to a closed bar. #718. Closing it used to be final for that rest: the clock
+    was still counting underneath, and the only way to see it again was to finish another
+    set. A lifter who closes it to read the next lift and then wants to know how long they
+    have been sitting there is the ordinary case, not an edge. Small and in the corner the
+    bar sat in, so it does not become a second bar; shown only while there is a rest to
+    reopen, and gone the moment the bar is back. %>
+<button type="button" id="rest-timer-reopen" hidden aria-label="Show rest timer"
+        class="fixed right-4 z-30 <%= rest_timer_offset %> mb-2 min-h-11 rounded-full border border-gray-300
+               bg-white px-4 text-sm font-medium text-sky-900 shadow-sm hover:bg-sky-50">
+  Rest timer
+</button>
 
 <%# The clock itself.
 
@@ -291,6 +302,7 @@
     var labels = bar.querySelectorAll('[data-rest-label]');
     var announce = bar.querySelector('[data-rest-announce]');
     var body = document.getElementById('session-page');
+    var reopen = document.getElementById('rest-timer-reopen');
 
     // How long the ring lasts. #396 asks for ten seconds, and ten seconds is the right ask:
     // the old pair of notes was over in a third of a second, which is nothing at all across a
@@ -385,7 +397,20 @@
       // there is one -- a class rather than markup so a scriptless page keeps its own
       // padding exactly as it was.
       if (body) { body.classList.toggle('pb-40', mode !== 'none'); }
+      // Offered only once a rest has begun on this page, and only while the bar is away.
+      if (reopen) { reopen.hidden = mode !== 'none' || !startedAt; }
     }
+
+    // Back to whichever of the two counting states it was closed in, with the clock where it
+    // would have been: startedAt never stopped. A bell that came due while the bar was closed
+    // is not rung late -- that would be the screen going off in somebody's hand for a rest
+    // they had already decided to stop watching -- it reads as the overshoot instead. #718.
+    function resume() {
+      if (bell !== null && (Date.now() - startedAt) / 1000 >= bell) { rang = true; }
+      show(bell === null ? 'counting' : 'running');
+      tick();
+    }
+    if (reopen) { reopen.addEventListener('click', resume); }
 
     // One reading of the clock, in one direction, whether or not a bell is set. #514.
     //
