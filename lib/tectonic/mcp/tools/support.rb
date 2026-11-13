@@ -566,9 +566,12 @@ class Tectonic < Roda
             .merge(lifted(set)).merge(performed(set)).merge(prescribed(set)).merge(provenance(set))
         end
 
-        # What was in the set: the load, the count, and how hard it turned out to be.
+        # What was in the set: the load, the count, and how hard it turned out to be. The
+        # count is reps or seconds, and `measure` says which; without the seconds a timed set
+        # read back through any tool as a set with no count at all.
         def lifted(set)
-          { weight: weight(set.weight), reps: set.reps, rpe: set.rpe }
+          { weight: weight(set.weight), reps: set.reps, duration_seconds: set.duration_seconds,
+            measure: set.measure, rpe: set.rpe }
         end
 
         # How the set was done, as against what was in it. Split out when is_commanded made
@@ -619,15 +622,23 @@ class Tectonic < Roda
         # whether the 40 is per side too -- and on a pair of dumbbells it half is, the stored
         # weight being one dumbbell's. Confirming a write in a phrase that can be read 2x out
         # is the mismatch this method exists to prevent.
+        #
+        # A timed set has seconds where the reps would be, and says "30s" as the session
+        # screen's `quantity_label` does. Without that every timed set was confirmed as
+        # "Logged  reps of Cat-Cow" -- an empty count, the nil reps interpolated straight.
         def load_phrase(set)
-          return "#{set.reps} reps#{per_side(set)}#{commanded(set)}" unless Load.carried?(set.weight)
+          return "#{counted(set)}#{per_side(set)}#{commanded(set)}" unless Load.carried?(set.weight)
 
           "#{weight(set.weight)}x#{counted(set)}#{per_side(set)}#{commanded(set)}"
         end
 
-        # The count as it reads with a qualifier behind it. #502.
+        # The count as it reads with a qualifier behind it (#502), or the seconds of a timed
+        # set. Unloaded work names its unit either way, as it did before.
         def counted(set)
-          set.is_per_side ? "#{set.reps} reps" : set.reps.to_s
+          return "#{set.duration_seconds}s" if set.duration_seconds
+          return "#{set.reps} reps" if set.is_per_side || !Load.carried?(set.weight)
+
+          set.reps.to_s
         end
 
         # The words get_workout's quantity_label already uses, so one session cannot be
