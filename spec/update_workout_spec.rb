@@ -54,6 +54,17 @@ describe 'moving a session onto the day it was trained' do
     assert_includes tool_result.dig('content', 0, 'text'), 'date'
     assert tool_result.dig('structuredContent', 'changed', 'date')
   end
+
+  # It said `date 2026-11-13 00:00:00 +0000 to #<Date: 2026-11-14 ((2461359j,0s,0n),...)>`:
+  # the stored Time and the parsed Date, each inspected raw. A day reads as the day.
+  it 'names both days as days' do
+    text = tool_result.dig('content', 0, 'text')
+
+    assert_includes text, %(date "#{yesterday.iso8601}" to "#{Date.today.iso8601}")
+    refute_includes text, '#<Date'
+    assert_equal({ 'from' => yesterday.iso8601, 'to' => Date.today.iso8601 },
+                 tool_result.dig('structuredContent', 'changed', 'date'))
+  end
 end
 
 # Send only what changes, which is update_set's rule. A name and a note go through the same

@@ -265,7 +265,7 @@ class Tectonic < Roda
 
         def apply(row, attributes)
           moved = attributes.reject { |field, value| row[field] == value }
-          record = moved.to_h { |field, value| [field, { from: plain(row[field]), to: value }] }
+          record = moved.to_h { |field, value| [field, { from: plain(row[field], field), to: plain(value, field) }] }
           row.update(moved) unless moved.empty?
           record
         end
@@ -274,8 +274,19 @@ class Tectonic < Roda
         # to an assistant as a string rather than as the weight it moved from. The
         # comparison above is left alone: BigDecimal(155) == 155 already, so a field set to
         # the value it held is still not a change.
-        def plain(value)
-          value.is_a?(BigDecimal) ? Plates.numeric(value) : value
+        #
+        # Dates likewise, on both sides of the move: a workout moved a day read as
+        # `date 2026-11-13 00:00:00 +0000 to #<Date: 2026-11-14 ((2461359j,0s,0n),+0s,2299161j)>`,
+        # the stored Time and the parsed Date each inspected raw. A workout's `date` is a day
+        # whatever column type holds it, so it is written as one; any other Time keeps its
+        # time of day.
+        def plain(value, field = nil)
+          case value
+          when BigDecimal then Plates.numeric(value)
+          when Time then field == :date ? value.to_date.iso8601 : value.iso8601
+          when Date then value.iso8601
+          else value
+          end
         end
 
         def describe(record)
